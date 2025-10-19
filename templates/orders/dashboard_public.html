@@ -1,0 +1,75 @@
+{% load i18n %}
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Tableau de bord FAGNI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",sans-serif;margin:0;background:#f7f7f9;color:#111}
+    .wrap{max-width:960px;margin:24px auto;padding:0 16px}
+    .bar{display:flex;gap:12px;margin-bottom:16px}
+    .chip{background:#e6eefc;border:1px solid #c8d9f8;padding:6px 10px;border-radius:99px;font-size:12px;display:inline-block}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:18px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+    .kpi .label{color:#6b7280;font-size:12px}
+    .kpi .value{font-size:28px;font-weight:700;margin-top:4px}
+    table{width:100%;border-collapse:collapse;margin-top:16px}
+    th,td{padding:10px 12px;border-bottom:1px solid #eee;font-size:14px;text-align:left}
+    th{font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="bar">
+      <span class="chip">Tableau de bord public</span>
+      <a class="chip" href="/admin/">Accéder à l'admin</a>
+    </div>
+
+    <h1 style="margin:0 0 12px 0;">Tableau de bord FAGNI</h1>
+
+    <div class="grid">
+      <div class="card kpi">
+        <div class="label">Chiffre d'affaires (30 j)</div>
+        <div class="value">{{ revenue_30d }} FCFA</div>
+      </div>
+      <div class="card kpi">
+        <div class="label">Commandes (30 j)</div>
+        <div class="value">{{ orders_30d }}</div>
+      </div>
+      <div class="card kpi">
+        <div class="label">Meilleur client (30 j)</div>
+        <div class="value">{{ top_client_name }} — {{ top_client_spent }} FCFA</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h2 style="margin:0 0 8px 0;font-size:18px;">Dernières commandes</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Client</th>
+            <th>Montant TTC</th>
+            <th>Statut</th>
+            <th>Créée le</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for o in last_orders %}
+          <tr>
+            <td>{{ o.code }}</td>
+            <td>{{ o.client }}</td>
+            <td>{{ o.total_ttc }}</td>
+            <td>{{ o.status }}</td>
+            <td>{{ o.created_at }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5">Aucune commande.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>Tableau de bord FAGNI</h1>
+<div class="module">
+  <h2>Chiffre d'affaires (30 j)</h2>
+  <p style="font-size:1.6rem">{{ chiffre_affaires_30 }} FCFA</p>
+</div>
+<p><a class="button" href="{% url 'dashboard:export_top_clients_csv' %}" download>Exporter en CSV</a></p>
+{% endblock %}

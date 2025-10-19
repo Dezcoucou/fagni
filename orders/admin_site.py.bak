@@ -1,0 +1,44 @@
+from django.urls import path
+from django.http import HttpResponse
+from .admin_dashboard import DashboardAdminSite
+from .models import Order
+import csv
+
+class FagniAdminSite(DashboardAdminSite):
+    """AdminSite FAGNI avec route d'export CSV + dashboard."""
+    def get_urls(self):
+        urls = super().get_urls()
+        my = [
+            path(
+                "export-csv/",
+                self.admin_view(self.export_csv),
+                name="export_csv",
+            ),
+        ]
+        return my + urls
+
+    def export_csv(self, request):
+        """Export des commandes en CSV."""
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="orders.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow(["Code", "Client", "Service", "Total TTC", "Statut", "Créée le"])
+
+        qs = (
+            Order.objects.select_related("customer", "service_type")
+            .order_by("-created_at")[:5000]
+        )
+        for o in qs:
+            writer.writerow([
+                o.code,
+                getattr(o.customer, "username", ""),
+                getattr(getattr(o, "service_type", None), "name", ""),
+                o.total_ttc,
+                o.status,
+                o.created_at.strftime("%Y-%m-%d %H:%M") if o.created_at else "",
+            ])
+        return response
+
+# instance globale importée par urls.py
+fagni_admin_site = FagniAdminSite(name="fagni_admin")

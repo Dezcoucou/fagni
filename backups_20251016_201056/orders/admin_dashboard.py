@@ -1,0 +1,47 @@
+from django.contrib.admin.views.decorators import staff_member_required
+from django.db.models import Sum, Value, DecimalField
+from django.db.models.functions import Coalesce
+from django.shortcuts import render
+from .models import Order
+
+DF = DecimalField(max_digits=12, decimal_places=2)
+
+@staff_member_required
+def dashboard_view(request):
+    ca = Order.objects.aggregate(
+        total=Coalesce(
+            Sum('total_ttc', output_field=DF),
+            Value(0, output_field=DF),
+            output_field=DF
+        )
+    )['total']
+
+    orders_count = Order.objects.count()
+
+    best = (Order.objects
+            .values('customer__username', 'customer__first_name', 'customer__last_name')
+            .annotate(total=Coalesce(
+                Sum('total_ttc', output_field=DF),
+                Value(0, output_field=DF),
+                output_field=DF
+            ))
+            .order_by('-total')
+            .first())
+
+    if best and best['total'] > 0:
+        name = (best.get('customer__username')
+                or f"{best.get('customer__first_name') or ''} {best.get('customer__last_name') or ''}".strip()
+                or "-")
+        best_customer = {'name': name, 'total': best['total']}
+    else:
+        best_customer = {'name': '-', 'total': 0}
+
+    latest_orders = Order.objects.order_by('-created_at')[:10]
+
+    ctx = {
+        'ca_30d': ca,
+        'orders_count_30d': orders_count,
+        'best_customer': best_customer,
+        'latest_orders': latest_orders,
+    }
+    return render(request, 'orders/dashboard.html', ctx)

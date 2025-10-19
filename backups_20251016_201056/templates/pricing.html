@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Nos Tarifs</h2>
+<p>Voici nos formules de blanchisserie :</p>
+<table border="1" cellpadding="8">
+  <tr><th>Type de service</th><th>Prix</th></tr>
+  <tr><td>Lavage & séchage</td><td>3 000 F / sac</td></tr>
+  <tr><td>Repassage seul</td><td>2 000 F / 10 pièces</td></tr>
+  <tr><td>Service Express 24h</td><td>+2 000 F</td></tr>
+</table>
+<p><a href="{% url 'order' %}" class="cta">Commander maintenant</a></p>
+<p><a href="{% url 'order' %}" class="cta">Commander maintenant</a></p>
+{% endblock %}

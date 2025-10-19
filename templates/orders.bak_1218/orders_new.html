@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width: 720px; margin: 24px auto;">
+  <div class="card-body">
+    <h1 style="margin-bottom: 16px;">Nouvelle commande</h1>
+
+    <form method="post" id="order-form">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label">Client</label>
+        {{ form.client }}
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Téléphone</label>
+        {{ form.phone }}
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Article</label>
+        {{ form.item }}
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Quantité</label>
+          {{ form.quantity }}
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Prix unitaire</label>
+          {{ form.unit_price }}
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Statut</label>
+        {{ form.status }}
+      </div>
+
+      <div class="alert alert-info" id="total-box" style="display:flex;justify-content:space-between;align-items:center;">
+        <strong>Total estimé</strong>
+        <span id="total-value">0.00</span> FCFA
+      </div>
+
+      <button class="btn btn-primary" type="submit">Enregistrer</button>
+      <a class="btn btn-outline-secondary" href="{% url 'orders:orders_list' %}">Retour à la liste</a>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  function num(v){ return parseFloat((v||'').toString().replace(',', '.')) || 0; }
+  const qty = document.getElementById("id_quantity");
+  const pu  = document.getElementById("id_unit_price");
+  const out = document.getElementById("total-value");
+  function update(){
+    const total = num(qty.value) * num(pu.value);
+    out.textContent = total.toFixed(2);
+  }
+  if(qty) qty.addEventListener("input", update);
+  if(pu)  pu.addEventListener("input", update);
+  update();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Merci pour votre commande" %}{% endblock %}
+
+{% block content %}
+<section class="container mt-24 text-center">
+  <h1 class="page-title">{% trans "Merci pour votre confiance !" %}</h1>
+  <p class="subtitle">{% trans "Votre commande a bien été enregistrée." %}</p>
+
+  <div class="order-info card">
+    <p><strong>{% trans "Code de suivi :" %}</strong> <span class="code">{{ code_suivi }}</span></p>
+    <p>{% trans "Conservez ce code pour suivre l’avancement de votre commande." %}</p>
+  </div>
+
+  <div class="mt-24">
+    <a href="{% url 'suivi_code' code_suivi=code_suivi %}" class="btn-primary">{% trans "Suivre ma commande" %}</a>
+    <a href="{% url 'accueil' %}" class="btn-secondary">{% trans "Retour à l’accueil" %}</a>
+  </div>
+</section>
+{% endblock %}

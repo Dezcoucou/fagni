@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Tableau de bord — FAGNI{% endblock %}
+
+{% block content %}
+<section class="dashboard">
+  <h1>Tableau de bord</h1>
+  <p>Bienvenue sur votre espace de gestion FAGNI.</p>
+
+  <div class="stats">
+    <div class="card">
+      <h3>Total commandes</h3>
+      <p>{{ stats.total_commandes }}</p>
+    </div>
+    <div class="card">
+      <h3>Revenu total (FCFA)</h3>
+      <p>{{ stats.revenu_total }}</p>
+    </div>
+    <div class="card">
+      <h3>Clients actifs</h3>
+      <p>{{ stats.clients_actifs }}</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

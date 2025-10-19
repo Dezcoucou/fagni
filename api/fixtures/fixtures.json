@@ -1,0 +1,96 @@
+[
+  {
+    "model": "api.servicetype",
+    "pk": 1,
+    "fields": {
+      "name": "Blanchisserie",
+      "slug": "blanchisserie",
+      "is_active": true,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "api.zone",
+    "pk": 1,
+    "fields": {
+      "name": "Abidjan",
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "api.partner",
+    "pk": 1,
+    "fields": {
+      "name": "Pressing Cocody",
+      "contact": "070000001",
+      "zone": 1,
+      "service_type": 1,
+      "is_active": true,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "api.article",
+    "pk": 1,
+    "fields": {
+      "name": "Chemise",
+      "price": "1000.00",
+      "service_type": 1,
+      "is_active": true,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "api.article",
+    "pk": 2,
+    "fields": {
+      "name": "Pantalon",
+      "price": "2000.00",
+      "service_type": 1,
+      "is_active": true,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "api.commande",
+    "pk": 1,
+    "fields": {
+      "partner": 1,
+      "customer_name": "Client Démo",
+      "customer_phone": "070000099",
+      "address": "Cocody Riviera",
+      "total": "0.00",
+      "created_at": "2025-01-02T10:00:00Z",
+      "updated_at": "2025-01-02T10:00:00Z"
+    }
+  },
+  {
+    "model": "api.lignecommande",
+    "pk": 1,
+    "fields": {
+      "commande": 1,
+      "article": 1,
+      "quantite": 2,
+      "prix": "2000.00",
+      "created_at": "2025-01-02T10:01:00Z",
+      "updated_at": "2025-01-02T10:01:00Z"
+    }
+  },
+  {
+    "model": "api.lignecommande",
+    "pk": 2,
+    "fields": {
+      "commande": 1,
+      "article": 2,
+      "quantite": 1,
+      "prix": "2000.00",
+      "created_at": "2025-01-02T10:02:00Z",
+      "updated_at": "2025-01-02T10:02:00Z"
+    }
+  }
+]

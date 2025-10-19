@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Suivi de commande{% endblock %}
+{% block content %}
+<h2>Suivi de votre commande</h2>
+
+<form method="post" class="form" style="margin-bottom:1rem">
+  {% csrf_token %}
+  <p>
+    <label for="{{ form.code.id_for_label }}">Entrez votre code de suivi :</label><br>
+    {{ form.code }}
+    {{ form.code.errors }}
+  </p>
+  <button type="submit" class="btn">Rechercher</button>
+</form>
+
+{% if messages %}
+  <ul class="messages">
+    {% for message in messages %}
+      <li>{{ message }}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+{% if order %}
+  <hr>
+  <h3>Détails de la commande</h3>
+  <p><strong>Code :</strong> {{ order.tracking_code }}</p>
+
+  {# Libellé humain : si tu as défini STATUS_CHOICES, get_status_display renvoie un libellé propre #}
+  {% with statut_label=order.get_status_display %}
+    <p>
+      <strong>Statut :</strong>
+      <span class="status-badge status-{{ order.status }}">
+        {{ statut_label|default:order.status|capfirst }}
+      </span>
+    </p>
+  {% endwith %}
+
+  {# Texte explicatif selon statut #}
+  <div class="status-explain">
+    {% if order.status == 'nouvelle' %}
+      Votre commande a été enregistrée. Nous préparons la collecte.
+    {% elif order.status == 'collecte' %}
+      Notre livreur est en route pour la collecte ou l’a déjà effectuée.
+    {% elif order.status == 'traitement' %}
+      Vos articles sont en cours de traitement chez notre partenaire.
+    {% elif order.status == 'livraison' %}
+      Votre commande est en cours de livraison vers votre adresse.
+    {% elif order.status == 'terminee' %}
+      Commande terminée. Merci pour votre confiance !
+    {% elif order.status == 'annulee' %}
+      Cette commande a été annulée.
+    {% else %}
+      Statut en cours de mise à jour.
+    {% endif %}
+  </div>
+
+  <p><strong>Service :</strong> {{ order.get_service_display }}</p>
+  <p><strong>Quantité :</strong> {{ order.quantity }}</p>
+  <p><strong>Adresse :</strong> {{ order.pickup_address }}</p>
+  <p><strong>Date :</strong> {{ order.created_at|date:"d/m/Y H:i" }}</p>
+
+  {% if order.status != 'annulee' %}
+    <div class="timeline">
+      <div class="step {% if order.status in 'nouvelle collecte traitement livraison terminee' %}active{% endif %}">
+        <span>1</span><p>Nouvelle</p>
+      </div>
+      <div class="step {% if order.status in 'collecte traitement livraison terminee' %}active{% endif %}">
+        <span>2</span><p>Collecte</p>
+      </div>
+      <div class="step {% if order.status in 'traitement livraison terminee' %}active{% endif %}">
+        <span>3</span><p>Traitement</p>
+      </div>
+      <div class="step {% if order.status in 'livraison terminee' %}active{% endif %}">
+        <span>4</span><p>Livraison</p>
+      </div>
+      <div class="step {% if order.status == 'terminee' %}active{% endif %}">
+        <span>5</span><p>Terminée</p>
+      </div>
+    </div>
+  {% else %}
+    <div class="alert-cancel">❌ Cette commande a été annulée.</div>
+  {% endif %}
+{% endif %}
+
+<style>
+/* Badge de statut (couleurs par statut) */
+.status-badge {
+  display:inline-block; padding:4px 10px; border-radius:999px; font-size:.85rem; font-weight:600;
+  border:1px solid transparent;
+}
+.status-nouvelle  { background:#eef6ff; color:#084298; border-color:#b6d4fe; }
+.status-collecte  { background:#fff7e6; color:#995700; border-color:#ffe0a6; }
+.status-traitement{ background:#f0f9ff; color:#0b7285; border-color:#a6e3f8; }
+.status-livraison { background:#f0fdf4; color:#166534; border-color:#bbf7d0; }
+.status-terminee  { background:#ecfdf5; color:#065f46; border-color:#a7f3d0; }
+.status-annulee   { background:#fee2e2; color:#991b1b; border-color:#fecaca; }
+
+.status-explain { margin:8px 0 12px 0; color:#444; }
+
+/* Timeline */
+.timeline { display:flex; justify-content:space-between; align-items:center; margin-top: 1.5rem; position:relative; }
+.timeline::before { content:""; position:absolute; top:50%; left:10%; right:10%; height:4px; background:#ddd; z-index:0; }
+.step { text-align:center; position:relative; z-index:1; }
+.step span { display:inline-block; background:#ccc; color:#fff; border-radius:50%; width:35px; height:35px; line-height:35px; font-weight:700; transition:background-color .3s; }
+.step.active span { background:#28a745; }
+.step p { margin-top:.5rem; font-size:.9rem; }
+
+/* Bandeau annulation */
+.alert-cancel { margin-top:1rem; padding:12px 14px; background:#ffe6e6; color:#a80000; border:1px solid #ffb3b3; border-radius:8px; font-weight:600; }
+</style>
+{% endblock %}

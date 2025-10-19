@@ -1,0 +1,13 @@
+from django.urls import path
+from . import views
+
+app_name = 'orders'
+
+urlpatterns = [
+    path('export_top_clients_csv/', views.export_top_clients_csv, name='export_top_clients_csv'),
+    path('', views.orders_list, name='list'),
+    path('create/', views.create, name='create'),
+    path('<int:order_id>/', views.detail, name='detail'),
+    path('<int:order_id>/update/', views.update, name='update'),
+    path('<int:order_id>/delete/', views.delete, name='delete'),
+]

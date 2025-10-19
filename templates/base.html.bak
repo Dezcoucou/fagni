@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Plateforme FAGNI</title>
+  <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
+</head>
+<body>
+  <header>
+    <h1>Plateforme FAGNI</h1>
+    <nav>
+      <a href="{% url 'home' %}">Accueil</a> |
+      <a href="{% url 'services' %}">Nos Services</a> |
+      <a href="{% url 'pricing' %}">Tarifs</a> |
+      <a href="{% url 'about' %}">À propos</a> |
+      <a href="{% url 'contact' %}">Contact</a>
+      <a class="btn" href="{% url 'manage_photos' %}">Gérer les photos</a>
+    </nav>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+  <footer>© 2025 FAGNI — Tous droits réservés</footer>
+</body>
+</html>

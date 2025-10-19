@@ -1,0 +1,7 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+{% block nav-global %}
+  {{ block.super }}
+  <a id="csv-link-global" href="{% url 'dashboard:export_top_clients_csv' %}" class="button">Exporter en CSV</a>
+  <span style="margin-left:10px; font-size:11px; opacity:.7;">CSV READY</span>
+{% endblock %}

@@ -1,0 +1,132 @@
+from django.contrib import admin
+from django.utils.html import format_html
+from django.urls import path
+from django.db.models import Sum, Count
+from django.utils import timezone
+from .models import Order, OrderItem
+
+class DashboardAdminSite(admin.AdminSite):
+    site_header = "Administration FAGNI"
+    site_title = "FAGNI • Tableau de bord"
+    index_title = "Résumé des activités"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('', self.admin_view(self.dashboard_view), name='index'),
+        ]
+        return custom_urls + urls
+
+    def dashboard_view(self, request):
+        today = timezone.now().date()
+
+        total_orders = Order.objects.count()
+        today_orders = Order.objects.filter(created_at__date=today).count()
+        total_revenue = Order.objects.aggregate(total=Sum('total_ttc'))['total'] or 0
+        total_items = OrderItem.objects.aggregate(total=Count('id'))['total'] or 0
+
+        # client le plus fidèle
+        top_customer = (
+            Order.objects.values('customer__username')
+            .annotate(nb=Count('id'))
+            .order_by('-nb')
+            .first()
+        )
+        top_customer_name = top_customer['customer__username'] if top_customer else "Aucun client"
+
+        html = f"""
+        <div style='font-family:Arial;margin:20px;'>
+            <h1 style='color:#004d80;'>📊 Tableau de bord FAGNI</h1>
+            <p style='font-size:16px;'>Bienvenue dans le centre de gestion des activités.</p>
+            <div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:15px;'>
+                <div style='background:#fafafa;border-radius:10px;padding:15px;box-shadow:0 2px 4px rgba(0,0,0,.1);'>
+                    <h3>Commandes totales</h3>
+                    <p style='font-size:22px;font-weight:bold;'>{total_orders}</p>
+                </div>
+                <div style='background:#fafafa;border-radius:10px;padding:15px;box-shadow:0 2px 4px rgba(0,0,0,.1);'>
+                    <h3>Commandes du jour</h3>
+                    <p style='font-size:22px;font-weight:bold;color:#0066cc;'>{today_orders}</p>
+                </div>
+                <div style='background:#fafafa;border-radius:10px;padding:15px;box-shadow:0 2px 4px rgba(0,0,0,.1);'>
+                    <h3>Total prestations</h3>
+                    <p style='font-size:22px;font-weight:bold;'>{total_items}</p>
+                </div>
+                <div style='background:#fafafa;border-radius:10px;padding:15px;box-shadow:0 2px 4px rgba(0,0,0,.1);'>
+                    <h3>Chiffre d'affaires total</h3>
+                    <p style='font-size:22px;font-weight:bold;color:#00aa00;'>{int(total_revenue):,} FCFA</p>
+                </div>
+                <div style='background:#fafafa;border-radius:10px;padding:15px;box-shadow:0 2px 4px rgba(0,0,0,.1);'>
+                    <h3>Client le plus fidèle</h3>
+                    <p style='font-size:20px;font-weight:bold;color:#555;'>{top_customer_name}</p>
+                </div>
+            </div>
+        </div>
+        """
+        from django.http import HttpResponse
+        return HttpResponse(format_html(html))
+
+    # --- Graphique d'évolution du chiffre d'affaires sur 7 jours ---
+    import json
+    from django.db.models import Sum
+    from django.utils import timezone
+    from datetime import timedelta
+
+    today = timezone.now().date()
+    labels = []
+    totals = []
+
+    for i in range(6, -1, -1):
+        day = today - timedelta(days=i)
+        day_total = Order.objects.filter(
+            created_at__date=day
+        ).aggregate(total=Sum("total_ttc"))["total"] or 0
+        labels.append(day.strftime("%d/%m"))
+        totals.append(float(day_total))
+
+    chart_data = {
+        "labels": labels,
+        "totals": totals,
+    }
+
+    html += f"""
+    <div style='margin-top:40px;padding:20px;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.05);'>
+        <h3 style='font-size:20px;margin-bottom:10px;color:#444;'>Évolution du chiffre d’affaires (7 derniers jours)</h3>
+        <canvas id='caChart' height='120'></canvas>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+            const ctx = document.getElementById('caChart').getContext('2d');
+            new Chart(ctx, {{
+                type: 'line',
+                data: {{
+                    labels: {json.dumps(chart_data["labels"])},
+                    datasets: [{{
+                        label: 'CA (FCFA)',
+                        data: {json.dumps(chart_data["totals"])},
+                        fill: true,
+                        borderColor: '#2b7a78',
+                        backgroundColor: 'rgba(43,122,120,0.2)',
+                        tension: 0.3,
+                        borderWidth: 2,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#2b7a78',
+                    }}]
+                }},
+                options: {{
+                    plugins: {{
+                        legend: {{ display: false }}
+                    }},
+                    scales: {{
+                        y: {{
+                            beginAtZero: true,
+                            ticks: {{
+                                callback: function(value) {{
+                                    return value.toLocaleString() + ' FCFA';
+                                }}
+                            }}
+                        }}
+                    }}
+                }}
+            }});
+        </script>
+    </div>
+    """

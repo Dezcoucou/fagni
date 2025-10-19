@@ -1,0 +1,74 @@
+/* === Style global FAGNI === */
+body {
+    font-family: "Poppins", sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f7fb;
+    color: #333;
+}
+
+/* === En-tête === */
+header {
+    background-color: #0066cc;
+    color: white;
+    padding: 1.2rem 0;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+}
+
+header h1 {
+    margin: 0;
+    font-size: 1.8rem;
+    letter-spacing: 1px;
+}
+
+/* === Barre de navigation === */
+.navbar {
+    background-color: #005bb5;
+    margin-top: 0.8rem;
+}
+
+.navbar ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.navbar li {
+    margin: 0.5rem 1rem;
+}
+
+.navbar a {
+    color: white;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 1rem;
+    transition: color 0.3s ease;
+}
+
+.navbar a:hover {
+    color: #ffdd00;
+}
+
+/* === Contenu principal === */
+main {
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 2rem;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+/* === Pied de page === */
+footer {
+    text-align: center;
+    padding: 1rem;
+    background: #003d80;
+    color: #ddd;
+    font-size: 0.9rem;
+    margin-top: 2rem;
+}

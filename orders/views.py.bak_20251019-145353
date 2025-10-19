@@ -1,0 +1,96 @@
+from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponse
+from django.db.models import F, Sum, Value, DecimalField
+from django.db.models.functions import Coalesce, Cast
+
+from .models import Order
+
+DEC = DecimalField(max_digits=12, decimal_places=2)
+
+
+def _annotate_totals(qs):
+    items_sum = Coalesce(
+        Sum(Cast(F("items_quantity"), DEC) * Cast(F("items_unit_price"), DEC)),
+        Value(0, output_field=DEC),
+    )
+    return (
+        qs.select_related("customer")
+          .annotate(items_total=items_sum)
+          .annotate(total_display=Coalesce(F("total"), F("items_total")))
+    )
+
+
+def orders_list(request):
+    orders = _annotate_totals(Order.objects.all()).order_by("-id")[:200]
+    return render(request, "orders/orders_list.html", {"orders": orders})
+def orders_by_customer(request, customer_id):
+    orders = _annotate_totals(
+        Order.objects.filter(customer_id=customer_id)
+    ).order_by("-id")[:200]
+    return render(
+        request,
+        "orders/orders_by_customer.html",
+        {"orders": orders, "customer_id": customer_id},
+    )
+
+
+def create(request):
+    return HttpResponse("create - placeholder", content_type="text/plain; charset=utf-8")
+
+
+def edit(request):
+    return HttpResponse("edit - placeholder", content_type="text/plain; charset=utf-8")
+
+
+def delete(request):
+    return HttpResponse("delete - placeholder", content_type="text/plain; charset=utf-8")
+
+
+def update(request):
+    return HttpResponse("update - placeholder", content_type="text/plain; charset=utf-8")
+
+
+def detail(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
+    return render(request, "orders/order_detail.html", {"order": order})
+
+
+def export_top_clients_csv(request):
+    """
+    CSV: Client,Nb Commandes,Montant Total (Top 100).
+    Montant = total si présent, sinon somme(items.quantity*items.unit_price).
+    """
+    from django.http import HttpResponse
+    from django.db.models import F, Sum, Count, DecimalField, ExpressionWrapper
+    from django.db.models.functions import Coalesce
+    from .models import Order
+
+    DEC = DecimalField(max_digits=12, decimal_places=2)
+
+    # total calculé sur la relation items
+    items_total = Sum(
+        ExpressionWrapper(F("items__quantity") * F("items__unit_price"), output_field=DEC),
+        output_field=DEC
+    )
+
+    qs = (
+        Order.objects
+        .select_related("customer")
+        .values("customer__name")
+        .annotate(
+            nb_cmd=Count("id", distinct=True),                    # éviter les doublons dus au JOIN sur items
+            montant_total=Coalesce(F("total"), items_total, output_field=DEC),
+        )
+        .order_by("-montant_total")[:100]
+    )
+
+    resp = HttpResponse(content_type="text/csv; charset=utf-8")
+    resp["Content-Disposition"] = 'attachment; filename="top_clients.csv"'
+    resp.write("Client,Nb Commandes,Montant Total\n")
+    for row in qs:
+        name = (row.get("customer__name") or "").replace('"', "").replace("\n", " ").replace("\r", " ")
+        nb = int(row.get("nb_cmd") or 0)
+        total = row.get("montant_total") or 0
+        resp.write(f"{name},{nb},{total}\n")
+    return resp
+

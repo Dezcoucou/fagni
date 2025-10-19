@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nouvelle commande</title>
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;margin:0;background:#f6f8fb}
+.wrap{max-width:860px;margin:24px auto;background:#fff;padding:20px;border-radius:12px}
+.row{display:grid;grid-template-columns:1.6fr .9fr .9fr 1.6fr 1fr .9fr .9fr;gap:8px;align-items:center}
+.head{font-weight:700;background:#f0f2f6;border-radius:8px;padding:8px}
+.btn{padding:8px 12px;border:1px solid #ddd;background:#fafafa;border-radius:8px;cursor:pointer}
+.add{margin-top:12px}
+.total{font-size:20px;font-weight:700}
+.hidden{display:none}
+.err{color:#b00020;margin-bottom:10px}
+img.preview{max-width:80px;border-radius:6px}
+@media(max-width:760px){
+  .row{grid-template-columns:1fr 1fr;grid-auto-rows:auto}
+  .head{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Nouvelle commande</h1>
+{% if error %}<div class="err">{{ error }}</div>{% endif %}
+<form method="post" enctype="multipart/form-data" id="form">
+  {% csrf_token %}
+  <div class="row head">
+    <div>Prestation</div><div>Quantité</div><div>Poids (kg)</div><div>Note</div><div>Photo</div><div>Total ligne</div><div>Actions</div>
+  </div>
+  <div id="lines"></div>
+  <button type="button" class="btn add" id="add">Ajouter une ligne</button>
+  <p>Total estimé: <span class="total" id="total">0 FCFA</span></p>
+  <button type="submit" class="btn">Valider</button>
+</form>
+</div>
+
+<template id="tpl">
+  <div class="row line">
+    <div>
+      <select name="item[]" class="item"></select>
+    </div>
+    <div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button type="button" class="btn minus">−</button>
+        <input type="number" name="quantity[]" class="qty" min="1" value="1">
+        <button type="button" class="btn plus">+</button>
+      </div>
+    </div>
+    <div>
+      <input type="number" step="0.01" min="0" name="weight_kg_est[]" class="wkg hidden">
+    </div>
+    <div>
+      <input type="text" name="note[]" class="note" placeholder="Détails">
+    </div>
+    <div>
+      <input type="file" name="photo[]" class="photo" accept="image/*">
+      <div class="ph"></div>
+    </div>
+    <div><span class="lineTotal">0 FCFA</span></div>
+    <div>
+      <button type="button" class="btn del">Supprimer</button>
+    </div>
+  </div>
+</template>
+
+<script>
+const items={{ items_data|safe }};
+const lines=document.getElementById('lines');
+const totalEl=document.getElementById('total');
+document.getElementById('add').onclick=()=>addLine();
+
+function fmtMoney(n){
+  n=Math.round(n);
+  return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g," ")+" FCFA";
+}
+function calcLine(l){
+  const sel=l.querySelector('.item');
+  const qty=l.querySelector('.qty');
+  const wkg=l.querySelector('.wkg');
+  const span=l.querySelector('.lineTotal');
+  const it=items.find(x=>x.id===parseInt(sel.value||0));
+  if(!it){span.textContent='0 FCFA';return 0;}
+  const price=parseFloat(it.base_price_per_kg||0);
+  let subtotal=0;
+  if(it.unit==='KG'){subtotal=price*parseFloat(wkg.value||0);}
+  else{subtotal=price*parseFloat(qty.value||0);}
+  span.textContent=fmtMoney(subtotal);
+  return subtotal;
+}
+function calcAll(){
+  let tot=0;
+  document.querySelectorAll('.line').forEach(l=>{tot+=calcLine(l)});
+  totalEl.textContent=fmtMoney(tot);
+}
+function onSelChange(l){
+  const sel=l.querySelector('.item');
+  const wkg=l.querySelector('.wkg');
+  const it=items.find(x=>x.id===parseInt(sel.value||0));
+  if(it&&it.unit==='KG'){wkg.classList.remove('hidden');}
+  else{wkg.classList.add('hidden');wkg.value='';}
+  calcAll();
+}
+function bind(l){
+  l.querySelector('.plus').onclick=()=>{l.querySelector('.qty').stepUp();calcAll()};
+  l.querySelector('.minus').onclick=()=>{l.querySelector('.qty').stepDown();calcAll()};
+  l.querySelector('.qty').oninput=calcAll;
+  l.querySelector('.wkg').oninput=calcAll;
+  l.querySelector('.item').onchange=()=>onSelChange(l);
+  l.querySelector('.del').onclick=()=>{l.remove();calcAll()};
+  l.querySelector('.photo').onchange=(e)=>{
+    const f=e.target.files[0];
+    const ph=l.querySelector('.ph');
+    ph.innerHTML='';
+    if(f){
+      const img=document.createElement('img');
+      img.className='preview';
+      img.src=URL.createObjectURL(f);
+      ph.appendChild(img);
+    }
+  }
+}
+function addLine(){
+  const t=document.getElementById('tpl');
+  const l=t.content.firstElementChild.cloneNode(true);
+  const sel=l.querySelector('.item');
+  sel.innerHTML='<option value="">Sélectionner</option>'+items.map(i=>
+    `<option value="${i.id}">${i.name} — ${i.unit} — ${parseFloat(i.base_price_per_kg)} FCFA</option>`
+  ).join('');
+  lines.appendChild(l);
+  bind(l);
+  calcAll();
+}
+addLine();
+</script>
+</body>
+</html>

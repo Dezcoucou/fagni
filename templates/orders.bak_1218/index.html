@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Commandes</h1>
+<p>
+  <a href="{% url 'export_orders_csv' %}">Exporter CSV</a> |
+  <a href="{% url 'export_orders_xlsx' %}">Exporter XLSX</a>
+</p>
+<table border="1" cellpadding="6">
+  <tr>
+    <th>ID</th>
+    <th>Client</th>
+    <th>Montant</th>
+    <th>Date</th>
+  </tr>
+  {% for order in orders %}
+  <tr>
+    <td>{{ order.id }}</td>
+    {% if order.customer %}
+      <td><a href="{% url 'orders_by_customer' order.customer_id %}">{{ order.customer.name }}</a></td>
+    {% else %}
+      <td>-</td>
+    {% endif %}
+    <td>{{ order.total|floatformat:0 }}</td>
+    <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="4">Aucune commande enregistrée.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

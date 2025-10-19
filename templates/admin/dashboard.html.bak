@@ -1,0 +1,111 @@
+{% load humanize l10n %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Tableau de bord FAGNI</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+    .wrap{max-width:1100px;margin:20px auto;padding:0 10px;}
+    .row{display:flex;gap:12px;flex-wrap:wrap;margin:10px 0;}
+    .card{background:#f5f7fa;border-radius:10px;padding:14px;flex:1;min-width:220px;}
+    .title{font-size:14px;color:#516175;margin:0 0 6px;}
+    .big{font-size:30px;font-weight:700;}
+    .bar{display:flex;gap:10px;margin:12px 0;}
+    .btn{background:#375a7f;color:#fff;border:none;border-radius:8px;padding:10px 14px;cursor:pointer;text-decoration:none;display:inline-block}
+    table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden}
+    th,td{padding:10px;border-bottom:1px solid #e7edf3;text-align:left;font-size:14px}
+    th{background:#e7edf3;color:#334}
+    .actions a{margin-right:8px}
+    .muted{color:#66788a}
+    .select{padding:8px;border-radius:8px;border:1px solid #c8d3e0;background:#fff}
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <h2>Tableau de bord FAGNI</h2>
+
+  <!-- Filtres + actions -->
+  <div class="bar">
+    <form method="get">
+      <select class="select" name="period">
+        <option value="7" {% if request.GET.period|default:'7' == '7' %}selected{% endif %}>7 jours</option>
+        <option value="30" {% if request.GET.period == '30' %}selected{% endif %}>30 jours</option>
+        <option value="90" {% if request.GET.period == '90' %}selected{% endif %}>90 jours</option>
+        <option value="365" {% if request.GET.period == '365' %}selected{% endif %}>12 mois</option>
+        <option value="all" {% if request.GET.period == 'all' %}selected{% endif %}>Tout</option>
+      </select>
+      <select class="select" name="service">
+        <option value="">Tous</option>
+        {% for s in services %}
+        <option value="{{ s.id }}" {% if request.GET.service == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn" type="submit">Filtrer</button>
+    </form>
+
+    <a class="btn" href="{% url 'fagni_admin:export_csv' %}">Exporter en CSV</a>
+    <a class="btn" href="{% url 'fagni_admin:orders_order_add' %}">+ Nouvelle commande</a>
+  </div>
+
+  <!-- KPIs -->
+  <div class="row">
+    <div class="card">
+      <p class="title">Chiffre d'affaires (TTC)</p>
+      <div class="big">{{ ca_total|floatformat:0|intcomma }} FCFA</div>
+    </div>
+    <div class="card">
+      <p class="title">Commandes</p>
+      <div class="big">{{ orders_count }}</div>
+    </div>
+    <div class="card">
+      <p class="title">Meilleur client</p>
+      <div class="big">{{ top_customer_name }}</div>
+      <div class="muted">{{ top_customer_total|floatformat:0|intcomma }} FCFA</div>
+    </div>
+  </div>
+
+  <!-- Placeholder du graphe -->
+  <div class="card" style="margin:10px 0">
+    <p class="title">Évolution du CA</p>
+    <div class="muted">Le graphe sera ajouté ici.</div>
+  </div>
+
+  <!-- Dernières commandes -->
+  <h3>Dernières commandes</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Client</th>
+        <th>Service</th>
+        <th>Montant TTC</th>
+        <th>Statut</th>
+        <th>Créée le</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in last_orders %}
+      <tr>
+        <td><a href="{% url 'fagni_admin:orders_order_change' o.id %}">{{ o.code }}</a></td>
+        <td>{{ o.customer }}</td>
+        <td>{{ o.service_type|default:"-" }}</td>
+        <td>{{ o.total_ttc|floatformat:0|intcomma }} FCFA</td>
+        <td>{{ o.status }}</td>
+        <td>{{ o.created_at|date:'d/m/Y H:i' }}</td>
+        <td class="actions">
+          <a href="{% url 'fagni_admin:orders_order_change' o.id %}">Voir/Modifier</a>
+          <a href="{% url 'fagni_admin:orders_order_delete' o.id %}">Supprimer</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" class="muted">Aucune commande.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+</div>
+</body>
+</html>

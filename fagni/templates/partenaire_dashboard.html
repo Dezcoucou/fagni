@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load static i18n %}
+
+{% block title %}{% trans "Espace partenaire" %} · FAGNI{% endblock %}
+
+{% block content %}
+<section class="pro-wrap">
+
+  {% if not partner_unlocked %}
+  <!-- Écran PIN -->
+  <div class="card pro-pin">
+    <h1 class="pro-title">FAGNI – {% trans "Partenaire" %}</h1>
+    <p class="muted">{% trans "Entrez votre code PIN à 4 chiffres" %}</p>
+
+    <form method="post" action="{% url 'partenaire_pin_accept' %}">
+      {% csrf_token %}
+      <div class="pro-pin-grid">
+        <input name="pin1" maxlength="1" inputmode="numeric" autofocus>
+        <input name="pin2" maxlength="1" inputmode="numeric">
+        <input name="pin3" maxlength="1" inputmode="numeric">
+        <input name="pin4" maxlength="1" inputmode="numeric">
+      </div>
+      <button class="btn btn-primary" type="submit">{% trans "Continuer" %}</button>
+    </form>
+
+    <p class="muted" style="margin-top:8px">{% trans "Astuce : utilisez un code simple défini avec l’équipe FAGNI." %}</p>
+  </div>
+  {% else %}
+
+  <!-- Tableau de bord -->
+  <div id="pro-dashboard">
+    <div class="flex-space">
+      <h2 class="section-title">{% trans "Mon activité" %}</h2>
+      <a href="{% url 'partenaire_logout' %}" class="btn btn-ghost">{% trans "Déconnexion" %}</a>
+    </div>
+
+    <div class="cards-2 pro-grid">
+      <a class="card pro-card pro-blue" href="{% url 'partenaire_commandes_liste' 'nouvelles' %}">
+        <div class="pro-ico">📥</div>
+        <div class="pro-txt">{% trans "Nouvelles commandes" %}</div>
+      </a>
+
+      <a class="card pro-card pro-orange" href="{% url 'partenaire_commandes_liste' 'en-cours' %}">
+        <div class="pro-ico">⚙️</div>
+        <div class="pro-txt">{% trans "En cours" %}</div>
+      </a>
+
+      <a class="card pro-card pro-green" href="{% url 'partenaire_commandes_liste' 'pretes' %}">
+        <div class="pro-ico">✅</div>
+        <div class="pro-txt">{% trans "Prêtes à livrer" %}</div>
+      </a>
+
+      <a class="card pro-card pro-purple" href="{% url 'partenaire_commandes_liste' 'livrees' %}">
+        <div class="pro-ico">📦</div>
+        <div class="pro-txt">{% trans "Livrées" %}</div>
+      </a>
+    </div>
+
+    <div class="card resultat mt-24">
+      <p class="muted">
+        {% trans "Touchez un bouton pour voir la liste correspondante. Vous pouvez ensuite mettre à jour le statut d’une commande en un clic." %}
+      </p>
+    </div>
+  </div>
+
+  {% endif %}
+</section>
+{% endblock %}

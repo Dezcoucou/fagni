@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Commande enregistrée" %}{% endblock %}
+{% block content %}
+  <div class="card">
+    <h1>{% trans "Merci !" %}</h1>
+    <p>{% trans "Votre commande a bien été enregistrée." %}</p>
+    <p><strong>{% trans "Code de suivi" %} :</strong> {{ commande.code_suivi }}</p>
+    <p><a class="btn" href="{% url 'suivi' %}">{% trans "Suivre ma commande" %}</a></p>
+  </div>
+{% endblock %}

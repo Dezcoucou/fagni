@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width: 900px; margin: 24px auto;">
+  <div class="card-body">
+    <h1 style="margin-bottom: 16px;">Nouvelle commande</h1>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <div style="display:grid; gap:12px;">
+        {{ form.non_field_errors }}
+        {% for field in form %}
+          <div>
+            <label style="display:block; font-weight:600; margin-bottom:4px;">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+              <div style="color:#b91c1c; font-size: 14px;">{{ field.errors|join:", " }}</div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+      <div style="margin-top:16px;">
+        <button class="btn btn-primary" type="submit">Enregistrer</button>
+        <a class="btn" href="{% url 'orders:orders_list' %}" style="margin-left:8px;">Retour à la liste</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

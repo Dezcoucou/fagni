@@ -1,0 +1,65 @@
+from datetime import timedelta
+from django.db.models import Sum, DecimalField
+from django.db.models.functions import Coalesce, TruncDate
+from django.utils import timezone
+from django.http import HttpResponse
+from django.shortcuts import render
+import json
+from .models import Order
+
+def _period_range(period: str):
+    now = timezone.now()
+    if period == "today":
+        return now.replace(hour=0, minute=0, second=0, microsecond=0), now
+    if period == "7d":
+        return now - timedelta(days=7), now
+    if period == "30d":
+        return now - timedelta(days=30), now
+    return None, now
+
+def dashboard_admin_view(request):
+    period = request.GET.get("period") or "30d"
+    start, end = _period_range(period)
+    qs = Order.objects.all()
+    if start:
+        qs = qs.filter(created_at__gte=start, created_at__lte=end)
+
+    total_ca = qs.aggregate(
+        total=Coalesce(Sum("total_ttc", output_field=DecimalField(max_digits=12, decimal_places=2)), 0)
+    )["total"]
+    orders_count = qs.count()
+
+    best = (
+        qs.values("customer__username", "customer__name")
+        .annotate(total=Coalesce(Sum("total_ttc", output_field=DecimalField(max_digits=12, decimal_places=2)), 0))
+        .order_by("-total")
+        .first()
+    )
+    if best:
+        best_name = best.get("customer__username") or best.get("customer__name") or "—"
+        best_total = best.get("total") or 0
+        best_customer = {"name": best_name, "total": best_total}
+    else:
+        best_customer = {"name": "—", "total": 0}
+
+    now = timezone.now()
+    last30_start = now - timedelta(days=30)
+    series = (
+        Order.objects.filter(created_at__gte=last30_start, created_at__lte=now)
+        .annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(total=Coalesce(Sum("total_ttc", output_field=DecimalField(max_digits=12, decimal_places=2)), 0))
+        .order_by("day")
+    )
+    labels = [d["day"].strftime("%d/%m") for d in series]
+    values = [float(d["total"]) for d in series]
+
+    context = {
+        "period": period,
+        "total_ca": total_ca,
+        "orders_count": orders_count,
+        "best_customer": best_customer,
+        "chart_labels_json": json.dumps(labels, ensure_ascii=False),
+        "chart_values_json": json.dumps(values),
+    }
+    return render(request, "admin/dashboard.html", context)

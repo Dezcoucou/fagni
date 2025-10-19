@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<h1 class="h3 mb-3">Top Clients (6 derniers mois)</h1>
+
+<div class="row">
+  <div class="col-md-6 mb-4">
+    <h5>Montant cumulé (FCFA)</h5>
+    <div style="height:360px"><canvas id="chartTopTotal"></canvas></div>
+  </div>
+  <div class="col-md-6 mb-4">
+    <h5>Nombre de commandes</h5>
+    <div style="height:360px"><canvas id="chartTopCount"></canvas></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const labels = {{ labels_json|safe }};
+  const dataTotal = {{ data_total_json|safe }};
+  const dataCount = {{ data_count_json|safe }};
+
+  new Chart(document.getElementById('chartTopTotal'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: "Montant (FCFA)", data: dataTotal }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
+  });
+
+  new Chart(document.getElementById('chartTopCount'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: "Commandes", data: dataCount }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,134 @@
+from django.shortcuts import render, get_object_or_404
+from django.db.models import F, Sum, Value, DecimalField, Count
+from django.db.models.functions import Coalesce, Cast
+from .models import Order
+
+DEC = DecimalField(max_digits=12, decimal_places=2)
+
+def _annotate_totals(qs):
+    items_sum = Coalesce(
+        Sum(Cast(F("items__quantity"), DEC) * Cast(F("items__unit_price"), DEC), output_field=DEC),
+        Value(0, output_field=DEC)
+    )
+    return (
+        qs.select_related("customer")
+          .annotate(items_total=items_sum)
+          .annotate(total_display=Coalesce(F("total"), F("items_total")))
+    )
+
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+
+def orders_list(request):
+    # queryset ordonné + annotations existantes si utiles
+    qs = Order.objects.all().order_by("-id")
+
+    # pagination robuste
+    page = request.GET.get("page", 1)
+    paginator = Paginator(qs, 20)  # 20 items / page
+    try:
+        page_obj = paginator.page(page)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+
+    return render(request, "orders/orders_list.html", {
+        "orders": page_obj.object_list,
+        "page_obj": page_obj,
+    })
+
+
+
+
+
+
+def orders_by_customer(request, customer_id):
+    orders = _annotate_totals(Order.objects.filter(customer_id=customer_id)).order_by("-id")
+    return render(request, "orders/orders_by_customer.html", {"orders": orders, "customer_id": customer_id})
+
+from django.http import HttpResponse
+import csv
+from django.core.paginator import Paginator
+
+
+def create(request):
+    from django.http import HttpResponse
+import csv
+    return HttpResponse('create - placeholder', content_type='text/plain; charset=utf-8')
+
+
+
+def edit(request):
+    from django.http import HttpResponse
+import csv
+    return HttpResponse('edit - placeholder', content_type='text/plain; charset=utf-8')
+
+
+
+def delete(request):
+    from django.http import HttpResponse
+import csv
+    return HttpResponse('delete - placeholder', content_type='text/plain; charset=utf-8')
+
+
+
+def update(request):
+    from django.http import HttpResponse
+import csv
+    return HttpResponse('update - placeholder', content_type='text/plain; charset=utf-8')
+
+
+
+def detail(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
+    return render(request, "orders/order_detail.html", {"order": order})
+
+def export_top_clients_csv(request):
+    """
+    Export CSV optimisé des 10 meilleurs clients (robuste et sécurisé).
+    """
+    import csv
+    from django.db.models import Sum, Count
+    from django.http import HttpResponse
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="top_clients.csv"'
+    writer = csv.writer(response)
+
+    try:
+        # ✅ Vérifie que le modèle Order existe
+        from .models import Order
+
+        # Si le modèle a un champ customer, on fait une agrégation
+        has_customer = hasattr(Order, "customer")
+
+        if has_customer:
+            # Agrégation: total et nombre de commandes par client
+            qs = (
+                Order.objects.values('customer__name')
+                .annotate(
+                    total_orders=Count('id'),
+                    amount=Sum('total')
+                )
+                .order_by('-amount')[:10]
+            )
+            writer.writerow(['Client', 'Nb Commandes', 'Montant Total'])
+            for r in qs:
+                writer.writerow([
+                    r.get('customer__name', 'Inconnu'),
+                    r.get('total_orders', 0),
+                    r.get('amount', 0)
+                ])
+        else:
+            # Fallback: export simple des 10 premières commandes
+            qs = Order.objects.all().order_by('-id')[:10]
+            writer.writerow(['Order ID', 'Total'])
+            for o in qs:
+                writer.writerow([o.id, getattr(o, 'total', 0)])
+
+    except Exception as e:
+        # Sécurité : pas de plantage visible, juste log minimal
+        writer.writerow(["Erreur", str(e)])
+
+    return response
+

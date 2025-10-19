@@ -1,0 +1,77 @@
+{% load static i18n %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Devenir partenaire - FAGNI</title>
+  <link rel="stylesheet" href="{% static 'style.css' %}">
+</head>
+<body>
+<header class="header">
+  <img src="{% static 'img/fagni_logo_q4_transparent.png' %}" alt="Logo FAGNI" class="logo">
+  <nav class="nav">
+    <a href="{% url 'accueil' %}">Accueil</a>
+    <a href="{% url 'commander' %}">Commander</a>
+    <a href="{% url 'suivi' %}">Suivi</a>
+    <a href="{% url 'contact' %}">Contact</a>
+    <a href="{% url 'partenaire' %}" class="active">Partenaire</a>
+  </nav>
+</header>
+
+<main class="container">
+  <h1>Rejoignez le réseau des partenaires FAGNI</h1>
+  <p>
+    FAGNI connecte les professionnels de la <b>blanchisserie</b>, de la <b>retouche couture</b> et de la
+    <b>cordonnerie</b> à des milliers de clients. Gagnez en visibilité et recevez des commandes régulières.
+  </p>
+
+  <h2>Formulaire de demande d’adhésion</h2>
+
+  <form method="post" novalidate class="form">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="errors">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="field">
+      <label for="{{ form.nom.id_for_label }}">{{ form.fields.nom.label }} :</label><br>
+      {{ form.nom }}
+      {% for e in form.nom.errors %}<div class="error">{{ e }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label for="{{ form.type_activite.id_for_label }}">{{ form.fields.type_activite.label }} :</label><br>
+      {{ form.type_activite }}
+      {% for e in form.type_activite.errors %}<div class="error">{{ e }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label for="{{ form.telephone.id_for_label }}">{{ form.fields.telephone.label }} :</label><br>
+      {{ form.telephone }}
+      {% for e in form.telephone.errors %}<div class="error">{{ e }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label for="{{ form.ville.id_for_label }}">{{ form.fields.ville.label }} :</label><br>
+      {{ form.ville }}
+      {% for e in form.ville.errors %}<div class="error">{{ e }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label for="{{ form.email.id_for_label }}">{{ form.fields.email.label }} :</label><br>
+      {{ form.email }}
+      {% for e in form.email.errors %}<div class="error">{{ e }}</div>{% endfor %}
+    </div>
+
+    <button type="submit" class="btn">Envoyer ma demande</button>
+  </form>
+
+  <p style="margin-top:2rem"><a href="{% url 'accueil' %}">← Retour à l’accueil</a></p>
+</main>
+
+<footer>
+  <p>© 2025 FAGNI — Tous droits réservés</p>
+</footer>
+</body>
+</html>

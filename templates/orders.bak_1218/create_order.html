@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nouvelle commande</title>
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;margin:0;background:#f6f8fb}
+.wrap{max-width:720px;margin:24px auto;background:#fff;padding:20px;border-radius:12px}
+.row{display:flex;gap:12px;align-items:center}
+.btn{padding:8px 12px;border:1px solid #ddd;background:#fafafa;border-radius:8px;cursor:pointer}
+input[type=number]{width:100px}
+.total{font-size:20px;font-weight:700}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Nouvelle commande</h1>
+<form method="post" enctype="multipart/form-data" id="form">
+  {% csrf_token %}
+  <div>
+    <label for="id_item">Prestation</label>
+    {{ form.item }}
+  </div>
+  <div class="row">
+    <label for="id_quantity">Quantité</label>
+    <button type="button" class="btn" id="minus">−</button>
+    {{ form.quantity }}
+    <button type="button" class="btn" id="plus">+</button>
+  </div>
+  <div id="kgbox" class="row hidden">
+    <label for="id_weight_kg_est">Poids (kg)</label>
+    {{ form.weight_kg_est }}
+  </div>
+  <div>
+    <label for="id_note">Note</label>
+    {{ form.note }}
+  </div>
+  <div>
+    <label for="id_photo">Photo</label>
+    {{ form.photo }}
+  </div>
+  <p>Total estimé: <span class="total" id="total">0</span> FCFA</p>
+  <button type="submit" class="btn">Valider</button>
+</form>
+</div>
+<script>
+const items={{ items_data|safe }};
+const sel=document.getElementById('id_item');
+const qty=document.getElementById('id_quantity');
+const wkg=document.getElementById('id_weight_kg_est');
+const total=document.getElementById('total');
+const kgbox=document.getElementById('kgbox');
+document.getElementById('plus').onclick=()=>{qty.stepUp();calc();};
+document.getElementById('minus').onclick=()=>{qty.stepDown();calc();};
+function cur(){const id=parseInt(sel.value||0);return items.find(x=>x.id===id)||null;}
+function showKg(){const c=cur();kgbox.classList.toggle('hidden',!(c&&c.unit==='KG'));}
+function calc(){
+  const c=cur(); if(!c){total.textContent='0';return;}
+  const q=parseFloat(qty.value||0);
+  const p=parseFloat(c.price||0);
+  if(c.unit==='KG'){const kg=parseFloat(wkg.value||0); total.textContent=(p*kg).toFixed(0); }
+  else{ total.textContent=(p*q).toFixed(0); }
+}
+sel.onchange=()=>{showKg();calc();};
+qty.oninput=calc;
+wkg.oninput=calc;
+showKg();calc();
+</script>
+</body>
+</html>

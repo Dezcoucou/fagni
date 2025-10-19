@@ -1,0 +1,166 @@
+from decimal import Decimal, ROUND_HALF_UP
+from django.db import models
+
+class Customer(models.Model):
+    name = models.CharField("Nom", max_length=120)
+    phone = models.CharField("Téléphone", max_length=30, blank=True)
+    email = models.EmailField("Email", blank=True)
+    address = models.CharField("Adresse", max_length=255, blank=True)
+
+    class Meta:
+        verbose_name = "Client"
+        verbose_name_plural = "Clients"
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.phone})" if self.phone else self.name
+
+
+class Order(models.Model):
+
+    total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    STATUS_CHOICES = [
+        ("pending", "En attente"),
+        ("in_progress", "En cours"),
+        ("done", "Terminée"),
+        ("canceled", "Annulée"),
+    ]
+
+    code = models.CharField("Code", max_length=20, unique=True, blank=True)
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="orders", verbose_name="Client")
+    status = models.CharField("Statut", max_length=20, choices=STATUS_CHOICES, default="pending")
+    created_at = models.DateTimeField("Créée le", auto_now_add=True)
+    updated_at = models.DateTimeField("Mise à jour le", auto_now=True)
+
+    class Meta:
+        verbose_name = "Commande"
+        verbose_name_plural = "Commandes"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.code or 'SANS-CODE'} - {self.customer}"
+
+    @property
+    def total_ht(self):
+        total = sum((li.line_total for li in self.items.all()), Decimal("0.00"))
+        return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def tva_amount(self):
+        # TVA désactivée par défaut (0%). Adapte à 0.18 pour 18% si besoin.
+        tva_rate = Decimal("0.00")
+        return (self.total_ht * tva_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def total_ttc(self):
+        return (self.total_ht + self.tva_amount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def amount_paid(self):
+        paid = sum((p.amount for p in self.payments.filter(status="paid")), Decimal("0.00"))
+        return paid.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def amount_due(self):
+        return (self.total_ttc - self.amount_paid).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+    def save(self, *args, **kwargs):
+        # Sauvegarde d'abord pour obtenir une PK
+        super().save(*args, **kwargs)
+        try:
+            from django.db.models import Sum
+            total = self.items.aggregate(s=Sum('total'))['s'] or 0
+        except Exception:
+            total = getattr(self, 'total', 0) or 0
+        # Mise à jour sans rappeler save() (évite boucle)
+        type(self).objects.filter(pk=self.pk).update(total=total)
+
+Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def amount_due(self):
+        return (self.total_ttc - self.amount_paid).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+class OrderItem(models.Model):
+    total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items", verbose_name="Commande")
+    designation = models.CharField("Désignation", max_length=120)  # ex: Chemise, Pantalon…
+    quantity = models.PositiveIntegerField("Quantité", default=1)
+    unit_price = models.DecimalField("Prix unitaire (FCFA)", max_digits=10, decimal_places=2)
+
+    class Meta:
+        verbose_name = "Ligne de commande"
+        verbose_name_plural = "Lignes de commande"
+
+    def __str__(self):
+        return f"{self.designation} x{self.quantity}"
+
+    @property
+    def line_total(self):
+        total = (self.unit_price or Decimal("0.00")) * Decimal(self.quantity or 0)
+        return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+class Delivery(models.Model):
+    STATUS_CHOICES = [
+        ("scheduled", "Planifiée"),
+        ("out_for_delivery", "En livraison"),
+        ("delivered", "Livrée"),
+        ("canceled", "Annulée"),
+    ]
+    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name="delivery", verbose_name="Commande")
+    address = models.CharField("Adresse de livraison", max_length=255, blank=True)
+    scheduled_at = models.DateTimeField("Date/heure prévue", blank=True, null=True)
+    status = models.CharField("Statut livraison", max_length=20, choices=STATUS_CHOICES, default="scheduled")
+    notes = models.TextField("Notes", blank=True)
+
+    class Meta:
+        verbose_name = "Livraison"
+        verbose_name_plural = "Livraisons"
+
+    def __str__(self):
+        return f"Livraison {self.order.code or self.order.id} - {self.get_status_display()}"
+
+
+class Payment(models.Model):
+    METHOD_CHOICES = [
+        ("cash", "Espèces"),
+        ("mobile_money", "Mobile Money"),
+        ("card", "Carte bancaire"),
+        ("other", "Autre"),
+    ]
+    STATUS_CHOICES = [
+        ("pending", "En attente"),
+        ("paid", "Payé"),
+        ("failed", "Échoué"),
+        ("refunded", "Remboursé"),
+    ]
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="payments", verbose_name="Commande")
+    method = models.CharField("Moyen de paiement", max_length=20, choices=METHOD_CHOICES, default="cash")
+    amount = models.DecimalField("Montant (FCFA)", max_digits=10, decimal_places=2)
+    status = models.CharField("Statut paiement", max_length=20, choices=STATUS_CHOICES, default="paid")
+    created_at = models.DateTimeField("Créé le", auto_now_add=True)
+    notes = models.CharField("Notes", max_length=255, blank=True)
+
+    class Meta:
+        verbose_name = "Paiement"
+        verbose_name_plural = "Paiements"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.get_method_display()} {self.amount} FCFA - {self.get_status_display()}"
+
+# --- Génération de code simple au moment du save (CMD-0001, etc.) ---
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
+
+@receiver(pre_save, sender=Order)
+def set_order_code(sender, instance: Order, **kwargs):
+    if not instance.code:
+        # ATTENTION: simple incrément « best effort » ; suffisant pour ce projet
+        last = Order.objects.order_by("-id").first()
+        next_num = (last.id + 1) if last else 1
+        instance.code = f"CMD-{next_num:04d}"

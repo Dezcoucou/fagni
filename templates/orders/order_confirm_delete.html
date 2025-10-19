@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block content %}
+<div class="card">
+  <h1>Supprimer la commande {{ order.code }} ?</h1>
+  <form method="post">{% csrf_token %}
+    <button class="btn btn-primary" type="submit">Confirmer</button>
+    <a class="btn" href="{% url 'orders:detail' order.id %}">Annuler</a>
+  </form>
+</div>
+{% endblock %}

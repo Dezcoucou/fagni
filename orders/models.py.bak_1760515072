@@ -1,0 +1,132 @@
+from django.db import models
+from django.contrib.auth import get_user_model
+from decimal import Decimal
+
+User = get_user_model()
+
+
+class ServiceCategory(models.Model):
+    name = models.CharField("Nom de la catégorie", max_length=120, unique=True)
+
+    class Meta:
+        verbose_name = "Catégorie de prestation"
+        verbose_name_plural = "Catégories de prestation"
+        ordering = ["name"]
+        indexes = [models.Index(fields=["name"])]
+
+    def __str__(self):
+        return self.name
+
+
+class LaundryItem(models.Model):
+    UNIT_CHOICES = [
+        ("ARTICLE", "Par article"),
+        ("PAIRE", "Par paire"),
+        ("METRE", "Au mètre"),
+        ("KG", "Au kilo"),
+    ]
+
+    category = models.ForeignKey(
+        ServiceCategory,
+        verbose_name="Catégorie",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="services",
+    )
+    name = models.CharField("Nom de la prestation", max_length=120)
+    base_price_per_kg = models.DecimalField("Prix HT", max_digits=8, decimal_places=2, default=0)
+    unit = models.CharField("Unité", max_length=10, choices=UNIT_CHOICES, default="ARTICLE")
+    active = models.BooleanField("Actif", default=True)
+
+    class Meta:
+        verbose_name = "Prestation"
+        verbose_name_plural = "Prestations"
+        ordering = ["name"]
+        indexes = [models.Index(fields=["name"]), models.Index(fields=["active"])]
+
+    def __str__(self):
+        return self.name
+
+
+class Order(models.Model):
+    STATUS_CHOICES = [
+        ("NEW", "Nouvelle commande"),
+        ("IN_PROGRESS", "En cours"),
+        ("DONE", "Terminée"),
+        ("CANCELLED", "Annulée"),
+    ]
+
+    customer = models.ForeignKey(
+        User, on_delete=models.PROTECT, related_name="orders", verbose_name="Client"
+    )
+    code = models.CharField("Code", max_length=50)
+    status = models.CharField("Statut", max_length=20, choices=STATUS_CHOICES, default="NEW")
+    service_type = models.CharField("Type de service", max_length=50, null=True, blank=True)
+
+    total_ht = models.DecimalField("Total HT", max_digits=10, decimal_places=2, default=0)
+    tva = models.DecimalField("Taux TVA (%)", max_digits=5, decimal_places=2, default=0)
+    total_ttc = models.DecimalField("Total TTC", max_digits=10, decimal_places=2, default=0)
+    total_weight_kg = models.DecimalField("Poids total (kg)", max_digits=10, decimal_places=2, default=0)
+
+    class Meta:
+        ordering = ["-id"]
+
+    def __str__(self):
+        return f"{self.code} - {self.customer}"
+
+    def update_totals(self):
+        items = self.items.select_related("item").all()
+        total_ht = Decimal("0.00")
+        total_weight = Decimal("0.00")
+
+        for li in items:
+            total_ht += Decimal(str(li.line_total()))
+            total_weight += Decimal(str(li.weight_kg or 0))
+
+        self.total_ht = total_ht.quantize(Decimal("0.01"))
+
+        tva_rate = Decimal(str(self.tva or 0)) / Decimal("100")
+        tva_amount = (self.total_ht * tva_rate).quantize(Decimal("0.01"))
+        self.total_ttc = (self.total_ht + tva_amount).quantize(Decimal("0.01"))
+        self.total_weight_kg = total_weight.quantize(Decimal("0.01"))
+
+        self.save(update_fields=["total_ht", "total_ttc", "total_weight_kg"])
+
+
+class OrderItem(models.Model):
+    order = models.ForeignKey(
+        Order, verbose_name="Commande", on_delete=models.CASCADE, related_name="items"
+    )
+    item = models.ForeignKey(
+        LaundryItem, verbose_name="Prestation", on_delete=models.PROTECT
+    )
+    quantity = models.PositiveIntegerField("Quantité", default=1)
+    weight_kg = models.DecimalField("Poids estimé (kg)", max_digits=8, decimal_places=2, null=True, blank=True)
+    note = models.TextField("Note", null=True, blank=True)
+    photo = models.ImageField("Photo", upload_to="orders/%Y/%m/%d/", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Ligne de commande"
+        verbose_name_plural = "Lignes de commande"
+
+    def __str__(self):
+        return f"{self.item} x{self.quantity} ({self.order.code})"
+
+    def line_total(self) -> float:
+        # Prix unitaire : on réutilise base_price_per_kg pour toutes les unités
+        price = float(getattr(self.item, "base_price_per_kg", 0) or 0)
+        if self.item.unit == "KG":
+            kg = float(self.weight_kg or 0)
+            return price * kg
+        else:
+            qty = float(self.quantity or 0)
+            return price * qty
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.order.update_totals()
+
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
+        self.order.update_totals()

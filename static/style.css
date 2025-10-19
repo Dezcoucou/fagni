@@ -1,0 +1,36 @@
+header{background:#1f4ea3;padding:10px 0}
+header h1{color:#fff;margin:0;text-align:center}
+nav{margin-top:6px;text-align:center}
+nav a{color:#fff;text-decoration:none;margin:0 8px;font-weight:600}
+nav a:hover{text-decoration:underline}
+main{max-width:960px;margin:20px auto;padding:12px;background:#fff;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+footer{background:#0e2f6d;color:#fff;text-align:center;padding:10px 0;margin-top:40px}
+.cta{display:inline-block;background:#0ea5e9;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none}
+.cta:hover{filter:brightness(1.05)}
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{border:1px solid #e5e7eb;padding:8px}
+
+.home {
+  text-align: center;
+  padding: 100px 20px;
+}
+
+.home .brand {
+  color: #1f5fbf;
+  font-weight: bold;
+}
+
+.btn-primary {
+  background: #1f5fbf;
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  text-decoration: none;
+  display: inline-block;
+  margin-top: 20px;
+  transition: background 0.3s ease;
+}
+
+.btn-primary:hover {
+  background: #174a91;
+}

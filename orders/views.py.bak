@@ -1,0 +1,32 @@
+from django.shortcuts import render
+from django.db.models import F, Sum, Value, DecimalField
+from django.db.models.functions import Coalesce, Cast
+from .models import Order
+
+DEC = DecimalField(max_digits=12, decimal_places=2)
+
+def _annotate_totals(qs):
+    items_sum = Coalesce(
+        Sum(Cast(F("items__quantity"), DEC) * Cast(F("items__unit_price"), DEC), output_field=DEC),
+        Value(0, output_field=DEC)
+    )
+    return (
+        qs.select_related("customer")
+          .annotate(items_total=items_sum)
+          .annotate(total_display=Coalesce(F("total"), F("items_total")))
+    )
+
+def orders_list(request):
+    orders = _annotate_totals(Order.objects.all()).order_by("-id")[:200]
+    return render(request, "orders/orders_list.html", {"orders": orders})
+
+def orders_by_customer(request, customer_id):
+    orders = _annotate_totals(Order.objects.filter(customer_id=customer_id)).order_by("-id")
+    return render(request, "orders/orders_by_customer.html", {"orders": orders, "customer_id": customer_id})
+
+
+from django.shortcuts import render
+from django.http import HttpResponse
+
+def create(request):
+    return HttpResponse('Formulaire de création – placeholder', content_type='text/plain; charset=utf-8')

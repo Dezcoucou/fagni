@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h1>Commande {{ order.code }}</h1>
+
+  <p><b>Client :</b> {{ order.customer.name }} — {{ order.customer.phone }}</p>
+  <p><b>Statut :</b> {{ order.get_status_display }} — <b>Créée :</b> {{ order.created_at|date:"Y-m-d H:i" }}</p>
+
+  <h3>Articles</h3>
+  {% if items %}
+    <table>
+      <thead>
+        <tr>
+          <th>Désignation</th>
+          <th>Qté</th>
+          <th>PU</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+          <tr>
+            <td>{{ it.designation }}</td>
+            <td>{{ it.quantity }}</td>
+            <td>{{ it.unit_price }}</td>
+            <td>{{ it.line_total }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3" style="text-align:right;"><b>Total :</b></td>
+          <td><b>{{ order.total_ttc|floatformat:2 }} FCFA</b></td>
+        </tr>
+      </tfoot>
+    </table>
+  {% else %}
+    <p>Aucun article.</p>
+  {% endif %}
+
+  <p style="margin-top:1rem;">
+    <a class="btn" href="{% url 'orders:list' %}">← Retour à la liste</a>
+    <a class="btn" href="{% url 'orders:update' order.pk %}">Modifier</a>
+    <a class="btn" href="{% url 'orders:delete' order.pk %}">Supprimer</a>
+  </p>
+</div>
+{% endblock %}

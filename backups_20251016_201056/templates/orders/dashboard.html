@@ -1,0 +1,56 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans "Accueil" %}</a> › {% trans "Tableau de bord" %}
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>{% trans "Tableau de bord FAGNI" %}</h1>
+
+<div class="module" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
+  <div class="panel">
+    <h2>{% trans "Chiffre d'affaires (30 j)" %}</h2>
+    <p style="font-size:28px;margin:4px 0;">{{ revenue }} FCFA</p>
+  </div>
+  <div class="panel">
+    <h2>{% trans "Commandes (30 j)" %}</h2>
+    <p style="font-size:28px;margin:4px 0;">{{ orders_count }}</p>
+  </div>
+  <div class="panel">
+    <h2>{% trans "Meilleur client (30 j)" %}</h2>
+    <p style="margin:4px 0;font-weight:bold;">{{ best_customer.name }}</p>
+    <p>{{ best_customer.total }} FCFA</p>
+  </div>
+</div>
+
+<h2 style="margin-top:18px;">{% trans "Dernières commandes" %}</h2>
+<div class="module">
+  <table class="adminlist">
+    <thead>
+      <tr>
+        <th>{% trans "Code" %}</th>
+        <th>{% trans "Client" %}</th>
+        <th>{% trans "Montant TTC" %}</th>
+        <th>{% trans "Statut" %}</th>
+        <th>{% trans "Créée le" %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in recent_orders %}
+      <tr>
+        <td>{{ o.code }}</td>
+        <td>{{ o.customer }}</td>
+        <td>{{ o.total_ttc }}</td>
+        <td>{{ o.get_status_display }}</td>
+        <td>{{ o.created_at|date:"d/m/Y H:i" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" style="text-align:center;opacity:.7;">{% trans "Aucune commande." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

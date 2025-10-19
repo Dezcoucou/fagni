@@ -1,0 +1,55 @@
+:root{
+  --blue:#133a63;
+  --orange:#f07c22;
+  --text:#1e293b;
+  --muted:#64748b;
+  --bg:#f8fafc;
+  --card:#ffffff;
+  --radius:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,sans-serif;color:var(--text);background:#fff}
+
+.container{max-width:1100px;margin:0 auto;padding:0 16px}
+
+.site-header{position:sticky;top:0;background:#fff;border-bottom:1px solid #e5e7eb;z-index:10}
+.header-grid{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;padding:12px 0}
+.brand{display:inline-flex;align-items:center;gap:8px;text-decoration:none}
+.logo{height:44px;width:auto;display:block}
+.nav{display:flex;gap:18px;justify-content:center}
+.nav a{color:var(--text);text-decoration:none;font-weight:500}
+.nav a:hover{color:var(--orange)}
+
+.btn-primary{background:var(--orange);color:#fff;text-decoration:none;border:none;border-radius:999px;padding:10px 18px;font-weight:700;display:inline-block}
+.btn-ghost{border:1px solid #cbd5e1;border-radius:999px;padding:10px 16px;color:var(--text);text-decoration:none;background:#fff}
+.actions{display:flex;gap:12px;justify-content:flex-end;margin-top:12px}
+
+.hero{background:#2f628d;color:#fff;padding:48px 0;margin:16px 0;border-radius:var(--radius)}
+.hero .hero-text{max-width:700px}
+.hero h1{margin:0 0 8px 0;font-size:36px;line-height:1.1}
+.hero p{margin:0 0 16px 0;color:#e6eef6}
+
+.cards{margin:32px 0}
+.cards h2{margin:0 0 16px 0}
+.card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.card{background:var(--card);border:1px solid #e5e7eb;border-radius:var(--radius);padding:18px}
+.card h3{margin:0 0 6px 0}
+
+.form{background:var(--card);border:1px solid #e5e7eb;border-radius:var(--radius);padding:16px;max-width:780px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+label{display:flex;flex-direction:column;gap:6px;font-weight:600}
+input,select,textarea{padding:10px;border:1px solid #cbd5e1;border-radius:10px;font:inherit}
+textarea{resize:vertical}
+
+.notice{margin-top:16px;padding:12px;border-radius:10px;background:var(--bg);border:1px solid #e2e8f0}
+
+.site-footer{margin-top:40px;border-top:1px solid #e5e7eb;background:#fff}
+.site-footer p{margin:0;padding:16px 0;color:var(--muted);font-size:14px}
+
+@media (max-width:840px){
+  .header-grid{grid-template-columns:1fr auto}
+  .nav{display:none}
+  .card-grid{grid-template-columns:1fr}
+  .form-grid{grid-template-columns:1fr}
+  .hero h1{font-size:28px}
+}

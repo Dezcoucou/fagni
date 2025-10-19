@@ -1,0 +1,11 @@
+from django.contrib import admin
+from .models import Order
+from .admin_site import fagni_admin_site
+
+@admin.register(Order)
+class OrderAdmin(admin.ModelAdmin):
+    list_display = ("code", "customer", "total_ttc", "status", "created_at")
+    ordering = ("-created_at",)
+
+# Enregistrer ce modèle aussi sur le site admin personnalisé
+fagni_admin_site.register(Order, OrderAdmin)

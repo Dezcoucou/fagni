@@ -1,0 +1,34 @@
+<!doctype html><html><head><meta charset="utf-8"><title>FAGNI</title>
+<style>
+ body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:24px;background:#f7f7f8}
+ .container{max-width:980px;margin:0 auto}
+ .btn{display:inline-block;padding:8px 12px;border-radius:8px;border:1px solid #ccc;text-decoration:none}
+ .btn-primary{background:#0d6efd;color:#fff;border-color:#0d6efd}
+ table{width:100%;border-collapse:collapse} th,td{padding:8px;border-bottom:1px solid #e6e6e6;text-align:left}
+ .card{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);padding:16px}
+ .nav a{margin-right:12px}
+</style></head><body>
+<div class="container">
+  <div class="nav">
+    <a href="/" class="btn">Accueil</a>
+    <a href="/orders/" class="btn">Commandes</a>
+    <a href="/admin/" class="btn">Admin</a>
+  </div>
+  {% if messages %}{% for m in messages %}<div>{{ m }}</div>{% endfor %}{% endif %}
+  
+  <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="/">Fagni</a>
+      <div class="collapse navbar-collapse show">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item"><a class="nav-link" href="/orders/">Commandes</a></li>
+          <li class="nav-item"><a class="nav-link" href="/dashboard/analytics/">Analytics</a></li>
+          <li class="nav-item"><a class="nav-link" href="/">Top Clients</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+{% block content %}{% endblock %}
+</div>
+</body></html>

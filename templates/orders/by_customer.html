@@ -1,0 +1,16 @@
+{% extends 'base.html' %}{% block content %}
+<h1>Commandes de {{ customer.name }}</h1>
+<p><a href="{% url 'order_list' %}">← Retour à la liste des commandes</a></p>
+<table border="1" cellpadding="6">
+  <tr><th>ID</th><th>Montant</th><th>Date</th></tr>
+  {% for o in orders %}
+    <tr>
+      <td>{{ o.id }}</td>
+      <td>{{ o.total|floatformat:0 }}</td>
+      <td>{{ o.created_at|date:"Y-m-d H:i" }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="3">Aucune commande pour ce client.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

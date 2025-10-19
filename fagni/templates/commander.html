@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Formulaire de commande</h1>
+  <p>Remplissez ce formulaire pour planifier la collecte de vos articles.</p>
+
+  <form method="post" class="form">
+    {% csrf_token %}
+    <div class="grid">
+      {{ form.as_p }}
+    </div>
+    <button type="submit">Valider la commande</button>
+  </form>
+
+  <p style="margin-top:1rem;">
+    Après validation, vous recevrez un code du type <code>FAGNI_XXXXXX</code>.
+    Utilisez-le sur la page <a href="/suivi/">Suivi</a>.
+  </p>
+{% endblock %}

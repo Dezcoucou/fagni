@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block content %}
+<div class="card">
+  <h1>{% if mode == "update" %}Modifier{% else %}Nouvelle{% endif %} commande</h1>
+  <form method="post">{% csrf_token %}
+    <fieldset style="margin-bottom:16px">
+      <legend>Commande</legend>
+      {{ form.as_p }}
+    </fieldset>
+    <fieldset>
+      <legend>Articles</legend>
+      {{ formset.management_form }}
+      {% for f in formset %}
+        <div style="border:1px solid #eee;padding:8px;margin-bottom:8px;border-radius:8px">
+          {{ f.as_p }}
+        </div>
+      {% endfor %}
+      <p style="opacity:.7">Pour ajouter plus de lignes, enregistre puis réédite la commande.</p>
+    </fieldset>
+    <p><button class="btn btn-primary" type="submit">Enregistrer</button></p>
+  </form>
+</div>
+{% endblock %}

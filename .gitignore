@@ -1,5 +1,37 @@
-venv_ok/
+# === Django standard ===
+*.pyc
 __pycache__/
 db.sqlite3
-staticfiles/
-*.pyc
+/media/
+*.log
+*.pot
+*.py[cod]
+*.mo
+*.swp
+
+# === Environnements virtuels ===
+venv/
+venv_ok/
+venv_clean/
+.env
+*.env
+.env.*
+
+# === Django static/media ===
+/static/
+/staticfiles/
+/media/
+
+# === IDE & système ===
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp
+
+# === PythonAnywhere & build ===
+/tmp/
+/__pycache__/
+/*.pid
+*.sock

@@ -1,0 +1,38 @@
+{% load humanize %}
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Commandes</title>
+<style>
+body{font-family:system-ui,-apple-system,Roboto,Arial,sans-serif;margin:24px}
+table{border-collapse:collapse;width:100%}
+th,td{border:1px solid #ddd;padding:8px}
+th{background:#f5f5f5;text-align:left}
+nav a{margin-right:12px}
+</style></head><body>
+<h1>Commandes</h1>
+
+<table>
+  <thead>
+    <tr><th>Client</th><th>Total</th><th>Créée le</th></tr>
+  </thead>
+  <tbody>
+  {% for order in orders %}
+    <tr>
+      <td><a href="/orders/customer/{{ order.customer_id }}/">{{ order.customer }}</a></td>
+      <td>{{ order.total_display|default_if_none:0|floatformat:0|intcomma }}</td>
+      <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="3">Aucune commande enregistrée.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<nav>
+  {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}">← Précédent</a>
+  {% endif %}
+  <span>Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}">Suivant →</a>
+  {% endif %}
+</nav>
+</body></html>

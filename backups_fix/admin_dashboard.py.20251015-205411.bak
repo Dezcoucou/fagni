@@ -1,0 +1,40 @@
+from django.shortcuts import render
+from django.utils import timezone
+from django.db.models import Sum, Value, DecimalField
+from django.db.models.functions import Coalesce
+
+from .models import Order
+
+def dashboard_view(request):
+    now = timezone.now()
+    start = now - timezone.timedelta(days=30)
+    qs = Order.objects.filter(created_at__gte=start)
+
+    # On force l’output_field à DecimalField pour éviter les erreurs
+    revenue = qs.aggregate(
+        total=Coalesce(Sum('total_ttc', output_field=DecimalField()), Value(0), output_field=DecimalField())
+    )['total'] or 0
+
+    orders_count = qs.count()
+
+    top = (
+        qs.values('customer__username')
+          .annotate(total=Coalesce(Sum('total_ttc', output_field=DecimalField()), Value(0), output_field=DecimalField()))
+          .order_by('-total')
+          .first()
+    )
+
+    best_customer = {
+        'name': (top or {}).get('customer__username') or '—',
+        'total': (top or {}).get('total') or 0,
+    }
+
+    recent_orders = Order.objects.order_by('-created_at')[:10]
+
+    ctx = {
+        'revenue': revenue,
+        'orders_count': orders_count,
+        'best_customer': best_customer,
+        'recent_orders': recent_orders,
+    }
+    return render(request, 'orders/dashboard.html', ctx)

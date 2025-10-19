@@ -1,0 +1,26 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plateforme FAGNI</title>
+
+  <!-- CSS via collectstatic -->
+  <link rel="stylesheet" href="{% static 'style.css' %}">
+  <!-- Favicon -->
+  <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
+</head>
+<body>
+  <header><h1>Bienvenue sur la plateforme FAGNI</h1></header>
+  <main>
+    <p>La solution connectée pour vos services.</p>
+    <a class="btn" href="/dashboard/">Aller au Tableau de Bord</a>
+  </main>
+  <style>
+    body{font-family:Arial,sans-serif;background:linear-gradient(135deg,#1e88e5,#42a5f5);color:#fff;text-align:center;margin:0;padding-top:10%}
+    .btn{display:inline-block;margin-top:20px;padding:12px 24px;background:#fff;color:#1e88e5;border-radius:6px;text-decoration:none;font-weight:700}
+    .btn:hover{background:#f1f1f1}
+  </style>
+</body>
+</html>

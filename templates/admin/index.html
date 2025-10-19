@@ -1,0 +1,77 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+  {{ block.super }}
+
+  <div class="dashboard-graph" style="margin: 16px 0;">
+    <h2 style="margin:0 0 8px 0;">Évolution (30 jours)</h2>
+    <canvas id="fagniChart" height="90"></canvas>
+  </div>
+
+  {# Le contenu natif de l'accueil admin (tables, dernières actions) reste rendu par block.super #}
+{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    (function() {
+      const labels = JSON.parse('{{ chart_labels|default:"[]"|safe|escapejs }}');
+      const sales  = JSON.parse('{{ chart_sales|default:"[]"|safe|escapejs }}');
+      const orders = JSON.parse('{{ chart_orders|default:"[]"|safe|escapejs }}');
+      const el = document.getElementById('fagniChart');
+      if (!el || !labels.length) return;
+
+      const ctx = el.getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'CA (FCFA)',
+              data: sales,
+              tension: 0.3,
+              borderWidth: 2,
+              yAxisID: 'y',
+            },
+            {
+              label: 'Commandes',
+              data: orders,
+              tension: 0.3,
+              borderWidth: 2,
+              yAxisID: 'y1',
+            },
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'top' },
+            tooltip: { callbacks: {
+              label: function(ctx) {
+                const lbl = ctx.dataset.label || '';
+                const v = ctx.parsed.y;
+                if (ctx.dataset.yAxisID === 'y') {
+                  return lbl + ': ' + new Intl.NumberFormat('fr-FR').format(v) + ' FCFA';
+                }
+                return lbl + ': ' + v;
+              }
+            }}
+          },
+          scales: {
+            y: {
+              type: 'linear', position: 'left',
+              ticks: {
+                callback: (v)=> new Intl.NumberFormat('fr-FR').format(v)
+              }
+            },
+            y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false } }
+          }
+        }
+      });
+    })();
+  </script>
+{% endblock %}

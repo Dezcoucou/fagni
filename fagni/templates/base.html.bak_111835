@@ -1,0 +1,32 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}Plateforme FAGNI{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
+  <link rel="stylesheet" href="{% static 'style.css' %}">
+</head>
+<body>
+
+  <nav class="topbar">
+    <div class="container">
+      <a class="brand" href="{% url 'home' %}">FAGNI</a>
+      <div class="links">
+        <a href="{% url 'home' %}">Accueil</a>
+        <a href="{% url 'orders:list' %}">Commandes</a>
+        <a href="{% url 'orders:create' %}">Créer</a>
+        <a href="{% url 'orders:create_multi' %}">Créer multi</a>
+        <a href="{% url 'dashboard:export_top_clients_csv' %}">Exporter</a>
+        <a href="{% url 'admin:index' %}">Admin</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page">
+    {% block content %}{% endblock %}
+  </main>
+
+</body>
+</html>

@@ -1,0 +1,66 @@
+import uuid
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse
+from .models import Order
+from .forms import OrderItemCreateForm
+
+def _code():
+    return uuid.uuid4().hex[:8].upper()
+
+@login_required
+def create_order(request):
+    items = LaundryItem.objects.filter(active=True).select_related("category").order_by("name")
+    if request.method == "POST":
+        f = OrderItemCreateForm(request.POST, request.FILES)
+        if f.is_valid():
+            o = Order.objects.create(customer=request.user, code=_code())
+            oi = f.save(commit=False)
+            oi.order = o
+            oi.save()
+            return redirect("orders:detail", code=o.code)
+    else:
+        f = OrderItemCreateForm()
+    data = [{"id":i.id,"name":i.name,"unit":i.unit,"price":float(i.base_price_per_kg)} for i in items]
+    return render(request, "orders/create_order.html", {"form": f, "items_data": data})
+
+@login_required
+def order_detail(request, code):
+    o = get_object_or_404(Order, code=code, customer=request.user)
+    return render(request, "orders/detail.html", {"order": o})
+
+import uuid
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect
+from .models import Order
+
+def _gen():
+    return uuid.uuid4().hex[:8].upper()
+
+@login_required
+def create_order_multi(request):
+    items = list(LaundryItem.objects.filter(active=True).select_related("category").order_by("name").values("id","name","unit","base_price_per_kg"))
+    if request.method == "POST":
+        ids = request.POST.getlist("item[]")
+        qtys = request.POST.getlist("quantity[]")
+        wkgs = request.POST.getlist("weight_kg[]")
+        notes = request.POST.getlist("note[]")
+        photos = request.FILES.getlist("photo[]")
+        if not ids:
+            return render(request, "orders/create_order_multi.html", {"items_data": items, "error": "Aucune ligne"})
+        o = Order.objects.create(customer=request.user, code=_gen())
+        for i, item_id in enumerate(ids):
+            if not item_id:
+                continue
+            q = int(qtys[i]) if i < len(qtys) and qtys[i] else 1
+            w = wkgs[i] if i < len(wkgs) else None
+            n = notes[i] if i < len(notes) else ""
+            oi = OrderItem(order=o, item_id=item_id, quantity=max(q,1))
+            if w:
+                oi.weight_kg = w
+            if i < len(photos):
+                oi.photo = photos[i]
+            oi.note = n
+            oi.save()
+        return redirect("orders:detail", code=o.code)
+    return render(request, "orders/create_order_multi.html", {"items_data": items})

@@ -1,0 +1,51 @@
+{% load static %}
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gérer les photos – {{ item }}</title>
+  <link rel="stylesheet" href="{% static 'admin/css/base.css' %}">
+  <style>
+    body{max-width:900px;margin:2rem auto;padding:0 1rem;font-family:system-ui,-apple-system,Segoe UI,Roboto}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:1rem}
+    .btn{display:inline-block;background:#0b5394;color:#fff;padding:.6rem 1rem;border-radius:8px;text-decoration:none}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:1rem}
+    .card{border:1px solid #ddd;border-radius:10px;padding:8px;text-align:center}
+    img{max-width:100%;height:140px;object-fit:cover;border-radius:6px}
+    form.upload{margin-top:1rem;border:1px dashed #bbb;padding:1rem;border-radius:10px;background:#fafafa}
+    .msg{margin:.6rem 0;color:#333}
+  </style>
+</head>
+<body>
+  <div class="top">
+    <h1>Photos – {{ item }}</h1>
+    <a href="javascript:history.back()" class="btn">← Retour</a>
+  </div>
+
+  {% if messages %}
+    <div class="msg">
+      {% for m in messages %}<div>{{ m }}</div>{% endfor %}
+    </div>
+  {% endif %}
+
+  <form class="upload" method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <p><strong>Ajouter des photos</strong> (JPEG/PNG, ≤ 6 Mo chacune)</p>
+    {{ form.images }}
+    <button class="btn" type="submit">Téléverser</button>
+  </form>
+
+  <h2>Photos existantes</h2>
+  <div class="grid">
+    {% for p in photos %}
+      <div class="card">
+        <img src="{{ p.image.url }}" alt="photo">
+        <div style="font-size:.85rem;margin-top:.4rem">#{{ p.id }}</div>
+      </div>
+    {% empty %}
+      <p>Aucune photo pour l’instant.</p>
+    {% endfor %}
+  </div>
+</body>
+</html>

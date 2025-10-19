@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Bienvenue sur FAGNI 👕</h1>
+<p>Votre plateforme de blanchisserie connectée.</p>
+<ul>
+  <li><a href="{% url 'orders:list' %}">Voir les commandes</a></li>
+  <li><a href="{% url 'orders:create' %}">Créer une commande</a></li>
+</ul>
+{% endblock %}

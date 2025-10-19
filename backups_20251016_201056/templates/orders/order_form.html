@@ -1,0 +1,38 @@
+<h1>Nouvelle commande</h1>
+
+<form method="post" class="p-4 bg-white rounded shadow-sm" style="max-width: 500px;">
+  {% csrf_token %}
+
+  <div class="mb-3">
+    <label>Nom du client</label>
+    <input type="text" name="client_name" class="form-control" placeholder="Nom du client" required>
+  </div>
+
+  <div class="mb-3">
+    <label>Email</label>
+    <input type="email" name="email" class="form-control" placeholder="Email">
+  </div>
+
+  <div class="mb-3">
+    <label>Téléphone</label>
+    <input type="text" name="phone" class="form-control" placeholder="Téléphone">
+  </div>
+
+  <div class="mb-3">
+    <label>Article</label>
+    <input type="text" name="article" class="form-control" placeholder="Nom de l’article">
+  </div>
+
+  <div class="row mb-3">
+    <div class="col">
+      <label>Quantité</label>
+      <input type="number" name="quantite" class="form-control" min="1" value="1" required>
+    </div>
+    <div class="col">
+      <label>Prix unitaire (FCFA)</label>
+      <input type="number" name="prix" class="form-control" step="0.01" value="0.00" required>
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-primary w-100">Enregistrer</button>
+</form>

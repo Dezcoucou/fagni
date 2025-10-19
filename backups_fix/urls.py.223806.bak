@@ -1,0 +1,19 @@
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    # API ou autre app principale
+    path('api/', include('api.urls', namespace='api')) if 'api' in locals() else None,
+
+    # Application orders
+    path('orders/', include('orders.urls')),
+
+    # Dashboard (interne/public)
+    path('dashboard/', include('orders.urls_dashboard')),
+
+    # Admin principal de Django
+    path('admin/', admin.site.urls),
+
+    # Route d’export CSV
+    path('export-csv/', include(('fagni.admin_extra_urls', 'fagni_admin'), namespace='fagni_admin')),
+]

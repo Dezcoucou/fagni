@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Commandes</title>
+  <style>
+    body{font-family:system-ui,Arial;margin:24px}
+    table{border-collapse:collapse;width:100%}
+    th,td{border:1px solid #ddd;padding:8px}
+    th{background:#f4f4f4;text-align:left}
+    .muted{color:#777}
+  </style>
+</head>
+<body>
+  <h1>Commandes {% if filter_customer %}<span class="muted">/ {{ filter_customer }}</span>{% endif %}</h1>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Client</th>
+        <th>Total</th>
+        <th>Créée le</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for order in orders %}
+        <tr>
+          <td>
+            {% if order.customer %}
+              {{ order.customer }}
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
+          </td>
+          <td>{{ order.total_any|floatformat:0 }}</td>
+          <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="3">Aucune commande enregistrée.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

@@ -1,0 +1,9 @@
+from django.contrib import admin
+from .models import Order
+from .admin_site import fagni_admin_site
+
+@admin.register(Order, site=fagni_admin_site)
+class OrderAdmin(admin.ModelAdmin):
+    list_display = ("code", "customer", "service_type", "total_ttc", "status", "created_at")
+    search_fields = ("code", "customer__username")
+    list_filter = ("status", "service_type")

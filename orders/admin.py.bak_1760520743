@@ -1,0 +1,67 @@
+from django.contrib import admin
+from .models import Order, OrderItem, LaundryItem, ServiceCategory
+
+@admin.register(ServiceCategory)
+class ServiceCategoryAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    search_fields = ("name",)
+
+@admin.register(LaundryItem)
+class LaundryItemAdmin(admin.ModelAdmin):
+    list_display = ("name", "category", "base_price_per_kg", "unit", "active")
+    list_filter = ("active", "unit", "category")
+    search_fields = ("name",)
+
+class OrderItemInline(admin.TabularInline):
+    model = OrderItem
+    extra = 1
+    autocomplete_fields = ("item",)
+    fields = ("item", "quantity", "weight_kg", "note", "photo", "line_total_display")
+    readonly_fields = ("line_total_display",)
+
+    def line_total_display(self, obj):
+        try:
+            return obj.line_total()
+        except Exception:
+            return "-"
+    line_total_display.short_description = "Total ligne HT"
+
+@admin.register(Order)
+class OrderAdmin(admin.ModelAdmin):
+    inlines = [OrderItemInline]
+
+    list_display = ("code", "customer", "service_type", "total_ht", "tva", "total_ttc", "updated_at")
+    list_filter = ("service_type", "status", "created_at")
+    search_fields = ("code", "customer__username", "customer__first_name", "customer__last_name")
+    readonly_fields = ("total_ht", "total_ttc", "total_weight_kg")
+
+    fieldsets = (
+        ("Infos", {
+            "fields": ("customer", "code", "status", "service_type")
+        }),
+        ("Montants", {
+            "fields": ("tva", "total_ht", "total_ttc", "total_weight_kg")
+        }),
+        ("Dates", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",),
+        }),
+    )
+    readonly_fields = ("total_ht", "total_ttc", "total_weight_kg", "created_at", "updated_at")
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        # Si TVA change sans modifier de lignes → on recalcule
+        obj.refresh_totals()
+
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save()
+        # Après modification des lignes → on recalcule
+        try:
+            form.instance.refresh_totals()
+        except Exception:
+            pass
+        return instancesfrom django.contrib import admin
+admin.site.site_header = "Administration FAGNI"
+admin.site.site_title = "FAGNI"
+admin.site.index_title = "Gestion de l’atelier"

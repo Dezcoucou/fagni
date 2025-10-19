@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Commandes" %} · FAGNI{% endblock %}
+
+{% block content %}
+<section class="pro-wrap">
+  <div class="flex-space">
+    <h2 class="section-title">
+      {% if filtre == 'nouvelles' %}{% trans "Nouvelles commandes" %}
+      {% elif filtre == 'en-cours' %}{% trans "En cours" %}
+      {% elif filtre == 'pretes' %}{% trans "Prêtes à livrer" %}
+      {% elif filtre == 'livrees' %}{% trans "Livrées" %}
+      {% else %}{% trans "Commandes" %}{% endif %}
+    </h2>
+    <a href="{% url 'partenaire_dashboard' %}" class="btn btn-ghost">← {% trans "Retour" %}</a>
+  </div>
+
+  {% if not commandes %}
+    <div class="card"><p class="muted">{% trans "Aucune commande pour l’instant." %}</p></div>
+  {% endif %}
+
+  {% for c in commandes %}
+    <div class="card" style="margin-top:12px;">
+      <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:800">{{ c.code_suivi }}</div>
+          <div class="muted">{{ c.nom_client }} — {{ c.telephone_client }}</div>
+          <div class="muted">{{ c.adresse_livraison }}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="muted">{% trans "Statut" %} : <b>{{ c.get_statut_display }}</b></div>
+          <div class="muted">{% trans "Créé le" %} : {{ c.date_creation|date:"d/m/Y H:i" }}</div>
+        </div>
+      </div>
+
+      {% comment %} Boutons d'action suivant le statut actuel {% endcomment %}
+      <form method="post" action="" style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+        {% csrf_token %}
+
+        {% if c.statut == "a_traiter" %}
+          <button formaction="{% url 'partenaire_set_statut' c.pk 'attente_collecte' %}" class="btn btn-primary">{% trans "À collecter" %}</button>
+          <button formaction="{% url 'partenaire_set_statut' c.pk 'en_cours' %}" class="btn btn-cta">{% trans "Démarrer" %}</button>
+
+        {% elif c.statut == "attente_collecte" %}
+          <button formaction="{% url 'partenaire_set_statut' c.pk 'en_cours' %}" class="btn btn-primary">{% trans "Traiter" %}</button>
+
+        {% elif c.statut == "en_cours" %}
+          <button formaction="{% url 'partenaire_set_statut' c.pk 'pret' %}" class="btn btn-primary">{% trans "Marquer prêt" %}</button>
+          <button formaction="{% url 'partenaire_set_statut' c.pk 'livraison' %}" class="btn">{% trans "Envoyer en livraison" %}</button>
+
+        {% elif c.statut == "pret" %}
+          <button formaction="{% url 'partenaire_set_statut' c.pk 'livraison' %}" class="btn btn-primary">{% trans "En livraison" %}</button>
+          <button formaction="{% url 'partenaire_set_statut' c.pk 'livree' %}" class="btn btn-cta">{% trans "Livrée" %}</button>
+
+        {% elif c.statut == "livraison" %}
+          <button formaction="{% url 'partenaire_set_statut' c.pk 'livree' %}" class="btn btn-cta">{% trans "Livrée" %}</button>
+        {% endif %}
+      </form>
+    </div>
+  {% endfor %}
+
+</section>
+{% endblock %}

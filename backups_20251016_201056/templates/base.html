@@ -1,0 +1,48 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}FAGNI{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{% static 'style.css' %}">
+  <style>
+    .navbar{position:sticky;top:0;z-index:999;background:#1d4ed8;color:#fff;padding:14px 18px}
+    .navbar a{color:#fff;text-decoration:none;margin-right:18px;font-weight:600}
+    main{max-width:980px;margin:24px auto;padding:16px}
+    .btn{background:#1d4ed8;color:#fff;border:0;border-radius:8px;padding:10px 16px}
+    .card{background:#fff;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,.08);padding:18px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid #eee}
+    th{text-align:left}
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a class="brand" href="{% url 'home' %}">FAGNI</a>
+    <a href="{% url 'home' %}">Accueil</a>
+    <a href="{% url 'orders:list' %}">Commandes</a>
+    <a href="{% url 'orders:create' %}">Nouvelle commande</a>
+    <a href="/admin/">Admin</a>
+  </nav>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+{% if messages %}
+  <div id="notification" style="position:fixed;top:10px;left:50%;transform:translateX(-50%);
+       background:#22c55e;color:white;padding:10px 20px;border-radius:8px;
+       box-shadow:0 2px 6px rgba(0,0,0,0.2);z-index:9999;">
+    {% for message in messages %}
+      {{ message }}
+    {% endfor %}
+  </div>
+  <script>
+    setTimeout(() => {
+      const notif = document.getElementById('notification');
+      if (notif) notif.style.display = 'none';
+    }, 3000);
+  </script>
+{% endif %}
+</html>

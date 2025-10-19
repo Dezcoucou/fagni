@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+<p style="text-align:center"><a href="{% url 'order' %}" class="cta">Commander une prestation</a></p>
+{% block title %}Nos Services – FAGNI{% endblock %}
+{% block content %}
+<h2>Nos Services</h2>
+
+<style>
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:12px}
+.card{border:1px solid #d7d7d7;border-radius:12px;padding:16px;background:#fff}
+.card h3{margin:0 0 8px 0}
+.card p{margin:6px 0}
+.card ul{margin:8px 0 0 18px}
+.cta{display:inline-block;margin-top:10px;border:1px solid #2c5cc5;padding:8px 12px;border-radius:8px;text-decoration:none}
+.cta:hover{background:#2c5cc5;color:#fff}
+.badge{display:inline-block;background:#eef4ff;border:1px solid #c9dbff;padding:2px 8px;border-radius:999px;font-size:.8rem;margin-left:6px}
+</style>
+
+<div class="grid">
+
+  <div class="card">
+    <h3>Collecte & Livraison <span class="badge">Domicile</span></h3>
+    <p>Prise de rendez-vous rapide, ramassage et retour chez vous.</p>
+    <ul>
+      <li>Plage horaire flexible</li>
+      <li>Suivi par SMS</li>
+      <li>Retour sous 24–48h</li>
+    </ul>
+    <a class="cta" href="{% url 'order' %}">Commander</a>
+  </div>
+
+  <div class="card">
+    <h3>Blanchisserie professionnelle</h3>
+    <p>Traitement complet pour votre linge quotidien.</p>
+    <ul>
+      <li>Tri par couleur & textile</li>
+      <li>Lessives adaptées</li>
+      <li>Pliage soigné</li>
+    </ul>
+    <a class="cta" href="/tarifs/">Voir les tarifs</a>
+  </div>
+
+  <div class="card">
+    <h3>Repassage & pliage</h3>
+    <p>Finitions nettes pour chemises, pantalons, tenues pro.</p>
+    <ul>
+      <li>Vapeur & presses</li>
+      <li>Antibrillance</li>
+      <li>Emballage individuel</li>
+    </ul>
+    <a class="cta" href="/tarifs/">Voir les tarifs</a>
+  </div>
+
+  <div class="card">
+    <h3>Pressing / Nettoyage à sec</h3>
+    <p>Soin des pièces délicates : costumes, robes, vestes.</p>
+    <ul>
+      <li>Détachage ciblé</li>
+      <li>Procédés doux</li>
+      <li>Contrôle qualité</li>
+    </ul>
+    <a class="cta" href="{% url 'contact' %}">Demander un devis</a>
+  </div>
+
+  <div class="card">
+    <h3>Retouches & couture</h3>
+    <p>Ourlets, reprises, boutons, fermetures éclair.</p>
+    <ul>
+      <li>Essayage si besoin</li>
+      <li>Finitions pro</li>
+      <li>Délais courts</li>
+    </ul>
+    <a class="cta" href="{% url 'contact' %}">Prendre RDV</a>
+  </div>
+
+  <div class="card">
+    <h3>Abonnements entreprises</h3>
+    <p>Offres mensuelles pour bureaux, hôtels, restos, équipes.</p>
+    <ul>
+      <li>Collecte planifiée</li>
+      <li>Facturation groupée</li>
+      <li>Réductions volume</li>
+    </ul>
+    <a class="cta" href="/tarifs/">Formules & tarifs</a>
+  </div>
+
+</div>
+
+<p style="margin-top:14px">
+Besoin d’un service spécifique (couettes, rideaux, tapis, robes de soirée) ?
+Passe par la page <a href="{% url 'contact' %}">Contact</a> pour un devis rapide.
+</p>
+<p style="text-align:center"><a href="{% url 'order' %}" class="cta">Commander une prestation</a></p>
+{% endblock %}

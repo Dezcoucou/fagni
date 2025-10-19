@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}FAGNI · {% trans "Tracking" %}{% endblock %}
+
+{% block content %}
+  <h2>{% trans "Order tracking" %}</h2>
+  <form method="get">
+    <label for="code">{% trans "Tracking code" %}</label>
+    <input id="code" name="code" placeholder="FAGNI_XXXXXX">
+    <button type="submit">{% trans "Search" %}</button>
+  </form>
+{% endblock %}

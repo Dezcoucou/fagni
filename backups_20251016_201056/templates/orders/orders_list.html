@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width: 980px; margin: 24px auto;">
+  <div class="card-body">
+    <h1 style="margin-bottom: 16px;">Commandes</h1>
+    <a href="{% url 'orders:create' %}" class="btn btn-primary" style="margin-bottom: 12px;">Nouvelle commande</a>
+    {% if orders %}
+      <table class="table" style="width:100%;">
+        <thead>
+          <tr><th>#</th><th>Code</th><th>Client</th><th>Téléphone</th><th>Article</th><th>Qté</th><th>Total</th><th>Statut</th><th>Créée</th></tr>
+        </thead>
+        <tbody>
+        {% for o in orders %}
+          <tr>
+            <td><a href="{% url 'orders:detail' o.pk %}">Voir</a></td>
+            <td>{{ o.code }}</td>
+            <td>{{ o.client }}</td>
+            <td>{{ o.phone }}</td>
+            <td>{{ o.item }}</td>
+            <td>{{ o.quantity }}</td>
+            <td>{{ o.total }}</td>
+            <td>{{ o.get_status_display }}</td>
+            <td>{{ o.created_at|date:"Y-m-d H:i" }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>Aucune commande pour le moment.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

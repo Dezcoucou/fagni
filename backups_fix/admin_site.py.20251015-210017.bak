@@ -1,0 +1,49 @@
+from datetime import timedelta
+from django.contrib.admin import AdminSite
+from django.urls import path
+from django.shortcuts import render
+from django.db.models import Sum
+from django.db.models.functions import Coalesce
+from django.utils.timezone import now
+from django.http import HttpResponse
+import csv
+
+from .models import Order
+
+class DashboardAdminSite(AdminSite):
+    site_header = "FAGNI"
+    site_title = "FAGNI Admin"
+    index_title = "Tableau de bord FAGNI"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path("dashboard/", self.admin_view(self.dashboard_view), name="index"),
+            path("export-csv/", self.admin_view(self.export_csv_view), name="export_csv"),
+        ]
+        return custom + urls
+
+    def dashboard_view(self, request):
+        start = now() - timedelta(days=30)
+        ca_30 = Order.objects.filter(created_at__gte=start).aggregate(
+            total=Coalesce(Sum("total_ttc"), 0)
+        )["total"]
+        ctx = {"chiffre_affaires_30": ca_30}
+        return render(request, "admin/dashboard_min.html", ctx)
+
+    def export_csv_view(self, request):
+        qs = Order.objects.order_by("-created_at")[:1000]
+        resp = HttpResponse(content_type="text/csv")
+        resp["Content-Disposition"] = 'attachment; filename="export.csv"'
+        w = csv.writer(resp)
+        w.writerow(["Code", "Client", "Montant TTC", "Créée le"])
+        for o in qs:
+            w.writerow([
+                o.code,
+                getattr(o.customer, "username", ""),
+                f"{o.total_ttc}",
+                o.created_at.strftime("%d/%m/%Y %H:%M"),
+            ])
+        return resp
+
+fagni_admin_site = DashboardAdminSite(name="fagni_admin")

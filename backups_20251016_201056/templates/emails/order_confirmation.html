@@ -1,0 +1,14 @@
+{% extends "emails/base_email.html" %}
+{% block content %}
+<h2 style="margin:0 0 12px 0;color:#111827;">Confirmation de commande</h2>
+<p>Bonjour <strong>{{ order.full_name }}</strong>,</p>
+<p>Merci pour votre commande sur <strong>FAGNI</strong>.</p>
+<ul>
+  <li><strong>Code :</strong> {{ order.tracking_code }}</li>
+  <li><strong>Service :</strong> {{ order.get_service_display }}</li>
+  <li><strong>Quantité :</strong> {{ order.quantity }}</li>
+  <li><strong>Adresse :</strong> {{ order.pickup_address }}</li>
+</ul>
+<p>Vous pouvez suivre votre commande ici : <a href="{{ tracking_url }}">{{ tracking_url }}</a></p>
+<p style="margin-top:18px;">À très vite !<br>— L’équipe FAGNI</p>
+{% endblock %}

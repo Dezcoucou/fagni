@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load currency %}
+{% block content %}
+<div class="card">
+  <h1>Commandes</h1>
+  <p>
+    <a class="btn btn-primary" href="{% url 'orders:create' %}">Nouvelle commande</a>
+    <a class="btn" href="/dashboard/analytics/export/csv/">Exporter CSV</a>
+  </p>
+
+  {% if orders %}
+  <table>
+    <thead><tr><th>Code</th><th>Client</th><th>Statut</th><th>Créée</th><th>Total</th><th></th></tr></thead>
+    <tbody>
+      {% for o in orders %}
+      <tr>
+        <td>{{ o.code }}</td>
+        <td>{{ o.customer.name }}</td>
+        <td>{{ o.get_status_display }}</td>
+        <td>{{ o.created_at|date:"Y-m-d H:i" }}</td>
+        <td>{{ o.total_ttc|floatformat:2 }} FCFA</td>
+        <td><a class="btn" href="{% url 'orders:detail' o.id %}">Voir</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p>Aucune commande.</p>
+  {% endif %}
+</div>
+{% endblock %}
+
+<p style="margin-top:1rem">
+  {% if page_obj.has_previous %}
+    <a class="btn" href="?page={{ page_obj.previous_page_number }}">« Préc.</a>
+  {% endif %}
+  Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+  {% if page_obj.has_next %}
+    <a class="btn" href="?page={{ page_obj.next_page_number }}">Suiv. »</a>
+  {% endif %}
+</p>
+<p style="margin:.5rem 0"><a class="btn" href="{% url 'orders:export_top_clients_csv' %}">Exporter (Top clients CSV)</a></p>
+
+<p><a class="btn" href="/orders/export_top_clients_csv/">Exporter Top Clients (CSV)</a></p>

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width: 960px; margin: 30px auto;">
+  <div class="card-body">
+    <h2>Nouvelle commande</h2>
+    <p>Cette page servira à créer une commande.</p>
+    <a href="{% url 'orders:list' %}" class="btn btn-secondary mt-3">Retour à la liste</a>
+  </div>
+</div>
+{% endblock %}

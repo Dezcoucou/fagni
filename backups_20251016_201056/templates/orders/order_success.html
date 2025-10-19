@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Succès</h1>
+<p>Commande enregistrée avec succès.</p>
+<p><a href="{% url 'orders:list' %}">Voir les commandes</a> · <a href="{% url 'orders:create' %}">Nouvelle commande</a></p>
+{% endblock %}

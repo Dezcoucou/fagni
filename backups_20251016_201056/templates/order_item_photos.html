@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<h2>Photos – {{ oi.item.name }} (commande #{{ oi.order_id }})</h2>
+
+{% if messages %}
+  <ul>
+    {% for m in messages %}<li>{{ m }}</li>{% endfor %}
+  </ul>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" style="margin:1rem 0">
+  {% csrf_token %}
+  {{ form.images }}
+  <button type="submit" class="btn">Ajouter</button>
+</form>
+
+{% if photos %}
+  <div style="display:flex; flex-wrap:wrap; gap:12px;">
+    {% for p in photos %}
+      <div style="border:1px solid #ddd; padding:8px; border-radius:8px; width:150px; text-align:center;">
+        <img src="{{ p.image.url }}" alt="" style="max-width:100%; max-height:120px; display:block; margin:0 auto 6px;">
+        <form method="post" action="{% url 'order_item_photo_delete' p.id %}">
+          {% csrf_token %}
+          <button type="submit" style="background:#eee;border:1px solid #bbb;padding:4px 8px;border-radius:6px;">Supprimer</button>
+        </form>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p>Aucune photo pour cet article.</p>
+{% endif %}
+
+<p style="margin-top:1rem;"><a href="{% url 'order_detail' oi.order_id %}">← Retour à la commande</a></p>
+{% endblock %}

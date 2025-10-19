@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Résultat du suivi — FAGNI" %}{% endblock %}
+{% block content %}
+<h1>{% trans "Détails de votre commande" %}</h1>
+<table class="table">
+  <tr><th>{% trans "Numéro" %}</th><td>#{{ commande.id }}</td></tr>
+  <tr><th>{% trans "Client" %}</th><td>{{ commande.nom_client }}</td></tr>
+  <tr><th>{% trans "Téléphone" %}</th><td>{{ commande.telephone_client }}</td></tr>
+  <tr><th>{% trans "Adresse" %}</th><td>{{ commande.adresse_livraison }}</td></tr>
+  <tr><th>{% trans "Service" %}</th><td>{{ commande.type_service }}</td></tr>
+  <tr><th>{% trans "Statut" %}</th><td>{{ commande.statut_livraison }}</td></tr>
+</table>
+<a class="btn" href="{% url 'accueil' %}">{% trans "Accueil" %}</a>
+{% endblock %}

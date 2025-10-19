@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Accueil — FAGNI{% endblock %}
+{% block content %}
+  <section class="hero">
+    <h1>Bienvenue sur la plateforme <span>FAGNI</span></h1>
+    <p>Gérez vos commandes simplement.</p>
+    <div class="actions">
+      <a class="btn" href="/orders/">Voir les commandes</a>
+      <a class="btn outline" href="/dashboard/analytics/export/csv/">Exporter en CSV</a>
+    </div>
+  </section>

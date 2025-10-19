@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width: 900px; margin: 24px auto;">
+  <div class="card-body">
+    <h1 style="margin-bottom: 8px;">Détail commande</h1>
+    <p><strong>Code :</strong> {{ order.code }}</p>
+    <p><strong>Client :</strong> {{ order.client }}</p>
+    <p><strong>Téléphone :</strong> {{ order.phone }}</p>
+    <p><strong>Article :</strong> {{ order.item }}</p>
+    <p><strong>Prix unitaire :</strong> {{ order.unit_price }}</p>
+    <p><strong>Quantité :</strong> {{ order.quantity }}</p>
+    <p><strong>Total :</strong> {{ order.total }}</p>
+    <p><strong>Statut :</strong> {{ order.get_status_display }}</p>
+    <p><strong>Créée :</strong> {{ order.created_at|date:"Y-m-d H:i" }}</p>
+    <div style="margin-top:12px;">
+      <a class="btn" href="{% url 'orders:orders_list' %}">Retour à la liste</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

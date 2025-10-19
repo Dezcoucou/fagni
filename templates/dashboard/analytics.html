@@ -1,0 +1,89 @@
+{% load static %}
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Reporting</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 20px; }
+    h1 { margin-top: 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
+    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    .btn { display:inline-block; padding:8px 12px; border-radius:8px; text-decoration:none; border:1px solid #e5e7eb; }
+    .btn:hover { background:#f8fafc; }
+    canvas { width:100%; height:320px; }
+  </style>
+</head>
+<body>
+
+  <h1>Reporting</h1>
+  <p class="row">
+    <a class="btn" href="/dashboard/analytics/export/csv/">Exporter Top 10 (CSV)</a>
+    <a class="btn" href="{% url 'orders:export_top_clients_xlsx' %}">Exporter Top 10 (XLSX)</a>
+    <a class="btn" href="/dashboard/">← Retour Dashboard</a>
+  </p>
+
+  <div class="grid">
+    <div class="card">
+      <h3>CA mensuel (12 mois)</h3>
+      <canvas id="repRevenue"></canvas>
+    </div>
+    <div class="card">
+      <h3>Commandes mensuelles (12 mois)</h3>
+      <canvas id="repOrders"></canvas>
+    </div>
+    <div class="card" style="grid-column: 1/-1;">
+      <h3>Top 10 clients par CA</h3>
+      <canvas id="repTopClients"></canvas>
+    </div>
+  </div>
+
+  <script>
+    // Données injectées par Django
+    const monthLabels   = {{ month_labels|safe }};
+    const monthRevenue  = {{ month_revenue|safe }};
+    const monthOrders   = {{ month_orders|safe }};
+    const clientLabels  = {{ top_client_labels|safe }};
+    const clientTotals  = {{ top_client_totals|safe }};
+
+    // CA mensuel
+    new Chart(document.getElementById('repRevenue'), {
+      type: 'line',
+      data: { labels: monthLabels, datasets: [{ label: 'CA (FCFA)', data: monthRevenue, tension: 0.3 }] },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    // Nb commandes mensuelles
+    new Chart(document.getElementById('repOrders'), {
+      type: 'bar',
+      data: { labels: monthLabels, datasets: [{ label: 'Commandes', data: monthOrders }] },
+      options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+    });
+
+    // Top 10 clients (barres horizontales)
+    const topChart = new Chart(document.getElementById('repTopClients'), {
+      type: 'bar',
+      data: { labels: clientLabels, datasets: [{ label: 'CA (FCFA)', data: clientTotals }] },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        scales: { x: { beginAtZero: true } }
+      }
+    
+            topChart.canvas.onclick = function(evt) {
+              const points = topChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+              if (points.length) {
+                const idx = points[0].index;
+                const client = clientLabels[idx];
+                window.location.href = '/orders/?client=' + encodeURIComponent(client);
+              }
+            };
+          </script>
+</body>
+</html>

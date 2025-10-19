@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<h2>Photos pour {{ oi.item.name }} (commande #{{ oi.order_id }})</h2>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  {{ form.as_p }}
+  {{ formset.management_form }}
+  <div id="photos">
+    {% for f in formset %}
+      <div class="photo-block" style="margin-bottom:8px;">
+        {{ f.image }}
+        {% if f.instance.pk %}
+          <img src="{{ f.instance.image.url }}" style="max-height:80px;vertical-align:middle;margin-left:8px;">
+        {% endif %}
+        {% if formset.can_delete %}
+          <label>{{ f.DELETE }} Supprimer</label>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+  <button type="submit" class="btn">Enregistrer</button>
+</form>
+
+<p><a href="{% url 'order_detail' oi.order_id %}">← Retour à la commande</a></p>
+
+<script>
+document.querySelectorAll('input[type=file]').forEach(inp=>{
+  inp.addEventListener('change', e=>{
+    const f = e.target.files[0];
+    if(!f) return;
+    const img = document.createElement('img');
+    img.style.maxHeight='80px';
+    img.src = URL.createObjectURL(f);
+    e.target.parentNode.appendChild(img);
+  });
+});
+</script>
+{% endblock %}

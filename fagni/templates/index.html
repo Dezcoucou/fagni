@@ -1,0 +1,30 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Bienvenue sur FAGNI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+  <!-- favicon si présent -->
+  <link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
+  <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+</head>
+<body>
+  <div class="container">
+    <h1>Bienvenue sur <span class="brand">FAGNI</span></h1>
+
+    <!-- Un seul grand logo (choix : fond blanc = plus lisible sur fond clair) -->
+    <img
+      class="logo"
+      src="{% static 'img/fagni_logo_q4_white.png' %}"
+      alt="FAGNI logo"
+    >
+
+    <div class="buttons">
+      <a class="btn" href="/api/clients/">API Clients</a>
+      <a class="btn outline" href="/admin/">Admin</a>
+    </div>
+  </div>
+</body>
+</html>

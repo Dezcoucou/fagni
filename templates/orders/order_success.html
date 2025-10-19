@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width: 720px; margin: 24px auto;">
+  <div class="card-body">
+    <h1>Succès</h1>
+    {% if code %}<p>Commande <strong>{{ code }}</strong> enregistrée avec succès.</p>{% else %}<p>Commande enregistrée avec succès.</p>{% endif %}
+    <p><a href="{% url 'orders:orders_list' %}">Voir les commandes</a> · <a href="{% url 'orders:create' %}">Nouvelle commande</a></p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "emails/base_email.html" %}
+{% block content %}
+<h2 style="margin:0 0 12px 0;color:#111827;">Mise à jour de votre commande</h2>
+<p>Bonjour <strong>{{ order.full_name }}</strong>,</p>
+<p>Le statut de votre commande <strong>{{ order.tracking_code }}</strong> a changé :</p>
+<ul>
+  <li><strong>Ancien statut :</strong> {{ old_label }}</li>
+  <li><strong>Nouveau statut :</strong> {{ new_label }}</li>
+</ul>
+<p>Consultez le suivi : <a href="{{ tracking_url }}">{{ tracking_url }}</a></p>
+<p style="margin-top:18px;">Merci pour votre confiance.<br>— L’équipe FAGNI</p>
+{% endblock %}

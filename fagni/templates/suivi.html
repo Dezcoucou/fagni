@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Order tracking</h1>
+
+  <form method="get" class="form" style="margin-bottom:1rem;">
+    <label for="code">Code de suivi</label>
+    <input id="code" name="code" value="{{ code|default:'' }}" placeholder="FAGNI_XXXXXX" />
+    <button type="submit">Rechercher</button>
+  </form>
+
+  {% if commande %}
+    <div class="card">
+      <h2>{{ commande.code }}</h2>
+      <p><strong>Statut :</strong> {{ commande.get_statut_display }}</p>
+      <p><strong>Service :</strong> {{ commande.get_type_service_display }}</p>
+      <p><strong>Client :</strong> {{ commande.nom_client }} — {{ commande.telephone }}</p>
+      <p><strong>Adresse :</strong> {{ commande.adresse_livraison }}</p>
+      {% if commande.zone %}<p><strong>Zone :</strong> {{ commande.zone }}</p>{% endif %}
+      {% if commande.instructions %}<p><strong>Instructions :</strong> {{ commande.instructions }}</p>{% endif %}
+      <p><small>Créée le {{ commande.created_at }}</small></p>
+    </div>
+  {% elif code %}
+    <p>Aucune commande trouvée pour ce code.</p>
+  {% else %}
+    <p>Entrez votre code pour voir l’état de votre commande.</p>
+  {% endif %}
+{% endblock %}

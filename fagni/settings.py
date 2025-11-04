@@ -136,3 +136,18 @@ CSRF_COOKIE_SECURE = True
 # --- HTTPS redirect configurable ---
 import os
 SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', '0') == '1'
+INSTALLED_APPS += ['produits']
+
+# --- Gestion des fichiers médias et statiques ---
+import os
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# En mode debug local : servir les fichiers médias automatiquement
+if DEBUG:
+    from django.conf import settings
+    from django.conf.urls.static import static
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -35,3 +35,19 @@ Thumbs.db
 /__pycache__/
 /*.pid
 *.sock
+# Sensible / inutile en repo
+.env
+*.log
+*.pyc
+__pycache__/
+secrets*.json
+*.sqlite3
+/media/
+staticfiles/
+.env
+*.log
+*.sqlite3
+__pycache__/
+staticfiles/
+media/
+*.pyc

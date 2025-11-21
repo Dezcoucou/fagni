@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard financier FAGNI</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background:#f5f5f5;
+            margin:0;
+            padding:16px;
+        }
+        .page {
+            max-width:1100px;
+            margin:0 auto;
+        }
+        h1 {
+            margin:0 0 4px;
+            font-size:24px;
+        }
+        .subtitle {
+            color:#666;
+            font-size:14px;
+            margin-bottom:16px;
+        }
+        .cards {
+            display:grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap:12px;
+            margin-bottom:20px;
+        }
+        .card {
+            background:#fff;
+            border-radius:10px;
+            padding:12px 14px;
+            box-shadow:0 1px 3px rgba(0,0,0,0.06);
+        }
+        .card-title {
+            font-size:13px;
+            color:#666;
+            margin-bottom:4px;
+        }
+        .card-value {
+            font-size:20px;
+            font-weight:600;
+        }
+        .card-value span {
+            font-size:13px;
+            font-weight:400;
+            color:#888;
+            margin-left:4px;
+        }
+        .section-title {
+            margin:16px 0 8px;
+            font-size:16px;
+        }
+        table {
+            width:100%;
+            border-collapse:collapse;
+            background:#fff;
+            border-radius:10px;
+            overflow:hidden;
+            box-shadow:0 1px 3px rgba(0,0,0,0.06);
+        }
+        th, td {
+            padding:8px 10px;
+            font-size:13px;
+            text-align:left;
+        }
+        th {
+            background:#f0f0f0;
+        }
+        tr:nth-child(every) {
+            background:#fafafa;
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <h1>Dashboard financier FAGNI</h1>
+    <p class="subtitle">
+        Synthèse des commandes, revenus FAGNI (service fee) et commissions MLM.
+        <br>
+        <strong>Période :</strong> {{ periode_label }}
+    </p>
+
+    <!-- Filtres de période -->
+    <div style="margin-bottom:12px;">
+        <a href="?period=all"
+           style="padding:4px 8px; font-size:12px; border-radius:999px; border:1px solid #ccc; text-decoration:none; margin-right:4px;
+           {% if period == 'all' %}background:#0056b3;color:#fff;border-color:#0056b3;{% else %}background:#fff;color:#333;{% endif %}">
+            Toutes
+        </a>
+        <a href="?period=30d"
+           style="padding:4px 8px; font-size:12px; border-radius:999px; border:1px solid #ccc; text-decoration:none; margin-right:4px;
+           {% if period == '30d' %}background:#0056b3;color:#fff;border-color:#0056b3;{% else %}background:#fff;color:#333;{% endif %}">
+            30 derniers jours
+        </a>
+        <a href="?period=7d"
+           style="padding:4px 8px; font-size:12px; border-radius:999px; border:1px solid #ccc; text-decoration:none; margin-right:4px;
+           {% if period == '7d' %}background:#0056b3;color:#fff;border-color:#0056b3;{% else %}background:#fff;color:#333;{% endif %}">
+            7 derniers jours
+        </a>
+        <a href="?period=today"
+           style="padding:4px 8px; font-size:12px; border-radius:999px; border:1px solid #ccc; text-decoration:none;
+           {% if period == 'today' %}background:#0056b3;color:#fff;border-color:#0056b3;{% else %}background:#fff;color:#333;{% endif %}">
+            Aujourd'hui
+        </a>
+    </div>
+
+    <!-- Cartes de synthèse -->
+    <div class="cards">
+        <div class="card">
+            <div class="card-title">Nombre total de commandes</div>
+            <div class="card-value">{{ total_orders }}</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">CA prestations</div>
+            <div class="card-value">
+                {{ total_revenue_prestation }}<span>FCFA</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Revenus FAGNI (Service fee)</div>
+            <div class="card-value">
+                {{ total_service_fee }}<span>FCFA</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Total commissions MLM</div>
+            <div class="card-value">
+                {{ total_mlm_commissions }}<span>FCFA</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Total crédité aux wallets</div>
+            <div class="card-value">
+                {{ total_wallet_credits }}<span>FCFA</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Revenu FAGNI net (après MLM)</div>
+            <div class="card-value">
+                {{ net_fagni_revenue }}<span>FCFA</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top blanchisseries -->
+    <h2 class="section-title">Top blanchisseries (par nombre de commandes)</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>Blanchisserie</th>
+            <th>Nombre de commandes</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for p in top_laundries %}
+            <tr>
+                <td>{{ p.name }}</td>
+                <td>{{ p.nb_orders }}</td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="2">Aucune blanchisserie n'a encore reçu de commandes.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Top livreurs -->
+    <h2 class="section-title">Top livreurs (par nombre de commandes)</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>Livreur</th>
+            <th>Nombre de commandes</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for p in top_deliveries %}
+            <tr>
+                <td>{{ p.name }}</td>
+                <td>{{ p.nb_orders }}</td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="2">Aucun livreur n'a encore été attribué.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+</div>
+</body>
+</html>

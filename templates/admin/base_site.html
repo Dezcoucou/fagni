@@ -1,7 +1,9 @@
 {% extends "admin/base.html" %}
-{% load i18n %}
-{% block nav-global %}
-  {{ block.super }}
-  <a href="/dashboard/analytics/export/csv/" class="button">Exporter en CSV</a>
-  <span style="margin-left:10px; font-size:11px; opacity:.7;">CSV READY</span>
-{% endblock %}
+
+{% block title %}FAGNI – Administration{% endblock %}
+
+{% block branding %}
+<h1 id="site-name">
+    <a href="{% url 'admin:index' %}">FAGNI – Administration</a>
+</h1>
+{% endblock branding %}

@@ -3,7 +3,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Commandes FAGNI</title>
+    <title>Liste des commandes - FAGNI</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <style>
@@ -40,41 +40,40 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.05);
         }
         .top-actions {
-            display:flex;
-            justify-content:space-between;
-            align-items:center;
-            gap:10px;
-            margin-bottom:12px;
-            flex-wrap:wrap;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            gap: 10px;
+            flex-wrap: wrap;
         }
         .btn-link {
-            text-decoration:none;
-            display:inline-block;
-            border-radius:999px;
-            padding:7px 12px;
-            font-size:13px;
+            text-decoration: none;
+            display: inline-block;
+            border-radius: 999px;
+            padding: 7px 12px;
+            font-size: 13px;
         }
         .btn-primary {
-            background:#0056b3;
-            color:#fff;
-            border:none;
+            background: #0056b3;
+            color: #fff;
+            border: none;
         }
         .btn-primary:hover {
-            background:#00408a;
+            background: #00408a;
         }
         .btn-secondary {
-            background:#fff;
-            border:1px solid #ccc;
-            color:#333;
+            background: #fff;
+            border: 1px solid #ccc;
+            color: #333;
         }
         .btn-secondary:hover {
-            background:#f3f3f3;
+            background: #f3f3f3;
         }
         table {
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
-            margin-top:8px;
         }
         th, td {
             padding: 8px 6px;
@@ -86,7 +85,7 @@
             font-weight: 600;
         }
         tr:hover {
-            background:#fafafa;
+            background: #fafafa;
         }
         .badge {
             padding: 3px 8px;
@@ -135,28 +134,29 @@
 <div class="page">
     <div class="card">
 
-        <!-- Barre du haut : stats + boutons -->
+        <!-- Bandeau haut : stats + boutons -->
         <div class="top-actions">
-            <div>
-                <strong>Total commandes :</strong>
-                {{ total_count }}
-                <span style="font-size:12px;color:#555;margin-left:8px;">
-                    Montant livré :
-                    <strong>{{ done_total }} FCFA</strong>
-                </span>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+                <div>
+                    <strong>Total commandes :</strong> {{ total_count }}
+                </div>
+                <div>
+                    <span style="font-size:12px;color:#555;">
+                        Terminées (cumul) :
+                        <strong>{{ done_total }} FCFA</strong>
+                    </span>
+                </div>
             </div>
+
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <a href="{% url 'orders:ops_dashboard' %}" class="btn-link btn-secondary">
-                    🚦 Suivi OPS
+                <a href="{% url 'orders:create' %}" class="btn-link btn-primary">
+                    + Nouvelle commande
                 </a>
                 <a href="{% url 'orders:dashboard' %}" class="btn-link btn-secondary">
                     📊 Dashboard commandes
                 </a>
                 <a href="{% url 'mlm:finance_dashboard' %}" class="btn-link btn-secondary">
                     💰 Finance FAGNI
-                </a>
-                <a href="{% url 'orders:create' %}" class="btn-link btn-primary">
-                    + Nouvelle commande
                 </a>
             </div>
         </div>
@@ -167,7 +167,7 @@
 
             <a href="{% url 'orders:list' %}"
                class="btn-link btn-secondary"
-               style="padding:4px 10px;{% if current_status == 'all' or not current_status %}background:#0056b3;color:#fff;border-color:#0056b3;{% endif %}">
+               style="padding:4px 10px;{% if current_status == 'all' %}background:#0056b3;color:#fff;border-color:#0056b3;{% endif %}">
                 Toutes ({{ total_count }})
             </a>
 
@@ -202,11 +202,9 @@
                     <tr>
                         <th>Code</th>
                         <th>Client</th>
-                        <th>Blanchisserie</th>
-                        <th>Livreur</th>
-                        <th>Statut</th>
-                        <th>Total</th>
                         <th>Créée le</th>
+                        <th>Total</th>
+                        <th>Statut</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -215,23 +213,8 @@
                     <tr>
                         <td>{{ order.code }}</td>
                         <td>{{ order.customer.name }}</td>
-
-                        <td>
-                            {% if order.laundry_partner %}
-                                {{ order.laundry_partner.name }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-
-                        <td>
-                            {% if order.delivery_partner %}
-                                🛵 {{ order.delivery_partner.name }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-
+                        <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
+                        <td>{{ order.total }} FCFA</td>
                         <td>
                             {% if order.status == "pending" %}
                                 <span class="badge badge-pending">En attente</span>
@@ -245,10 +228,6 @@
                                 <span class="badge">{{ order.status }}</span>
                             {% endif %}
                         </td>
-
-                        <td>{{ order.total }} FCFA</td>
-                        <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
-
                         <td class="actions">
                             <a href="{% url 'orders:detail' order.id %}">Détail</a> |
                             <a href="{% url 'orders:update' order.id %}">Modifier</a>

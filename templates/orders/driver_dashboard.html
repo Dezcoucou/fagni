@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Logistique livreurs – FAGNI</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        body{
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin:0;
+            padding:0;
+            background:#f5f5f7;
+            color:#222;
+        }
+        header{
+            background:linear-gradient(90deg,#ff7a00,#0056b3);
+            color:#fff;
+            padding:16px 24px;
+        }
+        header h1{
+            margin:0;
+            font-size:20px;
+        }
+        header p{
+            margin:4px 0 0;
+            font-size:13px;
+            opacity:.9;
+        }
+        .page{
+            max-width:1200px;
+            margin:20px auto 30px;
+            padding:0 10px;
+        }
+        .top-bar{
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:10px;
+            flex-wrap:wrap;
+            margin-bottom:14px;
+        }
+        .summary{
+            font-size:13px;
+            color:#333;
+        }
+        .summary span{
+            margin-right:10px;
+        }
+        .btn-link{
+            text-decoration:none;
+            display:inline-block;
+            border-radius:999px;
+            padding:7px 12px;
+            font-size:13px;
+        }
+        .btn-primary{
+            background:#0056b3;
+            color:#fff;
+            border:none;
+        }
+        .btn-primary:hover{
+            background:#00408a;
+        }
+        .btn-secondary{
+            background:#fff;
+            border:1px solid #ccc;
+            color:#333;
+        }
+        .btn-secondary:hover{
+            background:#f3f3f3;
+        }
+        .filter-bar{
+            display:flex;
+            align-items:center;
+            gap:8px;
+            font-size:13px;
+        }
+        .filter-bar select{
+            padding:4px 6px;
+            border-radius:6px;
+            border:1px solid #ccc;
+            font-size:13px;
+        }
+        .board{
+            background:#fff;
+            border-radius:10px;
+            box-shadow:0 4px 10px rgba(0,0,0,0.04);
+            padding:12px 12px 16px;
+        }
+        table{
+            width:100%;
+            border-collapse:collapse;
+            font-size:12px;
+        }
+        th,td{
+            padding:6px 4px;
+            border-bottom:1px solid #f0f0f0;
+            vertical-align:top;
+        }
+        th{
+            background:#fafafa;
+            font-weight:600;
+        }
+        tr:hover{
+            background:#fafafa;
+        }
+        .link-detail{
+            font-size:11px;
+            text-decoration:none;
+            color:#0056b3;
+        }
+        .link-detail:hover{
+            text-decoration:underline;
+        }
+        .empty{
+            font-size:12px;
+            color:#777;
+            padding:8px 0;
+            text-align:center;
+        }
+        .ops-mini{
+            font-size:11px;
+            color:#555;
+            line-height:1.35;
+        }
+        .badge-status{
+            display:inline-block;
+            border-radius:999px;
+            padding:2px 8px;
+            font-size:10px;
+            font-weight:600;
+        }
+        .badge-collecte{ background:#e3f2fd; color:#0d47a1; }
+        .badge-blanchisserie{ background:#fff3cd; color:#856404; }
+        .badge-lavage{ background:#e0f7fa; color:#006064; }
+        .badge-retour{ background:#e2e3e5; color:#343a40; }
+        .badge-livre{ background:#d4edda; color:#155724; }
+        .badge-enattente{ background:#f8d7da; color:#721c24; }
+        button{
+            font-size:11px;
+            border-radius:999px;
+            border:none;
+            padding:3px 8px;
+            cursor:pointer;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Logistique livreurs – FAGNI</h1>
+    <p>Vue par livreur : commandes, distances, coûts et marges logistiques.</p>
+</header>
+
+<div class="page">
+
+    <div class="top-bar">
+        <div class="summary">
+            <span><strong>Commandes avec livreur :</strong> {{ orders|length }}</span>
+        </div>
+        <div>
+            <a href="{% url 'orders:ops_dashboard' %}" class="btn-link btn-secondary">← OPS général</a>
+            <a href="{% url 'orders:list' %}" class="btn-link btn-secondary">📋 Liste des commandes</a>
+            <a href="{% url 'orders:create' %}" class="btn-link btn-primary">+ Nouvelle commande</a>
+        </div>
+    </div>
+
+    <div class="top-bar" style="margin-bottom:18px;">
+        <form method="get" class="filter-bar">
+            <span>Filtrer par livreur :</span>
+            <select name="driver" onchange="this.form.submit()">
+                <option value="">— Tous les livreurs —</option>
+                {% for d in drivers %}
+                    <option value="{{ d.id }}"
+                        {% if selected_driver_id == d.id %}selected{% endif %}>
+                        {{ d.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+
+    <div class="board">
+        {% if orders %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Code / dates</th>
+                        <th>Client / adresse</th>
+                        <th>Livreur / statut</th>
+                        <th>Articles / photos</th>
+                        <th>Montants & logistique</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for order in orders %}
+                    <tr>
+                        <td>
+                            <strong>{{ order.code }}</strong><br>
+                            <span class="ops-mini">
+                                Créée le {{ order.created_at|date:"d/m H:i" }}<br>
+                                {% if order.delivered_time %}
+                                    Livrée le {{ order.delivered_time|date:"d/m H:i" }}
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            <strong>{{ order.customer.name }}</strong><br>
+                            <span class="ops-mini">
+                                📍 {{ order.customer.address|default:"(adresse non renseignée)" }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="ops-mini">
+                                {% if order.delivery_partner %}
+                                    🛵 {{ order.delivery_partner.name }}
+                                {% else %}
+                                    🛵 (non assigné)
+                                {% endif %}
+                            </span>
+                            <br>
+                            <span class="ops-mini">
+                                {% if not order.pickup_time %}
+                                    <span class="badge-status badge-enattente">En attente collecte</span>
+                                {% elif not order.dropoff_time %}
+                                    <span class="badge-status badge-collecte">Collecte en cours</span>
+                                {% elif not order.wash_complete_time %}
+                                    <span class="badge-status badge-blanchisserie">Chez la blanchisserie</span>
+                                {% elif not order.return_time %}
+                                    <span class="badge-status badge-lavage">Lavage terminé</span>
+                                {% elif not order.delivered_time %}
+                                    <span class="badge-status badge-retour">Retour vers client</span>
+                                {% else %}
+                                    <span class="badge-status badge-livre">Livrée</span>
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="ops-mini">
+                                🧺 {{ order.nb_items }} article{{ order.nb_items|pluralize:"s" }}<br>
+                                📸 {{ order.nb_photos }} photo{{ order.nb_photos|pluralize:"s" }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="ops-mini">
+                                💰 Total : <strong>{{ order.total }} FCFA</strong><br>
+                                🚛 Livraison : {{ order.delivery_fee|default:"0" }} FCFA<br>
+                                👟 Coût livreur : {{ order.driver_logistic_cost|default:"0" }} FCFA<br>
+                                📈 Marge FAGNI : {{ order.logistic_margin|default:"0" }} FCFA<br>
+                                📏 Distance AR :
+                                {% if order.distance_km %}
+                                    {{ order.distance_km }} km
+                                {% else %}
+                                    (non calculée)
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{% url 'orders:detail' order.id %}" class="link-detail">
+                                Détail commande
+                            </a><br>
+                            <a href="{% url 'orders:ops_dashboard' %}" class="link-detail">
+                                Ouvrir dans OPS
+                            </a>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="empty">
+                Aucune commande avec livreur pour ce filtre.
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+
+</body>
+</html>

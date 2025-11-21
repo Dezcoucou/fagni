@@ -1,0 +1,415 @@
+{% load humanize %}
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Tableau de bord livreurs – FAGNI</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+
+    <style>
+        body{
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin:0;
+            padding:0;
+            background:#f5f5f7;
+            color:#222;
+        }
+        header{
+            background:linear-gradient(90deg,#ff7a00,#0056b3);
+            color:#fff;
+            padding:16px 24px;
+        }
+        header h1{
+            margin:0;
+            font-size:20px;
+        }
+        header p{
+            margin:4px 0 0;
+            font-size:13px;
+            opacity:.9;
+        }
+        .page{
+            max-width:1200px;
+            margin:20px auto 30px;
+            padding:0 10px;
+        }
+        .top-bar{
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-start;
+            gap:10px;
+            flex-wrap:wrap;
+            margin-bottom:14px;
+        }
+        .btn-link{
+            text-decoration:none;
+            display:inline-block;
+            border-radius:999px;
+            padding:7px 12px;
+            font-size:13px;
+        }
+        .btn-primary{
+            background:#0056b3;
+            color:#fff;
+            border:none;
+        }
+        .btn-primary:hover{
+            background:#00408a;
+        }
+        .btn-secondary{
+            background:#fff;
+            border:1px solid #ccc;
+            color:#333;
+        }
+        .btn-secondary:hover{
+            background:#f3f3f3;
+        }
+        .card{
+            background:#fff;
+            border-radius:10px;
+            box-shadow:0 4px 10px rgba(0,0,0,0.04);
+            padding:12px 14px 14px;
+            margin-bottom:14px;
+        }
+        .card h2{
+            margin:0 0 6px;
+            font-size:15px;
+        }
+        .card small{
+            font-size:11px;
+            color:#666;
+        }
+        .filters-row{
+            display:flex;
+            flex-wrap:wrap;
+            gap:10px;
+            align-items:flex-end;
+        }
+        .field-group{
+            display:flex;
+            flex-direction:column;
+            gap:3px;
+            font-size:12px;
+        }
+        .field-group label{
+            font-size:12px;
+        }
+        .field-group select,
+        .field-group input[type="date"]{
+            padding:5px 7px;
+            border-radius:6px;
+            border:1px solid #ddd;
+            font-size:13px;
+            min-width:150px;
+        }
+        .btn-small{
+            border-radius:999px;
+            border:1px solid #ccc;
+            background:#fff;
+            color:#333;
+            padding:6px 10px;
+            font-size:12px;
+            cursor:pointer;
+            white-space:nowrap;
+        }
+        .btn-small:hover{
+            background:#f5f5f5;
+        }
+        .stats-grid{
+            display:grid;
+            grid-template-columns:repeat(3,1fr);
+            gap:10px;
+            margin-top:8px;
+        }
+        @media(max-width:900px){
+            .stats-grid{
+                grid-template-columns:1fr;
+            }
+        }
+        .stat-box{
+            background:#fafafa;
+            border-radius:8px;
+            padding:8px 10px;
+            font-size:12px;
+        }
+        .stat-label{
+            font-size:11px;
+            color:#666;
+        }
+        .stat-value{
+            font-weight:600;
+            font-size:14px;
+        }
+        .stat-highlight{
+            color:#ff7a00;
+        }
+        table{
+            width:100%;
+            border-collapse:collapse;
+            font-size:12px;
+        }
+        th,td{
+            padding:6px 4px;
+            border-bottom:1px solid #f0f0f0;
+            vertical-align:top;
+        }
+        th{
+            background:#fafafa;
+            font-weight:600;
+        }
+        tr:hover{
+            background:#fafafa;
+        }
+        .badge{
+            display:inline-block;
+            border-radius:999px;
+            padding:2px 6px;
+            font-size:10px;
+        }
+        .badge-km{
+            background:#e3f2fd;
+            color:#0d47a1;
+        }
+        .badge-margin{
+            background:#d4edda;
+            color:#155724;
+        }
+        .badge-orders{
+            background:#fff3cd;
+            color:#856404;
+        }
+        .section-title{
+            font-size:14px;
+            margin:10px 0 6px;
+            font-weight:600;
+        }
+        .hint{
+            font-size:11px;
+            color:#777;
+        }
+        .link-detail{
+            font-size:11px;
+            text-decoration:none;
+            color:#0056b3;
+        }
+        .link-detail:hover{
+            text-decoration:underline;
+        }
+        .empty{
+            font-size:12px;
+            color:#777;
+            padding:8px 0;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Tableau de bord livreurs – FAGNI</h1>
+    <p>Analyse de l’activité des livreurs : courses, distances, coûts et marges logistiques.</p>
+</header>
+
+<div class="page">
+
+    <!-- Barre du haut : navigation + actions -->
+    <div class="top-bar">
+        <div>
+            <a href="{% url 'orders:ops_dashboard' %}" class="btn-link btn-secondary">← Ops global</a>
+            <a href="{% url 'orders:list' %}" class="btn-link btn-secondary">📋 Liste des commandes</a>
+            <a href="{% url 'orders:create' %}" class="btn-link btn-primary">+ Nouvelle commande</a>
+        </div>
+    </div>
+
+    <!-- Filtres + stats globales -->
+    <div class="card">
+        <h2>Filtres & synthèse</h2>
+        <small>Filtre par livreur et période pour analyser les performances logistiques.</small>
+
+        <form method="get" class="filters-row" style="margin-top:8px;">
+            <div class="field-group">
+                <label for="driver_id">Livreur :</label>
+                <select name="driver_id" id="driver_id">
+                    <option value="">Tous les livreurs</option>
+                    {% for d in drivers %}
+                        <option value="{{ d.id }}" {% if filters.driver_id|default:"" == d.id|stringformat:"s" %}selected{% endif %}>
+                            {{ d.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="field-group">
+                <label for="start">Date début :</label>
+                <input type="date" name="start" id="start" value="{{ filters.start|default:"" }}">
+            </div>
+
+            <div class="field-group">
+                <label for="end">Date fin :</label>
+                <input type="date" name="end" id="end" value="{{ filters.end|default:"" }}">
+            </div>
+
+            <div class="field-group" style="flex-direction:row;gap:6px;">
+                <button type="submit" class="btn-small">🔍 Filtrer</button>
+                <a href="{% url 'orders:driver_dashboard' %}" class="btn-small">✖ Réinitialiser</a>
+            </div>
+        </form>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-label">Nombre de commandes</div>
+                <div class="stat-value">
+                    {{ global_stats.nb_orders|default:0 }}
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Total livraison facturée (FCFA)</div>
+                <div class="stat-value">
+                    {{ global_stats.total_delivery|floatformat:0|intcomma }}
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Coût logistique livreurs (FCFA)</div>
+                <div class="stat-value">
+                    {{ global_stats.total_driver_cost|floatformat:0|intcomma }}
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Marge logistique FAGNI (FCFA)</div>
+                <div class="stat-value stat-highlight">
+                    {{ global_stats.total_margin|floatformat:0|intcomma }}
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Distance totale (km AR)</div>
+                <div class="stat-value">
+                    {{ global_stats.total_distance|floatformat:0 }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tableau agrégé par livreur -->
+    <div class="card">
+        <div class="section-title">Performance par livreur</div>
+        <p class="hint">
+            Une ligne = un livreur. Tu vois le volume de courses, les montants de livraison, le coût livreur et la marge FAGNI.
+        </p>
+
+        {% if driver_stats %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Livreur</th>
+                        <th>Courses</th>
+                        <th>Livraison (FCFA)</th>
+                        <th>Coût livreur (FCFA)</th>
+                        <th>Marge FAGNI (FCFA)</th>
+                        <th>Distance (km AR)</th>
+                        <th>Photos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in driver_stats %}
+                    <tr>
+                        <td>
+                            {{ row.delivery_partner__name|default:"(Sans nom)" }}
+                        </td>
+                        <td>
+                            <span class="badge badge-orders">
+                                {{ row.nb_orders|default:0 }} commande{{ row.nb_orders|default:0|pluralize:"s" }}
+                            </span>
+                        </td>
+                        <td>{{ row.total_delivery|floatformat:0|intcomma }}</td>
+                        <td>{{ row.total_driver_cost|floatformat:0|intcomma }}</td>
+                        <td>
+                            <span class="badge badge-margin">
+                                {{ row.computed_margin|floatformat:0|intcomma }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge badge-km">
+                                {{ row.total_distance|floatformat:0 }} km
+                            </span>
+                        </td>
+                        <td>
+                            📸 {{ row.photos_count|default:0 }}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <div class="empty">
+                Aucune course trouvée pour ces filtres.
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Détail des courses pour le livreur sélectionné -->
+    <div class="card">
+        <div class="section-title">
+            Détail des courses
+            {% if filters.driver_id %}
+                – livreur sélectionné
+            {% else %}
+                (sélectionne un livreur pour filtrer)
+            {% endif %}
+        </div>
+        <p class="hint">
+            Liste des commandes (max 200) pour affiner l’analyse opérationnelle : client, montant, distance, marges, etc.
+        </p>
+
+        {% if orders_for_driver %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Date</th>
+                        <th>Client</th>
+                        <th>Total livraison (FCFA)</th>
+                        <th>Coût livreur (FCFA)</th>
+                        <th>Marge (FCFA)</th>
+                        <th>Distance (km AR)</th>
+                        <th>Détail</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for o in orders_for_driver %}
+                    <tr>
+                        <td>{{ o.code }}</td>
+                        <td>{{ o.created_at|date:"d/m/Y H:i" }}</td>
+                        <td>{{ o.customer.name }}</td>
+                        <td>{{ o.delivery_fee|default:0 }}</td>
+                        <td>{{ o.driver_logistic_cost|default:0 }}</td>
+                        <td>{{ o.logistic_margin|default:0 }}</td>
+                        <td>
+                            {% if o.distance_km %}
+                                {{ o.distance_km }} km
+                            {% else %}
+                                –
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'orders:detail' o.id %}" class="link-detail">
+                                Voir
+                            </a>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="empty">
+                {% if filters.driver_id %}
+                    Aucune commande trouvée pour ce livreur avec ces dates.
+                {% else %}
+                    Sélectionne un livreur pour voir le détail de ses courses.
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+
+</body>
+</html>

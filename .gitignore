@@ -35,3 +35,4 @@ Thumbs.db
 /__pycache__/
 /*.pid
 *.sock
+logs/*.log

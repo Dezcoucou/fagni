@@ -1,5 +1,4 @@
 from django.apps import AppConfig
-from django.db.models.signals import post_migrate
 
 
 class OrdersConfig(AppConfig):
@@ -8,27 +7,32 @@ class OrdersConfig(AppConfig):
 
     def ready(self):
         """
-        Connecte un signal post_migrate pour créer automatiquement
-        un superuser 'admin' une fois que les migrations sont appliquées.
+        Hook appelé quand Django a chargé toutes les apps.
+        Ici on se contente de brancher un signal post_migrate
+        qui créera un superuser par défaut si besoin.
         """
+        from django.db.models.signals import post_migrate
+        from django.conf import settings
         from django.contrib.auth import get_user_model
-        from django.db.utils import OperationalError, ProgrammingError
 
-        User = get_user_model()
+        def ensure_default_superuser(sender, **kwargs):
+            """
+            Création auto d'un admin sur chaque migrate
+            (local + Render).
+            On ne le crée que s'il n'existe pas déjà.
+            """
+            User = get_user_model()
 
-        def create_default_admin(sender, **kwargs):
-            try:
-                # On évite de toucher la DB si les tables ne sont pas prêtes
-                if not User.objects.filter(username="admin").exists():
-                    User.objects.create_superuser(
-                        username="admin",
-                        password="Admin1234!",
-                        email="admin@fagni.com",
-                    )
-            except (OperationalError, ProgrammingError):
-                # Si la DB n'est pas encore prête (premier démarrage foireux, etc.),
-                # on ignore et on ne bloque pas le processus.
-                pass
+            username = getattr(settings, "DEFAULT_ADMIN_USERNAME", "admin")
+            email = getattr(settings, "DEFAULT_ADMIN_EMAIL", "admin@fagni.com")
+            password = getattr(settings, "DEFAULT_ADMIN_PASSWORD", "Admin1234!")
 
-        # On connecte le signal sur cette app
-        post_migrate.connect(create_default_admin, sender=self)
+            if not User.objects.filter(username=username).exists():
+                User.objects.create_superuser(
+                    username=username,
+                    email=email,
+                    password=password,
+                )
+
+        # On connecte le signal après migrations
+        post_migrate.connect(ensure_default_superuser, sender=self)

@@ -2,5 +2,8 @@ from django.apps import AppConfig
 
 
 class MlmConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'mlm'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "mlm"
+
+    def ready(self):
+        import mlm.signals

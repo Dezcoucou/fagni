@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Demandes de retrait – Back-office MLM FAGNI</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        body{
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin:0;
+            padding:0;
+            background:#f5f5f7;
+            color:#222;
+        }
+        header{
+            background:linear-gradient(90deg,#ff7a00,#0056b3);
+            color:#fff;
+            padding:16px 24px;
+        }
+        header h1{
+            margin:0;
+            font-size:20px;
+        }
+        header p{
+            margin:4px 0 0;
+            font-size:13px;
+            opacity:.9;
+        }
+        .page{
+            max-width:1100px;
+            margin:20px auto 30px;
+            padding:0 10px;
+        }
+        .card{
+            background:#fff;
+            border-radius:10px;
+            box-shadow:0 4px 10px rgba(0,0,0,0.04);
+            padding:14px 18px 18px;
+            margin-bottom:14px;
+        }
+        .mini{
+            font-size:11px;
+            color:#666;
+        }
+        table{
+            width:100%;
+            border-collapse:collapse;
+            font-size:13px;
+        }
+        th,td{
+            padding:6px 4px;
+            border-bottom:1px solid #eee;
+            vertical-align:top;
+        }
+        th{
+            background:#fafafa;
+            font-weight:600;
+            white-space:nowrap;
+        }
+        tr:hover{
+            background:#fafafa;
+        }
+        .t-right{ text-align:right; }
+        .badge{
+            display:inline-block;
+            padding:2px 6px;
+            border-radius:999px;
+            font-size:11px;
+        }
+        .badge-pending{background:#fff3cd;color:#856404;}
+        .badge-approved{background:#cce5ff;color:#004085;}
+        .badge-paid{background:#d4edda;color:#155724;}
+        .badge-rejected{background:#f8d7da;color:#721c24;}
+        .btn{
+            border-radius:999px;
+            padding:3px 8px;
+            font-size:11px;
+            border:none;
+            cursor:pointer;
+        }
+        .btn-approve{background:#007bff;color:#fff;}
+        .btn-paid{background:#28a745;color:#fff;}
+        .btn-reject{background:#dc3545;color:#fff;}
+        .filter-bar{
+            display:flex;
+            gap:8px;
+            align-items:center;
+            margin-bottom:8px;
+            flex-wrap:wrap;
+        }
+        .filter-bar select{
+            border-radius:999px;
+            border:1px solid #ccc;
+            padding:4px 8px;
+            font-size:12px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Demandes de retrait – MLM FAGNI</h1>
+    <p>Validation et suivi des retraits d'affiliés.</p>
+</header>
+
+<div class="page">
+    <div class="card">
+        <form method="get" class="filter-bar">
+            <span class="mini">Filtrer par statut :</span>
+            <select name="status" onchange="this.form.submit()">
+                <option value="">Tous</option>
+                <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>En attente</option>
+                <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approuvés</option>
+                <option value="paid" {% if status_filter == 'paid' %}selected{% endif %}>Payés</option>
+                <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejetés</option>
+            </select>
+        </form>
+
+        {% if withdrawals %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Affilié</th>
+                        <th class="t-right">Montant (FCFA)</th>
+                        <th>Mode</th>
+                        <th>Statut</th>
+                        <th>Dates</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for wr in withdrawals %}
+                    <tr>
+                        <td>{{ wr.id }}</td>
+                        <td>
+                            {% if wr.profile.customer and wr.profile.customer.name %}
+                                {{ wr.profile.customer.name }}
+                            {% else %}
+                                Profil {{ wr.profile.id }}
+                            {% endif %}
+                            <div class="mini">
+                                Code : {{ wr.profile.referral_code }}
+                            </div>
+                        </td>
+                        <td class="t-right">
+                            {{ wr.amount }}
+                        </td>
+                        <td>
+                            {{ wr.payout_method }}
+                        </td>
+                        <td>
+                            {% if wr.status == 'pending' %}
+                                <span class="badge badge-pending">En attente</span>
+                            {% elif wr.status == 'approved' %}
+                                <span class="badge badge-approved">Approuvée</span>
+                            {% elif wr.status == 'paid' %}
+                                <span class="badge badge-paid">Payée</span>
+                            {% elif wr.status == 'rejected' %}
+                                <span class="badge badge-rejected">Rejetée</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="mini">
+                                Demande : {{ wr.created_at|date:"d/m/Y H:i" }}<br>
+                                {% if wr.processed_at %}
+                                    Traitée : {{ wr.processed_at|date:"d/m/Y H:i" }}
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            {% if wr.status in 'pending approved' %}
+                                <form method="post" style="display:inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="request_id" value="{{ wr.id }}">
+                                    <input type="hidden" name="action" value="approve">
+                                    <button type="submit" class="btn btn-approve">Approuver</button>
+                                </form>
+                                <form method="post" style="display:inline;margin-left:4px;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="request_id" value="{{ wr.id }}">
+                                    <input type="hidden" name="action" value="mark_paid">
+                                    <button type="submit" class="btn btn-paid">Marquer payée</button>
+                                </form>
+                                <form method="post" style="display:inline;margin-left:4px;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="request_id" value="{{ wr.id }}">
+                                    <input type="hidden" name="action" value="reject">
+                                    <button type="submit" class="btn btn-reject">Rejeter</button>
+                                </form>
+                            {% else %}
+                                <span class="mini">Aucune action</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="mini">
+                Aucune demande de retrait pour le moment.
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+</body>
+</html>

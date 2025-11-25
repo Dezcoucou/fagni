@@ -1,44 +1,49 @@
 from django.urls import path
 from . import views
-from .api import client_lookup
 
-app_name = 'orders'
+app_name = "orders"
 
 urlpatterns = [
-    # API pour autocomplétion client
-    path('api/client/', client_lookup, name='client_lookup'),
+    # Liste & CRUD de base
+    path("", views.orders_list, name="list"),
+    path("create/", views.create, name="create"),
+    path("<int:order_id>/", views.detail, name="detail"),
+    path("<int:order_id>/edit/", views.update, name="update"),
+    path("orders/<int:order_id>/ticket/", views.order_ticket_pdf, name="order_ticket_pdf"),
+    path("orders/<int:order_id>/ticket-thermal/", views.order_ticket_thermal_pdf, name="order_ticket_thermal_pdf"),
 
-    path('dashboard/', views.orders_dashboard, name='dashboard'),
 
-    # Export CSV
-    path('export_top_clients_csv/', views.export_top_clients_csv, name='export_top_clients_csv'),
+    path("api/client/", views.client_lookup, name="client_lookup"),
 
-    path('export_orders_csv/', views.export_orders_csv, name='export_orders_csv'),
+    # Dashboards
+    path("dashboard/", views.orders_dashboard, name="dashboard"),
+    path("ops/", views.ops_dashboard, name="ops_dashboard"),
+    path("ops/<int:order_id>/<str:action>/", views.ops_update_step, name="ops_update_step"),
+    path("drivers/", views.driver_dashboard, name="driver_dashboard"),
+    path("finance/", views.finance_dashboard, name="finance_dashboard"),
 
-    # Liste des commandes
-    path('', views.orders_list, name='list'),
+    # Clients / mini CRM
+    path("customers/", views.customers_list, name="customers_list"),
+    path("customers/export/", views.export_customers_csv, name="export_customers_csv"),
+    path("customer/<int:customer_id>/", views.orders_by_customer, name="orders_by_customer"),
 
-    # Création de commande
-    path('create/', views.create, name='create'),
+    # Export commandes
+    path("export/csv/", views.export_orders_csv, name="export_orders_csv"),
 
-    # 🔹 Dashboard OPS FAGNI
-    path('ops/', views.ops_dashboard, name='ops_dashboard'),
+    # Top clients (CSV + alias XLSX pour le template analytics)
+    path("top-clients.csv", views.export_top_clients_csv, name="export_top_clients_csv"),
+    path("top-clients.xlsx", views.export_top_clients_csv, name="export_top_clients_xlsx"),
 
-    path('ops/drivers/', views.driver_dashboard, name='ops_drivers'),
+    # Changement de statut simple
+    path("<int:order_id>/status/", views.change_status, name="change_status"),
 
-    # 🔹 Dashboard logistique par livreur
-    path('ops/drivers/', views.driver_dashboard, name='driver_dashboard'),
+    path("finance/", views.finance_dashboard, name="finance_dashboard"),
 
-    path('ops/<int:order_id>/<str:action>/', views.ops_update_step, name='ops_update_step'),
+    path("finance/export/", views.export_finance_xlsx, name="finance_export"),
 
-    # Détail commande
-    path('<int:order_id>/', views.detail, name='detail'),
+    path("orders/export/xlsx/", views.export_orders_xlsx, name="export_orders_xlsx"),
 
-    # Mise à jour commande
-    path('<int:order_id>/update/', views.update, name='update'),
+    path("customers/export/xlsx/", views.export_customers_xlsx, name="export_customers_xlsx"),
 
-    # Suppression commande
-    path('<int:order_id>/delete/', views.delete, name='delete'),
-
-    path('<int:order_id>/status/', views.change_status, name='change_status'),
+    path("top-clients/export/xlsx/", views.export_top_clients_xlsx, name="export_top_clients_xlsx"),
 ]

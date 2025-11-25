@@ -1,36 +1,481 @@
-<!doctype html>
-<html lang="fr">
-<head><meta charset="utf-8"><title>Commandes du client {{ customer_id }}</title></head>
-<body>
-  <h1>Commandes du client {{ customer_id }}</h1>
-  <p>Total : {{ order.total_any }}</p>
-  <table border="1" cellpadding="6">
-    <thead>
-      <tr><th>ID</th><th>Client</th><th>Créée le</th></tr>
-    </thead>
-    <tbody>
-    {% for order in orders %}
-      <tr>
-        <td>{{ order.id }}</td>
-        <td>{{ order.customer }}</td>
-        <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
-      </tr>
-    {% empty %}
-      <tr><td colspan="3">Aucune commande pour ce client.</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
+{% extends "base.html" %}
+{% load humanize %}
 
-  <nav>
-    {% if page_obj.has_previous %}
-      <a href="?page={{ page_obj.previous_page_number }}">« Précédent</a>
-    {% endif %}
-    <span>Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-    {% if page_obj.has_next %}
-      <a href="?page={{ page_obj.next_page_number }}">Suivant »</a>
-    {% endif %}
-  </nav>
+{% block content %}
+<style>
+    body{
+        background:#f5f5f7;
+    }
+    header{
+        background:linear-gradient(90deg,#ff7a00,#0056b3);
+        color:#fff;
+        padding:16px 24px;
+        margin:0 -12px 0 -12px;
+    }
+    header h1{
+        margin:0;
+        font-size:20px;
+    }
+    header p{
+        margin:4px 0 0;
+        font-size:13px;
+        opacity:.9;
+    }
+    .page{
+        max-width:1200px;
+        margin:20px auto 30px;
+        padding:0 10px;
+    }
+    .card{
+        background:#fff;
+        border-radius:10px;
+        box-shadow:0 4px 10px rgba(0,0,0,0.05);
+        padding:14px 18px 18px;
+        margin-bottom:14px;
+    }
+    .top-bar{
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:10px;
+        flex-wrap:wrap;
+        margin-bottom:10px;
+    }
+    .btn-link{
+        text-decoration:none;
+        display:inline-block;
+        border-radius:999px;
+        padding:7px 12px;
+        font-size:13px;
+    }
+    .btn-primary{
+        background:#0056b3;
+        color:#fff;
+        border:none;
+    }
+    .btn-primary:hover{
+        background:#00408a;
+    }
+    .btn-secondary{
+        background:#fff;
+        border:1px solid #ccc;
+        color:#333;
+    }
+    .btn-secondary:hover{
+        background:#f3f3f3;
+    }
+    .mini{
+        font-size:11px;
+        color:#666;
+    }
 
-  <p><a href="/orders/">← Retour à la liste</a></p>
-</body>
-</html>
+    .pill{
+        display:inline-flex;
+        align-items:center;
+        gap:4px;
+        padding:2px 8px;
+        border-radius:999px;
+        background:#f1f3f5;
+        font-size:11px;
+        margin-right:5px;
+    }
+    .pill-vip{
+        background:#fbe4ff;
+        color:#7b248c;
+    }
+    .pill-risk{
+        background:#fff3cd;
+        color:#856404;
+    }
+    .pill-regular{
+        background:#edf4ff;
+        color:#234f9c;
+    }
+
+    /* Grille profil + stats */
+    .profile-grid{
+        display:grid;
+        grid-template-columns:1.2fr 1.5fr;
+        gap:14px;
+    }
+    @media(max-width:900px){
+        .profile-grid{
+            grid-template-columns:1fr;
+        }
+    }
+
+    .profile-block h2{
+        font-size:15px;
+        margin:0 0 4px;
+    }
+
+    /* Stat cards */
+    .cards{
+        display:grid;
+        grid-template-columns:repeat(4,1fr);
+        gap:10px;
+        margin-top:8px;
+    }
+    @media(max-width:900px){
+        .cards{ grid-template-columns:repeat(2,1fr); }
+    }
+    @media(max-width:600px){
+        .cards{ grid-template-columns:1fr; }
+    }
+    .stat-card{
+        background:#f8f9fb;
+        border-radius:10px;
+        padding:10px 12px;
+    }
+    .stat-label{
+        font-size:11px;
+        color:#666;
+        margin-bottom:2px;
+    }
+    .stat-value{
+        font-size:18px;
+        font-weight:600;
+    }
+    .stat-sub{
+        font-size:11px;
+        color:#777;
+        margin-top:2px;
+    }
+
+    /* Tableau commandes */
+    table{
+        width:100%;
+        border-collapse:collapse;
+        font-size:13px;
+        margin-top:8px;
+    }
+    th,td{
+        padding:7px 5px;
+        border-bottom:1px solid #eee;
+        vertical-align:top;
+    }
+    th{
+        background:#fafafa;
+        font-weight:600;
+        white-space:nowrap;
+    }
+    tr:hover{
+        background:#fafafa;
+    }
+    .t-right{ text-align:right; }
+    .t-nowrap{ white-space:nowrap; }
+
+    .badge{
+        padding:3px 8px;
+        border-radius:999px;
+        font-size:11px;
+        white-space:nowrap;
+    }
+    .badge-pending{
+        background:#fff3cd;
+        color:#856404;
+    }
+    .badge-in-progress{
+        background:#cce5ff;
+        color:#004085;
+    }
+    .badge-done{
+        background:#d4edda;
+        color:#155724;
+    }
+    .badge-canceled{
+        background:#f8d7da;
+        color:#721c24;
+    }
+
+    .badge-paid{
+        background:#d4edda;
+        color:#155724;
+    }
+    .badge-due{
+        background:#fff3cd;
+        color:#856404;
+    }
+    .badge-unpaid{
+        background:#f8d7da;
+        color:#721c24;
+    }
+
+    .link-mini{
+        font-size:11px;
+        color:#0056b3;
+        text-decoration:none;
+    }
+    .link-mini:hover{
+        text-decoration:underline;
+    }
+
+    .legend{
+        margin-top:8px;
+        font-size:11px;
+        color:#666;
+    }
+    .empty{
+        padding:16px 0;
+        text-align:center;
+        font-size:13px;
+        color:#777;
+    }
+
+</style>
+
+<header>
+    <h1>Fiche client – FAGNI</h1>
+    <p>Vision 360° d’un client : coordonnées, volume, historique, encaissements et encours.</p>
+</header>
+
+<div class="page">
+
+    <!-- Carte profil client & synthèse -->
+    <div class="card">
+        <div class="top-bar">
+            <div>
+                <div style="font-size:14px;font-weight:600;">
+                    {% if customer %}
+                        {{ customer.name|default:"Client sans nom" }}
+                    {% else %}
+                        Client
+                    {% endif %}
+                </div>
+                <div class="mini" style="margin-top:2px;">
+                    {% if customer and customer.phone %}
+                        📞 {{ customer.phone }}<br>
+                    {% endif %}
+                    {% if customer and customer.email %}
+                        ✉️ {{ customer.email }}<br>
+                    {% endif %}
+                    {% if customer and customer.address %}
+                        📍 {{ customer.address }}<br>
+                    {% endif %}
+                    {% if customer and customer.notes %}
+                        📝 {{ customer.notes }}
+                    {% endif %}
+                </div>
+                <div style="margin-top:6px;">
+                    {% if is_vip %}
+                        <span class="pill pill-vip">Client VIP</span>
+                    {% else %}
+                        <span class="pill pill-regular">Client standard</span>
+                    {% endif %}
+                    {% if total_due and total_due > 0 %}
+                        <span class="pill pill-risk">
+                            🔔 Encours à suivre : {{ total_due|floatformat:0|intcomma }} FCFA
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                <a href="{% url 'orders:customers_list' %}" class="btn-link btn-secondary">
+                    👥 Liste clients
+                </a>
+                <a href="{% url 'orders:list' %}" class="btn-link btn-secondary">
+                    📋 Liste commandes
+                </a>
+                <a href="{% url 'orders:dashboard' %}" class="btn-link btn-secondary">
+                    📊 Dashboard commandes
+                </a>
+                <a href="{% url 'orders:finance_dashboard' %}" class="btn-link btn-secondary">
+                    💰 Dashboard financier
+                </a>
+                <a href="{% url 'orders:create' %}" class="btn-link btn-primary">
+                    + Nouvelle commande pour ce client
+                </a>
+            </div>
+        </div>
+
+        <!-- Profil + mini timeline -->
+        <div class="profile-grid">
+            <div class="profile-block">
+                <h2>Données client</h2>
+                <div class="mini">
+                    {% if first_order_date %}
+                        1ʳᵉ commande : <strong>{{ first_order_date|date:"d/m/Y H:i" }}</strong><br>
+                    {% endif %}
+                    {% if last_order_date %}
+                        Dernière commande : <strong>{{ last_order_date|date:"d/m/Y H:i" }}</strong><br>
+                    {% endif %}
+                    {% if orders_count %}
+                        Fréquence globale : <strong>{{ orders_count|intcomma }} commande{{ orders_count|pluralize }}</strong>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="profile-block">
+                <h2>Vision business rapide</h2>
+                <div class="mini">
+                    • CA cumulé (toutes commandes) : <strong>{{ total_amount|default:0|floatformat:0|intcomma }} FCFA</strong><br>
+                    • Montant déjà encaissé : <strong>{{ total_paid|default:0|floatformat:0|intcomma }} FCFA</strong><br>
+                    • Encours (reste à encaisser) : <strong>{{ total_due|default:0|floatformat:0|intcomma }} FCFA</strong><br>
+                    {% if avg_ticket %}
+                        • Panier moyen : <strong>{{ avg_ticket|floatformat:0|intcomma }} FCFA / commande</strong>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- KPIs -->
+        <div class="cards" style="margin-top:12px;">
+            <div class="stat-card">
+                <div class="stat-label">Nombre de commandes</div>
+                <div class="stat-value">
+                    {{ orders_count|default:orders|length|intcomma }}
+                </div>
+                <div class="stat-sub">
+                    Inclut toutes les commandes associées à ce client.
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">CA prestations (HT/TTC selon param.)</div>
+                <div class="stat-value">
+                    {{ total_prestations|default:0|floatformat:0|intcomma }} FCFA
+                </div>
+                <div class="stat-sub">
+                    Somme des lignes de prestations liées à ce client.
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Service FAGNI cumulé</div>
+                <div class="stat-value">
+                    {{ total_service_fee|default:0|floatformat:0|intcomma }} FCFA
+                </div>
+                <div class="stat-sub">
+                    Commission FAGNI générée par ce client.
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Livraison facturée à ce client</div>
+                <div class="stat-value">
+                    {{ total_delivery_fee|default:0|floatformat:0|intcomma }} FCFA
+                </div>
+                <div class="stat-sub">
+                    Utile pour analyser la rentabilité logistique client.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Historique des commandes -->
+    <div class="card">
+        <h2 style="margin:0 0 8px;font-size:16px;border-left:4px solid #ff7a00;padding-left:8px;">
+            Historique des commandes de ce client
+        </h2>
+        <p class="mini" style="margin:0 0 8px;">
+            Chaque ligne représente une commande de ce client, avec son statut opérationnel et financier.
+        </p>
+
+        {% if orders %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Commande</th>
+                        <th class="t-right">Prestations</th>
+                        <th class="t-right">Service FAGNI</th>
+                        <th class="t-right">Livraison</th>
+                        <th class="t-right">Total client</th>
+                        <th class="t-right">Payé</th>
+                        <th class="t-right">Dû</th>
+                        <th>Statut</th>
+                        <th>Livraison / Logistique</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for order in orders %}
+                    <tr>
+                        <td class="t-nowrap">
+                            <strong>{{ order.code|default:order.id }}</strong><br>
+                            <span class="mini">
+                                Créée le {{ order.created_at|date:"d/m/Y H:i" }}<br>
+                                {% if order.delivered_time %}
+                                    Livrée le {{ order.delivered_time|date:"d/m/Y H:i" }}
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td class="t-right">
+                            {{ order.base_total|default:order.total_ht|default:0|floatformat:0|intcomma }} FCFA
+                        </td>
+                        <td class="t-right">
+                            {{ order.service_fee|default:0|floatformat:0|intcomma }} FCFA
+                        </td>
+                        <td class="t-right">
+                            {{ order.delivery_fee|default:0|floatformat:0|intcomma }} FCFA
+                        </td>
+                        <td class="t-right">
+                            {{ order.total_global_client|default:order.total|default:0|floatformat:0|intcomma }} FCFA
+                        </td>
+                        <td class="t-right">
+                            {{ order.paid|default:0|floatformat:0|intcomma }} FCFA
+                        </td>
+                        <td class="t-right">
+                            {{ order.due|default:0|floatformat:0|intcomma }} FCFA
+                            <br>
+                            {% if order.is_fully_paid %}
+                                <span class="badge badge-paid">Soldée</span>
+                            {% elif order.due > 0 and order.paid > 0 %}
+                                <span class="badge badge-due">Partiellement payée</span>
+                            {% elif order.due > 0 %}
+                                <span class="badge badge-unpaid">Non payée</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if order.status == "pending" %}
+                                <span class="badge badge-pending">En attente</span>
+                            {% elif order.status == "in_progress" %}
+                                <span class="badge badge-in-progress">En cours</span>
+                            {% elif order.status == "done" %}
+                                <span class="badge badge-done">Terminée</span>
+                            {% elif order.status == "canceled" %}
+                                <span class="badge badge-canceled">Annulée</span>
+                            {% else %}
+                                <span class="badge">{{ order.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if order.laundry_partner %}
+                                <span class="mini">🧺 {{ order.laundry_partner.name }}</span><br>
+                            {% endif %}
+                            {% if order.delivery_partner %}
+                                <span class="mini">🛵 {{ order.delivery_partner.name }}</span><br>
+                            {% endif %}
+                            {% if order.distance_km %}
+                                <span class="mini">
+                                    Distance : {{ order.distance_km }} km
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'orders:detail' order.id %}" class="link-mini">
+                                Détail
+                            </a><br>
+                            <a href="{% url 'orders:order_ticket_pdf' order.id %}"
+                               class="link-mini"
+                               target="_blank">
+                                Ticket PDF
+                            </a>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="legend">
+                💡 <strong>Idées d’usage :</strong><br>
+                – Identifier les clients avec <strong>fort historique + encours</strong> pour les relances ciblées.<br>
+                – Voir rapidement l’impact de ce client sur le <strong>CA, le service FAGNI et la logistique</strong>.<br>
+                – Croiser cette fiche avec le <strong>dashboard financier</strong> pour les décisions de conditions spéciales (remises, abonnements, etc.).
+            </div>
+        {% else %}
+            <div class="empty">
+                Aucune commande enregistrée pour ce client pour le moment.
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

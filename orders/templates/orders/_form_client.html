@@ -1,0 +1,82 @@
+{# orders/templates/orders/_form_client.html #}
+
+<div class="mb-4">
+    <label for="client_phone" class="block text-sm font-medium text-gray-700">
+        Téléphone :
+    </label>
+    <input
+        type="text"
+        id="client_phone"
+        name="client_phone"
+        value="{{ order.customer.phone }}"
+        placeholder="Ex : 0700000000"
+        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm
+               focus:border-fagni-blue focus:ring-fagni-blue sm:text-sm p-2"
+        data-lookup-url="{% url 'orders:client_lookup' %}"
+    >
+</div>
+
+<div id="client_data_fields">
+    <div class="mb-4">
+        <label for="client_name" class="block text-sm font-medium text-gray-700">
+            Nom et prénoms :
+        </label>
+        <input
+            type="text"
+            id="client_name"
+            name="client_name"
+            value="{{ order.customer.name }}"
+            placeholder="Nom du client"
+            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm
+                   focus:border-fagni-blue focus:ring-fagni-blue sm:text-sm p-2"
+        >
+    </div>
+
+    <div class="mb-4">
+        <label for="client_address" class="block text-sm font-medium text-gray-700">
+            Adresse :
+        </label>
+        <div class="flex gap-2">
+            <input
+                type="text"
+                id="client_address"
+                name="client_address"
+                value="{{ order.customer.address }}"
+                placeholder="Ex : Cocody Angré 8ème tranche"
+                class="flex-1 rounded-md border-gray-300 shadow-sm
+                       focus:border-fagni-blue focus:ring-fagni-blue sm:text-sm p-2"
+            >
+            <button
+                type="button"
+                id="locateBtn"
+                class="flex-shrink-0 px-3 py-1 bg-white border border-fagni-orange
+                       text-fagni-orange rounded-full text-xs font-medium
+                       hover:bg-orange-50 transition"
+            >
+                📍 Me localiser
+            </button>
+        </div>
+        <small class="mt-1 text-xs text-gray-500">
+            Suggestions Google + géolocalisation si tu es chez le client.
+        </small>
+    </div>
+</div>
+
+<input type="hidden" id="client_lat" name="client_lat" value="{{ order.customer.latitude|default:'' }}">
+<input type="hidden" id="client_lng" name="client_lng" value="{{ order.customer.longitude|default:'' }}">
+
+{# Champ code parrain si tu l’avais déjà #}
+{% if order.customer and order.customer.referral_code %}
+    <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700">
+            Code parrain :
+        </label>
+        <input
+            type="text"
+            value="{{ order.customer.referral_code }}"
+            readonly
+            class="mt-1 block w-full rounded-md border-gray-200 bg-gray-100
+                   text-gray-700 sm:text-sm p-2"
+        >
+    </div>
+{% endif %}

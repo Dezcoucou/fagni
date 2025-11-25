@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Contrat & CGU affilié – FAGNI</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        body{
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            background:#f5f5f7;
+            margin:0;
+            padding:20px;
+            color:#222;
+        }
+        .page{
+            max-width:900px;
+            margin:0 auto;
+        }
+        .card{
+            background:#fff;
+            border-radius:10px;
+            padding:16px 20px;
+            box-shadow:0 3px 8px rgba(0,0,0,0.06);
+        }
+        h1{
+            font-size:22px;
+            margin-top:0;
+        }
+        h2{
+            font-size:16px;
+            margin-top:18px;
+        }
+        p, li{
+            font-size:14px;
+            line-height:1.5;
+        }
+        .back-link{
+            display:inline-block;
+            margin-top:16px;
+            text-decoration:none;
+            border-radius:999px;
+            padding:8px 14px;
+            background:#0056b3;
+            color:#fff;
+            font-size:13px;
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="card">
+        <h1>Contrat & Conditions Générales d’Utilisation – Programme d’affiliation FAGNI</h1>
+
+        <p>
+            Cette page présente une version de travail des dispositions contractuelles
+            applicables aux affiliés du programme MLM FAGNI. Le texte définitif devra
+            être validé par un conseil juridique avant publication officielle.
+        </p>
+
+        <h2>1. Objet du programme</h2>
+        <p>
+            Le programme d’affiliation FAGNI permet à un client, un influenceur ou une
+            entreprise partenaire (« l’Affilié ») de recommander les services de
+            pressing et services associés FAGNI et de percevoir des commissions sur
+            les commandes réalisées par les filleuls rattachés à son code.
+        </p>
+
+        <h2>2. Fonctionnement du parrainage</h2>
+        <ul>
+            <li>Chaque affilié dispose d’un <strong>code unique</strong> et éventuellement d’un <strong>lien de parrainage</strong>.</li>
+            <li>Tout nouveau client rattaché à ce code devient un <strong>filleul de niveau 1 (N1)</strong>.</li>
+            <li>Le réseau peut s’étendre jusqu’à <strong>3 niveaux</strong> (N1, N2, N3) selon les règles internes de FAGNI.</li>
+        </ul>
+
+        <h2>3. Règles de calcul des commissions</h2>
+        <p>
+            Les commissions sont calculées sur la base du <strong>service FAGNI</strong> généré par la commande,
+            avec une enveloppe globale de <strong>15&nbsp;%</strong> répartie comme suit :
+        </p>
+        <ul>
+            <li>Niveau 1 (N1) : <strong>10&nbsp;%</strong></li>
+            <li>Niveau 2 (N2) : <strong>3&nbsp;%</strong></li>
+            <li>Niveau 3 (N3) : <strong>2&nbsp;%</strong></li>
+        </ul>
+        <p>
+            Les montants sont crédités dans le <strong>wallet affilié</strong> après validation définitive de la
+            commande (statut « terminée »).
+        </p>
+
+        <h2>4. Retraits & contrôles</h2>
+        <p>
+            Les demandes de retrait sont soumises à validation par l’équipe FAGNI.
+            FAGNI se réserve le droit de vérifier les opérations et de bloquer tout
+            comportement frauduleux (création de faux comptes, commandes fictives, etc.).
+        </p>
+
+        <h2>5. Conformité légale</h2>
+        <p>
+            Le programme d’affiliation FAGNI est conçu comme un <strong>dispositif de
+            parrainage multi-niveaux légal</strong>, fondé sur une vraie prestation de
+            services (pressing, logistique, etc.) et non comme un système de type Ponzi.
+        </p>
+        <p>
+            Cette documentation est fournie à titre d’information. Le texte final
+            devra respecter le droit OHADA, la réglementation ivoirienne applicable
+            et, le cas échéant, toute exigence spécifique des autorités de régulation.
+        </p>
+
+        <a href="{% url 'mlm:affiliate_dashboard' %}" class="back-link">
+            ← Retour à mon tableau d'affilié
+        </a>
+    </div>
+</div>
+</body>
+</html>

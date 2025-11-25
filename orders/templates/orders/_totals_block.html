@@ -1,0 +1,39 @@
+{# orders/_totals_block.html #}
+
+<div class="mt-4 border-t border-gray-200 pt-3 text-sm">
+    <div class="flex justify-between">
+        <span class="font-medium">Total prestation :</span>
+        <span id="total_prestation">
+            {{ order.total_ht|default:0 }} FCFA
+        </span>
+    </div>
+
+    <div class="flex justify-between mt-1">
+        <span class="font-medium">Service FAGNI (5% min 500 FCFA) :</span>
+        <span id="service_fee_display">
+            {{ order.service_fee|default:0 }} FCFA
+        </span>
+    </div>
+
+    <div class="flex justify-between mt-1">
+        <span class="font-medium">Frais de livraison (estimation front) :</span>
+        <span id="delivery_fee_display">
+            {{ order.delivery_fee|default:0 }} FCFA
+        </span>
+    </div>
+
+    <div class="flex justify-between mt-2">
+        <span class="font-semibold text-orange-600">Total global estimé :</span>
+        <span id="total_global_display" class="font-semibold text-orange-600">
+            {{ order.grand_total|default:0 }} FCFA
+        </span>
+    </div>
+
+    <p class="text-xs text-gray-500 mt-2">
+        * Transport (estimation front) :
+        min <strong>{{ delivery_min_fee|default:0 }} FCFA</strong>,
+        environ {{ delivery_price_per_km|default:0 }} FCFA / km AR
+        (+ fixe {{ delivery_fixed_fee|default:0 }} FCFA).<br>
+        Le montant officiel est recalculé côté serveur selon la distance réelle client ↔ blanchisserie.
+    </p>
+</div>

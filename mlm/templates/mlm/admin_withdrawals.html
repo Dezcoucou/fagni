@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Demandes de retrait – Admin FAGNI</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        body{
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            background:#f5f5f7;
+            margin:0;
+            padding:0;
+            color:#222;
+        }
+        .page{
+            max-width:1100px;
+            margin:20px auto;
+            padding:0 10px;
+        }
+        .card{
+            background:#fff;
+            border-radius:10px;
+            padding:16px 20px;
+            box-shadow:0 3px 8px rgba(0,0,0,0.05);
+        }
+        h1{
+            font-size:20px;
+            margin-top:0;
+        }
+        table{
+            width:100%;
+            border-collapse:collapse;
+            font-size:13px;
+        }
+        th,td{
+            padding:6px 4px;
+            border-bottom:1px solid #eee;
+            vertical-align:top;
+        }
+        th{
+            background:#fafafa;
+            font-weight:600;
+            white-space:nowrap;
+        }
+        .mini{
+            font-size:11px;
+            color:#666;
+        }
+        .badge{
+            display:inline-block;
+            padding:2px 7px;
+            border-radius:999px;
+            font-size:11px;
+        }
+        .b-pending{ background:#fff3cd; color:#856404; }
+        .b-approved{ background:#d1ecf1; color:#0c5460; }
+        .b-rejected{ background:#f8d7da; color:#721c24; }
+        .b-paid{ background:#d4edda; color:#155724; }
+
+        form.inline{
+            display:inline-block;
+            margin:0 2px;
+        }
+        button{
+            font-size:11px;
+            border-radius:999px;
+            border:none;
+            padding:4px 8px;
+            cursor:pointer;
+        }
+        .btn-approve{ background:#17a2b8; color:#fff; }
+        .btn-reject{ background:#dc3545; color:#fff; }
+        .btn-paid{ background:#28a745; color:#fff; }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="card">
+        <h1>Demandes de retrait – Administration</h1>
+
+        {% if withdrawals %}
+            <table>
+                <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Affilié</th>
+                    <th>Montant</th>
+                    <th>Statut</th>
+                    <th>Moyen de paiement</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for w in withdrawals %}
+                    <tr>
+                        <td>{{ w.created_at|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            {% if w.profile.customer %}
+                                {{ w.profile.customer.name }}
+                                <div class="mini">
+                                    Code : {{ w.profile.referral_code }}
+                                </div>
+                            {% else %}
+                                {{ w.profile }}
+                            {% endif %}
+                        </td>
+                        <td>{{ w.amount }} FCFA</td>
+                        <td>
+                            {% if w.status == "pending" %}
+                                <span class="badge b-pending">En attente</span>
+                            {% elif w.status == "approved" %}
+                                <span class="badge b-approved">Approuvée</span>
+                            {% elif w.status == "rejected" %}
+                                <span class="badge b-rejected">Rejetée</span>
+                            {% elif w.status == "paid" %}
+                                <span class="badge b-paid">Payée</span>
+                            {% else %}
+                                {{ w.status }}
+                            {% endif %}
+                        </td>
+                        <td>{{ w.payout_method|default:"—" }}</td>
+                        <td>
+                            {% if w.status == "pending" %}
+                                <form method="post" class="inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="request_id" value="{{ w.id }}">
+                                    <input type="hidden" name="action" value="approve">
+                                    <button type="submit" class="btn-approve">Approuver</button>
+                                </form>
+                                <form method="post" class="inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="request_id" value="{{ w.id }}">
+                                    <input type="hidden" name="action" value="reject">
+                                    <button type="submit" class="btn-reject">Rejeter</button>
+                                </form>
+                            {% elif w.status == "approved" %}
+                                <form method="post" class="inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="request_id" value="{{ w.id }}">
+                                    <input type="hidden" name="action" value="mark_paid">
+                                    <button type="submit" class="btn-paid">Marquer comme payée</button>
+                                </form>
+                            {% else %}
+                                <span class="mini">Aucune action disponible.</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="mini">
+                Aucune demande de retrait pour le moment.
+            </p>
+        {% endif %}
+    </div>
+</div>
+</body>
+</html>

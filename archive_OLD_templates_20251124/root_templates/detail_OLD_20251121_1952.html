@@ -1,0 +1,567 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Détail commande {{ order.code }} - FAGNI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f5f5f7;
+            margin: 0;
+            padding: 0;
+            color: #222;
+        }
+        header {
+            background: linear-gradient(90deg, #ff7a00, #0056b3);
+            color: #fff;
+            padding: 16px 24px;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+        header p {
+            margin: 4px 0 0;
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        .page {
+            max-width: 1100px;
+            margin: 20px auto 30px;
+            padding: 0 10px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 10px;
+            padding: 16px 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            margin-bottom: 16px;
+        }
+        .card h2 {
+            margin-top: 0;
+            font-size: 18px;
+            border-left: 4px solid #ff7a00;
+            padding-left: 8px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 16px;
+        }
+        .field-row {
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+        .field-label {
+            font-weight: 600;
+            display: inline-block;
+            width: 110px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge.pending { background:#fff5eb; color:#b45b00; }
+        .badge.in_progress { background:#e3f2fd; color:#004e92; }
+        .badge.done { background:#e8f5e9; color:#1b5e20; }
+        .badge.canceled { background:#ffebee; color:#b71c1c; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+        th, td {
+            padding: 6px 4px;
+            border-bottom: 1px solid #eee;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background: #fafafa;
+            font-weight: 600;
+        }
+        .total-line {
+            font-weight: 600;
+        }
+        .totals-box {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        .totals-box div {
+            margin-bottom: 2px;
+        }
+        #map {
+            width: 100%;
+            height: 250px;
+            margin-top: 8px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            border: none;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-size: 13px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-back {
+            background:#fff;
+            border:1px solid #ccc;
+            color:#333;
+        }
+        .btn-edit {
+            background:#0056b3;
+            color:#fff;
+        }
+        .btn-back:hover { background:#f3f3f3; }
+        .btn-edit:hover { background:#00408a; }
+
+        .photos-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .photo-thumb {
+            width: 60px;
+            height: 60px;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #eee;
+        }
+        .photo-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .photo-count {
+            font-size: 11px;
+            color:#555;
+            margin-top: 2px;
+        }
+
+        @media (max-width: 800px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>Commande {{ order.code }}</h1>
+    <p>Détail complet de la commande et informations client.</p>
+</header>
+
+<div class="page">
+    <div class="card">
+        <div class="actions" style="margin-bottom:10px;">
+            <a href="{% url 'orders:list' %}" class="btn btn-back">← Retour à la liste</a>
+            <a href="{% url 'orders:update' order_id=order.id %}" class="btn btn-edit">Modifier la commande</a>
+        </div>
+
+        <div class="grid">
+            <!-- Colonne gauche : Commande / Client / Partenaires -->
+            <div>
+                <h2>Commande</h2>
+
+                <div class="field-row">
+                    <span class="field-label">Code :</span>
+                    <span>{{ order.code }}</span>
+                </div>
+
+                <div class="field-row">
+                    <span class="field-label">Statut :</span>
+
+                    {% if order.status == "pending" %}
+                        <span class="badge pending"
+                              style="padding:3px 8px;border-radius:999px;background:#fff3cd;color:#856404;font-size:12px;">
+                            En attente
+                        </span>
+                    {% elif order.status == "in_progress" %}
+                        <span class="badge in_progress"
+                              style="padding:3px 8px;border-radius:999px;background:#cce5ff;color:#004085;font-size:12px;">
+                            En cours
+                        </span>
+                    {% elif order.status == "done" %}
+                        <span class="badge done"
+                              style="padding:3px 8px;border-radius:999px;background:#d4edda;color:#155724;font-size:12px;">
+                            Terminée
+                        </span>
+                    {% elif order.status == "canceled" %}
+                        <span class="badge canceled"
+                              style="padding:3px 8px;border-radius:999px;background:#f8d7da;color:#721c24;font-size:12px;">
+                            Annulée
+                        </span>
+                    {% else %}
+                        <span class="badge">{{ order.status }}</span>
+                    {% endif %}
+                </div>
+
+                <form method="post" action="{% url 'orders:change_status' order.id %}" style="margin-top:8px;">
+                    {% csrf_token %}
+                    <label for="status_select" style="font-size:13px;">Changer le statut :</label>
+                    <select name="status" id="status_select"
+                            style="padding:4px 6px;font-size:13px;border-radius:6px;border:1px solid #ccc;">
+                        <option value="pending" {% if order.status == "pending" %}selected{% endif %}>En attente</option>
+                        <option value="in_progress" {% if order.status == "in_progress" %}selected{% endif %}>En cours</option>
+                        <option value="done" {% if order.status == "done" %}selected{% endif %}>Terminée</option>
+                        <option value="canceled" {% if order.status == "canceled" %}selected{% endif %}>Annulée</option>
+                    </select>
+
+                    <button type="submit"
+                            style="margin-left:6px;padding:4px 10px;border-radius:999px;
+                            border:none;font-size:13px;background:#0056b3;color:#fff;cursor:pointer;">
+                        Mettre à jour
+                    </button>
+                </form>
+
+                <div class="field-row">
+                    <span class="field-label">Créée le :</span>
+                    <span>{{ order.created_at|date:"d/m/Y H:i" }}</span>
+                </div>
+                <div class="field-row">
+                    <span class="field-label">Mise à jour :</span>
+                    <span>{{ order.updated_at|date:"d/m/Y H:i" }}</span>
+                </div>
+
+                <h2 style="margin-top:14px;">Client</h2>
+                <div class="field-row">
+                    <span class="field-label">Nom :</span>
+                    <span>{{ order.customer.name }}</span>
+                </div>
+                <div class="field-row">
+                    <span class="field-label">Téléphone :</span>
+                    <span>{{ order.customer.phone }}</span>
+                </div>
+                <div class="field-row">
+                    <span class="field-label">Adresse :</span>
+                    <span>{{ order.customer.address }}</span>
+                </div>
+
+                <h2 style="margin-top:14px;">Partenaires</h2>
+                <div class="field-row">
+                    <span class="field-label">Blanchisserie :</span>
+                    <span>
+                        {% if order.laundry_partner %}
+                            {{ order.laundry_partner }}
+                        {% else %}
+                            <em>Non affectée</em>
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="field-row">
+                    <span class="field-label">Livreur :</span>
+                    <span>
+                        {% if order.delivery_partner %}
+                            {{ order.delivery_partner }}
+                        {% else %}
+                            <em>Non affecté</em>
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Colonne droite : Map + Totaux + Timeline -->
+            <div>
+                <h2>Localisation</h2>
+                <div id="map"></div>
+
+                <h2 style="margin-top:16px;">Totaux</h2>
+                <div class="totals-box" style="
+                    background:#fafafa;
+                    border:1px solid #e5e5e5;
+                    border-radius:8px;
+                    padding:12px 14px;
+                    font-size:15px;
+                    line-height:1.5;
+                ">
+                    <div style="display:flex; justify-content:space-between;">
+                        <span>Sous-total (HT)</span>
+                        <strong>{{ order.total_ht }} FCFA</strong>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between;">
+                        <span>TVA</span>
+                        <strong>{{ order.tva_amount }} FCFA</strong>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between;">
+                        <span>Service FAGNI</span>
+                        <strong style="color:#ff6a00;">{{ order.service_fee }} FCFA</strong>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between;">
+                        <span>Frais de livraison</span>
+                        <strong>{{ order.delivery_fee|default:"0" }} FCFA</strong>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between;">
+                        <span>Distance aller-retour</span>
+                        <strong>
+                            {% if order.distance_km %}
+                                {{ order.distance_km }} km
+                            {% else %}
+                                —
+                            {% endif %}
+                        </strong>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between;">
+                        <span>Coût logistique livreur</span>
+                        <strong>{{ order.driver_logistic_cost|default:"0" }} FCFA</strong>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between;">
+                        <span>Marge logistique FAGNI</span>
+                        <strong>{{ order.logistic_margin|default:"0" }} FCFA</strong>
+                    </div>
+
+                    <div style="border-top:1px solid #ddd; margin:10px 0;"></div>
+
+                    <div style="display:flex; justify-content:space-between;">
+                        <span>Total TTC (hors service)</span>
+                        <strong>{{ order.total_ttc }} FCFA</strong>
+                    </div>
+
+                    <div style="margin-top:8px; display:flex; justify-content:space-between; font-size:16px;">
+                        <strong>Total général</strong>
+                        <strong style="color:#0056b3;">
+                            {{ order.grand_total }} FCFA
+                        </strong>
+                    </div>
+                </div>
+
+                <!-- Timeline opérationnelle -->
+                <h2 style="margin-top:16px;">Timeline opérationnelle</h2>
+                <div class="totals-box">
+
+                    <div>
+                        🛒 <strong>Créée :</strong>
+                        {{ order.created_at|date:"d/m/Y H:i" }}
+                    </div>
+
+                    <div>
+                        🛵 <strong>Collectée :</strong>
+                        {% if order.pickup_time %}
+                            {{ order.pickup_time|date:"d/m/Y H:i" }}
+                        {% else %}
+                            — Non encore collectée
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        🧺 <strong>Déposée blanchisserie :</strong>
+                        {% if order.dropoff_time %}
+                            {{ order.dropoff_time|date:"d/m/Y H:i" }}
+                        {% else %}
+                            — Non encore déposée
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        ✅ <strong>Lavage terminé :</strong>
+                        {% if order.wash_complete_time %}
+                            {{ order.wash_complete_time|date:"d/m/Y H:i" }}
+                        {% else %}
+                            — En attente de fin de lavage
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        🚚 <strong>Reprise livreur :</strong>
+                        {% if order.return_time %}
+                            {{ order.return_time|date:"d/m/Y H:i" }}
+                        {% else %}
+                            — Non reprise
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        🏠 <strong>Livrée :</strong>
+                        {% if order.delivered_time %}
+                            {{ order.delivered_time|date:"d/m/Y H:i" }}
+                        {% else %}
+                            — Non livrée
+                        {% endif %}
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Lignes de commande & photos</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Article</th>
+                    <th>Quantité</th>
+                    <th>PU (FCFA)</th>
+                    <th>Total (FCFA)</th>
+                    <th>Photos</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in order.items.all %}
+                    <tr>
+                        <td>{{ item.designation }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>{{ item.unit_price }}</td>
+                        <td>{{ item.total }}</td>
+                        <td>
+                            {% with photos=item.photos.all %}
+                                {% if photos %}
+                                    <div class="photos-grid">
+                                        {% for photo in photos %}
+                                            <div class="photo-thumb">
+                                                <a href="{{ photo.image.url }}" target="_blank">
+                                                    <img src="{{ photo.image.url }}" alt="Photo article {{ item.id }}">
+                                                </a>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="photo-count">
+                                        {{ photos.count }} photo{{ photos.count|pluralize:"s" }}
+                                    </div>
+                                {% else %}
+                                    <em>Aucune photo</em>
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5">Aucune ligne pour cette commande.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+let map, clientMarker, laundryMarker, geocoder;
+
+function parseCoord(raw) {
+    if (!raw) return null;
+    // On remplace une éventuelle virgule par un point
+    raw = raw.replace(',', '.');
+    const v = parseFloat(raw);
+    return isNaN(v) ? null : v;
+}
+
+function initMap() {
+    const mapElement = document.getElementById('map');
+    if (!mapElement || !window.google || !google.maps) {
+        console.log("Google Maps non disponible pour le moment.");
+        return;
+    }
+
+    // On passe tout en chaînes et on parse côté JS
+    const clientLatRaw = "{{ order.customer.latitude|default_if_none:'' }}";
+    const clientLngRaw = "{{ order.customer.longitude|default_if_none:'' }}";
+
+    const laundLatRaw = "{% if order.laundry_partner %}{{ order.laundry_partner.latitude|default_if_none:'' }}{% endif %}";
+    const laundLngRaw = "{% if order.laundry_partner %}{{ order.laundry_partner.longitude|default_if_none:'' }}{% endif %}";
+
+    const clientLat = parseCoord(clientLatRaw);
+    const clientLng = parseCoord(clientLngRaw);
+    const laundLat = parseCoord(laundLatRaw);
+    const laundLng = parseCoord(laundLngRaw);
+
+    const defaultCenter = {lat: 5.347, lng: -4.026}; // Abidjan
+    let center = defaultCenter;
+
+    if (clientLat !== null && clientLng !== null) {
+        center = {lat: clientLat, lng: clientLng};
+    }
+
+    map = new google.maps.Map(mapElement, {
+        zoom: 12,
+        center: center,
+    });
+    geocoder = new google.maps.Geocoder();
+
+    // 1) Client + blanchisserie → 2 marqueurs
+    if (clientLat !== null && clientLng !== null && laundLat !== null && laundLng !== null) {
+        const clientPos = {lat: clientLat, lng: clientLng};
+        const laundPos = {lat: laundLat, lng: laundLng};
+
+        clientMarker = new google.maps.Marker({
+            map: map,
+            position: clientPos,
+            label: "C",
+            title: "Client",
+        });
+
+        laundryMarker = new google.maps.Marker({
+            map: map,
+            position: laundPos,
+            label: "B",
+            title: "Blanchisserie",
+        });
+
+        const bounds = new google.maps.LatLngBounds();
+        bounds.extend(clientPos);
+        bounds.extend(laundPos);
+        map.fitBounds(bounds);
+
+    } else if (clientLat !== null && clientLng !== null) {
+        // 2) Seulement le client
+        const clientPos = {lat: clientLat, lng: clientLng};
+        clientMarker = new google.maps.Marker({
+            map: map,
+            position: clientPos,
+            label: "C",
+            title: "Client",
+        });
+        map.setCenter(clientPos);
+        map.setZoom(14);
+
+    } else {
+        // 3) On retombe sur le géocodage de l'adresse
+        const marker = new google.maps.Marker({
+            map: map,
+            position: defaultCenter,
+        });
+
+        const address = "{{ order.customer.address|escapejs }}";
+        if (address) {
+            geocoder.geocode(
+                { address: address + ", Côte d'Ivoire" },
+                function (results, status) {
+                    if (status === 'OK' && results[0]) {
+                        const loc = results[0].geometry.location;
+                        map.setCenter(loc);
+                        map.setZoom(14);
+                        marker.setPosition(loc);
+                    } else {
+                        console.log("Geocode KO:", status);
+                    }
+                }
+            );
+        }
+    }
+}
+</script>
+
+<script src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&callback=initMap" async defer></script>
+</body>
+</html>

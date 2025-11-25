@@ -1,18 +1,40 @@
 import os
 from pathlib import Path
+from decimal import Decimal
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# ========================
+#  CONFIG DE BASE
+# ========================
 SECRET_KEY = os.getenv('SECRET_KEY', 'changeme-dev-key')
-DEBUG = True
+DEBUG = True  # ⚠️ à mettre à False en prod
 
 ADMINS = [("Admin", "admin@example.com")]
-ALLOWED_HOSTS = ['dezcoucou80.pythonanywhere.com', '127.0.0.1', 'localhost']
-LOGIN_URL = '/admin/login/'
-CSRF_TRUSTED_ORIGINS = ['https://dezcoucou80.pythonanywhere.com']
 
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+    "dezcoucou80.pythonanywhere.com",  # tu peux le laisser si tu utilises encore PythonAnywhere
+    ".onrender.com",                   # accepte tous les sous-domaines Render
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://dezcoucou80.pythonanywhere.com",
+    "https://*.onrender.com",          # nécessaire pour les POST sur Render
+]
+
+SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "http://127.0.0.1:8000")
+
+LOGIN_URL = '/admin/login/'
+LOGIN_REDIRECT_URL = '/orders/'   # renvoie vers la liste des commandes
+
+# ========================
+#  APPS
+# ========================
 INSTALLED_APPS = [
     'dashboard',
+
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -20,19 +42,24 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize',
+
     'orders',
     'partners',
     'django_extensions',
     'mlm',
+    'api',
+    'portal',
 ]
 
-
+# ========================
+#  MIDDLEWARE
+# ========================
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.locale.LocaleMiddleware',
-        'django.middleware.locale.LocaleMiddleware',
-'django.middleware.common.CommonMiddleware',
+    'django.middleware.locale.LocaleMiddleware',   # ✅ une seule fois
+    'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -41,11 +68,14 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'fagni.urls'
 
+# ========================
+#  TEMPLATES
+# ========================
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
-            BASE_DIR / "templates",        # 👈 templates/ (accueil.html, admin/, etc.)
+            BASE_DIR / "templates",   # templates/ (accueil.html, etc.)
         ],
         'APP_DIRS': True,
         'OPTIONS': {
@@ -59,54 +89,48 @@ TEMPLATES = [
     },
 ]
 
+# ========================
+#  BASE DE DONNÉES
+# ========================
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
     }
 }
+
 AUTH_PASSWORD_VALIDATORS = []
+
+# ========================
+#  LOCALISATION
+# ========================
 LANGUAGE_CODE = 'fr'
-TIME_ZONE = 'Africa/Abidjan'
-USE_I18N = True
-USE_TZ = True
-
-STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-USE_L10N = True
-
-LOCALE_PATHS = [ BASE_DIR / 'locale' ]
-LOGIN_URL = '/admin/login/'
-LOGIN_REDIRECT_URL = '/orders/new-multi/'
-
 LANGUAGES = [
     ('fr', 'Français'),
 ]
 
-LOCALE_PATHS = [ BASE_DIR / 'locale' ]
-# --------------------[ Localisation FR – auto ]--------------------
-LANGUAGE_CODE = 'fr'
-LANGUAGES = [("fr", "Français")]
 TIME_ZONE = 'Africa/Abidjan'
 USE_I18N = True
 USE_L10N = True
 USE_TZ = True
 
-# Dossier templates si pas déjà configuré
-from pathlib import Path
-BASE_DIR = Path(__file__).resolve().parent.parent
-try:
-    TEMPLATES[0]["DIRS"] = list(set(TEMPLATES[0].get("DIRS", []) + [str(BASE_DIR / "templates")]))
-except Exception:
-    pass
-# ------------------------------------------------------------------
+LOCALE_PATHS = [BASE_DIR / 'locale']
 
+# ========================
+#  STATIC & MEDIA
+# ========================
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ========================
+#  LOGGING
+# ========================
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -122,20 +146,31 @@ LOGGING = {
         },
     },
     "loggers": {
-        "django.request": {"handlers": ["file","mail_admins"], "level": "ERROR", "propagate": True},
-        "orders": {"handlers": ["file"], "level": "INFO"},
+        "django.request": {
+            "handlers": ["file", "mail_admins"],
+            "level": "ERROR",
+            "propagate": True,
+        },
+        "orders": {
+            "handlers": ["file"],
+            "level": "INFO",
+        },
     },
 }
 
+# ========================
+#  SÉCURITÉ HTTPS
+# ========================
+# HSTS seulement si DEBUG = False
+SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
 
-# ---- Sécurisation production ----
-SECURE_HSTS_SECONDS = 31536000
-SECURE_SSL_REDIRECT = True
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+# Redirection HTTPS pilotée par variable d'env
+SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', '0') == '1'
 
 # ========================
-# FAGNI – LOGISTIQUE / LIVREURS
+#  FAGNI – LOGISTIQUE / LIVREURS
 # ========================
 FAGNI_LOGISTICS = {
     # Carburant / moto
@@ -149,8 +184,8 @@ FAGNI_LOGISTICS = {
     "driver_fixed_per_leg": 300,        # FCFA par jambe (aller ou retour)
 
     # ⚡ PARAMÈTRES CLIENT (borne le prix final)
-    "client_min_fee": 1000,   # minimum facturé au client
-    "client_max_fee": 5000,   # plafond sécurité
+    "client_min_fee": 1000,      # minimum facturé au client
+    "client_max_fee": 5000,      # plafond sécurité
     "client_price_per_km": 100,  # prix de base client par km AR
     "client_fixed_fee": 300,     # fixe client
 
@@ -162,32 +197,25 @@ FAGNI_LOGISTICS = {
     "fagni_min_margin": 300,     # marge minimale cible par course
 
     # ⚡ SURGE / MAJORATION DYNAMIQUE
-    "peak_multiplier": 1.3,      # heures de pointe (7–10 / 17–20)
-    "night_multiplier": 1.4,     # nuit (20h–6h)
-    "rain_multiplier": 1.3,      # pluie normale (placeholder)
-    "heavy_rain_multiplier": 1.6,# forte pluie / orage (placeholder)
+    "peak_multiplier": 1.3,       # heures de pointe (7–10 / 17–20)
+    "night_multiplier": 1.4,      # nuit (20h–6h)
+    "rain_multiplier": 1.3,       # pluie normale (placeholder)
+    "heavy_rain_multiplier": 1.6, # forte pluie / orage (placeholder)
 
     # Part de la majoration (surge) pour le livreur
     "driver_surge_share": 0.6,   # 60% du supplément pour le livreur
 }
 
-# Clé Distance Matrix côté serveur
-# (tu peux utiliser la même que GOOGLE_MAPS_API_KEY si elle a les droits)
-GOOGLE_DISTANCE_MATRIX_API_KEY = os.getenv(
-    "GOOGLE_DISTANCE_MATRIX_API_KEY",
-    os.getenv("GOOGLE_MAPS_API_KEY", "")
-)
-# --- HTTPS redirect configurable ---
-SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', '0') == '1'
-# Clé d'API Google Maps pour FAGNI
-GOOGLE_MAPS_API_KEY = "AIzaSyAq_L3zzJ95y5bUyGZzm2Iq7_gXsWYcP-0"
+# ========================
+#  GOOGLE MAPS / DISTANCE
+# ========================
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "AIzaSyAq_L3zzJ95y5bUyGZzm2Iq7_gXsWYcP-0")
 
-# ==== FAGNI DELIVERY PRICING ====
-from decimal import Decimal
+GOOGLE_DISTANCE_MATRIX_API_KEY = os.getenv("GOOGLE_DISTANCE_MATRIX_API_KEY", "AIzaSyAq_L3zzJ95y5bUyGZzm2Iq7_gXsWYcP-0")
 
-#DELIVERY_MIN_FEE = Decimal("2000")       # minimum facturé au client
-#DELIVERY_PRICE_PER_KM = Decimal("250")   # prix client par km
-#DRIVER_COST_PER_KM = Decimal("150")      # coût interne par km (carburant, usure, etc.)
+# (Optionnel) Si tu veux garder des constantes de pricing directes,
+# tu peux les décommenter et les utiliser ailleurs :
+# DELIVERY_MIN_FEE = Decimal("2000")
+# DELIVERY_PRICE_PER_KM = Decimal("250")
+# DRIVER_COST_PER_KM = Decimal("150")
 
-# Clé API Google Distance Matrix (à mettre dans ton vrai fichier local / env si tu préfères)
-GOOGLE_MAPS_API_KEY = "AIzaSyAq_L3zzJ95y5bUyGZzm2Iq7_gXsWYcP-0"

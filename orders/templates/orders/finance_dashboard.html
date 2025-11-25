@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block content %}
+<style>
+    body{
+        background:#f5f5f7;
+    }
+    header{
+        background:linear-gradient(90deg,#ff7a00,#0056b3);
+        color:#fff;
+        padding:16px 24px;
+        margin:0 -12px 0 -12px;
+    }
+    header h1{
+        margin:0;
+        font-size:20px;
+    }
+    header p{
+        margin:4px 0 0;
+        font-size:13px;
+        opacity:.9;
+    }
+    .page{
+        max-width:1200px;
+        margin:20px auto 30px;
+        padding:0 10px;
+    }
+    .card{
+        background:#fff;
+        border-radius:10px;
+        box-shadow:0 4px 10px rgba(0,0,0,0.05);
+        padding:14px 18px 18px;
+        margin-bottom:14px;
+    }
+    .top-bar{
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:10px;
+        flex-wrap:wrap;
+        margin-bottom:10px;
+    }
+    .btn-link{
+        text-decoration:none;
+        display:inline-block;
+        border-radius:999px;
+        padding:7px 12px;
+        font-size:13px;
+    }
+    .btn-primary{
+        background:#0056b3;
+        color:#fff;
+        border:none;
+    }
+    .btn-primary:hover{
+        background:#00408a;
+    }
+    .btn-secondary{
+        background:#fff;
+        border:1px solid #ccc;
+        color:#333;
+    }
+    .btn-secondary:hover{
+        background:#f3f3f3;
+    }
+    .mini{
+        font-size:11px;
+        color:#666;
+    }
+
+    .cards{
+        display:grid;
+        grid-template-columns:repeat(4,1fr);
+        gap:10px;
+        margin-top:8px;
+    }
+    @media(max-width:900px){
+        .cards{
+            grid-template-columns:repeat(2,1fr);
+        }
+    }
+    @media(max-width:600px){
+        .cards{
+            grid-template-columns:1fr;
+        }
+    }
+    .stat-card{
+        background:#f8f9fb;
+        border-radius:10px;
+        padding:10px 12px;
+    }
+    .stat-label{
+        font-size:11px;
+        color:#666;
+        margin-bottom:2px;
+    }
+    .stat-value{
+        font-size:18px;
+        font-weight:600;
+    }
+    .stat-sub{
+        font-size:11px;
+        color:#777;
+        margin-top:2px;
+    }
+
+    table{
+        width:100%;
+        border-collapse:collapse;
+        font-size:13px;
+        margin-top:6px;
+    }
+    th,td{
+        padding:6px 4px;
+        border-bottom:1px solid #eee;
+        vertical-align:top;
+    }
+    th{
+        background:#fafafa;
+        font-weight:600;
+        white-space:nowrap;
+    }
+    tr:hover{
+        background:#fafafa;
+    }
+    .t-right{ text-align:right; }
+    .t-nowrap{ white-space:nowrap; }
+
+    .badge-paid{
+        display:inline-block;
+        padding:2px 6px;
+        border-radius:999px;
+        font-size:10px;
+        background:#d4edda;
+        color:#155724;
+    }
+    .badge-due{
+        display:inline-block;
+        padding:2px 6px;
+        border-radius:999px;
+        font-size:10px;
+        background:#fff3cd;
+        color:#856404;
+    }
+    .badge-risk{
+        display:inline-block;
+        padding:2px 6px;
+        border-radius:999px;
+        font-size:10px;
+        background:#f8d7da;
+        color:#721c24;
+    }
+    .link-mini{
+        font-size:11px;
+        color:#0056b3;
+        text-decoration:none;
+    }
+    .link-mini:hover{
+        text-decoration:underline;
+    }
+    .legend{
+        margin-top:8px;
+        font-size:11px;
+        color:#666;
+    }
+</style>
+
+<header>
+    <h1>Dashboard financier – FAGNI</h1>
+    <p>Suivi des encaissements, des montants dus et de la marge FAGNI.</p>
+</header>
+
+<div class="page">
+
+    <!-- Synthèse globale -->
+    <div class="card">
+        <div class="top-bar">
+            <div>
+                <div style="font-size:14px;font-weight:600;">
+                    Synthèse financière globale
+                </div>
+                <div class="mini">
+                    Basé sur les commandes enregistrées dans FAGNI.
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                <a href="{% url 'orders:list' %}" class="btn-link btn-secondary">
+                    📋 Liste des commandes
+                </a>
+                <a href="{% url 'orders:dashboard' %}" class="btn-link btn-secondary">
+                    📊 Dashboard commandes
+                </a>
+                <a href="{% url 'orders:ops_dashboard' %}" class="btn-link btn-secondary">
+                    🚦 Tableau Ops
+                </a>
+                <a href="{% url 'orders:driver_dashboard' %}" class="btn-link btn-secondary">
+                    🛵 Tableau livreurs
+                </a>
+                <a href="{% url 'orders:create' %}" class="btn-link btn-primary">
+                    + Nouvelle commande
+                </a>
+            </div>
+        </div>
+
+        <div class="cards">
+            <div class="stat-card">
+                <div class="stat-label">Nombre de commandes</div>
+                <div class="stat-value">{{ total_orders|default:0|intcomma }}</div>
+                <div class="stat-sub">
+                    Toutes les commandes prises en compte dans ce tableau.
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total prestations (TTC)</div>
+                <div class="stat-value">
+                    {{ total_prestations|default:0|floatformat:0|intcomma }} FCFA
+                </div>
+                <div class="stat-sub">
+                    Montant des prestations (hors service FAGNI & livraison).
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Service FAGNI (global)</div>
+                <div class="stat-value">
+                    {{ total_service|default:0|floatformat:0|intcomma }} FCFA
+                </div>
+                <div class="stat-sub">
+                    Commission FAGNI sur l'ensemble des commandes.
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Livraison facturée</div>
+                <div class="stat-value">
+                    {{ total_delivery|default:0|floatformat:0|intcomma }} FCFA
+                </div>
+                <div class="stat-sub">
+                    Frais de livraison payés par les clients.
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Marge logistique</div>
+                <div class="stat-value">
+                    {{ total_logistic_margin|default:0|floatformat:0|intcomma }} FCFA
+                </div>
+                <div class="stat-sub">
+                    Différence entre frais livraison & coûts livreurs.
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Marge FAGNI (Service + Logistique)</div>
+                <div class="stat-value">
+                    {{ total_margin_fagni|default:0|floatformat:0|intcomma }} FCFA
+                </div>
+                <div class="stat-sub">
+                    Marge combinée sur l'ensemble des commandes.
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Montant encaissé</div>
+                <div class="stat-value">
+                    {{ total_paid|default:0|floatformat:0|intcomma }} FCFA
+                </div>
+                <div class="stat-sub">
+                    Somme de tous les paiements enregistrés.
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Montant dû</div>
+                <div class="stat-value">
+                    {{ total_due|default:0|floatformat:0|intcomma }} FCFA
+                </div>
+                <div class="stat-sub">
+                    Reste à encaisser sur l'ensemble des commandes.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tableau des commandes -->
+    <div class="card">
+        <h2 style="margin:0 0 8px;font-size:16px;border-left:4px solid #ff7a00;padding-left:8px;">
+            Commandes et encaissements
+        </h2>
+        <p class="mini" style="margin:0 0 8px;">
+            Vue détaillée des commandes avec leur statut financier et la marge FAGNI associée.
+        </p>
+
+        {% if orders %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Commande</th>
+                        <th>Client</th>
+                        <th class="t-right">Total TTC</th>
+                        <th class="t-right">Service FAGNI</th>
+                        <th class="t-right">Livraison</th>
+                        <th class="t-right">Total global client</th>
+                        <th class="t-right">Payé</th>
+                        <th class="t-right">Dû</th>
+                        <th class="t-right">Marge FAGNI</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for order in orders %}
+                    <tr>
+                        <td class="t-nowrap">
+                            <strong>{{ order.code|default:order.id }}</strong><br>
+                            <span class="mini">
+                                Créée le {{ order.created_at|date:"d/m/Y H:i" }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if order.customer %}
+                                <strong>{{ order.customer.name }}</strong><br>
+                                {% if order.customer.phone %}
+                                    <span class="mini">📞 {{ order.customer.phone }}</span><br>
+                                {% endif %}
+                                <a href="{% url 'orders:orders_by_customer' order.customer.id %}"
+                                   class="link-mini">
+                                    Fiche client →
+                                </a>
+                            {% else %}
+                                <span class="mini" style="color:#999;">Sans client</span>
+                            {% endif %}
+                        </td>
+                        <td class="t-right">
+                            {{ order.base_total|default:0|floatformat:0|intcomma }} FCFA
+                        </td>
+                        <td class="t-right">
+                            {{ order.service_fee|default:0|floatformat:0|intcomma }} FCFA
+                        </td>
+                        <td class="t-right">
+                            {{ order.delivery_fee|default:0|floatformat:0|intcomma }} FCFA
+                        </td>
+                        <td class="t-right">
+                            {{ order.total_global_client|default:0|floatformat:0|intcomma }} FCFA
+                        </td>
+                        <td class="t-right">
+                            {{ order.paid|default:0|floatformat:0|intcomma }} FCFA
+                        </td>
+                        <td class="t-right">
+                            {{ order.due|default:0|floatformat:0|intcomma }} FCFA
+                            <br>
+                            {% if order.is_fully_paid %}
+                                <span class="badge-paid">Soldée</span>
+                            {% elif order.due > 0 and order.paid > 0 %}
+                                <span class="badge-due">Partiellement payée</span>
+                            {% elif order.due > 0 %}
+                                <span class="badge-risk">Non payée</span>
+                            {% endif %}
+                        </td>
+                        <td class="t-right">
+                            {{ order.margin_fagni|default:0|floatformat:0|intcomma }} FCFA
+                        </td>
+                        <td>
+                            <a href="{% url 'orders:detail' order.id %}" class="link-mini">
+                                Détail
+                            </a><br>
+                            <a href="{% url 'orders:order_ticket_pdf' order.id %}"
+                               class="btn-link btn-secondary"
+                               target="_blank">
+                                📄 Ticket PDF
+                            </a>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="legend">
+                💡 <strong>Lecture rapide :</strong><br>
+                – Badge <strong>Soldée</strong> : plus rien à encaisser.<br>
+                – <strong>Partiellement payée</strong> : un encaissement existe mais le solde est &gt; 0.<br>
+                – <strong>Non payée</strong> : aucun paiement enregistré sur la commande.
+            </div>
+        {% else %}
+            <div class="legend">
+                Aucune commande à afficher pour le moment.
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

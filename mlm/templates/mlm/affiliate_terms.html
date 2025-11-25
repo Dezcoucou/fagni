@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Contrat & CGU Affilié – FAGNI</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+
+    <style>
+        body{
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin:0;
+            padding:0;
+            background:#f5f5f7;
+            color:#222;
+        }
+        header{
+            background:linear-gradient(90deg,#ff7a00,#0056b3);
+            color:#fff;
+            padding:16px 24px;
+        }
+        header h1{
+            margin:0;
+            font-size:20px;
+        }
+        header p{
+            margin:4px 0 0;
+            font-size:13px;
+            opacity:.9;
+        }
+        .page{
+            max-width:900px;
+            margin:20px auto 30px;
+            padding:0 10px;
+        }
+        .card{
+            background:#fff;
+            border-radius:10px;
+            box-shadow:0 4px 10px rgba(0,0,0,0.04);
+            padding:16px 18px 20px;
+            margin-bottom:14px;
+        }
+        h2{
+            font-size:16px;
+            margin-top:18px;
+            margin-bottom:6px;
+        }
+        h3{
+            font-size:14px;
+            margin-top:12px;
+            margin-bottom:4px;
+        }
+        p{
+            font-size:13px;
+            line-height:1.6;
+            margin:4px 0 6px;
+        }
+        ul{
+            font-size:13px;
+            padding-left:20px;
+        }
+        li{
+            margin-bottom:4px;
+        }
+        .tag{
+            display:inline-block;
+            font-size:11px;
+            background:#f1f3f5;
+            padding:3px 8px;
+            border-radius:999px;
+            margin-top:4px;
+        }
+        .notice{
+            font-size:12px;
+            color:#b10000;
+            background:#fff3f3;
+            border-left:3px solid #b10000;
+            padding:8px 10px;
+            border-radius:6px;
+            margin-bottom:10px;
+        }
+        .btn-back{
+            text-decoration:none;
+            display:inline-block;
+            border-radius:999px;
+            padding:7px 12px;
+            font-size:13px;
+            background:#fff;
+            border:1px solid #ccc;
+            color:#333;
+        }
+        .btn-back:hover{
+            background:#f3f3f3;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Contrat & Conditions Générales d’Utilisation Affilié – FAGNI</h1>
+    <p>Programme d’affiliation / parrainage FAGNI – Version de travail.</p>
+</header>
+
+<div class="page">
+
+    <div class="card">
+        <p class="notice">
+            ⚖️ <strong>Important :</strong> ce document est une base de travail générée pour
+            structurer le programme d’affiliation FAGNI. Il doit impérativement être
+            revu, complété et validé par un conseil juridique compétent en droit
+            ivoirien avant utilisation officielle.
+        </p>
+        <a href="{% url 'mlm:affiliate_dashboard' %}" class="btn-back">
+            ← Retour à mon tableau d’affilié
+        </a>
+    </div>
+
+    <div class="card">
+        <h2>1. Préambule</h2>
+        <p>
+            La plateforme digitale <strong>FAGNI</strong> propose un service de mise en relation
+            entre des clients et des prestataires de services (blanchisseries,
+            livreurs, points relais, etc.).<br>
+            Le présent document (ci-après les « CGU Affilié ») encadre les
+            conditions dans lesquelles une personne physique ou morale (ci-après
+            « l’Affilié ») participe au programme de parrainage / affiliation
+            FAGNI et perçoit, le cas échéant, des commissions sur les commandes
+            générées par son réseau.
+        </p>
+
+        <h2>2. Définitions</h2>
+        <ul>
+            <li><strong>Plateforme FAGNI</strong> : application ou site web exploité par FAGNI permettant la commande des services.</li>
+            <li><strong>Affilié</strong> : personne disposant d’un <em>profil de parrainage</em> et d’un <em>code affilié</em> valide.</li>
+            <li><strong>Filleul</strong> : client rattaché à un Affilié via son code ou lien de parrainage.</li>
+            <li><strong>Commande</strong> : prestation de services passée par un client via la plateforme FAGNI.</li>
+            <li><strong>Service fee</strong> : commission de service FAGNI perçue sur une commande (hors transport et prestations partenaires).</li>
+            <li><strong>Wallet</strong> : compte interne d’Affilié sur lequel sont créditées les commissions MLM.</li>
+        </ul>
+
+        <h2>3. Objet</h2>
+        <p>
+            Les présentes CGU Affilié ont pour objet de définir les modalités
+            d’adhésion, de fonctionnement et de rémunération du programme de
+            parrainage FAGNI, ainsi que les droits et obligations respectifs de
+            l’Affilié et de FAGNI.
+        </p>
+
+        <h2>4. Conditions d’adhésion</h2>
+        <ul>
+            <li>Être majeur et juridiquement capable (ou dûment représenté).</li>
+            <li>Disposer d’un compte client FAGNI valide et à jour.</li>
+            <li>Accepter sans réserve les présentes CGU Affilié.</li>
+            <li>Respecter la législation en vigueur en Côte d’Ivoire, notamment en matière de démarchage et de communication commerciale.</li>
+        </ul>
+
+        <h2>5. Fonctionnement du parrainage multi-niveaux</h2>
+        <p>
+            Le programme FAGNI repose sur un système de parrainage multi-niveaux
+            limité à <strong>3 niveaux</strong>. La structure est strictement liée à de
+            <strong>vraies commandes de services</strong> et ne repose à aucun moment
+            sur la vente de positions ou de packs d’investissement.
+        </p>
+        <ul>
+            <li><strong>Niveau 1 (N1)</strong> : filleuls rattachés directement au code de l’Affilié.</li>
+            <li><strong>Niveau 2 (N2)</strong> : filleuls des filleuls N1.</li>
+            <li><strong>Niveau 3 (N3)</strong> : filleuls des filleuls N2.</li>
+        </ul>
+        <p>
+            La structure est gérée automatiquement par la plateforme via les
+            <em>profils de parrainage</em> et les <em>codes affiliés</em>, sans intervention
+            manuelle de l’Affilié sur les placements de son réseau.
+        </p>
+
+        <h2>6. Plan de rémunération & commissions</h2>
+        <p>
+            Les commissions MLM sont calculées <strong>exclusivement</strong> sur le
+            <strong>service fee FAGNI</strong>, après exécution de la commande et uniquement
+            lorsque celle-ci est marquée comme <em>terminée</em> (« done ») dans le
+            système FAGNI.
+        </p>
+        <p>
+            Le pourcentage global maximum distribué aux Affiliés est de
+            <strong>15&nbsp;%</strong> du service fee, réparti comme suit&nbsp;:
+        </p>
+        <ul>
+            <li><strong>Niveau 1 (N1)</strong> : 10&nbsp;% du service fee FAGNI.</li>
+            <li><strong>Niveau 2 (N2)</strong> : 3&nbsp;% du service fee FAGNI.</li>
+            <li><strong>Niveau 3 (N3)</strong> : 2&nbsp;% du service fee FAGNI.</li>
+        </ul>
+        <p class="tag">
+            Exemple : pour un service fee de 1&nbsp;000 FCFA, le total des
+            commissions est de 150 FCFA (100 N1, 30 N2, 20 N3).
+        </p>
+        <p>
+            FAGNI se réserve le droit d’ajuster ces pourcentages dans le temps,
+            dans le respect des lois applicables, après information préalable
+            des Affiliés et mise à jour des présentes CGU.
+        </p>
+
+        <h2>7. Crédit du wallet affilié</h2>
+        <p>
+            Chaque commission validée donne lieu à la création d’une
+            <strong>transaction de wallet</strong> au profit de l’Affilié bénéficiaire.
+            Le solde du wallet correspond à la somme des mouvements&nbsp;:
+            commissions créditées, retraits, ajustements éventuels.
+        </p>
+        <ul>
+            <li>Le wallet n’a aucune valeur de compte bancaire.</li>
+            <li>Les montants affichés sont indicatifs et soumis à vérification.</li>
+            <li>FAGNI peut procéder à des ajustements en cas d’erreur ou de fraude.</li>
+        </ul>
+
+        <h2>8. Demande de retrait</h2>
+        <p>
+            L’Affilié peut soumettre une demande de retrait dès lors que son solde
+            atteint le <strong>montant minimum de retrait</strong> défini dans les
+            paramètres du programme (par exemple 2&nbsp;000 FCFA).
+        </p>
+        <ul>
+            <li>La demande est soumise à validation par FAGNI.</li>
+            <li>FAGNI peut demander des justificatifs d’identité ou de coordonnées de paiement.</li>
+            <li>Les retraits peuvent être effectués via Mobile Money, virement ou tout autre moyen proposé par FAGNI.</li>
+        </ul>
+
+        <h2>9. Obligations de l’Affilié</h2>
+        <ul>
+            <li>Utiliser le programme dans le respect des lois et de l’image de FAGNI.</li>
+            <li>Ne pas faire de promesses de gains irréalistes ou assimilables à un système de Ponzi.</li>
+            <li>Ne pas vendre de positions ou de « packs » d’investissement.</li>
+            <li>Communiquer de manière honnête, transparente et sans tromperie.</li>
+            <li>Respecter la confidentialité des données des personnes parrainées.</li>
+        </ul>
+
+        <h2>10. Obligations de FAGNI</h2>
+        <ul>
+            <li>Assurer un suivi technique correct du calcul des commissions.</li>
+            <li>Mettre à disposition un tableau de bord d’activité (commissions, réseau, wallet).</li>
+            <li>Traiter de bonne foi les demandes de retrait conformes aux règles en vigueur.</li>
+        </ul>
+
+        <h2>11. Responsabilité</h2>
+        <p>
+            L’Affilié agit en toute indépendance. Il ne dispose d’aucun mandat de
+            représentation juridique de FAGNI et ne peut prendre aucun engagement
+            au nom de FAGNI.<br>
+            FAGNI ne peut être tenue responsable des propos tenus par l’Affilié
+            en dehors des supports officiels fournis.
+        </p>
+
+        <h2>12. Durée, suspension et résiliation</h2>
+        <p>
+            Le présent contrat Affilié est conclu pour une durée indéterminée.
+            FAGNI peut suspendre ou résilier un profil Affilié en cas de :
+        </p>
+        <ul>
+            <li>fraude avérée ou tentative de fraude ;</li>
+            <li>non-respect grave des présentes conditions ;</li>
+            <li>atteinte à l’image de marque de FAGNI ;</li>
+            <li>utilisation abusive du système d’affiliation.</li>
+        </ul>
+
+        <h2>13. Données personnelles</h2>
+        <p>
+            FAGNI collecte et traite certaines données personnelles dans le cadre
+            du programme d’affiliation. Ces traitements sont réalisés dans le
+            respect de la réglementation applicable en matière de protection des
+            données et des politiques internes de FAGNI.
+        </p>
+
+        <h2>14. Modification des CGU Affilié</h2>
+        <p>
+            FAGNI se réserve le droit de modifier les présentes CGU Affilié.
+            Toute modification substantielle fera l’objet d’une information
+            préalable raisonnable (notification sur la plateforme, email, etc.).
+            La poursuite de l’activité d’Affilié vaut acceptation des CGU
+            modifiées.
+        </p>
+
+        <h2>15. Droit applicable et juridiction compétente</h2>
+        <p>
+            Les présentes CGU Affilié sont soumises au <strong>droit ivoirien</strong>.
+            Tout litige relatif à leur interprétation ou à leur exécution sera
+            soumis aux juridictions compétentes du ressort des tribunaux d’Abidjan,
+            sauf dispositions légales impératives contraires.
+        </p>
+    </div>
+
+</div>
+
+</body>
+</html>

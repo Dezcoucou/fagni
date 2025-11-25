@@ -31,13 +31,20 @@
             margin:20px auto 30px;
             padding:0 10px;
         }
+        .card{
+            background:#fff;
+            border-radius:10px;
+            box-shadow:0 4px 10px rgba(0,0,0,0.04);
+            padding:14px 16px 18px;
+            margin-bottom:14px;
+        }
         .top-bar{
             display:flex;
             justify-content:space-between;
-            align-items:center;
+            align-items:flex-start;
             gap:10px;
             flex-wrap:wrap;
-            margin-bottom:14px;
+            margin-bottom:10px;
         }
         .summary{
             font-size:13px;
@@ -46,6 +53,25 @@
         .summary span{
             margin-right:10px;
         }
+        .summary-Row2{
+            font-size:11px;
+            color:#666;
+            margin-top:3px;
+        }
+        .pill-global{
+            display:inline-flex;
+            align-items:center;
+            gap:4px;
+            padding:2px 8px;
+            border-radius:999px;
+            background:#f1f3f5;
+            font-size:11px;
+            margin-right:5px;
+        }
+        .pill-global span{
+            opacity:.85;
+        }
+
         .btn-link{
             text-decoration:none;
             display:inline-block;
@@ -69,6 +95,7 @@
         .btn-secondary:hover{
             background:#f3f3f3;
         }
+
         .board{
             display:grid;
             grid-template-columns:repeat(3,1fr);
@@ -82,11 +109,18 @@
         .col{
             background:#fff;
             border-radius:10px;
-            box-shadow:0 4px 10px rgba(0,0,0,0.04);
-            padding:12px 12px 16px;
+            box-shadow:0 2px 6px rgba(0,0,0,0.03);
+            padding:10px 10px 12px;
+        }
+        .col-header{
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-end;
+            gap:6px;
+            margin-bottom:6px;
         }
         .col h2{
-            margin:0 0 4px;
+            margin:0;
             font-size:15px;
             display:flex;
             align-items:center;
@@ -94,7 +128,6 @@
         }
         .col small{
             display:block;
-            margin-bottom:10px;
             font-size:11px;
             color:#666;
         }
@@ -104,6 +137,7 @@
             padding:2px 8px;
             font-size:11px;
         }
+
         table{
             width:100%;
             border-collapse:collapse;
@@ -117,10 +151,12 @@
         th{
             background:#fafafa;
             font-weight:600;
+            white-space:nowrap;
         }
         tr:hover{
             background:#fafafa;
         }
+
         .link-detail{
             font-size:11px;
             text-decoration:none;
@@ -129,11 +165,7 @@
         .link-detail:hover{
             text-decoration:underline;
         }
-        .empty-col{
-            font-size:12px;
-            color:#777;
-            padding:8px 0;
-        }
+
         form{ margin:0; }
         button{
             font-size:11px;
@@ -142,6 +174,7 @@
             padding:3px 8px;
             cursor:pointer;
         }
+
         .subtext{
             display:block;
             font-size:11px;
@@ -157,6 +190,59 @@
         .metric strong{
             font-weight:600;
         }
+        .empty-col{
+            font-size:12px;
+            color:#777;
+            padding:8px 0;
+        }
+
+        /* Boutons statut / étapes */
+        .btn-step-pickup{
+            background:#0056b3;
+            color:#fff;
+        }
+        .btn-step-dropoff{
+            background:#ffc107;
+            color:#212529;
+        }
+        .btn-step-wash{
+            background:#17a2b8;
+            color:#fff;
+        }
+        .btn-step-return{
+            background:#6c757d;
+            color:#fff;
+        }
+        .btn-step-delivered{
+            background:#28a745;
+            color:#fff;
+        }
+
+        /* Pastilles statut */
+        .badge-status{
+            padding:3px 8px;
+            border-radius:999px;
+            font-size:11px;
+            white-space:nowrap;
+        }
+        .badge-pending{
+            background:#fff3cd;
+            color:#856404;
+        }
+        .badge-in-progress{
+            background:#cce5ff;
+            color:#004085;
+        }
+        .badge-done{
+            background:#d4edda;
+            color:#155724;
+        }
+
+        .mini-legend{
+            font-size:10px;
+            color:#777;
+            margin-top:6px;
+        }
     </style>
 </head>
 <body>
@@ -168,27 +254,60 @@
 
 <div class="page">
 
-    <div class="top-bar">
-        <div class="summary">
-            <span><strong>Total en attente :</strong> {{ pending_orders|length }}</span>
-            <span><strong>En cours :</strong> {{ in_progress_orders|length }}</span>
-            <span><strong>Terminées :</strong> {{ done_orders|length }}</span>
-            <span><strong>Total Terminées (cumul) :</strong> {{ done_total }} FCFA</span>
+    <!-- Carte globale Ops -->
+    <div class="card">
+        <div class="top-bar">
+
+            <!-- Résumé global -->
+            <div>
+                <div class="summary">
+                    <span><strong>En attente :</strong> {{ pending_orders|length }}</span>
+                    <span><strong>En cours :</strong> {{ in_progress_orders|length }}</span>
+                    <span><strong>Terminées :</strong> {{ done_orders|length }}</span>
+                </div>
+                <div class="summary-Row2">
+                    <span class="pill-global">
+                        💰 <span>Total prestations livrées :</span>
+                        <strong>{{ done_total|default:0 }} FCFA</strong>
+                    </span>
+                    <span class="pill-global">
+                        🚦 <span>Vue temps réel des commandes actives.</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Boutons de navigation -->
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                <a href="{% url 'orders:list' %}" class="btn-link btn-secondary">
+                    ← Liste des commandes
+                </a>
+                <a href="{% url 'orders:driver_dashboard' %}" class="btn-link btn-secondary">
+                    🛵 Tableau livreurs
+                </a>
+                <a href="{% url 'orders:create' %}" class="btn-link btn-primary">
+                    + Nouvelle commande
+                </a>
+            </div>
         </div>
-        <div>
-            <a href="{% url 'orders:list' %}" class="btn-link btn-secondary">← Liste des commandes</a>
-            <a href="{% url 'orders:create' %}" class="btn-link btn-primary">+ Nouvelle commande</a>
+        <div class="mini-legend">
+            💡 Astuce : valide les étapes dans la colonne « En cours » pour mettre à jour automatiquement
+            la timeline et le statut des commandes.
         </div>
     </div>
 
+    <!-- Board 3 colonnes -->
     <div class="board">
 
         <!-- Colonne En attente -->
         <div class="col">
-            <h2>En attente
-                <span class="badge-total">{{ pending_orders|length }}</span>
-            </h2>
-            <small>Commandes créées, en attente de collecte.</small>
+            <div class="col-header">
+                <div>
+                    <h2>En attente
+                        <span class="badge-total">{{ pending_orders|length }}</span>
+                    </h2>
+                    <small>Commandes créées, en attente de collecte.</small>
+                </div>
+            </div>
 
             {% if pending_orders %}
                 <table>
@@ -209,45 +328,41 @@
                                 <span class="subtext">
                                     Créée le {{ order.created_at|date:"d/m H:i" }}
                                 </span>
+                                <span class="subtext">
+                                    <span class="badge-status badge-pending">En attente</span>
+                                </span>
                             </td>
                             <td>
                                 <strong>{{ order.customer.name }}</strong>
                                 {% if order.customer.phone %}
                                     <span class="subtext">📞 {{ order.customer.phone }}</span>
                                 {% endif %}
+                                {% if order.customer.address %}
+                                    <span class="metric">📍 {{ order.customer.address }}</span>
+                                {% endif %}
                             </td>
                             <td>
-                                <strong>{{ order.total }} FCFA</strong>
+                                <strong>{{ order.total|default:0 }} FCFA</strong>
                                 <span class="metric">
                                     Service FAGNI :
-                                    <strong>{{ order.service_fee|default:"0" }} FCFA</strong>
+                                    <strong>{{ order.service_fee|default:0 }} FCFA</strong>
                                 </span>
                                 <span class="metric">
                                     Livraison :
-                                    <strong>{{ order.delivery_fee|default:"0" }} FCFA</strong>
-                                </span>
-                                <span class="metric">
-                                    Distance AR :
-                                    <strong>
-                                        {% if order.distance_km %}
-                                            {{ order.distance_km }} km
-                                        {% else %}
-                                            —
-                                        {% endif %}
-                                    </strong>
+                                    <strong>{{ order.delivery_fee|default:0 }} FCFA</strong>
                                 </span>
                             </td>
                             <td>
                                 {% if order.laundry_partner %}
-                                    {{ order.laundry_partner.name }}
+                                    🧺 {{ order.laundry_partner.name }}
                                 {% else %}
-                                    (blanchisserie ?)
+                                    <span class="metric" style="color:#999;">Blanchisserie ?</span>
                                 {% endif %}
                                 <br>
                                 {% if order.delivery_partner %}
-                                    🛵 {{ order.delivery_partner.name }}
+                                    <span class="metric">🛵 {{ order.delivery_partner.name }}</span>
                                 {% else %}
-                                    🛵 (livreur ?)
+                                    <span class="metric" style="color:#999;">Livreur ?</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -258,7 +373,7 @@
                                       action="{% url 'orders:ops_update_step' order.id 'pickup' %}"
                                       style="margin-top:4px;">
                                     {% csrf_token %}
-                                    <button type="submit" style="background:#0056b3;color:#fff;">
+                                    <button type="submit" class="btn-step-pickup">
                                         ✅ Confirmer collecte
                                     </button>
                                 </form>
@@ -276,10 +391,14 @@
 
         <!-- Colonne En cours -->
         <div class="col">
-            <h2>En cours
-                <span class="badge-total">{{ in_progress_orders|length }}</span>
-            </h2>
-            <small>Commandes en collecte / lavage / retour.</small>
+            <div class="col-header">
+                <div>
+                    <h2>En cours
+                        <span class="badge-total">{{ in_progress_orders|length }}</span>
+                    </h2>
+                    <small>Commandes en collecte, lavage ou retour livreur.</small>
+                </div>
+            </div>
 
             {% if in_progress_orders %}
                 <table>
@@ -289,7 +408,7 @@
                             <th>Client</th>
                             <th>Montant</th>
                             <th>Partenaires</th>
-                            <th></th>
+                            <th>Étapes</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -300,45 +419,52 @@
                                 <span class="subtext">
                                     Créée le {{ order.created_at|date:"d/m H:i" }}
                                 </span>
+                                <span class="subtext">
+                                    <span class="badge-status badge-in-progress">En cours</span>
+                                </span>
                             </td>
                             <td>
                                 <strong>{{ order.customer.name }}</strong>
                                 {% if order.customer.phone %}
                                     <span class="subtext">📞 {{ order.customer.phone }}</span>
                                 {% endif %}
+                                {% if order.customer.address %}
+                                    <span class="metric">📍 {{ order.customer.address }}</span>
+                                {% endif %}
                             </td>
                             <td>
-                                <strong>{{ order.total }} FCFA</strong>
+                                <strong>{{ order.total|default:0 }} FCFA</strong>
                                 <span class="metric">
                                     Service FAGNI :
-                                    <strong>{{ order.service_fee|default:"0" }} FCFA</strong>
+                                    <strong>{{ order.service_fee|default:0 }} FCFA</strong>
                                 </span>
                                 <span class="metric">
                                     Livraison :
-                                    <strong>{{ order.delivery_fee|default:"0" }} FCFA</strong>
+                                    <strong>{{ order.delivery_fee|default:0 }} FCFA</strong>
                                 </span>
                                 <span class="metric">
                                     Distance AR :
                                     <strong>
                                         {% if order.distance_km %}
-                                            {{ order.distance_km }} km
+                                            {{ order.distance_km }}
                                         {% else %}
                                             —
                                         {% endif %}
+                                        km
                                     </strong>
                                 </span>
                             </td>
                             <td>
                                 {% if order.laundry_partner %}
-                                    {{ order.laundry_partner.name }}
+                                    🧺 {{ order.laundry_partner.name }}
                                 {% else %}
-                                    (blanchisserie ?)
+                                    <span class="metric" style="color:#999;">Blanchisserie ?</span>
                                 {% endif %}
                                 <br>
                                 {% if order.delivery_partner %}
-                                    🛵 {{ order.delivery_partner.name }}
+                                    <span class="metric">🛵 {{ order.delivery_partner.name }}</span>
                                 {% else %}
-                                    🛵 (livreur ?)
+                                    <span class="metric" style="color:#999;">Livreur ?</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -348,25 +474,25 @@
                                 <div style="margin-top:4px;display:flex;flex-direction:column;gap:3px;">
                                     <form method="post" action="{% url 'orders:ops_update_step' order.id 'dropoff' %}">
                                         {% csrf_token %}
-                                        <button type="submit" style="background:#ffc107;color:#212529;">
+                                        <button type="submit" class="btn-step-dropoff">
                                             🧺 Dépôt blanchisserie
                                         </button>
                                     </form>
                                     <form method="post" action="{% url 'orders:ops_update_step' order.id 'wash_done' %}">
                                         {% csrf_token %}
-                                        <button type="submit" style="background:#17a2b8;color:#fff;">
+                                        <button type="submit" class="btn-step-wash">
                                             ✅ Lavage terminé
                                         </button>
                                     </form>
                                     <form method="post" action="{% url 'orders:ops_update_step' order.id 'return' %}">
                                         {% csrf_token %}
-                                        <button type="submit" style="background:#6c757d;color:#fff;">
+                                        <button type="submit" class="btn-step-return">
                                             🚚 Reprise livreur
                                         </button>
                                     </form>
                                     <form method="post" action="{% url 'orders:ops_update_step' order.id 'delivered' %}">
                                         {% csrf_token %}
-                                        <button type="submit" style="background:#28a745;color:#fff;">
+                                        <button type="submit" class="btn-step-delivered">
                                             🏠 Livrée au client
                                         </button>
                                     </form>
@@ -385,10 +511,14 @@
 
         <!-- Colonne Terminées -->
         <div class="col">
-            <h2>Terminées
-                <span class="badge-total">{{ done_orders|length }}</span>
-            </h2>
-            <small>Commandes livrées au client.</small>
+            <div class="col-header">
+                <div>
+                    <h2>Terminées
+                        <span class="badge-total">{{ done_orders|length }}</span>
+                    </h2>
+                    <small>Commandes livrées au client.</small>
+                </div>
+            </div>
 
             {% if done_orders %}
                 <table>
@@ -397,7 +527,7 @@
                             <th>Code</th>
                             <th>Client</th>
                             <th>Montant</th>
-                            <th>Livrée</th>
+                            <th>Livrée le</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -408,6 +538,9 @@
                                 <span class="subtext">
                                     Créée le {{ order.created_at|date:"d/m H:i" }}
                                 </span>
+                                <span class="subtext">
+                                    <span class="badge-status badge-done">Terminée</span>
+                                </span>
                             </td>
                             <td>
                                 <strong>{{ order.customer.name }}</strong>
@@ -416,23 +549,24 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <strong>{{ order.total }} FCFA</strong>
+                                <strong>{{ order.total|default:0 }} FCFA</strong>
                                 <span class="metric">
                                     Service FAGNI :
-                                    <strong>{{ order.service_fee|default:"0" }} FCFA</strong>
+                                    <strong>{{ order.service_fee|default:0 }} FCFA</strong>
                                 </span>
                                 <span class="metric">
                                     Livraison :
-                                    <strong>{{ order.delivery_fee|default:"0" }} FCFA</strong>
+                                    <strong>{{ order.delivery_fee|default:0 }} FCFA</strong>
                                 </span>
                                 <span class="metric">
                                     Distance AR :
                                     <strong>
                                         {% if order.distance_km %}
-                                            {{ order.distance_km }} km
+                                            {{ order.distance_km }}
                                         {% else %}
                                             —
                                         {% endif %}
+                                        km
                                     </strong>
                                 </span>
                             </td>

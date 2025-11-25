@@ -1,0 +1,173 @@
+from decimal import Decimal, ROUND_HALF_UP
+from mlm.models import ReferralCommission, WalletTransaction, MLMSettings, ReferralLink
+import random
+import string
+
+def generate_mlm_commissions_for_order(order):
+    """
+    Génère les commissions MLM pour une commande terminée :
+    - Supprime les éventuelles commissions déjà calculées
+    - Recalcule selon le plan validé (10% / 3% / 2%)
+    """
+
+    # 1) Seulement pour les commandes terminées
+    if order.status != "done":
+        return
+
+    # 2) On nettoie les anciennes commissions pour éviter les doublons
+    ReferralCommission.objects.filter(order=order).delete()
+    WalletTransaction.objects.filter(order=order, type="mlm_commission").delete()
+
+    # 3) Profil affilié du client
+    try:
+        link = ReferralLink.objects.get(customer=order.customer)
+    except ReferralLink.DoesNotExist:
+        return
+
+    # 4) Upline (N1, N2, N3)
+    upline = link.get_upline(levels=3)
+    if not upline:
+        return
+
+    # 5) Paramétrage actif
+    settings_obj = MLMSettings.get_active()
+
+    # Pas de commissions si le service fee est trop faible
+    if order.service_fee < settings_obj.min_service_fee_for_commission:
+        return
+
+    fee_base = int(order.service_fee)
+
+    # 6) Pourcentages
+    percent_levels = [
+        settings_obj.level1_percent,
+        settings_obj.level2_percent,
+        settings_obj.level3_percent,
+    ]
+
+    # 7) Calcul des commissions
+    for idx, sponsor_profile in enumerate(upline):
+        percent = percent_levels[idx]
+        commission_decimal = (Decimal(fee_base) * percent / Decimal("100")).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        commission_amount = int(commission_decimal)
+
+        if commission_amount <= 0:
+            continue
+
+        level = idx + 1
+
+        # On crée la commission
+        ReferralCommission.objects.create(
+            beneficiary_profile=sponsor_profile,
+            level=level,
+            order=order,
+            service_fee_base=fee_base,
+            commission_percent=percent,
+            commission_amount=commission_amount,
+        )
+
+        # On crédite le wallet
+        WalletTransaction.objects.create(
+            profile=sponsor_profile,
+            type="mlm_commission",
+            amount=commission_amount,
+            order=order,
+            description=f"Commission niveau {level} - commande {order.code}",
+        )
+
+
+def generate_unique_referral_code(prefix: str = "AFF") -> str:
+    """
+    Génère un code affilié unique du type AFF-XYZ123.
+    On boucle tant que le code existe déjà.
+    """
+    from .models import ReferralLink
+
+    while True:
+        suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        code = f"{prefix}-{suffix}"
+        if not ReferralLink.objects.filter(referral_code__iexact=code).exists():
+            return code
+
+
+def normalize_referral_code(raw_code: str | None) -> str | None:
+    """
+    Nettoie un code affilié saisi par un utilisateur :
+    - strip espaces
+    - uppercase
+    Retourne None si vide.
+    """
+    if not raw_code:
+        return None
+    code = str(raw_code).strip()
+    if not code:
+        return None
+    return code.upper()
+
+
+def get_sponsor_profile_by_code(raw_code: str | None):
+    """
+    Retourne le profil MLM du parrain à partir d'un code affilié,
+    ou None si le code est invalide / inexistant.
+    """
+    from .models import ReferralLink
+
+    code = normalize_referral_code(raw_code)
+    if not code:
+        return None
+
+    try:
+        return ReferralLink.objects.get(referral_code__iexact=code)
+    except ReferralLink.DoesNotExist:
+        return None
+
+
+def attach_customer_to_sponsor(customer, sponsor_code: str | None):
+    """
+    Rattache un client FAGNI à un parrain via son code affilié.
+
+    - Si sponsor_code est vide ou invalide → on ne fait rien, on retourne None.
+    - Si le client a déjà un profil MLM, on NE recrée pas un profil :
+        - si pas de sponsor, on lui associe le parrain trouvé
+        - sinon, on laisse tel quel (pour éviter de changer d'upline sauvagement)
+    - Si le client n'a pas encore de profil MLM :
+        - on crée un ReferralLink avec :
+            * customer=client
+            * sponsor = parrain trouvé
+            * un code affilié unique (pour qu'il puisse à son tour parrainer)
+    """
+    from .models import ReferralLink
+
+    sponsor = get_sponsor_profile_by_code(sponsor_code)
+    if sponsor is None:
+        # Code invalide ou parrain inexistant : on ne fait rien
+        return None
+
+    # Est-ce que le client a déjà un profil affilié ?
+    try:
+        profile = ReferralLink.objects.get(customer=customer)
+        created = False
+    except ReferralLink.DoesNotExist:
+        profile = None
+        created = True
+
+    if created:
+        # On crée un nouveau profil affilié pour ce client
+        profile = ReferralLink.objects.create(
+            customer=customer,
+            sponsor=sponsor,
+            referral_code=generate_unique_referral_code(prefix="AFF"),
+            actor_type="client",
+        )
+        return profile
+
+    # Le client avait déjà un profil MLM
+    # S'il n'avait pas de sponsor, on peut le compléter
+    if profile.sponsor is None:
+        profile.sponsor = sponsor
+        profile.save(update_fields=["sponsor"])
+
+    # S'il avait déjà un sponsor, on NE TOUCHE PAS (sécurité business)
+    return profile

@@ -5,17 +5,14 @@ import math
 from django.db import models
 from django.db.models import Sum
 from django.conf import settings
-
-from partners.models import LaundryPartner, DeliveryPartner, RelayPointPartner
 from django.utils import timezone
 
-
-# --- Paramètres historiques (plus vraiment utilisés, gardés si besoin) ---
-# MIN_DELIVERY_FEE = Decimal("2000.00")   # minimum 2000 FCFA
-# PRICE_PER_KM = Decimal("200.00")        # 200 FCFA / km
-# ROUNDTRIP_FACTOR = Decimal("2.0")       # aller + retour
+from partners.models import LaundryPartner, DeliveryPartner, RelayPointPartner
 
 
+# =====================
+#  UTILITAIRE DISTANCE
+# =====================
 def haversine_distance_km(origin_lat, origin_lng, dest_lat, dest_lng):
     """
     Distance géodésique (en km) entre deux points (lat/lng) avec la formule de Haversine.
@@ -53,10 +50,9 @@ def haversine_distance_km(origin_lat, origin_lng, dest_lat, dest_lng):
 #  CLIENT
 # =====================
 class Customer(models.Model):
-    name = models.CharField("Nom", max_length=120)
-    phone = models.CharField("Téléphone", max_length=30, blank=True)
-    email = models.EmailField("Email", blank=True)
-    address = models.CharField("Adresse", max_length=255, blank=True)
+    name = models.CharField(max_length=150, verbose_name="Nom complet")
+    phone = models.CharField(max_length=20, verbose_name="Téléphone")
+    address = models.CharField(max_length=255, blank=True, verbose_name="Adresse")
 
     latitude = models.DecimalField(
         "Latitude",
@@ -93,9 +89,18 @@ class Order(models.Model):
         ("canceled", "Annulée"),
     ]
 
+    # --------- Statut ---------
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending",
+        verbose_name="Statut",
+    )
+
     # Identifiant lisible
     code = models.CharField("Code", max_length=20, unique=True, blank=True)
 
+    # --------- Liens principaux ---------
     customer = models.ForeignKey(
         Customer,
         on_delete=models.PROTECT,
@@ -121,7 +126,7 @@ class Order(models.Model):
         verbose_name="Livreur partenaire",
     )
 
-    # 🔹 NOUVEAU : point relais partenaire
+    # Point relais partenaire (optionnel)
     relay_partner = models.ForeignKey(
         RelayPointPartner,
         on_delete=models.SET_NULL,
@@ -131,17 +136,10 @@ class Order(models.Model):
         verbose_name="Point relais partenaire",
     )
 
-    status = models.CharField(
-        "Statut",
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default="pending",
-    )
-
     created_at = models.DateTimeField("Créée le", auto_now_add=True)
     updated_at = models.DateTimeField("Mise à jour le", auto_now=True)
 
-    # Montants
+    # --------- Montants ---------
     total = models.DecimalField(
         "Total prestations TTC",
         max_digits=10,
@@ -188,7 +186,7 @@ class Order(models.Model):
         default=0,
     )
 
-    # Timestamps opérationnels
+    # --------- Timestamps opérationnels ---------
     pickup_time = models.DateTimeField(
         "Collectée par le livreur",
         null=True,
@@ -270,18 +268,13 @@ class Order(models.Model):
     # ---------- BASE PRICING (MODELE 3) ----------
     def compute_delivery_pricing(self, one_way_km: Decimal):
         """
-        Calcul "BASE" avant majoration dynamique (surge) :
+        Calcul "BASE" avant majoration dynamique (surge).
 
-        - distance_totale_km = aller-retour (client <-> blanchisserie)
-        - driver_cost_base = ce que FAGNI doit payer au livreur
-        - client_fee_base = ce que FAGNI facture au client AVANT surge
-        - margin_base = marge FAGNI (client_fee_base - driver_cost_base)
-
-        La logique :
-        1) On calcule le coût livreur (km + fixes par jambe)
-        2) On calcule une marge cible FAGNI (par km + min)
-        3) Prix client = coût livreur + marge cible
-        4) On applique les bornes client_min_fee / client_max_fee
+        Retourne :
+        - distance_totale (km)
+        - client_fee_base
+        - driver_cost_base
+        - margin_base
         """
         if one_way_km is None:
             return None, Decimal("0.00"), Decimal("0.00"), Decimal("0.00")
@@ -331,7 +324,6 @@ class Order(models.Model):
         client_fee_base = client_fee_raw
         if client_fee_base < client_min_fee:
             client_fee_base = client_min_fee
-
         if client_max_fee > 0 and client_fee_base > client_max_fee:
             client_fee_base = client_max_fee
 
@@ -341,34 +333,18 @@ class Order(models.Model):
 
         return distance_totale, client_fee_base, driver_cost_base, margin_base
 
-    # petit alias pour tes tests interactifs avec le "_" et les flags
+    # petit alias pour tes tests interactifs
     def _compute_delivery_pricing(self, one_way_km, is_peak=False, is_night=False, is_rain=False):
-        """
-        Wrapper pour compatibilité avec les tests shell :
-        on ignore pour l'instant is_peak / is_night / is_rain,
-        la partie dynamique est gérée dans compute_delivery_fee().
-        """
         return self.compute_delivery_pricing(one_way_km)
 
     def compute_delivery_fee(self, context: dict | None = None):
         """
-        V2 dynamique (inspiration Yango / Uber) :
-
-        1) On calcule la distance aller simple (Haversine) client ↔ blanchisserie.
-        2) On calcule la tarification BASE (compute_delivery_pricing).
-        3) On applique un multiplicateur dynamique (surge) :
-           - heures de pointe (7–10, 17–20)
-           - nuit (20–6)
-           - météo (si fournie dans `context["weather"]`)
-        4) On répartit la MAJORATION entre :
-           - le livreur (driver_surge_share, ex : 60%)
-           - FAGNI (reste)
-
-        Les champs mis à jour :
+        V2 dynamique (inspiration Yango / Uber).
+        Met à jour :
         - distance_km
         - driver_logistic_cost
         - logistic_margin
-        - (delivery_fee est retourné, puis stocké en vue)
+        et retourne le montant à facturer au client (delivery_fee).
         """
         context = context or {}
 
@@ -410,11 +386,9 @@ class Order(models.Model):
         # 4) Calcul du multiplicateur dynamique (surge_factor)
         surge_factor = Decimal("1.00")
 
-        # 4.a Heure de la commande / ou maintenant si pas de date
         now = timezone.localtime(self.created_at or timezone.now())
         hour = now.hour
 
-        # Heures de pointe (approx) : 7–10 et 17–20
         peak_multiplier = Decimal(str(logi.get("peak_multiplier", 1.3)))
         night_multiplier = Decimal(str(logi.get("night_multiplier", 1.4)))
 
@@ -426,7 +400,6 @@ class Order(models.Model):
         elif is_night:
             surge_factor *= night_multiplier
 
-        # 4.b Météo (si fournie dans context ou si un jour on ajoute un champ Order.weather)
         weather = context.get("weather", "clear")  # "clear", "rain", "heavy_rain"
         rain_multiplier = Decimal(str(logi.get("rain_multiplier", 1.3)))
         heavy_rain_multiplier = Decimal(str(logi.get("heavy_rain_multiplier", 1.6)))
@@ -452,7 +425,6 @@ class Order(models.Model):
         )
 
         if extra > 0:
-            # part pour le livreur
             extra_driver = (extra * driver_surge_share).quantize(
                 Decimal("0.01"), rounding=ROUND_HALF_UP
             )
@@ -481,6 +453,19 @@ class Order(models.Model):
         """
         return sum((item.photos.count() for item in self.items.all()), 0)
 
+    def get_all_photos(self):
+        """
+        Retourne une liste de TOUTES les photos
+        rattachées aux lignes de cette commande.
+        Utilisé pour la galerie globale dans detail.html.
+        """
+        photos = []
+        qs = self.items.prefetch_related("photos").all()
+        for item in qs:
+            for p in item.photos.all():
+                photos.append(p)
+        return photos
+
     # ---------- Service fee FAGNI ----------
     def compute_service_fee(self):
         """
@@ -500,7 +485,7 @@ class Order(models.Model):
         fee = base if base >= minimum else minimum
         return fee.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-    # ---------- Montants payés / dus (placeholder pour plus tard) ----------
+    # ---------- Montants payés / dus ----------
     @property
     def amount_paid(self):
         """
@@ -524,67 +509,87 @@ class Order(models.Model):
     # ---------- Recalcul centralisé ----------
     def save(self, *args, **kwargs):
         """
-        On laisse la vue gérer distance_km / delivery_fee / driver_logistic_cost.
+        On laisse la vue / les signaux gérer :
+        - distance_km
+        - delivery_fee
+        - driver_logistic_cost
+        - génération des commissions MLM
+
         Ici on recalcule seulement :
         - code
         - total (somme des lignes)
         - service_fee
         """
+        # Génération automatique d’un code lisible si absent
         if not self.code:
             self.code = str(uuid.uuid4())[:8]
 
+        # On sauve d’abord pour avoir un PK
         super().save(*args, **kwargs)
 
+        # Recalcul du total des lignes
         agg = self.items.aggregate(s=Sum("total"))
         total = (agg["s"] or Decimal("0.00")).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
+
+        # Recalcul du service FAGNI
         fee_service = self.compute_service_fee()
 
+        # Mise à jour en base sans re-déclencher de save()
         type(self).objects.filter(pk=self.pk).update(
             total=total,
             service_fee=fee_service,
         )
 
-        # Si tu as le module MLM, on garde la logique :
-        if hasattr(self, "mlm_commissions") and self.status == "done" and not self.mlm_commissions.exists():
-            self.distribute_mlm_commissions()
-
     # ---------- MLM ----------
     def distribute_mlm_commissions(self):
         """
         Distribue les commissions MLM sur 3 niveaux à partir du service_fee :
-        - N1 = 5%
-        - N2 = 3%
-        - N3 = 1%
+
+        - N1 = 10 %
+        - N2 = 3 %
+        - N3 = 2 %
+
+        Soit 15 % du service_fee distribués au réseau.
         """
         from mlm.models import ReferralLink, ReferralCommission, WalletTransaction
 
+        # 1) Récupérer le lien de parrainage du client
         try:
             link = ReferralLink.objects.get(customer=self.customer)
         except ReferralLink.DoesNotExist:
             return
 
+        # 2) Remonter la lignée jusqu’à 3 niveaux
         upline = link.get_upline(levels=3)
         if not upline:
             return
 
+        # 3) Base de calcul = service_fee de la commande
         fee_base_decimal = self.service_fee or Decimal("0.00")
+        if fee_base_decimal <= 0:
+            return
+
+        # Pour stockage « propre » en entier FCFA
         fee_base = int(fee_base_decimal)
 
+        # 4) Pourcentages par niveau
         percent_levels = [
-            Decimal("5.00"),
-            Decimal("3.00"),
-            Decimal("1.00"),
+            Decimal("10.00"),  # N1
+            Decimal("3.00"),   # N2
+            Decimal("2.00"),   # N3
         ]
 
+        # 5) Boucle sur les parrains de la lignée
         for idx, sponsor_link in enumerate(upline):
             if idx >= len(percent_levels):
-                break
+                break  # sécurité
 
             percent = percent_levels[idx]
             rate = percent / Decimal("100")
 
+            # Commission théorique
             commission_decimal = (fee_base_decimal * rate).quantize(
                 Decimal("0.01"),
                 rounding=ROUND_HALF_UP,
@@ -594,8 +599,9 @@ class Order(models.Model):
             if commission_amount <= 0:
                 continue
 
-            level = idx + 1
+            level = idx + 1  # N1, N2, N3...
 
+            # Enregistrer la commission détaillée
             ReferralCommission.objects.create(
                 beneficiary_profile=sponsor_link,
                 level=level,
@@ -605,6 +611,7 @@ class Order(models.Model):
                 commission_amount=commission_amount,
             )
 
+            # Enregistrer le mouvement sur le wallet
             WalletTransaction.objects.create(
                 profile=sponsor_link,
                 type="mlm_commission",
@@ -625,7 +632,7 @@ class OrderItem(models.Model):
         verbose_name="Commande",
     )
 
-    # 🔹 Lien vers la prestation du catalogue (facultatif)
+    # Lien vers la prestation du catalogue (facultatif)
     service = models.ForeignKey(
         "ServiceItem",
         on_delete=models.SET_NULL,
@@ -676,16 +683,16 @@ class OrderItemPhoto(models.Model):
         OrderItem,
         on_delete=models.CASCADE,
         related_name="photos",
-        verbose_name="Ligne de commande"
+        verbose_name="Ligne de commande",
     )
     image = models.ImageField(
         "Photo",
-        upload_to="order_items/photos/"
+        upload_to="order_items/photos/",
     )
     caption = models.CharField(
         "Description",
         max_length=255,
-        blank=True
+        blank=True,
     )
     created_at = models.DateTimeField("Ajoutée le", auto_now_add=True)
 
@@ -726,14 +733,14 @@ class ServiceItem(models.Model):
         ServiceCategory,
         on_delete=models.CASCADE,
         related_name="services",
-        verbose_name="Catégorie"
+        verbose_name="Catégorie",
     )
     name = models.CharField("Nom", max_length=150)
     code = models.CharField("Code interne", max_length=50, blank=True)
     default_price = models.DecimalField(
         "Prix de base (FCFA)",
         max_digits=10,
-        decimal_places=2
+        decimal_places=2,
     )
     is_active = models.BooleanField("Actif", default=True)
 

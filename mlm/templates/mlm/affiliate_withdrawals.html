@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Mes retraits – FAGNI</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        body{
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            background:#f5f5f7;
+            margin:0;
+            padding:0;
+            color:#222;
+        }
+        .page{
+            max-width:900px;
+            margin:20px auto;
+            padding:0 10px;
+        }
+        .card{
+            background:#fff;
+            border-radius:10px;
+            padding:16px 20px;
+            box-shadow:0 3px 8px rgba(0,0,0,0.05);
+            margin-bottom:14px;
+        }
+        h1{
+            font-size:20px;
+            margin-top:0;
+        }
+        .mini{
+            font-size:12px;
+            color:#666;
+        }
+        table{
+            width:100%;
+            border-collapse:collapse;
+            font-size:13px;
+        }
+        th,td{
+            padding:6px 4px;
+            border-bottom:1px solid #eee;
+            vertical-align:top;
+        }
+        th{
+            background:#fafafa;
+            font-weight:600;
+            white-space:nowrap;
+        }
+        .badge{
+            display:inline-block;
+            padding:2px 7px;
+            border-radius:999px;
+            font-size:11px;
+        }
+        .b-pending{ background:#fff3cd; color:#856404; }
+        .b-approved{ background:#d1ecf1; color:#0c5460; }
+        .b-rejected{ background:#f8d7da; color:#721c24; }
+        .b-paid{ background:#d4edda; color:#155724; }
+        .btn-link{
+            text-decoration:none;
+            font-size:13px;
+            display:inline-block;
+            margin-top:10px;
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="card">
+        <h1>Mes demandes de retrait</h1>
+        <p class="mini">
+            Solde wallet actuel : <strong>{{ wallet_balance }} FCFA</strong>
+        </p>
+
+        {% if withdrawals %}
+            <table>
+                <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Montant</th>
+                    <th>Statut</th>
+                    <th>Moyen de paiement</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for w in withdrawals %}
+                    <tr>
+                        <td>
+                            {{ w.created_at|date:"d/m/Y H:i" }}
+                        </td>
+                        <td>
+                            {{ w.amount }} FCFA
+                        </td>
+                        <td>
+                            {% if w.status == "pending" %}
+                                <span class="badge b-pending">En attente</span>
+                            {% elif w.status == "approved" %}
+                                <span class="badge b-approved">Approuvée</span>
+                            {% elif w.status == "rejected" %}
+                                <span class="badge b-rejected">Rejetée</span>
+                            {% elif w.status == "paid" %}
+                                <span class="badge b-paid">Payée</span>
+                            {% else %}
+                                {{ w.status }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ w.payout_method|default:"—" }}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="mini">
+                Vous n'avez pas encore effectué de demande de retrait.
+            </p>
+        {% endif %}
+
+        <a href="{% url 'mlm:affiliate_withdrawal_request' %}" class="btn-link">
+            💸 Faire une nouvelle demande
+        </a><br>
+        <a href="{% url 'mlm:affiliate_dashboard' %}" class="btn-link">
+            ← Retour à mon tableau d'affilié
+        </a>
+    </div>
+</div>
+</body>
+</html>

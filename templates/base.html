@@ -1,34 +1,171 @@
-<!doctype html><html><head><meta charset="utf-8"><title>FAGNI</title>
-<style>
- body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:24px;background:#f7f7f8}
- .container{max-width:980px;margin:0 auto}
- .btn{display:inline-block;padding:8px 12px;border-radius:8px;border:1px solid #ccc;text-decoration:none}
- .btn-primary{background:#0d6efd;color:#fff;border-color:#0d6efd}
- table{width:100%;border-collapse:collapse} th,td{padding:8px;border-bottom:1px solid #e6e6e6;text-align:left}
- .card{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);padding:16px}
- .nav a{margin-right:12px}
-</style></head><body>
-<div class="container">
-  <div class="nav">
-    <a href="/" class="btn">Accueil</a>
-    <a href="/orders/" class="btn">Commandes</a>
-    <a href="/admin/" class="btn">Admin</a>
-  </div>
-  {% if messages %}{% for m in messages %}<div>{{ m }}</div>{% endfor %}{% endif %}
-  
-  <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="/">Fagni</a>
-      <div class="collapse navbar-collapse show">
-        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <li class="nav-item"><a class="nav-link" href="/orders/">Commandes</a></li>
-          <li class="nav-item"><a class="nav-link" href="/dashboard/analytics/">Analytics</a></li>
-          <li class="nav-item"><a class="nav-link" href="/">Top Clients</a></li>
-        </ul>
-      </div>
-    </div>
-  </nav>
+{% load static %}
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>FAGNI – Plateforme pressing & services</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
 
-{% block content %}{% endblock %}
+    <style>
+        :root{
+            --fagni-orange:#ff7a00;
+            --fagni-blue:#0056b3;
+            --bg-body:#f5f5f7;
+        }
+        *{box-sizing:border-box;}
+        body{
+            margin:0;
+            padding:0;
+            font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+            background:var(--bg-body);
+            color:#222;
+        }
+        a{text-decoration:none;color:inherit;}
+
+        header{
+            background:linear-gradient(90deg,var(--fagni-orange),var(--fagni-blue));
+            color:#fff;
+            padding:10px 16px 12px;
+            box-shadow:0 2px 8px rgba(0,0,0,0.18);
+        }
+        .header-inner{
+            max-width:1200px;
+            margin:0 auto;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px;
+            flex-wrap:wrap;
+        }
+        .brand{
+            display:flex;
+            align-items:center;
+            gap:8px;
+        }
+        .brand-mark{
+            width:32px;
+            height:32px;
+            border-radius:12px;
+            background:#fff;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-weight:700;
+            color:var(--fagni-orange);
+            font-size:16px;
+        }
+        .brand-text{
+            display:flex;
+            flex-direction:column;
+            line-height:1.1;
+        }
+        .brand-title{
+            font-size:18px;
+            font-weight:600;
+        }
+        .brand-sub{
+            font-size:11px;
+            opacity:.9;
+        }
+
+        .main-nav{
+            display:flex;
+            flex-wrap:wrap;
+            gap:6px;
+        }
+        .nav-group{
+            display:flex;
+            flex-wrap:wrap;
+            gap:6px;
+        }
+        .nav-link{
+            display:inline-flex;
+            align-items:center;
+            gap:4px;
+            padding:6px 10px;
+            font-size:12px;
+            border-radius:999px;
+            border:1px solid rgba(255,255,255,0.32);
+            background:rgba(0,0,0,0.08);
+            color:#fff;
+            white-space:nowrap;
+        }
+        .nav-link.primary{
+            background:#fff;
+            color:var(--fagni-blue);
+            font-weight:600;
+        }
+        .nav-link:hover{
+            background:rgba(255,255,255,0.16);
+        }
+        .nav-link.primary:hover{
+            background:#f3f3f3;
+        }
+
+        .page{
+            max-width:1200px;
+            margin:18px auto 30px;
+            padding:0 10px;
+        }
+
+        @media(max-width:800px){
+            .header-inner{
+                align-items:flex-start;
+            }
+            .main-nav{
+                width:100%;
+                justify-content:flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-inner">
+        <div class="brand">
+            <div class="brand-mark">F</div>
+            <div class="brand-text">
+                <span class="brand-title">FAGNI</span>
+                <span class="brand-sub">Ops & Finance – Pressing digital</span>
+            </div>
+        </div>
+
+        <nav class="main-nav">
+            <div class="nav-group">
+                <a href="{% url 'orders:list' %}" class="nav-link">
+                    📋 <span>Commandes</span>
+                </a>
+                <a href="{% url 'orders:create' %}" class="nav-link primary">
+                    ➕ <span>Nouvelle commande</span>
+                </a>
+            </div>
+            <div class="nav-group">
+                <a href="{% url 'orders:dashboard' %}" class="nav-link">
+                    📊 <span>Dashboard commandes</span>
+                </a>
+                <a href="{% url 'orders:ops_dashboard' %}" class="nav-link">
+                    🚦 <span>Tableau Ops</span>
+                </a>
+                <a href="{% url 'orders:finance_dashboard' %}" class="nav-link">
+                    💰 <span>Finance</span>
+                </a>
+            </div>
+            <div class="nav-group">
+                <a href="{% url 'orders:customers_list' %}" class="nav-link">
+                    👥 <span>Clients</span>
+                </a>
+                <a href="{% url 'orders:driver_dashboard' %}" class="nav-link">
+                    🛵 <span>Livreurs</span>
+                </a>
+            </div>
+        </nav>
+    </div>
+</header>
+
+<div class="page">
+    {% block content %}{% endblock %}
 </div>
-</body></html>
+
+</body>
+</html>

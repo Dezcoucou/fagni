@@ -1,495 +1,573 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Dashboard FAGNI - Commandes</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "base.html" %}
+{% load humanize %}
 
-    <style>
-        body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background: #f5f5f7;
-            margin: 0;
-            padding: 0;
-            color: #222;
+{% block content %}
+<style>
+    body{
+        background:#f5f5f7;
+    }
+    header{
+        background:linear-gradient(90deg,#ff7a00,#0056b3);
+        color:#fff;
+        padding:16px 24px;
+        margin:0 -12px 0 -12px;
+    }
+    header h1{
+        margin:0;
+        font-size:20px;
+    }
+    header p{
+        margin:4px 0 0;
+        font-size:13px;
+        opacity:.9;
+    }
+    .page{
+        max-width:1200px;
+        margin:20px auto 30px;
+        padding:0 10px;
+    }
+    .card{
+        background:#fff;
+        border-radius:10px;
+        box-shadow:0 4px 10px rgba(0,0,0,0.05);
+        padding:14px 18px 18px;
+        margin-bottom:14px;
+    }
+    .top-bar{
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:10px;
+        flex-wrap:wrap;
+        margin-bottom:10px;
+    }
+    .btn-link{
+        text-decoration:none;
+        display:inline-block;
+        border-radius:999px;
+        padding:7px 12px;
+        font-size:13px;
+    }
+    .btn-primary{
+        background:#0056b3;
+        color:#fff;
+        border:none;
+    }
+    .btn-primary:hover{
+        background:#00408a;
+    }
+    .btn-secondary{
+        background:#fff;
+        border:1px solid #ccc;
+        color:#333;
+    }
+    .btn-secondary:hover{
+        background:#f3f3f3;
+    }
+    .mini{
+        font-size:11px;
+        color:#666;
+    }
+
+    /* Cartes KPI */
+    .cards{
+        display:grid;
+        grid-template-columns:repeat(4,1fr);
+        gap:10px;
+        margin-top:8px;
+    }
+    @media(max-width:900px){
+        .cards{
+            grid-template-columns:repeat(2,1fr);
         }
-        header {
-            background: linear-gradient(90deg, #ff7a00, #0056b3);
-            color: #fff;
-            padding: 16px 24px;
+    }
+    @media(max-width:600px){
+        .cards{
+            grid-template-columns:1fr;
         }
-        header h1 {
-            margin: 0;
-            font-size: 20px;
+    }
+    .stat-card{
+        background:#f8f9fb;
+        border-radius:10px;
+        padding:10px 12px;
+    }
+    .stat-label{
+        font-size:11px;
+        color:#666;
+        margin-bottom:2px;
+    }
+    .stat-value{
+        font-size:18px;
+        font-weight:600;
+    }
+    .stat-sub{
+        font-size:11px;
+        color:#777;
+        margin-top:2px;
+    }
+
+    /* Boutons filtres période graphique */
+    .graph-filters{
+        display:flex;
+        gap:6px;
+        align-items:center;
+        flex-wrap:wrap;
+        margin-bottom:6px;
+        font-size:12px;
+    }
+    .chip{
+        border-radius:999px;
+        padding:4px 10px;
+        border:1px solid #ddd;
+        font-size:11px;
+        text-decoration:none;
+        color:#333;
+        background:#fff;
+    }
+    .chip.active{
+        background:#0056b3;
+        border-color:#0056b3;
+        color:#fff;
+    }
+
+    /* Zone graphique */
+    .charts-grid{
+        display:grid;
+        grid-template-columns:2fr 1.3fr;
+        gap:12px;
+        margin-top:6px;
+    }
+    @media(max-width:900px){
+        .charts-grid{
+            grid-template-columns:1fr;
         }
-        header p {
-            margin: 4px 0 0;
-            font-size: 13px;
-            opacity: 0.9;
+    }
+    .chart-box{
+        background:#f8f9fb;
+        border-radius:10px;
+        padding:10px 12px;
+    }
+    .chart-title{
+        font-size:13px;
+        font-weight:600;
+        margin-bottom:4px;
+    }
+    .chart-sub{
+        font-size:11px;
+        color:#777;
+        margin-bottom:6px;
+    }
+
+    /* Conteneur du graphique (hauteur maîtrisée) */
+    .chart-container{
+        position:relative;
+        width:100%;
+        max-width:100%;
+        height:220px; /* hauteur visible du graph */
+    }
+    @media(max-width:768px){
+        .chart-container{
+            height:180px;
         }
-        .page {
-            max-width: 1100px;
-            margin: 20px auto;
-            padding: 0 10px 30px;
-        }
-        .top-actions {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 14px;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .btn-link {
-            text-decoration: none;
-            display: inline-block;
-            border-radius: 999px;
-            padding: 7px 12px;
-            font-size: 13px;
-        }
-        .btn-primary {
-            background: #0056b3;
-            color: #fff;
-            border: none;
-        }
-        .btn-primary:hover {
-            background: #00408a;
-        }
-        .btn-secondary {
-            background: #fff;
-            border: 1px solid #ccc;
-            color: #333;
-        }
-        .btn-secondary:hover {
-            background: #f3f3f3;
-        }
-        .grid-cards {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 14px;
-            margin-bottom: 16px;
-        }
-        .card {
-            background: #fff;
-            border-radius: 10px;
-            padding: 14px 16px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-        }
-        .card h2 {
-            margin: 0 0 6px;
-            font-size: 16px;
-        }
-        .card p {
-            margin: 2px 0;
-            font-size: 13px;
-        }
-        .kpi-main {
-            font-size: 22px;
-            font-weight: 700;
-        }
-        .kpi-sub {
-            font-size: 11px;
-            color: #777;
-        }
-        @media (max-width: 900px) {
-            .grid-cards {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-        }
-        @media (max-width: 640px) {
-            .grid-cards {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
-</head>
-<body>
+    }
+
+    /* Top tables */
+    table{
+        width:100%;
+        border-collapse:collapse;
+        font-size:13px;
+        margin-top:6px;
+    }
+    th,td{
+        padding:6px 4px;
+        border-bottom:1px solid #eee;
+        vertical-align:top;
+    }
+    th{
+        background:#fafafa;
+        font-weight:600;
+        white-space:nowrap;
+    }
+    tr:hover{
+        background:#fafafa;
+    }
+    .t-right{ text-align:right; }
+    .t-nowrap{ white-space:nowrap; }
+
+    .tag-client{
+        display:inline-block;
+        padding:2px 6px;
+        border-radius:999px;
+        background:#edf4ff;
+        color:#234f9c;
+        font-size:11px;
+        margin-top:2px;
+    }
+    .tag-item{
+        display:inline-block;
+        padding:2px 6px;
+        border-radius:999px;
+        background:#fff3cd;
+        color:#856404;
+        font-size:11px;
+        margin-top:2px;
+    }
+    .legend{
+        margin-top:8px;
+        font-size:11px;
+        color:#666;
+    }
+</style>
+
 <header>
-    <h1>Dashboard FAGNI – Commandes</h1>
-    <p>Vue synthétique des commandes et du chiffre d’affaires.</p>
+    <h1>Dashboard commandes – FAGNI</h1>
+    <p>Vision synthétique des commandes, du CA et des comportements clients.</p>
 </header>
 
 <div class="page">
 
-    <div class="top-actions">
-        <div>
-            <a href="{% url 'orders:list' %}" class="btn-link btn-secondary">← Retour à la liste des commandes</a>
-        </div>
-        <div>
-            <a href="{% url 'orders:create' %}" class="btn-link btn-primary">+ Nouvelle commande</a>
-        </div>
-    </div>
-
-    <!-- Sélecteur de période pour le graphique -->
-    <div class="card" style="margin-bottom:16px;">
-        <h2 style="font-size:14px;margin-bottom:8px;">Période du graphique</h2>
-        <p class="kpi-sub" style="margin-bottom:8px;">
-            Choisis la fenêtre temporelle pour l'évolution des commandes.
-        </p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <a href="{% url 'orders:dashboard' %}?days=7"
-               class="btn-link btn-secondary"
-               style="padding:5px 10px;
-                      {% if current_days == 7 %}
-                        background:#0056b3;color:#fff;border-color:#0056b3;
-                      {% endif %}">
-                7 jours
-            </a>
-            <a href="{% url 'orders:dashboard' %}?days=14"
-               class="btn-link btn-secondary"
-               style="padding:5px 10px;
-                      {% if current_days == 14 %}
-                        background:#0056b3;color:#fff;border-color:#0056b3;
-                      {% endif %}">
-                14 jours
-            </a>
-            <a href="{% url 'orders:dashboard' %}?days=30"
-               class="btn-link btn-secondary"
-               style="padding:5px 10px;
-                      {% if current_days == 30 %}
-                        background:#0056b3;color:#fff;border-color:#0056b3;
-                      {% endif %}">
-                30 jours
-            </a>
-        </div>
-    </div>
-
-    <!-- KPIs globaux -->
-    <div class="grid-cards">
-        <div class="card">
-            <h2>Commandes totales</h2>
-            <p class="kpi-main">{{ total_count }}</p>
-            <p class="kpi-sub">Toutes périodes confondues</p>
+    <!-- Barre du haut : navigation -->
+    <div class="card">
+        <div class="top-bar">
+            <div>
+                <div style="font-size:14px;font-weight:600;">
+                    Synthèse opérationnelle & business
+                </div>
+                <div class="mini">
+                    Période du jour : <strong>{{ today|date:"d/m/Y" }}</strong><br>
+                    Vue globale construite à partir de toutes les commandes FAGNI.
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                <a href="{% url 'orders:list' %}" class="btn-link btn-secondary">
+                    📋 Liste des commandes
+                </a>
+                <a href="{% url 'orders:ops_dashboard' %}" class="btn-link btn-secondary">
+                    🚦 Tableau Ops
+                </a>
+                <a href="{% url 'orders:driver_dashboard' %}" class="btn-link btn-secondary">
+                    🛵 Tableau livreurs
+                </a>
+                <a href="{% url 'orders:finance_dashboard' %}" class="btn-link btn-secondary">
+                    💰 Dashboard financier
+                </a>
+                <a href="{% url 'orders:create' %}" class="btn-link btn-primary">
+                    + Nouvelle commande
+                </a>
+            </div>
         </div>
 
-        <div class="card">
-            <h2>Commandes en cours</h2>
-            <p class="kpi-main">{{ in_progress_count }}</p>
-            <p class="kpi-sub">Statut : en cours</p>
-        </div>
-
-        <div class="card">
-            <h2>Commandes terminées</h2>
-            <p class="kpi-main">{{ done_count }}</p>
-            <p class="kpi-sub">Statut : terminées</p>
-        </div>
-    </div>
-
-    <!-- Performance globale -->
-    <div class="card" style="margin-bottom:16px;">
-        <h2>Performance globale</h2>
-        <p class="kpi-sub">Vue synthétique de la qualité et de la valeur des commandes.</p>
-
-        <ul style="list-style:none;padding-left:0;margin-top:10px;font-size:13px;">
-            <li style="margin-bottom:4px;">
-                ✅ Taux de commandes terminées :
-                <strong>
+        <!-- KPIs principaux -->
+        <div class="cards">
+            <div class="stat-card">
+                <div class="stat-label">Total commandes</div>
+                <div class="stat-value">{{ total_count|default:0|intcomma }}</div>
+                <div class="stat-sub">
+                    Terminées : <strong>{{ done_count|default:0|intcomma }}</strong> ·
+                    Annulées : <strong>{{ canceled_count|default:0|intcomma }}</strong>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">CA prestations livrées</div>
+                <div class="stat-value">
+                    {{ done_total|default:0|floatformat:0|intcomma }} FCFA
+                </div>
+                <div class="stat-sub">
+                    Basé sur les commandes au statut <strong>Terminée</strong>.
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Taux de complétion</div>
+                <div class="stat-value">
                     {{ completion_rate|floatformat:1 }} %
-                </strong>
-            </li>
-            <li style="margin-bottom:4px;">
-                ⚠️ Taux de commandes annulées :
-                <strong>
-                    {{ cancel_rate|floatformat:1 }} %
-                </strong>
-            </li>
-            <li style="margin-bottom:4px;">
-                💰 Panier moyen (commandes terminées) :
-                <strong>
-                    {{ avg_ticket_done|floatformat:0 }} FCFA
-                </strong>
-            </li>
-            <li>
-                💼 Panier moyen global (toutes commandes) :
-                <strong>
-                    {{ avg_ticket_all|floatformat:0 }} FCFA
-                </strong>
-            </li>
-        </ul>
-    </div>
-
-    <!-- Répartition par statut -->
-    <div class="grid-cards">
-        <div class="card">
-            <h2>En attente</h2>
-            <p class="kpi-main">{{ pending_count }}</p>
-            <p class="kpi-sub">Commandes non encore traitées</p>
+                </div>
+                <div class="stat-sub">
+                    Annulation : <strong>{{ cancel_rate|floatformat:1 }} %</strong><br>
+                    <span class="mini">Complétion = Terminées / Total commandes.</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Panier moyen</div>
+                <div class="stat-value">
+                    {{ avg_ticket_done|floatformat:0|intcomma }} FCFA
+                </div>
+                <div class="stat-sub">
+                    Moyenne sur les commandes terminées.<br>
+                    Global (toutes commandes) : {{ avg_ticket_all|floatformat:0|intcomma }} FCFA.
+                </div>
+            </div>
         </div>
 
-        <div class="card">
-            <h2>Annulées</h2>
-            <p class="kpi-main">{{ canceled_count }}</p>
-            <p class="kpi-sub">Commandes annulées</p>
-        </div>
-
-        <div class="card">
-            <h2>CA total terminé</h2>
-            <p class="kpi-main">{{ done_total }} FCFA</p>
-            <p class="kpi-sub">Somme des commandes terminées</p>
-        </div>
-    </div>
-
-    <!-- Focus sur aujourd'hui -->
-    <div class="grid-cards">
-        <div class="card">
-            <h2>Commandes du {{ today|date:"d/m/Y" }}</h2>
-            <p class="kpi-main">{{ today_count }}</p>
-            <p class="kpi-sub">Toutes commandes créées aujourd'hui</p>
-        </div>
-
-    <!-- Statistiques hebdomadaires -->
-    <div class="grid-cards">
-        <div class="card">
-            <h2>Semaine du {{ start_week|date:"d/m" }}</h2>
-            <p class="kpi-main">{{ week_count }}</p>
-            <p class="kpi-sub">Commandes créées cette semaine</p>
-        </div>
-
-        <div class="card">
-            <h2>CA terminé cette semaine</h2>
-            <p class="kpi-main">{{ week_done_total }} FCFA</p>
-            <p class="kpi-sub">Commandes terminées cette semaine</p>
-        </div>
-
-        <div class="card">
-            <h2>Performance hebdomadaire</h2>
-            <p class="kpi-main">
-                {% if week_count > 0 %}
-                    {{ week_done_total|floatformat:0 }} FCFA / {{ week_count }} cmd
-                {% else %}
-                    —
-                {% endif %}
-            </p>
-            <p class="kpi-sub">Panier moyen semaine</p>
+        <!-- KPIs jour / semaine / mois -->
+        <div class="cards" style="margin-top:10px;">
+            <div class="stat-card">
+                <div class="stat-label">Aujourd’hui ({{ today|date:"d/m" }})</div>
+                <div class="stat-value">
+                    {{ today_count|default:0|intcomma }}
+                </div>
+                <div class="stat-sub">
+                    CA livré : <strong>{{ today_done_total|floatformat:0|intcomma }} FCFA</strong>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">
+                    Semaine en cours
+                    <span class="mini">(depuis {{ start_week|date:"d/m" }})</span>
+                </div>
+                <div class="stat-value">
+                    {{ week_count|default:0|intcomma }}
+                </div>
+                <div class="stat-sub">
+                    CA livré : <strong>{{ week_done_total|floatformat:0|intcomma }} FCFA</strong>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">
+                    Mois en cours
+                    <span class="mini">(depuis {{ start_month|date:"d/m" }})</span>
+                </div>
+                <div class="stat-value">
+                    {{ month_count|default:0|intcomma }}
+                </div>
+                <div class="stat-sub">
+                    CA livré : <strong>{{ month_done_total|floatformat:0|intcomma }} FCFA</strong>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Commandes en cours</div>
+                <div class="stat-value">{{ in_progress_count|default:0|intcomma }}</div>
+                <div class="stat-sub">
+                    En attente : <strong>{{ pending_count|default:0|intcomma }}</strong><br>
+                    Annulées : <strong>{{ canceled_count|default:0|intcomma }}</strong>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Statistiques mensuelles -->
-    <div class="grid-cards">
-        <div class="card">
-            <h2>Mois du {{ start_month|date:"m/Y" }}</h2>
-            <p class="kpi-main">{{ month_count }}</p>
-            <p class="kpi-sub">Commandes créées ce mois</p>
-        </div>
+    <!-- Graphiques + Top clients / articles -->
+    <div class="card">
 
-        <div class="card">
-            <h2>CA terminé ce mois</h2>
-            <p class="kpi-main">{{ month_done_total }} FCFA</p>
-            <p class="kpi-sub">Total ventes confirmées ce mois</p>
-        </div>
-
-        <div class="card">
-            <h2>Performance mensuelle</h2>
-            <p class="kpi-main">
-                {% if month_count > 0 %}
-                    {{ month_done_total|floatformat:0 }} FCFA / {{ month_count }} cmd
-                {% else %}
-                    —
-                {% endif %}
-            </p>
-            <p class="kpi-sub">Panier moyen mois</p>
-        </div>
-    </div>
-
-        <div class="card">
-            <h2>CA terminé aujourd'hui</h2>
-            <p class="kpi-main">{{ today_done_total }} FCFA</p>
-            <p class="kpi-sub">Commandes terminées aujourd'hui</p>
-        </div>
-
-        <div class="card">
-            <h2>Actions rapides</h2>
-            <p>
-                <a href="{% url 'orders:list' %}?status=pending" class="btn-link btn-secondary">
-                    Voir les commandes en attente
+        <div class="top-bar" style="margin-bottom:6px;">
+            <div>
+                <div style="font-size:14px;font-weight:600;">
+                    Tendances des commandes & du CA
+                </div>
+                <div class="mini">
+                    Visualisation sur <strong>{{ current_days }}</strong> derniers jours.
+                </div>
+            </div>
+            <div class="graph-filters">
+                <span class="mini">Période :</span>
+                <a href="{% url 'orders:dashboard' %}?days=7"
+                   class="chip {% if current_days == 7 %}active{% endif %}">
+                    7 jours
                 </a>
-            </p>
-            <p>
-                <a href="{% url 'orders:list' %}?status=in_progress" class="btn-link btn-secondary">
-                    Voir les commandes en cours
+                <a href="{% url 'orders:dashboard' %}?days=14"
+                   class="chip {% if current_days == 14 %}active{% endif %}">
+                    14 jours
                 </a>
-            </p>
+                <a href="{% url 'orders:dashboard' %}?days=30"
+                   class="chip {% if current_days == 30 %}active{% endif %}">
+                    30 jours
+                </a>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <!-- Graphique ligne commandes & CA -->
+            <div class="chart-box">
+                <div class="chart-title">Évolution quotidienne des commandes & du CA</div>
+                <div class="chart-sub">
+                    Ligne bleu = nombre de commandes · Barres orange = total prestations livrées (FCFA).
+                </div>
+                <div class="chart-container">
+                    <canvas id="ordersChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Top clients / articles (bloc texte) -->
+            <div class="chart-box">
+                <div class="chart-title">Vue rapide Top</div>
+                <div class="chart-sub">
+                    Clients les plus générateurs & prestations les plus demandées.
+                </div>
+                <div class="mini">
+                    • <strong>Top clients</strong> : par montant cumulé sur les commandes livrées.<br>
+                    • <strong>Top prestations</strong> : par volume (quantité totale).
+                </div>
+            </div>
         </div>
     </div>
 
-<!-- Top 5 clients par CA -->
-    <div class="card" style="margin-top:18px;">
-        <h2>Top 5 clients (commandes terminées)</h2>
-        <p class="kpi-sub">Clients avec le plus fort chiffre d'affaires cumulé.</p>
+    <!-- Top clients + Top prestations -->
+    <div class="card">
+        <div class="top-bar" style="margin-bottom:6px;">
+            <div>
+                <div style="font-size:14px;font-weight:600;">
+                    Top clients & Top prestations
+                </div>
+                <div class="mini">
+                    Idéal pour cibler la fidélisation, les offres promotionnelles et les best-sellers.
+                </div>
+            </div>
+        </div>
 
-        {% if top_clients %}
-            <div style="overflow-x:auto;">
-                <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;">
-                    <thead>
-                        <tr style="background:#f3f3f3;">
-                            <th style="text-align:left;padding:6px 8px;border-bottom:1px solid #ddd;">Client</th>
-                            <th style="text-align:left;padding:6px 8px;border-bottom:1px solid #ddd;">Téléphone</th>
-                            <th style="text-align:right;padding:6px 8px;border-bottom:1px solid #ddd;">Nb commandes</th>
-                            <th style="text-align:right;padding:6px 8px;border-bottom:1px solid #ddd;">Total (FCFA)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+        <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:12px;">
+            <!-- Top clients -->
+            <div>
+                <h3 style="font-size:13px;margin:0 0 4px;border-left:3px solid #0056b3;padding-left:6px;">
+                    Top 5 clients par CA cumulé
+                </h3>
+                {% if top_clients %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Client</th>
+                                <th class="t-right">Nb commandes</th>
+                                <th class="t-right">Montant cumulé</th>
+                            </tr>
+                        </thead>
+                        <tbody>
                         {% for c in top_clients %}
                             <tr>
-                                <td style="padding:6px 8px;border-bottom:1px solid #eee;">
-                                    {{ c.customer__name }}
+                                <td>
+                                    {{ c.customer__name|default:"(Sans nom)" }}
+                                    {% if c.customer__phone %}
+                                        <div class="mini">📞 {{ c.customer__phone }}</div>
+                                    {% endif %}
                                 </td>
-                                <td style="padding:6px 8px;border-bottom:1px solid #eee;">
-                                    {{ c.customer__phone }}
+                                <td class="t-right">
+                                    {{ c.orders_count|default:0|intcomma }}
                                 </td>
-                                <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">
-                                    {{ c.orders_count }}
-                                </td>
-                                <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">
-                                    {{ c.total_spent|floatformat:0 }} FCFA
+                                <td class="t-right">
+                                    {{ c.total_spent|default:0|floatformat:0|intcomma }} FCFA
                                 </td>
                             </tr>
                         {% endfor %}
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="mini">Pas encore de données suffisantes pour les top clients.</div>
+                {% endif %}
             </div>
-        {% else %}
-            <p class="kpi-sub" style="margin-top:8px;">
-                Aucune commande terminée pour le moment.
-            </p>
-        {% endif %}
-    </div>
 
-<!-- Top 5 articles par quantité -->
-    <div class="card" style="margin-top:18px;">
-        <h2>Top 5 articles (commandes terminées)</h2>
-        <p class="kpi-sub">Articles les plus traités (en quantité), sur les commandes terminées.</p>
-
-        {% if top_items %}
-            <div style="overflow-x:auto;">
-                <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;">
-                    <thead>
-                        <tr style="background:#f3f3f3;">
-                            <th style="text-align:left;padding:6px 8px;border-bottom:1px solid #ddd;">Article</th>
-                            <th style="text-align:right;padding:6px 8px;border-bottom:1px solid #ddd;">Quantité totale</th>
-                            <th style="text-align:right;padding:6px 8px;border-bottom:1px solid #ddd;">Montant total (FCFA)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+            <!-- Top prestations -->
+            <div>
+                <h3 style="font-size:13px;margin:0 0 4px;border-left:3px solid #ff7a00;padding-left:6px;">
+                    Top 5 prestations
+                </h3>
+                {% if top_items %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Prestation</th>
+                                <th class="t-right">Quantité</th>
+                                <th class="t-right">Montant</th>
+                            </tr>
+                        </thead>
+                        <tbody>
                         {% for it in top_items %}
                             <tr>
-                                <td style="padding:6px 8px;border-bottom:1px solid #eee;">
-                                    {{ it.designation }}
+                                <td>
+                                    {{ it.designation|default:"(Sans désignation)" }}
                                 </td>
-                                <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">
-                                    {{ it.total_qty }}
+                                <td class="t-right">
+                                    {{ it.total_qty|default:0|intcomma }}
                                 </td>
-                                <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">
-                                    {{ it.total_amount|floatformat:0 }} FCFA
+                                <td class="t-right">
+                                    {{ it.total_amount|default:0|floatformat:0|intcomma }} FCFA
                                 </td>
                             </tr>
                         {% endfor %}
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="mini">Pas encore de données suffisantes pour les prestations.</div>
+                {% endif %}
             </div>
-        {% else %}
-            <p class="kpi-sub" style="margin-top:8px;">
-                Aucune donnée disponible pour l’instant.
-            </p>
-        {% endif %}
+        </div>
+
+        <div class="legend">
+            💡 <strong>Idées d’usage :</strong><br>
+            – Cibler les top clients pour des offres VIP ou des codes promo.<br>
+            – Construire des packs ou abonnements basés sur les prestations les plus demandées.
+        </div>
     </div>
 
-    <!-- Graphique commandes et CA sur 7 jours -->
-    <div class="card" style="margin-top:18px;">
-        <h2>Évolution sur {{ current_days }} jours</h2>
-        <p class="kpi-sub">Nombre de commandes et CA des commandes terminées par jour</p>
-        <canvas id="ordersChart" style="max-height:280px;"></canvas>
-    </div>    
-
 </div>
-
-<!-- Données JSON pour le graphique -->
-{{ chart_labels|json_script:"chart-labels" }}
-{{ chart_orders|json_script:"chart-orders" }}
-{{ chart_totals|json_script:"chart-totals" }}
 
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    (function() {
-        const labels = JSON.parse(document.getElementById('chart-labels').textContent);
-        const ordersData = JSON.parse(document.getElementById('chart-orders').textContent);
-        const totalsData = JSON.parse(document.getElementById('chart-totals').textContent);
+    (function(){
+        const labels = {{ chart_labels|default:"[]"|safe }};
+        const ordersData = {{ chart_orders|default:"[]"|safe }};
+        const totalsData = {{ chart_totals|default:"[]"|safe }};
 
-        const ctx = document.getElementById('ordersChart').getContext('2d');
-
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Commandes',
-                        data: ordersData,
-                        yAxisID: 'y',
-                        borderWidth: 1
-                    },
-                    {
-                        label: 'CA terminé (FCFA)',
-                        data: totalsData,
-                        type: 'line',
-                        yAxisID: 'y1',
-                        borderWidth: 2,
-                        tension: 0.3
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
-                stacked: false,
-                scales: {
-                    y: {
-                        type: 'linear',
-                        position: 'left',
-                        title: {
-                            display: true,
-                            text: 'Nombre de commandes'
+        const ctx = document.getElementById('ordersChart');
+        if (ctx && labels.length) {
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: 'Nb commandes',
+                            data: ordersData,
+                            borderWidth: 2,
+                            tension: 0.3,
+                            yAxisID: 'y',
                         },
-                        ticks: {
-                            precision: 0
+                        {
+                            type: 'bar',
+                            label: 'CA prestations livrées (FCFA)',
+                            data: totalsData,
+                            borderWidth: 1,
+                            yAxisID: 'y1',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            position: 'left',
+                            title: { display:true, text:'Nb commandes' }
+                        },
+                        y1: {
+                            beginAtZero: true,
+                            position: 'right',
+                            grid: { drawOnChartArea:false },
+                            title: { display:true, text:'Montant (FCFA)' }
                         }
                     },
-                    y1: {
-                        type: 'linear',
-                        position: 'right',
-                        title: {
-                            display: true,
-                            text: 'CA (FCFA)'
+                    plugins: {
+                        legend: {
+                            labels: { font: { size: 11 } }
                         },
-                        grid: {
-                            drawOnChartArea: false
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: true
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                if (context.dataset.label.includes('CA')) {
-                                    return context.dataset.label + ': ' + context.raw.toLocaleString('fr-FR') + ' FCFA';
+                        tooltip: {
+                            callbacks: {
+                                label: function(context){
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed.y !== null) {
+                                        const val = context.parsed.y;
+                                        label += new Intl.NumberFormat('fr-FR').format(val);
+                                    }
+                                    if (context.dataset.label && context.dataset.label.includes('CA')) {
+                                        label += ' FCFA';
+                                    }
+                                    return label;
                                 }
-                                return context.dataset.label + ': ' + context.raw;
                             }
                         }
                     }
                 }
-            }
-        });
+            });
+        }
     })();
 </script>
-
-</body>
-</html>
+{% endblock %}

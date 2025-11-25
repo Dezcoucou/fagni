@@ -1,0 +1,99 @@
+{# orders/_form_add_item.html #}
+
+<div class="space-y-3">
+
+    <div class="mb-3">
+        <label for="category_select" class="block text-sm font-medium text-gray-700">
+            Catégorie de service
+        </label>
+        <select
+            id="category_select"
+            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm px-3 py-2 focus:ring-blue-600 focus:border-blue-600"
+        >
+            <option value="">-- Choisir une catégorie --</option>
+            {% for cat in service_categories %}
+                <option value="{{ cat.id }}">{{ cat.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label for="service_select" class="block text-sm font-medium text-gray-700">
+            Prestation / Article
+        </label>
+        <select
+            id="service_select"
+            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm px-3 py-2 focus:ring-blue-600 focus:border-blue-600"
+            disabled
+        >
+            <option value="">-- Choisir une catégorie d'abord --</option>
+            {% for s in service_items %}
+                <option value="{{ s.id }}"
+                        data-category="{{ s.category_id }}"
+                        data-price="{{ s.default_price }}"
+                        data-cat-name="{{ s.category.name }}"
+                        hidden>
+                    {{ s.name }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label for="item_designation" class="block text-sm font-medium text-gray-700">
+            Désignation (modifiable)
+        </label>
+        <input
+            type="text"
+            id="item_designation"
+            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm px-3 py-2 focus:ring-blue-600 focus:border-blue-600"
+            placeholder="Texte qui apparaîtra sur la commande"
+        >
+        <p class="text-xs text-gray-500 mt-1">
+            Par défaut : le libellé de la prestation. Tu peux l’adapter au contexte (par ex. “Chemise business blanche”).
+        </p>
+    </div>
+
+    <div class="flex gap-3 items-end">
+        <div class="flex-1">
+            <label for="item_quantity" class="block text-sm font-medium text-gray-700">
+                Quantité
+            </label>
+            <input
+                type="number"
+                id="item_quantity"
+                min="1"
+                value="1"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm px-3 py-2 focus:ring-blue-600 focus:border-blue-600"
+            >
+        </div>
+
+        <div class="flex-[1.5]">
+            <label for="item_price" class="block text-sm font-medium text-gray-700">
+                Prix unitaire (catalogue, non modifiable)
+            </label>
+            <input
+                type="number"
+                id="item_price"
+                min="0"
+                value="0"
+                readonly
+                class="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm text-sm px-3 py-2"
+            >
+            <p class="text-xs text-gray-500 mt-1">
+                Les prix viennent du catalogue FAGNI.  
+                Toute modification se fait côté catalogue, pas ici.
+            </p>
+        </div>
+    </div>
+
+    <div class="mt-1">
+        <button
+            type="button"
+            id="addItemBtn"
+            class="inline-flex items-center px-3 py-2 rounded-full border border-orange-500 text-orange-500 text-xs font-medium hover:bg-orange-50"
+        >
+            ➕ Ajouter une nouvelle ligne
+        </button>
+    </div>
+</div>

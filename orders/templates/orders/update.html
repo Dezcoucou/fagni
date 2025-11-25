@@ -1,233 +1,351 @@
+{% extends "base.html" %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Modifier commande {{ order.code }} - FAGNI</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <style>
-        body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background: #f5f5f7;
-            margin: 0;
-            padding: 0;
-            color: #222;
-        }
-        header {
-            background: linear-gradient(90deg, #ff7a00, #0056b3);
-            color: #fff;
-            padding: 16px 24px;
-        }
-        header h1 {
-            margin: 0;
-            font-size: 20px;
-        }
-        header p {
-            margin: 4px 0 0;
-            font-size: 13px;
-            opacity: 0.9;
-        }
-        .page {
-            max-width: 1100px;
-            margin: 20px auto;
-            padding: 0 10px 30px;
-        }
-        .card {
-            background: #fff;
-            border-radius: 10px;
-            padding: 16px 20px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-            margin-bottom: 16px;
-        }
-        .card h2 {
-            margin-top: 0;
-            font-size: 18px;
-            border-left: 4px solid #ff7a00;
-            padding-left: 8px;
-        }
-        .top-actions {
-            display:flex;
-            justify-content:space-between;
-            align-items:center;
-            gap:10px;
-            margin-bottom:14px;
-            flex-wrap:wrap;
-        }
-        .btn-link {
-            text-decoration:none;
-            border-radius:999px;
-            padding:7px 12px;
-            font-size:13px;
-            display:inline-block;
-        }
-        .btn-secondary {
-            background:#fff;
-            border:1px solid #ccc;
-            color:#333;
-        }
-        .btn-secondary:hover {
-            background:#f3f3f3;
-        }
+{% block content %}
+<style>
+    :root {
+        --fagni-orange: #ff7a00;
+        --fagni-blue: #0056b3;
+        --bg-soft: #f5f5f7;
+        --card-bg: #ffffff;
+        --border-soft: #e5e7eb;
+        --text-main: #222222;
+        --text-muted: #6b7280;
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg-soft);
+        margin: 0;
+        padding: 0;
+        color: var(--text-main);
+    }
+
+    header {
+        background: linear-gradient(90deg, #ff7a00, #0056b3);
+        color: #fff;
+        padding: 16px 24px;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+        margin: 0 -12px 0 -12px;
+    }
+    header h1 {
+        margin: 0;
+        font-size: 20px;
+    }
+    header p {
+        margin: 4px 0 0;
+        font-size: 13px;
+        opacity: 0.9;
+    }
+
+    .page {
+        max-width: 1100px;
+        margin: 20px auto;
+        padding: 0 10px 30px;
+    }
+
+    .card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+        margin-bottom: 16px;
+        border: 1px solid var(--border-soft);
+    }
+
+    .card h2 {
+        margin-top: 0;
+        font-size: 18px;
+        border-left: 4px solid #ff7a00;
+        padding-left: 8px;
+    }
+
+    .top-actions {
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:10px;
+        margin-bottom:14px;
+        flex-wrap:wrap;
+    }
+
+    .btn-link {
+        text-decoration:none;
+        border-radius:999px;
+        padding:7px 12px;
+        font-size:13px;
+        display:inline-flex;
+        align-items:center;
+        gap:6px;
+    }
+
+    .btn-secondary {
+        background:#fff;
+        border:1px solid #ccc;
+        color:#333;
+    }
+
+    .btn-secondary:hover {
+        background:#f3f3f3;
+    }
+
+    .btn-primary {
+        background:#0056b3;
+        color:#fff;
+        border:none;
+    }
+
+    .btn-primary:hover{
+        background:#00408a;
+    }
+
+    .grid {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 16px;
+    }
+
+    .field-group {
+        margin-bottom: 10px;
+    }
+
+    .field-group label {
+        display: block;
+        font-size: 13px;
+        margin-bottom: 4px;
+    }
+
+    .field-group input[type="text"],
+    .field-group input[type="number"],
+    .field-group select {
+        width: 100%;
+        padding: 7px 8px;
+        border-radius: 6px;
+        border: 1px solid #ddd;
+        font-size: 14px;
+        box-sizing: border-box;
+    }
+
+    .field-group input[type="text"]:focus,
+    .field-group input[type="number"]:focus,
+    .field-group select:focus {
+        outline: none;
+        border-color: var(--fagni-blue);
+        box-shadow: 0 0 0 1px rgba(0,86,179,0.15);
+    }
+
+    .address-row {
+        display:flex;
+        gap:8px;
+        align-items:center;
+    }
+
+    .address-row input[type="text"] {
+        flex:1;
+    }
+
+    .btn-small {
+        border-radius:999px;
+        border:1px solid #ff7a00;
+        background:#fff;
+        color:#ff7a00;
+        padding:6px 10px;
+        font-size:12px;
+        cursor:pointer;
+        white-space:nowrap;
+        display:inline-flex;
+        align-items:center;
+        gap:4px;
+    }
+
+    .btn-small:hover {
+        background:#fff5eb;
+    }
+
+    .btn-icon {
+        padding:4px 7px;
+        border-radius:999px;
+        border:1px solid #e5e7eb;
+        background:#fff;
+        font-size:11px;
+        cursor:pointer;
+    }
+
+    .btn-icon:hover {
+        background:#fee2e2;
+        border-color:#fecaca;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        margin-top: 4px;
+    }
+
+    th, td {
+        padding: 6px 4px;
+        border-bottom: 1px solid #f1f1f1;
+        text-align: left;
+        vertical-align: top;
+    }
+
+    th {
+        background: #fafafa;
+        font-weight: 600;
+        font-size: 12px;
+    }
+
+    tbody tr:nth-child(even) {
+        background:#fcfcfd;
+    }
+
+    tbody tr:hover {
+        background:#f5f5ff;
+    }
+
+    td.num {
+        text-align:right;
+        white-space:nowrap;
+    }
+
+    .btn-row {
+        display: flex;
+        gap: 10px;
+        margin-top: 12px;
+        flex-wrap:wrap;
+    }
+
+    button {
+        border: none;
+        padding: 8px 14px;
+        border-radius: 999px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    #previewBtn {
+        background: #fff;
+        border: 1px solid #ff7a00;
+        color: #ff7a00;
+    }
+
+    #previewBtn:hover {
+        background: #fff5eb;
+    }
+
+    #submitBtn {
+        background: #0056b3;
+        color: #fff;
+    }
+
+    #submitBtn:hover {
+        background: #00408a;
+    }
+
+    #summaryBox {
+        margin-top: 10px;
+        border-radius: 8px;
+        border: 1px solid #eee;
+        padding: 10px;
+        background: #fafafa;
+    }
+
+    #summaryBox.hidden {
+        display: none;
+    }
+
+    .summary-item {
+        margin: 0 0 4px;
+    }
+
+    #map {
+        width: 100%;
+        height: 260px;
+        margin-top: 8px;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+    }
+
+    .error {
+        background: #ffe5e5;
+        color: #b00020;
+        padding: 8px 10px;
+        border-radius: 8px;
+        font-size: 13px;
+        margin-bottom: 8px;
+    }
+
+    .totals-block p {
+        margin: 3px 0;
+        font-size: 13px;
+        clear: both;
+    }
+
+    .totals-block .label {
+        font-weight:600;
+    }
+
+    .totals-block .value {
+        float:right;
+    }
+
+    .totals-block .grand {
+        color:#ff7a00;
+        font-weight:700;
+    }
+
+    .note {
+        font-size:11px;
+        color:#777;
+        margin-top:6px;
+        clear:both;
+    }
+
+    .photo-thumbs,
+    .photos-preview {
+        margin-top:4px;
+        display:flex;
+        gap:4px;
+        flex-wrap:wrap;
+    }
+
+    .photo-thumbs img,
+    .photos-preview img {
+        width:36px;
+        height:36px;
+        object-fit:cover;
+        border-radius:6px;
+        border:1px solid #ddd;
+    }
+
+    .photo-info {
+        font-size:11px;
+        color:#555;
+        margin-left:4px;
+    }
+
+    .line-designation {
+        font-weight:500;
+    }
+
+    .line-meta {
+        font-size:10px;
+        color:#6b7280;
+        margin-top:2px;
+    }
+
+    @media (max-width: 800px) {
         .grid {
-            display: grid;
-            grid-template-columns: 1.1fr 0.9fr;
-            gap: 16px;
+            grid-template-columns: 1fr;
         }
-        .field-group {
-            margin-bottom: 10px;
-        }
-        .field-group label {
-            display: block;
-            font-size: 13px;
-            margin-bottom: 4px;
-        }
-        .field-group input[type="text"],
-        .field-group input[type="number"],
-        .field-group select {
-            width: 100%;
-            padding: 7px 8px;
-            border-radius: 6px;
-            border: 1px solid #ddd;
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-        .address-row {
-            display:flex;
-            gap:8px;
-            align-items:center;
-        }
-        .address-row input[type="text"] {
-            flex:1;
-        }
-        .btn-small {
-            border-radius:999px;
-            border:1px solid #ff7a00;
-            background:#fff;
-            color:#ff7a00;
-            padding:6px 10px;
-            font-size:12px;
-            cursor:pointer;
-            white-space:nowrap;
-        }
-        .btn-small:hover {
-            background:#fff5eb;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-            margin-top: 4px;
-        }
-        th, td {
-            padding: 6px 4px;
-            border-bottom: 1px solid #eee;
-            text-align: left;
-        }
-        th {
-            background: #fafafa;
-            font-weight: 600;
-        }
-        .btn-row {
-            display: flex;
-            gap: 10px;
-            margin-top: 12px;
-            flex-wrap:wrap;
-        }
-        button {
-            border: none;
-            padding: 8px 14px;
-            border-radius: 999px;
-            font-size: 14px;
-            cursor: pointer;
-        }
-        #previewBtn {
-            background: #fff;
-            border: 1px solid #ff7a00;
-            color: #ff7a00;
-        }
-        #previewBtn:hover {
-            background: #fff5eb;
-        }
-        #submitBtn {
-            background: #0056b3;
-            color: #fff;
-        }
-        #submitBtn:hover {
-            background: #00408a;
-        }
-        #summaryBox {
-            margin-top: 10px;
-            border-radius: 8px;
-            border: 1px solid #eee;
-            padding: 10px;
-            background: #fafafa;
-        }
-        #summaryBox.hidden {
-            display: none;
-        }
-        .summary-item {
-            margin: 0 0 4px;
-        }
-        #map {
-            width: 100%;
-            height: 260px;
-            margin-top: 8px;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-        }
-        .error {
-            background: #ffe5e5;
-            color: #b00020;
-            padding: 8px 10px;
-            border-radius: 8px;
-            font-size: 13px;
-            margin-bottom: 8px;
-        }
-        .totals-block p {
-            margin: 3px 0;
-            font-size: 13px;
-            clear: both;
-        }
-        .totals-block .label {
-            font-weight:600;
-        }
-        .totals-block .value {
-            float:right;
-        }
-        .totals-block .grand {
-            color:#ff7a00;
-            font-weight:700;
-        }
-        .note {
-            font-size:11px;
-            color:#777;
-            margin-top:6px;
-            clear:both;
-        }
-        .photo-thumbs,
-        .photo-preview {
-            margin-top:4px;
-            display:flex;
-            gap:4px;
-            flex-wrap:wrap;
-        }
-        .photo-thumbs img,
-        .photo-preview img {
-            width:36px;
-            height:36px;
-            object-fit:cover;
-            border-radius:6px;
-            border:1px solid #ddd;
-        }
-        @media (max-width: 800px) {
-            .grid {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
-</head>
-<body>
+    }
+</style>
+
 <header>
     <h1>Modifier la commande {{ order.code }}</h1>
     <p>Mise à jour client, prestations du catalogue, localisation & montants.</p>
@@ -238,10 +356,9 @@
 
         <div class="top-actions">
             <div>
-                <strong>Commande :</strong> {{ order.code }}<br>
+                <strong>Commande {{ order.code }}</strong><br>
                 <span style="font-size:12px;color:#555;">
-                    Créée le {{ order.created_at|date:"d/m/Y H:i" }},
-                    statut actuel : {{ order.get_status_display }}
+                    Créée le {{ order.created_at|date:"d/m/Y H:i" }}, statut : {{ order.get_status_display }}
                 </span>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -254,6 +371,15 @@
                 <a href="{% url 'orders:ops_dashboard' %}" class="btn-link btn-secondary">
                     🚦 Suivi OPS
                 </a>
+                <a href="{% url 'orders:dashboard' %}" class="btn-link btn-secondary">
+                    📊 Dashboard commandes
+                </a>
+                <a href="{% url 'orders:finance_dashboard' %}" class="btn-link btn-secondary">
+                    💰 Dashboard financier
+                </a>
+                <a href="{% url 'orders:customers_list' %}" class="btn-link btn-secondary">
+                    👥 Clients (mini-CRM)
+                </a>
             </div>
         </div>
 
@@ -261,7 +387,6 @@
             <div class="error">{{ error }}</div>
         {% endif %}
 
-        <!-- ⚠️ enctype pour photos -->
         <form id="orderForm" method="post" enctype="multipart/form-data">
             {% csrf_token %}
 
@@ -272,23 +397,35 @@
 
                     <div class="field-group">
                         <label for="client_phone">Téléphone :</label>
-                        <input type="text" id="client_phone" name="client_phone"
-                               value="{{ order.customer.phone }}"
-                               placeholder="Ex : 0700000000">
+                        <input
+                            type="text"
+                            id="client_phone"
+                            name="client_phone"
+                            value="{{ order.customer.phone|default:'' }}"
+                            placeholder="Ex : 0700000000"
+                            data-lookup-url="{% url 'orders:client_lookup' %}"
+                        >
                     </div>
 
                     <div class="field-group">
                         <label for="client_name">Nom et prénoms :</label>
                         <input type="text" id="client_name" name="client_name"
-                               value="{{ order.customer.name }}"
+                               value="{{ order.customer.name|default:'' }}"
                                placeholder="Nom du client">
+                    </div>
+
+                    <div class="field-group">
+                        <label for="referral_code">Code parrain (optionnel) :</label>
+                        <input type="text" id="referral_code" name="referral_code"
+                               value="{{ order.referral_code|default:'' }}"
+                               placeholder="Ex : PARRAIN123">
                     </div>
 
                     <div class="field-group">
                         <label for="client_address">Adresse :</label>
                         <div class="address-row">
                             <input type="text" id="client_address" name="client_address"
-                                   value="{{ order.customer.address }}"
+                                   value="{{ order.customer.address|default:'' }}"
                                    placeholder="Ex : Cocody Angré 8ème tranche">
                             <button type="button" id="locateBtn" class="btn-small">
                                 📍 Me localiser
@@ -330,8 +467,9 @@
                                 <option value="{{ s.id }}"
                                         data-category="{{ s.category_id }}"
                                         data-price="{{ s.default_price }}"
+                                        data-cat-name="{{ s.category.name }}"
                                         hidden>
-                                    {{ s.name }} ({{ s.category.name }})
+                                    {{ s.name }}
                                 </option>
                             {% endfor %}
                         </select>
@@ -342,52 +480,65 @@
                         <input type="text" id="item_designation" placeholder="Texte qui apparaîtra sur la commande">
                     </div>
 
-                    <div class="field-group" style="display:flex;gap:8px;">
-                        <div style="flex:1;">
+                    <div class="field-group" style="display:flex;gap:8px;align-items:flex-end;">
+                        <div style="flex:0.7;">
                             <label for="item_quantity">Quantité :</label>
                             <input type="number" id="item_quantity" min="1" value="1">
                         </div>
                         <div style="flex:1;">
-                            <label for="item_price">Prix unitaire (FCFA) :</label>
-                            <input type="number" id="item_price" min="0" value="0">
+                            <label for="item_price">Prix unitaire (catalogue, non modifiable) :</label>
+                            <input type="number" id="item_price" min="0" value="0"
+                                   readonly style="background:#f8f8f8;">
+                            <div style="font-size:11px;color:#777;">
+                                Les prix sont issus du catalogue FAGNI.<br>
+                                Toute mise à jour se fait dans le catalogue.
+                            </div>
                         </div>
                     </div>
 
                     <button type="button" id="addItemBtn" class="btn-small" style="margin-top:4px;">
-                        ➕ Ajouter / mettre à jour la ligne
+                        ➕ Ajouter une nouvelle ligne
                     </button>
 
                     <h2 style="margin-top:18px;">Lignes de commande</h2>
                     <table id="itemsTable">
                         <thead>
                             <tr>
-                                <th>Prestation</th>
-                                <th>Qté</th>
-                                <th>PU</th>
-                                <th>Total</th>
-                                <th>Photo(s)</th>
-                             </tr>
+                                <th>Prestation / Désignation</th>
+                                <th class="num">Qté</th>
+                                <th class="num">PU</th>
+                                <th class="num">Total</th>
+                                <th>Photos / Actions</th>
+                            </tr>
                         </thead>
                         <tbody>
                             {% for item in order.items.all %}
-                                {% with service_id=item.service.id|default_if_none:"" %}
+                                {% with service=item.service %}
                                 <tr>
                                     <td>
-                                        {{ item.designation }}
+                                        <div class="line-designation">{{ item.designation }}</div>
+                                        <div class="line-meta">
+                                            {% if service and service.category %}
+                                                <span>{{ service.category.name }}</span> •
+                                            {% endif %}
+                                            <span>Prestation ID #{{ service.id|default:"—" }}</span>
+                                        </div>
+                                        <!-- index pour faire le lien avec photos_X -->
+                                        <input type="hidden" name="item_index[]" value="{{ forloop.counter0 }}">
                                         <input type="hidden" name="item_id[]" value="{{ item.id }}">
-                                        <input type="hidden" name="service_id[]" value="{{ service_id }}">
+                                        <input type="hidden" name="service_id[]" value="{{ service.id|default:'' }}">
                                         <input type="hidden" name="designation[]" value="{{ item.designation }}">
-                                    </td>
-                                    <td>
-                                        {{ item.quantity }}
                                         <input type="hidden" name="quantity[]" value="{{ item.quantity }}">
+                                        <input type="hidden" name="unit_price[]" value="{{ item.unit_price }}">
                                     </td>
-                                    <td>
-                                         {{ item.unit_price }}
-                                         <input type="hidden" name="unit_price[]" value="{{ item.unit_price }}">
+                                    <td class="num">
+                                        {{ item.quantity }}
                                     </td>
-                                    <td data-line-total="{{ item.total }}">
-                                        {{ item.total }}
+                                    <td class="num">
+                                        {{ item.unit_price|floatformat:0 }}
+                                    </td>
+                                    <td class="num" data-line-total="{{ item.total }}">
+                                        {{ item.total|floatformat:0 }}
                                     </td>
                                     <td>
                                         {% with photos=item.photos.all %}
@@ -395,7 +546,8 @@
                                                 <div class="photo-thumbs">
                                                     {% for photo in photos %}
                                                         <a href="{{ photo.image.url }}" target="_blank">
-                                                            <img src="{{ photo.image.url }}" alt="Photo article {{ item.id }}">
+                                                            <img src="{{ photo.image.url }}"
+                                                                 alt="Photo article {{ item.id }}">
                                                         </a>
                                                     {% endfor %}
                                                 </div>
@@ -406,12 +558,17 @@
                                                accept="image/*"
                                                multiple
                                                style="display:none;">
-                                        <button type="button" class="btn-small btn-photo">📷 Photo</button>
-                                        <button type="button" class="btn-small btn-remove" style="margin-left:4px;">✖</button>
-                                        <div class="photo-preview"></div>
+                                        <button type="button" class="btn-small btn-photo">📷 Photos</button>
+                                        <span class="photo-info"></span>
+                                        <button type="button" class="btn-icon btn-remove" title="Supprimer la ligne">
+                                            ✖
+                                        </button>
+                                        <div class="photos-preview"></div>
                                     </td>
                                 </tr>
                                 {% endwith %}
+                            {% empty %}
+                                <!-- Aucune ligne -->
                             {% endfor %}
                         </tbody>
                     </table>
@@ -420,41 +577,42 @@
                         <p>
                             <span class="label">Total prestation :</span>
                             <span id="total_prestation" class="value">
-                                {{ order.total_ht }} FCFA
+                                {{ order.total_ht|default:0|floatformat:0 }} FCFA
                             </span>
                         </p>
                         <p>
                             <span class="label">Service FAGNI (5% min 500 FCFA) :</span>
                             <span id="service_fee_display" class="value">
-                                {{ order.service_fee }} FCFA
+                                {{ order.service_fee|default:0|floatformat:0 }} FCFA
                             </span>
                         </p>
                         <p>
                             <span class="label">Frais de livraison (estimation front) :</span>
                             <span id="delivery_fee_display" class="value">
-                                {{ order.delivery_fee|default:"0" }} FCFA
+                                {{ order.delivery_fee|default:0|floatformat:0 }} FCFA
                             </span>
                         </p>
                         <p>
                             <span class="label">Total global estimé :</span>
                             <span id="total_global_display" class="value grand">
-                                {{ order.grand_total }} FCFA
+                                {{ order.grand_total|default:0|floatformat:0 }} FCFA
                             </span>
                         </p>
 
-                        <!-- ✅ NOTE MISE À JOUR AVEC FAGNI_LOGISTICS -->
                         <p class="note">
                             * Transport (estimation) :
                             min <strong>{{ delivery_min_fee|default:0 }} FCFA</strong>,
                             environ {{ delivery_price_per_km|default:0 }} FCFA / km AR
-                            (+ fixe {{ delivery_fixed_fee|default:0 }} FCFA).
+                            (+ fixe {{ delivery_fixed_fee|default:0 }} FCFA).<br>
                             Le montant officiel est recalculé côté serveur selon la distance réelle client ↔ blanchisserie.
                         </p>
                     </div>
 
                     <div class="btn-row">
                         <button type="button" id="previewBtn">Voir le résumé</button>
-                        <button type="submit" id="submitBtn">Enregistrer les modifications</button>
+                        <button type="submit" id="submitBtn" class="btn-primary">
+                            Enregistrer les modifications
+                        </button>
                     </div>
 
                     <div id="summaryBox" class="hidden">
@@ -492,7 +650,7 @@ function initMap() {
     }
 
     map = new google.maps.Map(mapElement, {
-        zoom: 12,
+        zoom: (!isNaN(latVal) && !isNaN(lngVal) && latVal !== 0 && lngVal !== 0) ? 14 : 12,
         center: center,
     });
 
@@ -509,7 +667,7 @@ function initMap() {
             fields: ["geometry", "formatted_address"]
         });
 
-        autocomplete.addEventListener("place_changed", function () {
+        autocomplete.addListener("place_changed", function () {
             const place = autocomplete.getPlace();
             if (!place.geometry || !place.geometry.location) return;
 
@@ -527,8 +685,6 @@ function initMap() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-
-    // ✅ Paramètres logistiques depuis le contexte Django
     const DELIVERY_MIN_FEE = {{ delivery_min_fee|default:0 }};
     const DELIVERY_PRICE_PER_KM = {{ delivery_price_per_km|default:0 }};
     const DELIVERY_FIXED_FEE = {{ delivery_fixed_fee|default:0 }};
@@ -558,25 +714,61 @@ document.addEventListener('DOMContentLoaded', function () {
     const summaryBox = document.getElementById('summaryBox');
     const summaryContent = document.getElementById('summaryContent');
 
-    // 1) Autocomplétion client
+    // Autocomplétion client par téléphone
     if (phoneInput && nameInput && addressInput) {
+        const lookupUrl = phoneInput.getAttribute('data-lookup-url') || '/orders/api/client/';
+
         phoneInput.addEventListener('input', function () {
             const phone = phoneInput.value.trim();
             if (phone.length < 4) return;
 
-            fetch(`/orders/api/client/?phone=${encodeURIComponent(phone)}`)
+            const url = lookupUrl + (lookupUrl.includes('?') ? '&' : '?') + 'phone=' + encodeURIComponent(phone);
+
+            fetch(url)
                 .then(res => res.ok ? res.json() : null)
                 .then(data => {
-                    if (data && data.exists) {
-                        nameInput.value = data.name || '';
-                        addressInput.value = data.address || '';
+                    if (!data) return;
+
+                    let existsFlag = data.exists;
+                    let c = data.customer || data;
+
+                    if (existsFlag === false) {
+                        return;
+                    }
+
+                    const nameVal =
+                        c.name ||
+                        c.full_name ||
+                        c.customer_name ||
+                        '';
+
+                    const addressVal =
+                        c.address ||
+                        c.customer_address ||
+                        c.location ||
+                        '';
+
+                    const latVal = c.latitude || c.lat || null;
+                    const lngVal = c.longitude || c.lng || null;
+
+                    if (nameVal && !nameInput.value.trim()) {
+                        nameInput.value = nameVal;
+                    }
+                    if (addressVal && !addressInput.value.trim()) {
+                        addressInput.value = addressVal;
+                    }
+                    if (latInput && latVal) {
+                        latInput.value = latVal;
+                    }
+                    if (lngInput && lngVal) {
+                        lngInput.value = lngVal;
                     }
                 })
                 .catch(err => console.error('Erreur API client :', err));
         });
     }
 
-    // 2) "Me localiser" : GPS navigateur
+    // "Me localiser" : GPS + reverse geocoding
     if (locateBtn && navigator.geolocation) {
         locateBtn.addEventListener('click', function () {
             locateBtn.disabled = true;
@@ -599,6 +791,18 @@ document.addEventListener('DOMContentLoaded', function () {
                         marker.setPosition(loc);
                     }
 
+                    if (geocoder) {
+                        geocoder.geocode({ location: { lat: lat, lng: lng } }, function(results, status) {
+                            if (status === 'OK' && results && results[0]) {
+                                if (addressInput) {
+                                    addressInput.value = results[0].formatted_address;
+                                }
+                            } else {
+                                console.warn('Reverse geocode échoué :', status);
+                            }
+                        });
+                    }
+
                     locateBtn.disabled = false;
                     locateBtn.textContent = "📍 Me localiser";
                 },
@@ -617,7 +821,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 3) Filtrage prestations par catégorie
+    // Filtrage prestations par catégorie + prix catalogue non modifiable
     if (categorySelect && serviceSelect) {
         serviceSelect.disabled = true;
         Array.from(serviceSelect.options).forEach(opt => {
@@ -631,6 +835,8 @@ document.addEventListener('DOMContentLoaded', function () {
             serviceSelect.value = "";
             designationInput.value = "";
             priceInput.value = 0;
+            priceInput.readOnly = true;
+            priceInput.style.background = "#f8f8f8";
 
             if (!catId) {
                 serviceSelect.disabled = true;
@@ -655,20 +861,31 @@ document.addEventListener('DOMContentLoaded', function () {
                 const optCat = opt.getAttribute('data-category');
                 opt.hidden = (optCat !== catId);
             });
+
+            serviceSelect.focus();
         });
 
         serviceSelect.addEventListener('change', function () {
             const opt = serviceSelect.options[serviceSelect.selectedIndex];
-            if (!opt || !opt.value) return;
+            if (!opt || !opt.value) {
+                priceInput.value = 0;
+                priceInput.readOnly = true;
+                priceInput.style.background = "#f8f8f8";
+                return;
+            }
             const defaultPrice = opt.getAttribute('data-price') || "0";
             priceInput.value = parseFloat(defaultPrice) || 0;
+            priceInput.readOnly = true;
+            priceInput.style.background = "#f8f8f8";
+
             if (!designationInput.value.trim()) {
                 designationInput.value = opt.textContent.trim();
             }
+            quantityInput.focus();
         });
     }
 
-    // 4) Recalcule les totaux sur les lignes déjà présentes
+    // Recalcul des totaux
     function recalcTotals() {
         let total = 0;
         const rows = itemsTableBody.querySelectorAll('tr');
@@ -684,7 +901,6 @@ document.addEventListener('DOMContentLoaded', function () {
             serviceFee = 500;
         }
 
-        // ✅ Livraison estimée front : min DELIVERY_MIN_FEE si commande > 0
         let deliveryFee = 0;
         if (total > 0) {
             deliveryFee = DELIVERY_MIN_FEE;
@@ -707,13 +923,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     recalcTotals();
 
-    // 5) Ajout d'une nouvelle ligne
+    // Ajout d'une nouvelle ligne
     if (addItemBtn && itemsTableBody) {
         addItemBtn.addEventListener('click', function () {
             const serviceId = serviceSelect.value;
-            const serviceText = serviceSelect.options[serviceSelect.selectedIndex]
-                ? serviceSelect.options[serviceSelect.selectedIndex].textContent.trim()
-                : "";
+            const selectedOpt = serviceSelect.options[serviceSelect.selectedIndex] || null;
+            const serviceText = selectedOpt ? selectedOpt.textContent.trim() : "";
+            const catName = selectedOpt ? (selectedOpt.getAttribute('data-cat-name') || "") : "";
 
             let designation = designationInput.value.trim();
             const qty = parseInt(quantityInput.value || '0', 10);
@@ -721,16 +937,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (!serviceId) {
                 alert("Choisis une prestation dans le catalogue.");
+                if (categorySelect && !categorySelect.value) {
+                    categorySelect.focus();
+                } else if (serviceSelect) {
+                    serviceSelect.focus();
+                }
                 return;
             }
             if (!qty || qty <= 0) {
                 alert("La quantité doit être supérieure à 0.");
+                quantityInput.focus();
                 return;
             }
-            if (!price || price <= 0) {
-                alert("Le prix unitaire doit être supérieur à 0.");
+            if (price <= 0) {
+                alert("Cette prestation du catalogue doit avoir un prix valide.");
                 return;
             }
+
             if (!designation) {
                 designation = serviceText;
             }
@@ -741,19 +964,25 @@ document.addEventListener('DOMContentLoaded', function () {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>
-                    ${designation}
+                    <div class="line-designation">${designation}</div>
+                    <div class="line-meta">
+                        ${catName ? `<span>${catName}</span> • ` : ""}
+                        <span>Prestation ID #${serviceId}</span>
+                    </div>
+                    <input type="hidden" name="item_index[]" value="${rowIndex}">
+                    <input type="hidden" name="item_id[]" value="">
                     <input type="hidden" name="service_id[]" value="${serviceId}">
                     <input type="hidden" name="designation[]" value="${designation}">
-                </td>
-                <td>
-                    ${qty}
                     <input type="hidden" name="quantity[]" value="${qty}">
-                </td>
-                <td>
-                    ${price.toLocaleString('fr-FR')}
                     <input type="hidden" name="unit_price[]" value="${price}">
                 </td>
-                <td data-line-total="${lineTotal}">
+                <td class="num">
+                    ${qty}
+                </td>
+                <td class="num">
+                    ${price.toLocaleString('fr-FR')}
+                </td>
+                <td class="num" data-line-total="${lineTotal}">
                     ${lineTotal.toLocaleString('fr-FR')}
                 </td>
                 <td>
@@ -763,9 +992,12 @@ document.addEventListener('DOMContentLoaded', function () {
                            multiple
                            capture="environment"
                            style="display:none;">
-                    <button type="button" class="btn-small btn-photo">📷 Photo</button>
-                    <button type="button" class="btn-small btn-remove" style="margin-left:4px;">✖</button>
-                    <div class="photo-preview"></div>
+                    <button type="button" class="btn-small btn-photo">📷 Photos</button>
+                    <span class="photo-info"></span>
+                    <button type="button" class="btn-icon btn-remove" title="Supprimer la ligne">
+                        ✖
+                    </button>
+                    <div class="photos-preview"></div>
                 </td>
             `;
             itemsTableBody.appendChild(tr);
@@ -773,11 +1005,18 @@ document.addEventListener('DOMContentLoaded', function () {
             designationInput.value = "";
             quantityInput.value = 1;
             priceInput.value = 0;
+            priceInput.readOnly = true;
+            priceInput.style.background = "#f8f8f8";
+
+            if (serviceSelect) {
+                serviceSelect.value = "";
+                serviceSelect.focus();
+            }
 
             recalcTotals();
         });
 
-        // 6) Gestion des boutons Photo / Remove + preview photos
+        // Boutons photo / suppression + preview
         itemsTableBody.addEventListener('click', function (e) {
             if (e.target.classList.contains('btn-remove')) {
                 const tr = e.target.closest('tr');
@@ -797,26 +1036,47 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         itemsTableBody.addEventListener('change', function (e) {
-            if (e.target.matches('input[type="file"]')) {
-                const files = e.target.files;
-                const td = e.target.closest('td');
-                const preview = td ? td.querySelector('.photo-preview') : null;
-                if (!preview) return;
+            const input = e.target;
+            if (input.tagName.toLowerCase() !== 'input' || input.type !== 'file') return;
 
-                preview.innerHTML = "";
-                if (!files || !files.length) return;
+            const td = input.closest('td');
+            if (!td) return;
 
-                Array.from(files).forEach(file => {
+            const previewDiv = td.querySelector('.photos-preview');
+            const infoSpan = td.querySelector('.photo-info');
+            if (!previewDiv) return;
+
+            previewDiv.innerHTML = '';
+            if (infoSpan) infoSpan.textContent = '';
+
+            const files = Array.from(input.files || []);
+            if (!files.length) {
+                previewDiv.innerHTML = '<span style="font-size:10px;color:#777;">Aucune nouvelle photo.</span>';
+                return;
+            }
+
+            files.forEach((file, idx) => {
+                if (!file.type.startsWith('image/')) return;
+
+                const reader = new FileReader();
+                reader.onload = function (ev) {
                     const img = document.createElement('img');
-                    img.src = URL.createObjectURL(file);
-                    img.alt = file.name;
-                    preview.appendChild(img);
-                });
+                    img.src = ev.target.result;
+                    img.alt = file.name || ('photo_' + idx);
+                    previewDiv.appendChild(img);
+                };
+                reader.readAsDataURL(file);
+            });
+
+            if (infoSpan) {
+                infoSpan.textContent = files.length === 1
+                    ? '1 nouvelle photo'
+                    : files.length + ' nouvelles photos';
             }
         });
     }
 
-    // 7) Résumé
+    // Résumé
     if (previewBtn && summaryBox && summaryContent) {
         previewBtn.addEventListener('click', function (e) {
             e.preventDefault();
@@ -825,7 +1085,10 @@ document.addEventListener('DOMContentLoaded', function () {
             rows.forEach(row => {
                 const tds = row.querySelectorAll('td');
                 if (tds.length < 4) return;
-                const designation = tds[0].textContent.trim();
+                const labelEl = tds[0].querySelector('.line-designation');
+                const designation = labelEl
+                    ? labelEl.textContent.trim()
+                    : tds[0].textContent.trim();
                 const qty = tds[1].textContent.trim();
                 const pu = tds[2].textContent.trim();
                 const total = tds[3].textContent.trim();
@@ -839,7 +1102,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 8) Validation
+    // Validation avant submit
     if (form) {
         form.addEventListener('submit', function (e) {
             const rows = itemsTableBody.querySelectorAll('tr');
@@ -859,5 +1122,4 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <script src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&libraries=places&callback=initMap" async defer></script>
-</body>
-</html>
+{% endblock %}

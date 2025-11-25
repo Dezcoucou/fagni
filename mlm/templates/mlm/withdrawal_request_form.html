@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Demande de retrait – FAGNI MLM</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        body{
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin:0;
+            padding:0;
+            background:#f5f5f7;
+            color:#222;
+        }
+        header{
+            background:linear-gradient(90deg,#ff7a00,#0056b3);
+            color:#fff;
+            padding:16px 24px;
+        }
+        header h1{
+            margin:0;
+            font-size:20px;
+        }
+        header p{
+            margin:4px 0 0;
+            font-size:13px;
+            opacity:.9;
+        }
+        .page{
+            max-width:600px;
+            margin:20px auto 30px;
+            padding:0 10px;
+        }
+        .card{
+            background:#fff;
+            border-radius:10px;
+            box-shadow:0 4px 10px rgba(0,0,0,0.04);
+            padding:14px 18px 18px;
+            margin-bottom:14px;
+        }
+        .btn{
+            display:inline-block;
+            border-radius:999px;
+            padding:8px 14px;
+            font-size:13px;
+            border:none;
+            cursor:pointer;
+        }
+        .btn-primary{
+            background:#0056b3;
+            color:#fff;
+        }
+        .btn-primary:hover{
+            background:#00408a;
+        }
+        .btn-secondary{
+            background:#fff;
+            border:1px solid #ccc;
+            color:#333;
+        }
+        .btn-secondary:hover{
+            background:#f3f3f3;
+        }
+        .field{
+            margin-bottom:10px;
+            font-size:13px;
+        }
+        .field label{
+            display:block;
+            font-size:12px;
+            color:#666;
+            margin-bottom:3px;
+        }
+        .field input,
+        .field textarea{
+            width:100%;
+            border-radius:8px;
+            border:1px solid #ddd;
+            padding:7px 8px;
+            font-size:13px;
+            box-sizing:border-box;
+        }
+        .mini{
+            font-size:11px;
+            color:#666;
+        }
+        .error{
+            background:#fff5f5;
+            border-left:3px solid #dc3545;
+            padding:8px 10px;
+            border-radius:6px;
+            font-size:12px;
+            color:#721c24;
+            margin-bottom:10px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Demande de retrait – FAGNI MLM</h1>
+    <p>Retirez une partie de vos commissions disponibles.</p>
+</header>
+
+<div class="page">
+    <div class="card">
+        <p class="mini" style="margin-top:0;">
+            Solde disponible :
+            <strong>{{ wallet_balance }} FCFA</strong>
+        </p>
+
+        {% if error %}
+            <div class="error">
+                {{ error }}
+            </div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="field">
+                <label for="amount">Montant à retirer (FCFA)</label>
+                <input type="number" name="amount" id="amount" min="1" max="{{ wallet_balance }}" required>
+                <div class="mini">
+                    Vous ne pouvez pas dépasser votre solde disponible.
+                </div>
+            </div>
+
+            <div class="field">
+                <label for="payout_method">Mode de paiement souhaité</label>
+                <input type="text"
+                       name="payout_method"
+                       id="payout_method"
+                       placeholder="Ex : Mobile Money (Orange Money), virement bancaire, espèces…"
+                       required>
+            </div>
+
+            <div class="field">
+                <label for="note">Commentaire (optionnel)</label>
+                <textarea name="note" id="note" rows="3"
+                          placeholder="Précisez une info utile (numéro Mobile Money, banque, etc.)."></textarea>
+            </div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:10px;">
+                <a href="{% url 'mlm:affiliate_dashboard' %}" class="btn btn-secondary">
+                    Annuler
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    Envoyer la demande
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+</body>
+</html>

@@ -24,7 +24,10 @@ CSRF_TRUSTED_ORIGINS = [
     "https://*.onrender.com",          # nécessaire pour les POST sur Render
 ]
 
-SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "http://127.0.0.1:8000")
+SITE_BASE_URL = "https://fagni-t1s8.onrender.com"
+
+# Pour les QR codes FAGNI (tickets PDF)
+FAGNI_QR_BASE_URL = SITE_BASE_URL
 
 LOGIN_URL = '/admin/login/'
 LOGIN_REDIRECT_URL = '/orders/'   # renvoie vers la liste des commandes

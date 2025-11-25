@@ -529,11 +529,12 @@
                                     Détail
                                 </a>
                                 <br>
-                                <a href="{% url 'orders:ticket' order.id %}"
-                                   class="link-detail"
+                                <a href="{% url 'orders:order_ticket_pdf' order.id %}" 
+                                   class="btn-link btn-secondary" 
                                    target="_blank">
                                     📄 Ticket PDF
                                 </a>
+
 
                                 <div style="margin-top:4px;display:flex;flex-direction:column;gap:3px;">
                                     <form method="post" action="{% url 'orders:ops_update_step' order.id 'dropoff' %}">

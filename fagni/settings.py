@@ -16,14 +16,12 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "dezcoucou80.pythonanywhere.com",  # tu peux le laisser si tu utilises encore PythonAnywhere
-    "fagni-t1s8.onrender.com", 
-   ".onrender.com",                   # accepte tous les sous-domaines Render
+    "fagni-t1s8.onrender.com",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     "https://dezcoucou80.pythonanywhere.com",
     "https://fagni-t1s8.onrender.com",
-    "https://*.onrender.com",          # nécessaire pour les POST sur Render
 ]
 
 SITE_BASE_URL = "https://fagni-t1s8.onrender.com"
@@ -48,7 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.humanize',
 
-    'orders',
+    'orders.apps.OrdersConfig',  # ✅ IMPORTANT : PAS juste "orders"
     'partners',
     'django_extensions',
     'mlm',

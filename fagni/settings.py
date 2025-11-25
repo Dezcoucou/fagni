@@ -16,11 +16,13 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "dezcoucou80.pythonanywhere.com",  # tu peux le laisser si tu utilises encore PythonAnywhere
-    ".onrender.com",                   # accepte tous les sous-domaines Render
+    "fagni-t1s8.onrender.com", 
+   ".onrender.com",                   # accepte tous les sous-domaines Render
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     "https://dezcoucou80.pythonanywhere.com",
+    "https://fagni-t1s8.onrender.com",
     "https://*.onrender.com",          # nécessaire pour les POST sur Render
 ]
 

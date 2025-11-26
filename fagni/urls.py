@@ -44,6 +44,7 @@ urlpatterns = [
 
     # 📊 Dashboard index
     path("dashboard/", dashboard_index, name="dashboard_index"),
+    path("dashboard/", include("dashboard.urls", namespace="dashboard")),
 
     # Routes métier FAGNI
     path("orders/", include(("orders.urls", "orders"), namespace="orders")),

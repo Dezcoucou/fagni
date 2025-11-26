@@ -87,6 +87,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'fagni.context_processors.google_keys',
             ],
         },
     },
@@ -212,9 +213,8 @@ FAGNI_LOGISTICS = {
 # ========================
 #  GOOGLE MAPS / DISTANCE
 # ========================
-GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "AIzaSyAq_L3zzJ95y5bUyGZzm2Iq7_gXsWYcP-0")
-
-GOOGLE_DISTANCE_MATRIX_API_KEY = os.getenv("GOOGLE_DISTANCE_MATRIX_API_KEY", "AIzaSyAq_L3zzJ95y5bUyGZzm2Iq7_gXsWYcP-0")
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
+GOOGLE_DISTANCE_MATRIX_API_KEY = os.getenv("GOOGLE_DISTANCE_MATRIX_API_KEY", "")
 
 # (Optionnel) Si tu veux garder des constantes de pricing directes,
 # tu peux les décommenter et les utiliser ailleurs :

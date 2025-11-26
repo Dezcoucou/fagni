@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard financier FAGNI{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+
+  <!-- Header + filtres -->
+  <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">
+        Dashboard financier FAGNI
+      </h1>
+      <p class="text-sm text-gray-500">
+        Encaissements, restes à payer, structure de paiement des commandes.
+      </p>
+    </div>
+
+    <form method="get" class="flex flex-wrap items-end gap-3">
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Du</label>
+        <input type="date" name="date_from"
+               value="{{ date_from|date:'Y-m-d' }}"
+               class="border rounded-md px-2 py-1 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Au</label>
+        <input type="date" name="date_to"
+               value="{{ date_to|date:'Y-m-d' }}"
+               class="border rounded-md px-2 py-1 text-sm">
+      </div>
+      <button type="submit"
+              class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+        Appliquer
+      </button>
+    </form>
+  </div>
+
+  <!-- KPIs principaux -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase">CA client (période)</p>
+      <p class="mt-2 text-2xl font-bold text-gray-900">
+        {{ total_ca_client|floatformat:0 }} <span class="text-sm font-semibold">FCFA</span>
+      </p>
+      <p class="mt-1 text-xs text-gray-500">
+        Prestations : {{ total_prestations|floatformat:0 }} ·
+        Service : {{ total_service|floatformat:0 }} ·
+        Livraison : {{ total_delivery|floatformat:0 }}
+      </p>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase">Marge FAGNI</p>
+      <p class="mt-2 text-2xl font-bold text-amber-600">
+        {{ total_marge_fagni|floatformat:0 }} <span class="text-sm font-semibold text-gray-700">FCFA</span>
+      </p>
+      <p class="mt-1 text-xs text-gray-500">
+        Logistique : {{ total_logistic_margin|floatformat:0 }} FCFA
+      </p>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase">Encaissements</p>
+      <p class="mt-2 text-2xl font-bold text-emerald-600">
+        {{ total_paid|floatformat:0 }} <span class="text-sm font-semibold text-gray-700">FCFA</span>
+      </p>
+      <p class="mt-1 text-xs text-gray-500">
+        Restant dû : <span class="font-semibold text-rose-600">{{ total_due|floatformat:0 }} FCFA</span>
+      </p>
+    </div>
+  </div>
+
+  <!-- Structure des paiements -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase">Commandes soldées</p>
+      <p class="mt-2 text-2xl font-bold text-emerald-600">
+        {{ fully_paid_count }}
+      </p>
+      <p class="mt-1 text-xs text-gray-500">
+        Montant encaissé : {{ total_paid|floatformat:0 }} FCFA (toutes commandes)
+      </p>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase">Partiellement payées</p>
+      <p class="mt-2 text-2xl font-bold text-amber-500">
+        {{ partially_paid_count }}
+      </p>
+      <p class="mt-1 text-xs text-gray-500">
+        Ces commandes ont un payé & un dû.
+      </p>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase">Impayées</p>
+      <p class="mt-2 text-2xl font-bold text-rose-600">
+        {{ unpaid_count }}
+      </p>
+      <p class="mt-1 text-xs text-gray-500">
+        Montant encore dû (toutes commandes) : {{ total_due|floatformat:0 }} FCFA
+      </p>
+    </div>
+  </div>
+
+  <!-- Listes: impayées & partiellement payées -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Impayées -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <p class="text-sm font-semibold text-gray-800">Commandes impayées (top 20)</p>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">#</th>
+              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Client</th>
+              <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase">Montant dû</th>
+              <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase">Date</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            {% if unpaid_orders %}
+              {% for o in unpaid_orders %}
+                <tr class="hover:bg-gray-50">
+                  <td class="px-3 py-2 text-xs text-gray-500">{{ o.id }}</td>
+                  <td class="px-3 py-2 text-sm text-gray-800">
+                    {% if o.customer %}
+                      {{ o.customer.name }}<br>
+                      <span class="text-xs text-gray-500">{{ o.customer.phone }}</span>
+                    {% else %}
+                      <span class="text-xs text-gray-400">(Sans client)</span>
+                    {% endif %}
+                  </td>
+                  <td class="px-3 py-2 text-right text-sm font-semibold text-rose-600">
+                    {{ o.amount_due|floatformat:0 }} FCFA
+                  </td>
+                  <td class="px-3 py-2 text-right text-xs text-gray-500">
+                    {{ o.created_at|date:"d/m/Y H:i" }}
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="4" class="px-3 py-6 text-center text-sm text-gray-500">
+                  Aucune commande impayée sur cette période.
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Partiellement payées -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <p class="text-sm font-semibold text-gray-800">Commandes partiellement payées (top 20)</p>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">#</th>
+              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Client</th>
+              <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase">Payé</th>
+              <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase">Dû</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            {% if partial_orders %}
+              {% for o in partial_orders %}
+                <tr class="hover:bg-gray-50">
+                  <td class="px-3 py-2 text-xs text-gray-500">{{ o.id }}</td>
+                  <td class="px-3 py-2 text-sm text-gray-800">
+                    {% if o.customer %}
+                      {{ o.customer.name }}<br>
+                      <span class="text-xs text-gray-500">{{ o.customer.phone }}</span>
+                    {% else %}
+                      <span class="text-xs text-gray-400">(Sans client)</span>
+                    {% endif %}
+                  </td>
+                  <td class="px-3 py-2 text-right text-sm text-emerald-600">
+                    {{ o.amount_paid|floatformat:0 }} FCFA
+                  </td>
+                  <td class="px-3 py-2 text-right text-sm text-amber-600">
+                    {{ o.amount_due|floatformat:0 }} FCFA
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="4" class="px-3 py-6 text-center text-sm text-gray-500">
+                  Aucune commande partiellement payée sur cette période.
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

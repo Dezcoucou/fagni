@@ -57,7 +57,7 @@ import qrcode
 
 # Champ décimal générique pour les expressions
 DEC = DecimalField(max_digits=12, decimal_places=2)
-
+DECIMAL_ZERO = Decimal("0")
 
 # -------------------------------------------------
 # Helpers FAGNI : parsing des lignes + calcul frais
@@ -2101,6 +2101,34 @@ def update(request, order_id):
         # ---------- RECALCUL CENTRAL ----------
         order.save()
 
+        # --- GESTION DES PHOTOS PAR LIGNE (CREATE / UPDATE) ---
+        #
+        # On part du principe que :
+        #  - le template envoie une ligne par item dans order.items.all
+        #  - chaque input file est nommé photos_0, photos_1, etc.
+        #  - dans detail.html et update.html on utilise item.photos.all
+        #
+        # Ici on RECRÉE les liens photo -> OrderItem pour ce POST.
+
+        # On supprime éventuellement les liens existants si tu veux repartir propre
+        # (si tu veux conserver toutes les anciennes photos, commente cette ligne)
+        OrderItemPhoto.objects.filter(order_item__order=order).delete()
+
+        # On récupère les items dans le même ordre que le template :
+        items = list(order.items.all().order_by("id"))
+
+        for idx, item in enumerate(items):
+            field_name = f"photos_{idx}"          # photos_0, photos_1, ...
+            files = request.FILES.getlist(field_name)
+            if not files:
+                continue
+
+            for f in files:
+                OrderItemPhoto.objects.create(
+                    order_item=item,
+                    image=f,
+                )
+
         return redirect("orders:detail", order_id=order.id)
 
     # ---------- GET : AFFICHAGE ----------
@@ -2270,7 +2298,6 @@ def driver_dashboard(request):
 # ============================================================
 #  TABLEAU DE BORD FINANCIER
 # ============================================================
-
 @login_required
 def finance_dashboard(request):
     """
@@ -2413,10 +2440,9 @@ def export_finance_xlsx(request):
     - Onglet 2 : Détail des commandes
     """
 
-    # --- Filtres GET (mêmes noms que finance_dashboard) ---
     date_from = request.GET.get("date_from") or ""
     date_to = request.GET.get("date_to") or ""
-    status_filter = request.GET.get("status") or "all"  # all / paid / partial / unpaid
+    status_filter = request.GET.get("status") or "all"
     min_amount_input = request.GET.get("min_amount") or ""
 
     qs = (
@@ -2424,7 +2450,6 @@ def export_finance_xlsx(request):
         .select_related("customer", "laundry_partner", "delivery_partner")
     )
 
-    # Filtre période sur la date de création
     if date_from:
         df = parse_date(date_from)
         if df:
@@ -2436,11 +2461,8 @@ def export_finance_xlsx(request):
             qs = qs.filter(created_at__date__lte=dt)
 
     qs = qs.order_by("-created_at")
-
-    # On limite à 500 commandes pour l'export (tu pourras augmenter si besoin)
     raw_orders = list(qs[:500])
 
-    # Helper pour sécuriser les Decimals
     def d(val):
         if isinstance(val, Decimal):
             return val
@@ -2451,10 +2473,9 @@ def export_finance_xlsx(request):
         except Exception:
             return Decimal("0")
 
-    # Enrichissement des commandes comme dans finance_dashboard
     enriched_orders = []
     for o in raw_orders:
-        base = d(getattr(o, "total", None))  # montant prestations
+        base = d(getattr(o, "total", None))
         service = d(getattr(o, "service_fee", None))
         delivery = d(getattr(o, "delivery_fee", None))
         logi_margin = d(getattr(o, "logistic_margin", None))
@@ -2471,20 +2492,16 @@ def export_finance_xlsx(request):
 
         enriched_orders.append(o)
 
-    # Conversion du filtre montant minimum
     try:
         min_amount = Decimal(min_amount_input) if min_amount_input else Decimal("0")
     except Exception:
         min_amount = Decimal("0")
 
-    # Application des filtres "financiers" en Python
     filtered_orders = []
     for o in enriched_orders:
-        # Filtre montant global client
         if min_amount > 0 and o.total_global_client < min_amount:
             continue
 
-        # Filtre statut financier
         if status_filter == "paid":
             if not o.is_fully_paid:
                 continue
@@ -2497,7 +2514,6 @@ def export_finance_xlsx(request):
 
         filtered_orders.append(o)
 
-    # Totaux globaux sur les commandes filtrées
     total_orders = len(filtered_orders)
     total_prestations = Decimal("0")
     total_service = Decimal("0")
@@ -2516,18 +2532,13 @@ def export_finance_xlsx(request):
 
     total_margin_fagni = total_service + total_logistic_margin
 
-    # ==============================
-    #   CONSTRUCTION DU FICHIER XLSX
-    # ==============================
-
     wb = Workbook()
 
-    # ---------- Styles ----------
     title_font = Font(size=16, bold=True, color="FFFFFF")
     header_font = Font(bold=True, color="FFFFFF")
     label_font = Font(bold=True)
-    header_fill = PatternFill("solid", fgColor="0056B3")  # bleu FAGNI
-    section_fill = PatternFill("solid", fgColor="FF7A00")  # orange FAGNI
+    header_fill = PatternFill("solid", fgColor="0056B3")
+    section_fill = PatternFill("solid", fgColor="FF7A00")
     thin_border = Border(
         left=Side(style="thin", color="DDDDDD"),
         right=Side(style="thin", color="DDDDDD"),
@@ -2539,11 +2550,9 @@ def export_finance_xlsx(request):
     left = Alignment(horizontal="left", vertical="center")
     wrap = Alignment(wrap_text=True, vertical="top")
 
-    # ---------- Onglet 1 : Synthèse ----------
     ws1 = wb.active
     ws1.title = "Synthèse"
 
-    # Titre fusionné
     ws1.merge_cells("A1:D1")
     cell_title = ws1["A1"]
     cell_title.value = "FAGNI – Dashboard financier (export)"
@@ -2551,12 +2560,10 @@ def export_finance_xlsx(request):
     cell_title.fill = header_fill
     cell_title.alignment = center
 
-    # Ligne info génération
     ws1["A3"] = "Généré le"
     ws1["A3"].font = label_font
     ws1["B3"] = timezone.localtime().strftime("%d/%m/%Y %H:%M")
 
-    # Période
     ws1["A4"] = "Période"
     ws1["A4"].font = label_font
     if date_from or date_to:
@@ -2569,7 +2576,6 @@ def export_finance_xlsx(request):
         txt_period = "Toutes les dates"
     ws1["B4"] = txt_period
 
-    # Filtres financiers
     ws1["A5"] = "Filtre statut financier"
     ws1["A5"].font = label_font
     if status_filter == "paid":
@@ -2585,7 +2591,6 @@ def export_finance_xlsx(request):
     ws1["A6"].font = label_font
     ws1["B6"] = f"{min_amount_input or '0'} FCFA"
 
-    # Bandeau section totaux
     ws1.merge_cells("A8:D8")
     cell_sec = ws1["A8"]
     cell_sec.value = "Synthèse des montants (après filtres)"
@@ -2593,7 +2598,6 @@ def export_finance_xlsx(request):
     cell_sec.fill = section_fill
     cell_sec.alignment = left
 
-    # Totaux
     rows_totaux = [
         ("Nombre de commandes", total_orders),
         ("Total prestations (TTC)", f"{total_prestations} FCFA"),
@@ -2612,13 +2616,9 @@ def export_finance_xlsx(request):
         ws1[f"A{r}"].font = label_font
         ws1[f"B{r}"] = value
 
-    # Ajuste un peu les largeurs
     ws1.column_dimensions["A"].width = 40
     ws1.column_dimensions["B"].width = 35
-    ws1.column_dimensions["C"].width = 10
-    ws1.column_dimensions["D"].width = 10
 
-    # ---------- Onglet 2 : Détail des commandes ----------
     ws2 = wb.create_sheet(title="Commandes")
 
     headers = [
@@ -2642,7 +2642,6 @@ def export_finance_xlsx(request):
         "Marge logistique",
     ]
 
-    # Ligne d'en-tête
     for col_idx, head in enumerate(headers, start=1):
         cell = ws2.cell(row=1, column=col_idx, value=head)
         cell.font = header_font
@@ -2650,10 +2649,8 @@ def export_finance_xlsx(request):
         cell.alignment = center
         cell.border = thin_border
 
-    # Lignes de données
     row_idx = 2
     for o in filtered_orders:
-        # Statut financier textuel
         if o.is_fully_paid:
             f_status = "Soldée"
         elif o.due > 0 and o.paid > 0:
@@ -2663,73 +2660,49 @@ def export_finance_xlsx(request):
         else:
             f_status = ""
 
-        ws2.cell(row=row_idx, column=1, value=o.code or o.id)  # Code
-        ws2.cell(
-            row=row_idx,
-            column=2,
-            value=o.created_at.strftime("%d/%m/%Y %H:%M") if o.created_at else "",
-        )
-        ws2.cell(row=row_idx, column=3, value=o.get_status_display())
+        row_vals = [
+            o.code or o.id,
+            o.created_at.strftime("%d/%m/%Y %H:%M") if o.created_at else "",
+            o.get_status_display(),
+            o.customer.name if o.customer else "",
+            o.customer.phone if o.customer else "",
+            o.customer.address if o.customer else "",
+            float(o.base_total),
+            float(d(o.service_fee)),
+            float(d(o.delivery_fee)),
+            float(o.total_global_client),
+            float(o.paid),
+            float(o.due),
+            f_status,
+            float(o.margin_fagni),
+            o.laundry_partner.name if o.laundry_partner else "",
+            o.delivery_partner.name if o.delivery_partner else "",
+            float(d(getattr(o, "distance_km", None))),
+            float(d(getattr(o, "logistic_margin", None))),
+        ]
 
-        ws2.cell(row=row_idx, column=4, value=o.customer.name if o.customer else "")
-        ws2.cell(row=row_idx, column=5, value=o.customer.phone if o.customer else "")
-        ws2.cell(row=row_idx, column=6, value=o.customer.address if o.customer else "")
-
-        ws2.cell(row=row_idx, column=7, value=float(o.base_total))
-        ws2.cell(row=row_idx, column=8, value=float(d(o.service_fee)))
-        ws2.cell(row=row_idx, column=9, value=float(d(o.delivery_fee)))
-        ws2.cell(row=row_idx, column=10, value=float(o.total_global_client))
-        ws2.cell(row=row_idx, column=11, value=float(o.paid))
-        ws2.cell(row=row_idx, column=12, value=float(o.due))
-        ws2.cell(row=row_idx, column=13, value=f_status)
-        ws2.cell(row=row_idx, column=14, value=float(o.margin_fagni))
-        ws2.cell(
-            row=row_idx,
-            column=15,
-            value=o.laundry_partner.name if o.laundry_partner else "",
-        )
-        ws2.cell(
-            row=row_idx,
-            column=16,
-            value=o.delivery_partner.name if o.delivery_partner else "",
-        )
-        ws2.cell(
-            row=row_idx,
-            column=17,
-            value=float(d(getattr(o, "distance_km", None))),
-        )
-        ws2.cell(
-            row=row_idx,
-            column=18,
-            value=float(d(getattr(o, "logistic_margin", None))),
-        )
-
-        # Styles par ligne
-        for col in range(1, len(headers) + 1):
-            cell = ws2.cell(row=row_idx, column=col)
+        for col_idx, val in enumerate(row_vals, start=1):
+            cell = ws2.cell(row=row_idx, column=col_idx, value=val)
             cell.border = thin_border
-            if col in (7, 8, 9, 10, 11, 12, 14, 18):
+            if col_idx in (7, 8, 9, 10, 11, 12, 14, 18):
                 cell.alignment = right
                 cell.number_format = "#,##0"
-            elif col == 17:
+            elif col_idx == 17:
                 cell.alignment = right
                 cell.number_format = "0.0"
-            elif col in (4, 5, 6, 15, 16, 13):
+            elif col_idx in (4, 5, 6, 15, 16, 13):
                 cell.alignment = wrap
             else:
                 cell.alignment = left
 
         row_idx += 1
 
-    # Largeurs colonnes
     widths = [14, 18, 16, 20, 16, 30, 16, 14, 14, 18, 14, 14, 18, 16, 20, 20, 14, 16]
     for col_idx, w in enumerate(widths, start=1):
         ws2.column_dimensions[chr(64 + col_idx)].width = w
 
-    # Auto-filter sur la ligne d'en-tête
     ws2.auto_filter.ref = ws2.dimensions
 
-    # Préparation de la réponse HTTP
     output = BytesIO()
     wb.save(output)
     output.seek(0)
@@ -2911,3 +2884,16 @@ def change_status(request, order_id):
         order.save()
 
     return redirect("orders:detail", order_id=order.id)
+
+
+def _safe_dec(val):
+    if isinstance(val, Decimal):
+        return val
+    if val in (None, "", 0):
+        return DECIMAL_ZERO
+    try:
+        return Decimal(str(val))
+    except Exception:
+        return DECIMAL_ZERO
+
+

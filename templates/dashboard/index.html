@@ -1,2 +1,235 @@
-<h1>Dashboard index ✅</h1>
-<p><a href="/dashboard/analytics/">Aller vers Analytics</a></p>
+{% extends "base.html" %}
+
+{% block title %}Dashboard FAGNI{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+
+  <!-- Header + filtres -->
+  <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">
+        Dashboard FAGNI
+      </h1>
+      <p class="text-sm text-gray-500">
+        Vue d’ensemble de l’activité sur la période sélectionnée.
+      </p>
+    </div>
+
+    <form method="get" class="flex flex-wrap items-end gap-3">
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Du</label>
+        <input type="date" name="date_from"
+               value="{{ date_from|date:'Y-m-d' }}"
+               class="border rounded-md px-2 py-1 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Au</label>
+        <input type="date" name="date_to"
+               value="{{ date_to|date:'Y-m-d' }}"
+               class="border rounded-md px-2 py-1 text-sm">
+      </div>
+      <button type="submit"
+              class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+        Filtrer
+      </button>
+    </form>
+  </div>
+
+  <!-- KPIs principaux -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <!-- Commandes totales -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase">Commandes (période)</p>
+      <p class="mt-2 text-2xl font-bold text-gray-900">{{ total_orders }}</p>
+      <p class="mt-1 text-xs text-gray-500">
+        Terminées : <span class="font-semibold text-green-600">{{ done_count }}</span> ·
+        En cours : <span class="font-semibold text-blue-600">{{ in_progress_count }}</span>
+      </p>
+    </div>
+
+    <!-- CA client -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase">Chiffre d’affaires client</p>
+      <p class="mt-2 text-2xl font-bold text-gray-900">
+        {{ total_ca_client|floatformat:0 }} <span class="text-sm font-semibold">FCFA</span>
+      </p>
+      <p class="mt-1 text-xs text-gray-500">
+        Prestations : {{ total_prestations|floatformat:0 }} ·
+        Service : {{ total_service|floatformat:0 }} ·
+        Livraison : {{ total_delivery|floatformat:0 }}
+      </p>
+    </div>
+
+    <!-- Marge FAGNI -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase">Marge FAGNI</p>
+      <p class="mt-2 text-2xl font-bold text-amber-600">
+        {{ total_margin_fagni|floatformat:0 }} <span class="text-sm font-semibold text-gray-700">FCFA</span>
+      </p>
+      <p class="mt-1 text-xs text-gray-500">
+        Logistique : {{ total_logistic_margin|floatformat:0 }} FCFA
+      </p>
+    </div>
+
+    <!-- Paiements -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase">Encaissements</p>
+      <p class="mt-2 text-2xl font-bold text-emerald-600">
+        {{ total_paid|floatformat:0 }} <span class="text-sm font-semibold text-gray-700">FCFA</span>
+      </p>
+      <p class="mt-1 text-xs text-gray-500">
+        Restant dû : <span class="font-semibold text-rose-600">{{ total_due|floatformat:0 }} FCFA</span>
+      </p>
+    </div>
+  </div>
+
+  <!-- Aujourd’hui + semaine -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase">Aujourd’hui</p>
+      <p class="mt-2 text-lg font-bold text-gray-900">
+        {{ today_orders }} commande(s)
+      </p>
+      <p class="mt-1 text-sm text-gray-600">
+        CA : {{ today_revenue|floatformat:0 }} FCFA
+      </p>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase">Semaine en cours</p>
+      <p class="mt-2 text-lg font-bold text-gray-900">
+        {{ week_revenue|floatformat:0 }} FCFA
+      </p>
+      <p class="mt-1 text-sm text-gray-600">
+        Du lundi à aujourd’hui.
+      </p>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-col justify-between">
+      <div>
+        <p class="text-xs font-semibold text-gray-500 uppercase">Actions rapides</p>
+        <p class="mt-1 text-sm text-gray-600">
+          Accès direct aux outils clés FAGNI.
+        </p>
+      </div>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <a href="{% url 'orders:create' %}"
+           class="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium text-white bg-amber-500 hover:bg-amber-600">
+          + Nouvelle commande
+        </a>
+        <a href="{% url 'dashboard:analytics' %}"
+           class="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100">
+          Analytics
+        </a>
+        <a href="{% url 'dashboard:top_clients' %}"
+           class="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100">
+          Top clients
+        </a>
+        <a href="{% url 'orders:finance_dashboard' %}"
+           class="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100">
+          Finance
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mini graphs -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <!-- Commandes / jour -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div class="flex items-center justify-between mb-2">
+        <p class="text-sm font-semibold text-gray-800">Commandes – 7 derniers jours</p>
+      </div>
+      <canvas id="ordersChart" height="120"></canvas>
+    </div>
+
+    <!-- CA / jour -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div class="flex items-center justify-between mb-2">
+        <p class="text-sm font-semibold text-gray-800">CA client – 7 derniers jours</p>
+      </div>
+      <canvas id="revenueChart" height="120"></canvas>
+    </div>
+  </div>
+
+  <!-- Liens vers les autres dashboards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <a href="{% url 'dashboard:analytics' %}"
+       class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:border-blue-400 transition">
+      <p class="text-xs font-semibold text-blue-600 uppercase mb-1">Analytics</p>
+      <p class="text-sm text-gray-800 font-semibold">Courbes & analyse des commandes</p>
+      <p class="text-xs text-gray-500 mt-1">
+        Volume, CA, statuts, dynamique de la période.
+      </p>
+    </a>
+
+    <a href="{% url 'dashboard:top_clients' %}"
+       class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:border-emerald-400 transition">
+      <p class="text-xs font-semibold text-emerald-600 uppercase mb-1">Top clients</p>
+      <p class="text-sm text-gray-800 font-semibold">Top 100 clients FAGNI</p>
+      <p class="text-xs text-gray-500 mt-1">
+        CA cumulé, panier moyen, nombre de commandes.
+      </p>
+    </a>
+
+    <a href="{% url 'orders:finance_dashboard' %}"
+       class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:border-purple-400 transition">
+      <p class="text-xs font-semibold text-purple-600 uppercase mb-1">Finance</p>
+      <p class="text-sm text-gray-800 font-semibold">Dashboard financier</p>
+      <p class="text-xs text-gray-500 mt-1">
+        Marges, encaissements, soldées / partiellement payées / impayées.
+      </p>
+    </a>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const labels = {{ chart_labels_json|safe }};
+  const ordersData = {{ chart_orders_json|safe }};
+  const revenueData = {{ chart_revenue_json|safe }};
+
+  const ordersCtx = document.getElementById('ordersChart').getContext('2d');
+  new Chart(ordersCtx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Commandes',
+        data: ordersData,
+        tension: 0.3,
+        fill: false,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { size: 10 } } },
+        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+      }
+    }
+  });
+
+  const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+  new Chart(revenueCtx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'CA (FCFA)',
+        data: revenueData,
+        tension: 0.3,
+        fill: true,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { size: 10 } } },
+        y: { beginAtZero: true }
+      }
+    }
+  });
+</script>
+{% endblock %}

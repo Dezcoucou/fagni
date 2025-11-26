@@ -1,35 +1,54 @@
 {% extends "base.html" %}
-{% load static %}
+
+{% block title %}Top clients – FAGNI{% endblock %}
+
 {% block content %}
-<h1 class="h3 mb-3">Top Clients (6 derniers mois)</h1>
+<div class="max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
 
-<div class="row">
-  <div class="col-md-6 mb-4">
-    <h5>Montant cumulé (FCFA)</h5>
-    <div style="height:360px"><canvas id="chartTopTotal"></canvas></div>
+  <h1 class="text-2xl font-bold mb-2">Top clients FAGNI</h1>
+  <p class="text-sm text-gray-600 mb-6">
+    Classement des meilleurs clients par total TTC cumulé.
+  </p>
+
+  {% if top_clients %}
+  <div class="bg-white shadow rounded-xl overflow-hidden border border-gray-100">
+
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 text-xs font-semibold text-gray-600 uppercase">
+        <tr>
+          <th class="px-3 py-2 text-left">Client</th>
+          <th class="px-3 py-2 text-left">Téléphone</th>
+          <th class="px-3 py-2 text-right">Nombre commandes</th>
+          <th class="px-3 py-2 text-right">Montant total (FCFA)</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+
+        {% for c in top_clients %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-3 py-2">
+            {{ c.customer__name }}
+          </td>
+          <td class="px-3 py-2">
+            {{ c.customer__phone|default:"—" }}
+          </td>
+          <td class="px-3 py-2 text-right">
+            {{ c.total_orders }}
+          </td>
+          <td class="px-3 py-2 text-right font-semibold">
+            {{ c.total_spent|floatformat:0 }} FCFA
+          </td>
+        </tr>
+        {% endfor %}
+
+      </tbody>
+    </table>
+
   </div>
-  <div class="col-md-6 mb-4">
-    <h5>Nombre de commandes</h5>
-    <div style="height:360px"><canvas id="chartTopCount"></canvas></div>
-  </div>
+
+  {% else %}
+    <p class="text-sm text-gray-500 italic">Aucun client trouvé.</p>
+  {% endif %}
+
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-  const labels = {{ labels_json|safe }};
-  const dataTotal = {{ data_total_json|safe }};
-  const dataCount = {{ data_count_json|safe }};
-
-  new Chart(document.getElementById('chartTopTotal'), {
-    type: 'bar',
-    data: { labels, datasets: [{ label: "Montant (FCFA)", data: dataTotal }] },
-    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
-  });
-
-  new Chart(document.getElementById('chartTopCount'), {
-    type: 'bar',
-    data: { labels, datasets: [{ label: "Commandes", data: dataCount }] },
-    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
-  });
-</script>
 {% endblock %}

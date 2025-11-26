@@ -1,269 +1,259 @@
+{% extends "base.html" %}
 {% load static %}
-<!doctype html>
-<html lang="fr">
-<head>
-    <meta charset="utf-8">
-    <title>Ops FAGNI – Suivi opérationnel des commandes</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1">
 
-    <style>
-        body{
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            margin:0;
-            padding:0;
-            background:#f5f5f7;
-            color:#222;
-        }
-        header{
-            background:linear-gradient(90deg,#ff7a00,#0056b3);
-            color:#fff;
-            padding:16px 24px;
-        }
-        header h1{
-            margin:0;
-            font-size:20px;
-        }
-        header p{
-            margin:4px 0 0;
-            font-size:13px;
-            opacity:.9;
-        }
-        .page{
-            max-width:1200px;
-            margin:20px auto 30px;
-            padding:0 10px;
-        }
-        .card{
-            background:#fff;
-            border-radius:10px;
-            box-shadow:0 4px 10px rgba(0,0,0,0.04);
-            padding:14px 16px 18px;
-            margin-bottom:14px;
-        }
-        .top-bar{
-            display:flex;
-            justify-content:space-between;
-            align-items:flex-start;
-            gap:10px;
-            flex-wrap:wrap;
-            margin-bottom:10px;
-        }
-        .summary{
-            font-size:13px;
-            color:#333;
-        }
-        .summary span{
-            margin-right:10px;
-        }
-        .summary-Row2{
-            font-size:11px;
-            color:#666;
-            margin-top:3px;
-        }
-        .pill-global{
-            display:inline-flex;
-            align-items:center;
-            gap:4px;
-            padding:2px 8px;
-            border-radius:999px;
-            background:#f1f3f5;
-            font-size:11px;
-            margin-right:5px;
-        }
-        .pill-global span{
-            opacity:.85;
-        }
+{% block title %}Ops FAGNI – Suivi opérationnel des commandes{% endblock %}
 
-        .btn-link{
-            text-decoration:none;
-            display:inline-block;
-            border-radius:999px;
-            padding:7px 12px;
-            font-size:13px;
-        }
-        .btn-primary{
-            background:#0056b3;
-            color:#fff;
-            border:none;
-        }
-        .btn-primary:hover{
-            background:#00408a;
-        }
-        .btn-secondary{
-            background:#fff;
-            border:1px solid #ccc;
-            color:#333;
-        }
-        .btn-secondary:hover{
-            background:#f3f3f3;
-        }
+{% block content %}
 
+<style>
+    .page-ops{
+        max-width:1200px;
+        margin:20px auto 30px;
+        padding:0 10px;
+    }
+    .ops-header{
+        margin-bottom:14px;
+    }
+    .ops-header h1{
+        margin:0;
+        font-size:20px;
+    }
+    .ops-header p{
+        margin:4px 0 0;
+        font-size:13px;
+        color:#555;
+    }
+
+    .card{
+        background:#fff;
+        border-radius:10px;
+        box-shadow:0 4px 10px rgba(0,0,0,0.04);
+        padding:14px 16px 18px;
+        margin-bottom:14px;
+    }
+    .top-bar{
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:10px;
+        flex-wrap:wrap;
+        margin-bottom:10px;
+    }
+
+    .summary{
+        font-size:13px;
+        color:#333;
+    }
+    .summary span{
+        margin-right:10px;
+    }
+    .summary-row2{
+        font-size:11px;
+        color:#666;
+        margin-top:3px;
+    }
+    .pill-global{
+        display:inline-flex;
+        align-items:center;
+        gap:4px;
+        padding:2px 8px;
+        border-radius:999px;
+        background:#f1f3f5;
+        font-size:11px;
+        margin-right:5px;
+    }
+    .pill-global span{
+        opacity:.85;
+    }
+
+    .btn-link{
+        text-decoration:none;
+        display:inline-block;
+        border-radius:999px;
+        padding:7px 12px;
+        font-size:13px;
+    }
+    .btn-primary{
+        background:#0056b3;
+        color:#fff;
+        border:none;
+    }
+    .btn-primary:hover{
+        background:#00408a;
+    }
+    .btn-secondary{
+        background:#fff;
+        border:1px solid #ccc;
+        color:#333;
+    }
+    .btn-secondary:hover{
+        background:#f3f3f3;
+    }
+
+    .board{
+        display:grid;
+        grid-template-columns:repeat(3,1fr);
+        gap:14px;
+    }
+    @media(max-width:900px){
         .board{
-            display:grid;
-            grid-template-columns:repeat(3,1fr);
-            gap:14px;
+            grid-template-columns:1fr;
         }
-        @media(max-width:900px){
-            .board{
-                grid-template-columns:1fr;
-            }
-        }
-        .col{
-            background:#fff;
-            border-radius:10px;
-            box-shadow:0 2px 6px rgba(0,0,0,0.03);
-            padding:10px 10px 12px;
-        }
-        .col-header{
-            display:flex;
-            justify-content:space-between;
-            align-items:flex-end;
-            gap:6px;
-            margin-bottom:6px;
-        }
-        .col h2{
-            margin:0;
-            font-size:15px;
-            display:flex;
-            align-items:center;
-            gap:6px;
-        }
-        .col small{
-            display:block;
-            font-size:11px;
-            color:#666;
-        }
-        .badge-total{
-            background:#eee;
-            border-radius:999px;
-            padding:2px 8px;
-            font-size:11px;
-        }
+    }
+    .col{
+        background:#fff;
+        border-radius:10px;
+        box-shadow:0 2px 6px rgba(0,0,0,0.03);
+        padding:10px 10px 12px;
+    }
+    .col-header{
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-end;
+        gap:6px;
+        margin-bottom:6px;
+    }
+    .col h2{
+        margin:0;
+        font-size:15px;
+        display:flex;
+        align-items:center;
+        gap:6px;
+    }
+    .col small{
+        display:block;
+        font-size:11px;
+        color:#666;
+    }
+    .badge-total{
+        background:#eee;
+        border-radius:999px;
+        padding:2px 8px;
+        font-size:11px;
+    }
 
-        table{
-            width:100%;
-            border-collapse:collapse;
-            font-size:12px;
-        }
-        th,td{
-            padding:6px 4px;
-            border-bottom:1px solid #f0f0f0;
-            vertical-align:top;
-        }
-        th{
-            background:#fafafa;
-            font-weight:600;
-            white-space:nowrap;
-        }
-        tr:hover{
-            background:#fafafa;
-        }
+    table{
+        width:100%;
+        border-collapse:collapse;
+        font-size:12px;
+    }
+    th,td{
+        padding:6px 4px;
+        border-bottom:1px solid #f0f0f0;
+        vertical-align:top;
+    }
+    th{
+        background:#fafafa;
+        font-weight:600;
+        white-space:nowrap;
+    }
+    tr:hover{
+        background:#fafafa;
+    }
 
-        .link-detail{
-            font-size:11px;
-            text-decoration:none;
-            color:#0056b3;
-        }
-        .link-detail:hover{
-            text-decoration:underline;
-        }
+    .link-detail{
+        font-size:11px;
+        text-decoration:none;
+        color:#0056b3;
+    }
+    .link-detail:hover{
+        text-decoration:underline;
+    }
 
-        form{ margin:0; }
-        button{
-            font-size:11px;
-            border-radius:999px;
-            border:none;
-            padding:3px 8px;
-            cursor:pointer;
-        }
+    form{ margin:0; }
+    button{
+        font-size:11px;
+        border-radius:999px;
+        border:none;
+        padding:3px 8px;
+        cursor:pointer;
+    }
 
-        .subtext{
-            display:block;
-            font-size:11px;
-            color:#666;
-            margin-top:2px;
-        }
-        .metric{
-            display:block;
-            font-size:10px;
-            color:#777;
-            margin-top:1px;
-        }
-        .metric strong{
-            font-weight:600;
-        }
-        .empty-col{
-            font-size:12px;
-            color:#777;
-            padding:8px 0;
-        }
+    .subtext{
+        display:block;
+        font-size:11px;
+        color:#666;
+        margin-top:2px;
+    }
+    .metric{
+        display:block;
+        font-size:10px;
+        color:#777;
+        margin-top:1px;
+    }
+    .metric strong{
+        font-weight:600;
+    }
+    .empty-col{
+        font-size:12px;
+        color:#777;
+        padding:8px 0;
+    }
 
-        /* Boutons statut / étapes */
-        .btn-step-pickup{
-            background:#0056b3;
-            color:#fff;
-        }
-        .btn-step-dropoff{
-            background:#ffc107;
-            color:#212529;
-        }
-        .btn-step-wash{
-            background:#17a2b8;
-            color:#fff;
-        }
-        .btn-step-return{
-            background:#6c757d;
-            color:#fff;
-        }
-        .btn-step-delivered{
-            background:#28a745;
-            color:#fff;
-        }
+    /* Boutons statut / étapes */
+    .btn-step-pickup{
+        background:#0056b3;
+        color:#fff;
+    }
+    .btn-step-dropoff{
+        background:#ffc107;
+        color:#212529;
+    }
+    .btn-step-wash{
+        background:#17a2b8;
+        color:#fff;
+    }
+    .btn-step-return{
+        background:#6c757d;
+        color:#fff;
+    }
+    .btn-step-delivered{
+        background:#28a745;
+        color:#fff;
+    }
 
-        /* Pastilles statut */
-        .badge-status{
-            padding:3px 8px;
-            border-radius:999px;
-            font-size:11px;
-            white-space:nowrap;
-        }
-        .badge-pending{
-            background:#fff3cd;
-            color:#856404;
-        }
-        .badge-in-progress{
-            background:#cce5ff;
-            color:#004085;
-        }
-        .badge-done{
-            background:#d4edda;
-            color:#155724;
-        }
+    /* Pastilles statut */
+    .badge-status{
+        padding:3px 8px;
+        border-radius:999px;
+        font-size:11px;
+        white-space:nowrap;
+    }
+    .badge-pending{
+        background:#fff3cd;
+        color:#856404;
+    }
+    .badge-in-progress{
+        background:#cce5ff;
+        color:#004085;
+    }
+    .badge-done{
+        background:#d4edda;
+        color:#155724;
+    }
 
-        .mini-legend{
-            font-size:10px;
-            color:#777;
-            margin-top:6px;
-        }
-        .timeline-inline{
-            display:block;
-            font-size:10px;
-            margin-top:3px;
-            color:#555;
-        }
-        .timeline-inline span{
-            margin-right:4px;
-        }
-    </style>
-</head>
-<body>
+    .mini-legend{
+        font-size:10px;
+        color:#777;
+        margin-top:6px;
+    }
+    .timeline-inline{
+        display:block;
+        font-size:10px;
+        margin-top:3px;
+        color:#555;
+    }
+    .timeline-inline span{
+        margin-right:4px;
+    }
+</style>
 
-<header>
-    <h1>Tableau Ops – Commandes FAGNI</h1>
-    <p>Suivi opérationnel : collecte, dépôt blanchisserie, lavage, retour et livraison.</p>
-</header>
+<div class="page-ops">
 
-<div class="page">
+    <div class="ops-header">
+        <h1>Tableau Ops – Commandes FAGNI</h1>
+        <p>Suivi opérationnel : collecte, dépôt blanchisserie, lavage, retour et livraison.</p>
+    </div>
 
     <!-- Carte globale Ops -->
     <div class="card">
@@ -283,7 +273,7 @@
                     <span><strong>En cours :</strong> {{ in_progress_orders|length }}</span>
                     <span><strong>Terminées :</strong> {{ done_orders|length }}</span>
                 </div>
-                <div class="summary-Row2">
+                <div class="summary-row2">
                     <span class="pill-global">
                         💰 <span>Total prestations livrées :</span>
                         <strong>{{ done_total|default:0 }} FCFA</strong>
@@ -535,7 +525,6 @@
                                     📄 Ticket PDF
                                 </a>
 
-
                                 <div style="margin-top:4px;display:flex;flex-direction:column;gap:3px;">
                                     <form method="post" action="{% url 'orders:ops_update_step' order.id 'dropoff' %}">
                                         {% csrf_token %}
@@ -642,7 +631,7 @@
                                     —
                                 {% endif %}
                                 <br>
-                                <a href="{% url 'orders:ticket' order.id %}"
+                                <a href="{% url 'orders:order_ticket_pdf' order.id %}"
                                    class="link-detail"
                                    target="_blank">
                                     📄 Ticket PDF
@@ -663,5 +652,4 @@
 
 </div>
 
-</body>
-</html>
+{% endblock content %}

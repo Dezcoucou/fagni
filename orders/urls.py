@@ -73,7 +73,7 @@ urlpatterns = [
     path("drivers/dashboard/", views.driver_dashboard, name="driver_dashboard"),
 
     # Dashboard financier
-    path("finance/dashboard/", views.finance_dashboard, name="finance_dashboard"),
+    path("finance-dashboard/", views.finance_dashboard, name="finance_dashboard"),
     path(
         "finance/export/xlsx/",
         views.export_finance_xlsx,

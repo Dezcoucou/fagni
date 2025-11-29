@@ -144,25 +144,24 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "handlers": {
-        "file": {
-            "class": "logging.FileHandler",
-            "filename": str(BASE_DIR / "logs" / "app.log"),
-            "level": "INFO",
-        },
-        "mail_admins": {
-            "class": "django.utils.log.AdminEmailHandler",
-            "level": "ERROR",
+        "console": {
+            "class": "logging.StreamHandler",
         },
     },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
     "loggers": {
-        "django.request": {
-            "handlers": ["file", "mail_admins"],
-            "level": "ERROR",
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
             "propagate": True,
         },
-        "orders": {
-            "handlers": ["file"],
-            "level": "INFO",
+        "fagni": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
         },
     },
 }

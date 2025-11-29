@@ -47,7 +47,7 @@ logs/
 *backup*.html
 
 # Dossiers non utilisés
-bonuses/
+#bonuses/
 templates/orders/*backup*
 templates/orders/*OLD*
 orders/templates/orders/*old*

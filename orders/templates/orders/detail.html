@@ -1,847 +1,531 @@
+{% extends "base.html" %}
 {% load static %}
-<!doctype html>
-<html lang="fr">
-<head>
-    <meta charset="utf-8">
-    <title>Détail commande – FAGNI</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1">
 
-    <style>
-        body{
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            margin:0;
-            padding:0;
-            background:#f5f5f7;
-            color:#222;
-        }
-        header{
-            background:linear-gradient(90deg,#ff7a00,#0056b3);
-            color:#fff;
-            padding:16px 24px;
-        }
-        header h1{
-            margin:0;
-            font-size:20px;
-        }
-        header p{
-            margin:4px 0 0;
-            font-size:13px;
-            opacity:.9;
-        }
-        .page{
-            max-width:1200px;
-            margin:20px auto 30px;
-            padding:0 10px;
-        }
-        .card{
-            background:#fff;
-            border-radius:10px;
-            box-shadow:0 4px 10px rgba(0,0,0,0.04);
-            padding:14px 18px 18px;
-            margin-bottom:14px;
-        }
-        .top-bar{
-            display:flex;
-            justify-content:space-between;
-            align-items:flex-start;
-            gap:10px;
-            flex-wrap:wrap;
-            margin-bottom:8px;
-        }
-        .btn-link{
-            text-decoration:none;
-            display:inline-block;
-            border-radius:999px;
-            padding:7px 12px;
-            font-size:13px;
-            transition:background .15s, box-shadow .15s, transform .08s;
-        }
-        .btn-link:active{
-            transform:scale(.98);
-        }
-        .btn-primary{
-            background:#0056b3;
-            color:#fff;
-            border:none;
-        }
-        .btn-primary:hover{
-            background:#00408a;
-        }
-        .btn-secondary{
-            background:#fff;
-            border:1px solid #ccc;
-            color:#333;
-        }
-        .btn-secondary:hover{
-            background:#f3f3f3;
-        }
-        .badge-status{
-            padding:3px 8px;
-            border-radius:999px;
-            font-size:11px;
-            white-space:nowrap;
-        }
-        .badge-pending{
-            background:#fff3cd;
-            color:#856404;
-        }
-        .badge-in-progress{
-            background:#cce5ff;
-            color:#004085;
-        }
-        .badge-done{
-            background:#d4edda;
-            color:#155724;
-        }
-        .badge-canceled{
-            background:#f8d7da;
-            color:#721c24;
-        }
-        .mini{
-            font-size:11px;
-            color:#666;
-        }
-        .grid-two{
-            display:grid;
-            grid-template-columns:2fr 1.3fr;
-            gap:12px;
-        }
-        @media(max-width:900px){
-            .grid-two{
-                grid-template-columns:1fr;
-            }
-        }
-        .block-title{
-            font-size:14px;
-            font-weight:600;
-            margin-bottom:4px;
-            display:flex;
-            align-items:center;
-            gap:6px;
-        }
-        .block-title span.emoji{
-            font-size:16px;
-        }
-        .info-line{
-            font-size:13px;
-            margin-bottom:3px;
-        }
-        .info-label{
-            font-size:11px;
-            text-transform:uppercase;
-            letter-spacing:.03em;
-            color:#888;
-        }
+{% block content %}
+<style>
+    :root {
+        --fagni-orange: #ff7a00;
+        --fagni-blue: #0056b3;
+        --bg-soft: #f5f5f7;
+        --card-bg: #ffffff;
+        --border-soft: #e5e7eb;
+        --text-main: #111827;
+        --text-muted: #6b7280;
+    }
 
-        /* Bloc finance */
-        .finance-grid{
-            display:grid;
-            grid-template-columns:repeat(3,1fr);
-            gap:8px;
-            margin-top:6px;
-        }
-        @media(max-width:600px){
-            .finance-grid{
-                grid-template-columns:1fr;
-            }
-        }
-        .finance-card{
-            border-radius:10px;
-            padding:8px 10px;
-            background:#f8f9fb;
-        }
-        .finance-label{
-            font-size:11px;
-            color:#666;
-            margin-bottom:2px;
-            text-transform:uppercase;
-            letter-spacing:.03em;
-        }
-        .finance-main{
-            font-size:16px;
-            font-weight:600;
-        }
-        .finance-ok{
-            border-left:3px solid #28a745;
-        }
-        .finance-alert{
-            border-left:3px solid #dc3545;
-            background:#fff5f5;
-        }
+    * {
+        box-sizing: border-box;
+    }
 
-        /* Tableau lignes */
-        table{
-            width:100%;
-            border-collapse:collapse;
-            font-size:13px;
-        }
-        th,td{
-            padding:6px 4px;
-            border-bottom:1px solid #eee;
-            vertical-align:top;
-        }
-        th{
-            background:#fafafa;
-            font-weight:600;
-            white-space:nowrap;
-        }
-        tr:hover{
-            background:#fafafa;
-        }
-        .t-right{ text-align:right; }
-        .t-nowrap{ white-space:nowrap; }
+    body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg-soft);
+        margin: 0;
+        padding: 0;
+        color: var(--text-main);
+    }
 
-        /* Logistique */
-        .pill{
-            display:inline-block;
-            padding:2px 6px;
-            border-radius:999px;
-            background:#f1f3f5;
-            font-size:11px;
-            color:#333;
-        }
-        .pill-logi{
-            background:#edf4ff;
-            color:#1850a8;
-        }
+    header {
+        background: linear-gradient(90deg, #ff7a00, #0056b3);
+        color: #fff;
+        padding: 16px 24px;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+        margin: 0 -12px 0 -12px;
+    }
+    header h1 {
+        margin: 0;
+        font-size: 20px;
+    }
+    header p {
+        margin: 4px 0 0;
+        font-size: 13px;
+        opacity: 0.9;
+    }
 
-        .legend{
-            margin-top:8px;
-            font-size:11px;
-            color:#666;
-        }
+    .page {
+        max-width: 1100px;
+        margin: 20px auto;
+        padding: 0 10px 30px;
+    }
 
-        /* Photos des articles (vignettes par ligne) */
-        .photo-thumbs{
-            display:flex;
-            gap:4px;
-            flex-wrap:wrap;
-            margin-top:2px;
-        }
-        .photo-thumbs a{
-            display:inline-block;
-        }
-        .photo-thumbs img{
-            width:40px;
-            height:40px;
-            border-radius:6px;
-            object-fit:cover;
-            border:1px solid #ddd;
-        }
-        .no-photo{
-            font-size:11px;
-            color:#999;
-        }
+    .card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+        margin-bottom: 16px;
+        border: 1px solid var(--border-soft);
+    }
 
-        /* Timeline opérationnelle */
-        .timeline{
-            position:relative;
-            margin-top:8px;
-            padding-left:10px;
-        }
-        .timeline::before{
-            content:"";
-            position:absolute;
-            left:10px;
-            top:0;
-            bottom:0;
-            width:2px;
-            background:#e0e0e0;
-        }
-        .timeline-step{
-            position:relative;
-            padding-left:28px;
-            padding-bottom:10px;
-        }
-        .timeline-step:last-child{
-            padding-bottom:0;
-        }
-        .timeline-dot{
-            position:absolute;
-            left:4px;
-            top:6px;
-            width:12px;
-            height:12px;
-            border-radius:50%;
-            background:#ccc;
-            border:2px solid #fff;
-            box-shadow:0 0 0 2px #e0e0e0;
-        }
-        .timeline-step--done .timeline-dot{
-            background:#28a745;
-            box-shadow:0 0 0 2px rgba(40,167,69,.3);
-        }
-        .timeline-step--current .timeline-dot{
-            background:#ff7a00;
-            box-shadow:0 0 0 2px rgba(255,122,0,.35);
-        }
-        .timeline-step--todo .timeline-dot{
-            background:#ccc;
-        }
-        .timeline-step--canceled .timeline-dot{
-            background:#dc3545;
-            box-shadow:0 0 0 2px rgba(220,53,69,.35);
-        }
-        .timeline-label{
-            font-size:13px;
-            font-weight:600;
-        }
-        .timeline-date{
-            font-size:12px;
-            color:#555;
-            margin-top:1px;
-        }
-        .timeline-meta{
-            font-size:11px;
-            color:#777;
-            margin-top:1px;
-        }
-        .timeline-badge{
-            display:inline-block;
-            font-size:11px;
-            padding:2px 6px;
-            border-radius:999px;
-            background:#f3f3f3;
-            margin-left:6px;
-        }
+    .card h2 {
+        margin-top: 0;
+        font-size: 18px;
+        border-left: 4px solid #ff7a00;
+        padding-left: 8px;
+    }
 
-        @media(max-width:600px){
-            .timeline-label{
-                font-size:12px;
-            }
-            .timeline-date{
-                font-size:11px;
-            }
-        }
+    .top-actions {
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:10px;
+        margin-bottom:14px;
+        flex-wrap:wrap;
+    }
 
-        /* Galerie globale (toutes les photos de la commande) */
-        .gallery-grid{
-            display:flex;
-            flex-wrap:wrap;
-            gap:8px;
-            margin-top:6px;
+    .btn-link {
+        text-decoration:none;
+        border-radius:999px;
+        padding:7px 12px;
+        font-size:13px;
+        display:inline-flex;
+        align-items:center;
+        gap:6px;
+    }
+
+    .btn-secondary {
+        background:#fff;
+        border:1px solid #ccc;
+        color:#333;
+    }
+
+    .btn-secondary:hover {
+        background:#f3f3f3;
+    }
+
+    .btn-primary {
+        background:#0056b3;
+        color:#fff;
+        border:none;
+    }
+
+    .btn-primary:hover{
+        background:#00408a;
+    }
+
+    .badge-status {
+        display:inline-flex;
+        align-items:center;
+        gap:6px;
+        border-radius:999px;
+        padding:4px 10px;
+        font-size:11px;
+        background:#e5f2ff;
+        color:#0056b3;
+    }
+
+    .badge-status-dot {
+        width:8px;
+        height:8px;
+        border-radius:999px;
+        background:#10b981;
+    }
+
+    .layout {
+        display:grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap:16px;
+    }
+
+    .field-line {
+        margin-bottom:6px;
+        font-size:13px;
+    }
+    .field-label {
+        font-weight:600;
+        color:var(--text-muted);
+        margin-right:4px;
+    }
+
+    .timeline {
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px;
+        margin-top:8px;
+        font-size:11px;
+    }
+    .timeline-step {
+        display:flex;
+        align-items:center;
+        gap:4px;
+        padding:4px 10px;
+        border-radius:999px;
+        border:1px solid #e5e7eb;
+        background:#f9fafb;
+    }
+    .timeline-step-dot {
+        width:8px;
+        height:8px;
+        border-radius:999px;
+        background:#d1d5db;
+    }
+    .timeline-step.is-current {
+        border-color:#ff7a00;
+        background:#fff7ed;
+        color:#b45309;
+    }
+    .timeline-step.is-current .timeline-step-dot {
+        background:#f97316;
+    }
+
+    .status-form {
+        margin-top:10px;
+        display:flex;
+        align-items:center;
+        gap:8px;
+        flex-wrap:wrap;
+    }
+    .status-form select {
+        padding:5px 8px;
+        border-radius:999px;
+        border:1px solid #d1d5db;
+        font-size:12px;
+    }
+    .status-form button {
+        padding:6px 10px;
+        border-radius:999px;
+        font-size:12px;
+        cursor:pointer;
+    }
+
+    .status-help {
+        font-size:11px;
+        color:#6b7280;
+        margin-top:4px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        margin-top: 4px;
+    }
+
+    th, td {
+        padding: 6px 4px;
+        border-bottom: 1px solid #f1f1f1;
+        text-align: left;
+        vertical-align: top;
+    }
+
+    th {
+        background: #fafafa;
+        font-weight: 600;
+        font-size: 12px;
+    }
+
+    tbody tr:nth-child(even) {
+        background:#fcfcfd;
+    }
+
+    .num {
+        text-align:right;
+        white-space:nowrap;
+    }
+
+    .line-designation {
+        font-weight:500;
+    }
+
+    .line-meta {
+        font-size:10px;
+        color:#6b7280;
+        margin-top:2px;
+    }
+
+    .photo-thumbs {
+        margin-top:4px;
+        display:flex;
+        gap:4px;
+        flex-wrap:wrap;
+    }
+
+    .photo-thumbs img {
+        width:40px;
+        height:40px;
+        object-fit:cover;
+        border-radius:6px;
+        border:1px solid #ddd;
+    }
+
+    .totals-block p {
+        margin: 3px 0;
+        font-size: 13px;
+        clear: both;
+    }
+
+    .totals-block .label {
+        font-weight:600;
+    }
+
+    .totals-block .value {
+        float:right;
+    }
+
+    .totals-block .grand {
+        color:#ff7a00;
+        font-weight:700;
+    }
+
+    .note-box {
+        margin-top:8px;
+        padding:8px 10px;
+        border-radius:8px;
+        background:#f9fafb;
+        border:1px dashed #d1d5db;
+        font-size:13px;
+        white-space:pre-line;
+    }
+
+    @media (max-width: 900px) {
+        .layout {
+            grid-template-columns: 1fr;
         }
-        .gallery-grid a{
-            display:inline-block;
-        }
-        .gallery-grid img{
-            width:90px;
-            height:90px;
-            border-radius:8px;
-            object-fit:cover;
-            border:1px solid #ddd;
-        }
-    </style>
-</head>
-<body>
+    }
+</style>
 
 <header>
-    <h1>Détail commande – FAGNI</h1>
-    <p>Visualisation complète de la commande, du client à la logistique.</p>
+    <h1>Commande {{ order.code }}</h1>
+    <p>Détail complet : client, timeline, prestations, photos & montants.</p>
 </header>
 
 <div class="page">
-
-    <!-- Entête commande -->
     <div class="card">
-        <div class="top-bar">
+        <div class="top-actions">
             <div>
-                <div style="font-size:14px;font-weight:600;">
-                    Commande {{ order.code|default:order.id }}
-                    {% if order.status == "pending" %}
-                        <span class="badge-status badge-pending">En attente</span>
-                    {% elif order.status == "in_progress" %}
-                        <span class="badge-status badge-in-progress">En cours</span>
-                    {% elif order.status == "done" %}
-                        <span class="badge-status badge-done">Terminée</span>
-                    {% elif order.status == "canceled" %}
-                        <span class="badge-status badge-canceled">Annulée</span>
-                    {% endif %}
-                </div>
-                <div class="mini">
-                    Créée le {{ order.created_at|date:"d/m/Y H:i" }}
-                    {% if order.delivered_time %}
-                        • Livrée le {{ order.delivered_time|date:"d/m/Y H:i" }}
-                    {% endif %}
-                </div>
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-
-                <a href="{% url 'orders:list' %}" class="btn-link btn-secondary">
-                    ← Retour liste
-                </a>
-
-                <a href="{% url 'orders:ops_dashboard' %}" class="btn-link btn-secondary">
-                   🚦 Tableau Ops
-                </a>
-
-                <!-- ⚠️ adapte le nom de l'URL si besoin (ici : order_ticket_pdf) -->
-                <a href="{% url 'orders:order_ticket_pdf' order.id %}"
-                   class="btn-link btn-secondary"
-                   target="_blank">
-                    📄 Ticket PDF
-                </a>
-
-                <a href="{% url 'orders:order_ticket_thermal_pdf' order.id %}"
-                   class="btn-link btn-secondary"
-                   target="_blank">
-                    🧾 Ticket 80mm (Thermique)
-                </a>
-
-                <a href="{% url 'orders:update' order.id %}" class="btn-link btn-primary">
-                    ✏ Modifier la commande
-                </a>
-
-            </div>
-        </div>
-    </div>
-
-    <!-- Timeline opérationnelle -->
-    <div class="card">
-        <div class="block-title">
-            <span class="emoji">📍</span> Timeline opérationnelle
-        </div>
-
-        <div class="timeline">
-            <!-- Étape 1 : Création -->
-            <div class="timeline-step timeline-step--done">
-                <div class="timeline-dot"></div>
-                <div class="timeline-content">
-                    <div class="timeline-label">
-                        Commande créée
-                        <span class="timeline-badge">#{{ order.code|default:order.id }}</span>
-                    </div>
-                    <div class="timeline-date">
-                        {{ order.created_at|date:"d/m/Y H:i" }}
-                    </div>
-                    <div class="timeline-meta">
-                        Client : {{ order.customer.name }}{% if order.customer.phone %} • 📞 {{ order.customer.phone }}{% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Étape 2 : Collecte (pickup) -->
-            <div class="timeline-step
-                {% if order.pickup_time %}
-                    timeline-step--done
-                {% elif order.status != 'canceled' and not order.delivered_time %}
-                    timeline-step--current
-                {% else %}
-                    timeline-step--todo
-                {% endif %}
-            ">
-                <div class="timeline-dot"></div>
-                <div class="timeline-content">
-                    <div class="timeline-label">
-                        Collecte chez le client
-                    </div>
-                    {% if order.pickup_time %}
-                        <div class="timeline-date">
-                            Réalisée le {{ order.pickup_time|date:"d/m/Y H:i" }}
-                        </div>
-                    {% else %}
-                        <div class="timeline-date">
-                            En attente de collecte
-                        </div>
-                    {% endif %}
-                    <div class="timeline-meta">
-                        {% if order.delivery_partner %}
-                            Livreurs : {{ order.delivery_partner.name }}
-                        {% else %}
-                            Livreurs non assigné(s)
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Étape 3 : Dépôt blanchisserie (dropoff) -->
-            <div class="timeline-step
-                {% if order.dropoff_time %}
-                    timeline-step--done
-                {% elif order.pickup_time and not order.dropoff_time and order.status != 'canceled' %}
-                    timeline-step--current
-                {% else %}
-                    timeline-step--todo
-                {% endif %}
-            ">
-                <div class="timeline-dot"></div>
-                <div class="timeline-content">
-                    <div class="timeline-label">
-                        Dépôt à la blanchisserie
-                    </div>
-                    {% if order.dropoff_time %}
-                        <div class="timeline-date">
-                            Effectué le {{ order.dropoff_time|date:"d/m/Y H:i" }}
-                        </div>
-                    {% else %}
-                        <div class="timeline-date">
-                            En attente de dépôt blanchisserie
-                        </div>
-                    {% endif %}
-                    <div class="timeline-meta">
-                        {% if order.laundry_partner %}
-                            Blanchisserie : {{ order.laundry_partner.name }}
-                        {% else %}
-                            Aucune blanchisserie assignée
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Étape 4 : Lavage terminé (wash_complete_time) -->
-            <div class="timeline-step
-                {% if order.wash_complete_time %}
-                    timeline-step--done
-                {% elif order.dropoff_time and not order.wash_complete_time and order.status != 'canceled' %}
-                    timeline-step--current
-                {% else %}
-                    timeline-step--todo
-                {% endif %}
-            ">
-                <div class="timeline-dot"></div>
-                <div class="timeline-content">
-                    <div class="timeline-label">
-                        Lavage / Traitement terminé
-                    </div>
-                    {% if order.wash_complete_time %}
-                        <div class="timeline-date">
-                            Terminé le {{ order.wash_complete_time|date:"d/m/Y H:i" }}
-                        </div>
-                    {% else %}
-                        <div class="timeline-date">
-                            En cours de traitement ou en attente
-                        </div>
-                    {% endif %}
-                    <div class="timeline-meta">
-                        Suivi production blanchisserie.
-                    </div>
-                </div>
-            </div>
-
-            <!-- Étape 5 : Retour vers le client (return_time) -->
-            <div class="timeline-step
-                {% if order.return_time %}
-                    timeline-step--done
-                {% elif order.wash_complete_time and not order.return_time and order.status != 'canceled' %}
-                    timeline-step--current
-                {% else %}
-                    timeline-step--todo
-                {% endif %}
-            ">
-                <div class="timeline-dot"></div>
-                <div class="timeline-content">
-                    <div class="timeline-label">
-                        Retour / livraison vers le client
-                    </div>
-                    {% if order.return_time %}
-                        <div class="timeline-date">
-                            Retour en cours / effectué le {{ order.return_time|date:"d/m/Y H:i" }}
-                        </div>
-                    {% else %}
-                        <div class="timeline-date">
-                            En attente de retour chez le client
-                        </div>
-                    {% endif %}
-                    <div class="timeline-meta">
-                        Distance A/R : 
-                        {% if order.distance_km %}
-                            {{ order.distance_km }} km • Coût livreur : {{ order.driver_logistic_cost|default:0|floatformat:0 }} FCFA
-                        {% else %}
-                            Non calculée pour cette commande.
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Étape 6 : Livraison / statut final -->
-            <div class="timeline-step
-                {% if order.status == 'canceled' %}
-                    timeline-step--canceled
-                {% elif order.delivered_time %}
-                    timeline-step--done
-                {% elif order.return_time and not order.delivered_time %}
-                    timeline-step--current
-                {% else %}
-                    timeline-step--todo
-                {% endif %}
-            ">
-                <div class="timeline-dot"></div>
-                <div class="timeline-content">
-                    <div class="timeline-label">
-                        {% if order.status == "canceled" %}
-                            Commande annulée
-                        {% else %}
-                            Commande livrée & clôturée
-                        {% endif %}
-                    </div>
-
-                    {% if order.status == "canceled" %}
-                        <div class="timeline-date">
-                            Statut : {{ order.get_status_display }}
-                        </div>
-                        <div class="timeline-meta">
-                            Cette commande n’ira pas au bout du cycle standard (livraison).
-                        </div>
-                    {% else %}
-                        {% if order.delivered_time %}
-                            <div class="timeline-date">
-                                Livrée le {{ order.delivered_time|date:"d/m/Y H:i" }}
-                            </div>
-                            <div class="timeline-meta">
-                                Ticket : total client {{ order.total_ttc|default:order.total|default:0|floatformat:0 }} FCFA •
-                                Service FAGNI : {{ order.service_fee|default:0|floatformat:0 }} FCFA.
-                            </div>
-                        {% else %}
-                            <div class="timeline-date">
-                                Livraison finale non encore confirmée.
-                            </div>
-                            <div class="timeline-meta">
-                                Statut actuel : {{ order.get_status_display }}.
-                            </div>
-                        {% endif %}
-                    {% endif %}
-                </div>
-            </div>
-
-        </div>
-
-        <div class="legend">
-            Cette timeline synthétise le cycle complet FAGNI : collecte, lavage, retour et statut final.
-        </div>
-    </div>
-
-    <!-- Grille client + finance -->
-    <div class="grid-two">
-        <!-- Bloc client & partenaires -->
-        <div class="card">
-            <div class="block-title">
-                <span class="emoji">👤</span> Client & logistique
-            </div>
-
-            <div class="info-line">
-                <span class="info-label">Client</span><br>
-                <strong>{{ order.customer.name }}</strong>
-            </div>
-
-            {% if order.customer.phone %}
-            <div class="info-line">
-                <span class="info-label">Téléphone</span><br>
-                📞 {{ order.customer.phone }}
-            </div>
-            {% endif %}
-
-            {% if order.customer.address %}
-            <div class="info-line">
-                <span class="info-label">Adresse</span><br>
-                📍 {{ order.customer.address }}
-            </div>
-            {% endif %}
-
-            {% if order.customer.latitude and order.customer.longitude %}
-            <div class="info-line">
-                <span class="info-label">Géolocalisation</span><br>
-                Lat : {{ order.customer.latitude }} / Lng : {{ order.customer.longitude }}
-            </div>
-            {% endif %}
-
-            <hr style="border:none;border-top:1px solid #eee;margin:10px 0;">
-
-            <div class="block-title" style="margin-bottom:6px;">
-                <span class="emoji">🏭</span> Partenaires
-            </div>
-
-            <div class="info-line">
-                <span class="info-label">Blanchisserie</span><br>
-                {% if order.laundry_partner %}
-                    🧺 {{ order.laundry_partner.name }}
-                {% else %}
-                    <span class="mini" style="color:#999;">Non assignée</span>
-                {% endif %}
-            </div>
-
-            <div class="info-line">
-                <span class="info-label">Livreur</span><br>
-                {% if order.delivery_partner %}
-                    🛵 {{ order.delivery_partner.name }}
-                {% else %}
-                    <span class="mini" style="color:#999;">Non assigné</span>
-                {% endif %}
-            </div>
-
-            <div class="info-line">
-                <span class="info-label">Logistique</span><br>
-                {% if order.distance_km %}
-                    <span class="pill pill-logi">
-                        Distance A/R : {{ order.distance_km }} km
+                <strong>Commande {{ order.code }}</strong><br>
+                <span style="font-size:12px;color:#555;">
+                    Créée le {{ order.created_at|date:"d/m/Y H:i" }}<br>
+                    Dernière mise à jour : {{ order.updated_at|default:order.created_at|date:"d/m/Y H:i" }}
+                </span>
+                <div style="margin-top:6px;">
+                    <span class="badge-status">
+                        <span class="badge-status-dot"></span>
+                        Statut actuel : {{ order.get_status_display }}
                     </span>
-                    <div class="mini" style="margin-top:3px;">
-                        Coût livreur : <strong>{{ order.driver_logistic_cost|default:0|floatformat:0 }} FCFA</strong><br>
-                        Marge logistique FAGNI : <strong>{{ order.logistic_margin|default:0 }} FCFA</strong>
-                    </div>
-                {% else %}
-                    <span class="mini" style="color:#999;">Distance non calculée.</span>
-                {% endif %}
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <a href="{% url 'orders:list' %}" class="btn-link btn-secondary">
+                    ← Retour à la liste
+                </a>
+                <a href="{% url 'orders:update' order.id %}" class="btn-link btn-primary">
+                    ✏️ Modifier la commande
+                </a>
+                <a href="{% url 'orders:order_ticket_pdf' order.id %}" 
+                   class="btn-link btn-secondary" 
+                   target="_blank">
+                    🧾 Ticket PDF
+                </a>
+                <a href="{% url 'orders:order_ticket_thermal_pdf' order.id %}"
+                   target="_blank"
+                   class="btn-link btn-secondary">
+                    🧾 Ticket thermique
+                </a>
             </div>
         </div>
 
-        <!-- Bloc finance globale -->
-        <div class="card">
-            <div class="block-title">
-                <span class="emoji">💰</span> Synthèse financière
-            </div>
-
-            <div class="finance-grid">
-                <div class="finance-card">
-                    <div class="finance-label">Total TTC commande</div>
-                    <div class="finance-main">
-                        {{ order.total_ttc|default:order.total|default:0|floatformat:0 }} FCFA
+        {% if status_choices %}
+            <div class="timeline">
+                {% for value,label in status_choices %}
+                    <div class="timeline-step {% if value == order.status %}is-current{% endif %}">
+                        <span class="timeline-step-dot"></span>
+                        <span>{{ label }}</span>
                     </div>
-                    <div class="mini">
-                        Prestations + TVA (hors livraison & service FAGNI).
-                    </div>
-                </div>
-
-                <div class="finance-card">
-                    <div class="finance-label">Service FAGNI</div>
-                    <div class="finance-main">
-                        {{ order.service_fee|default:0|floatformat:0 }} FCFA
-                    </div>
-                    <div class="mini">
-                        Commission FAGNI (minimum 500 FCFA / commande).
-                    </div>
-                </div>
-
-                <div class="finance-card">
-                    <div class="finance-label">Livraison facturée</div>
-                    <div class="finance-main">
-                        {{ order.delivery_fee|default:0|floatformat:0 }} FCFA
-                    </div>
-                    <div class="mini">
-                        Frais de livraison payés par le client.
-                    </div>
-                </div>
-            </div>
-
-            <hr style="border:none;border-top:1px solid #eee;margin:10px 0;">
-
-            <div class="finance-grid">
-                <div class="finance-card">
-                    <div class="finance-label">Total global client</div>
-                    <div class="finance-main">
-                        {{ order.grand_total|default:0|floatformat:0 }} FCFA
-                    </div>
-                    <div class="mini">
-                        TTC + service FAGNI + livraison.
-                    </div>
-                </div>
-
-                <div class="finance-card {% if order.amount_due and order.amount_due > 0 %}finance-alert{% else %}finance-ok{% endif %}">
-                    <div class="finance-label">Montant payé</div>
-                    <div class="finance-main">
-                        {{ order.amount_paid|default:0|floatformat:0 }} FCFA
-                    </div>
-                    <div class="mini">
-                        {% if order.amount_due and order.amount_due > 0 %}
-                            ⚠ Paiement partiel enregistré.
-                        {% else %}
-                            ✅ Commande soldée.
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="finance-card {% if order.amount_due and order.amount_due > 0 %}finance-alert{% else %}finance-ok{% endif %}">
-                    <div class="finance-label">Montant dû</div>
-                    <div class="finance-main">
-                        {{ order.amount_due|default:0|floatformat:0 }} FCFA
-                    </div>
-                    <div class="mini">
-                        Montant restant à encaisser sur cette commande.
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Lignes de prestations -->
-    <div class="card">
-        <div class="block-title" style="margin-bottom:6px;">
-            <span class="emoji">🧺</span> Détail des prestations
-        </div>
-
-        {% if order.items.all %}
-            <table>
-                <thead>
-                    <tr>
-                        <th>Désignation</th>
-                        <th class="t-right">Qté</th>
-                        <th class="t-right">PU (FCFA)</th>
-                        <th class="t-right">Total (FCFA)</th>
-                        <th>Photos</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for item in order.items.all %}
-                    <tr>
-                        <td>
-                            {{ item.designation }}
-                            {% if item.service %}
-                                <div class="mini">
-                                    Catégorie : {{ item.service.category.name }} – {{ item.service.name }}
-                                </div>
-                            {% endif %}
-                        </td>
-                        <td class="t-right">{{ item.quantity }}</td>
-                        <td class="t-right">{{ item.unit_price|floatformat:0 }}</td>
-                        <td class="t-right">{{ item.total|floatformat:0 }}</td>
-                        <td>
-                            {% with photos=item.photos.all %}
-                                {% if photos %}
-                                    <div class="photo-thumbs">
-                                        {% for photo in photos %}
-                                            <a href="{{ photo.image.url }}" target="_blank">
-                                                <img src="{{ photo.image.url }}"
-                                                     alt="Photo article {{ item.id }}">
-                                            </a>
-                                        {% endfor %}
-                                    </div>
-                                {% else %}
-                                    <span class="no-photo">Aucune photo</span>
-                                {% endif %}
-                            {% endwith %}
-                        </td>
-                    </tr>
                 {% endfor %}
-                </tbody>
-            </table>
-        {% else %}
-            <div class="legend">
-                Aucune ligne de prestation enregistrée pour cette commande.
+            </div>
+        {% endif %}
+
+        {% if status_choices %}
+            <form method="post"
+                  action="{% url 'orders:update_status' order.id %}"
+                  class="status-form">
+                {% csrf_token %}
+                <label for="status" style="font-size:12px;font-weight:600;color:#374151;">
+                    Changer le statut :
+                </label>
+                <select id="status" name="status">
+                    {% for value,label in status_choices %}
+                        <option value="{{ value }}" {% if value == order.status %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn-primary" style="font-size:12px;padding:6px 12px;">
+                    Mettre à jour
+                </button>
+            </form>
+            <div class="status-help">
+                Utilise ce sélecteur pour faire évoluer la timeline (ex : Commande créée → En cours → Livrée).
             </div>
         {% endif %}
     </div>
 
-    <!-- Galerie globale des photos -->
-    {% if all_photos %}
-    <div class="card">
-        <div class="block-title" style="margin-bottom:6px;">
-            <span class="emoji">🖼️</span> Galerie globale des photos
+    <div class="layout">
+        <!-- Colonne gauche : client + notes -->
+        <div>
+            <div class="card">
+                <h2>Client & contact</h2>
+                <div class="field-line">
+                    <span class="field-label">Nom :</span>
+                    <span>{{ order.customer.name|default:"—" }}</span>
+                </div>
+                <div class="field-line">
+                    <span class="field-label">Téléphone :</span>
+                    <span>{{ order.customer.phone|default:"—" }}</span>
+                </div>
+                <div class="field-line">
+                    <span class="field-label">Code parrain :</span>
+                    <span>{{ order.referral_code|default:"—" }}</span>
+                </div>
+                <div class="field-line">
+                    <span class="field-label">Adresse :</span>
+                    <span>{{ order.customer.address|default:"—" }}</span>
+                </div>
+                <div class="field-line">
+                    <span class="field-label">Blanchisserie :</span>
+                    <span>
+                        {% if order.laundry_partner %}
+                            {{ order.laundry_partner.name }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="field-line">
+                    <span class="field-label">Livreur :</span>
+                    <span>
+                        {% if order.delivery_partner %}
+                            {{ order.delivery_partner.name }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </span>
+                </div>
+
+                <h2 style="margin-top:16px;">Notes / instructions</h2>
+                {% if order.notes %}
+                    <div class="note-box">
+                        {{ order.notes }}
+                    </div>
+                {% else %}
+                    <div class="note-box" style="font-style:italic;color:#9ca3af;">
+                        Aucune note spécifique. Tu peux en ajouter depuis la page de modification.
+                    </div>
+                {% endif %}
+
+                <h2 style="margin-top:16px;">Historique des statuts</h2>
+                {% if order.status_history.all %}
+                    <ul style="list-style:none;padding-left:0;font-size:12px;color:#4b5563;">
+                        {% for h in order.status_history.all %}
+                            <li style="margin-bottom:3px;">
+                                <strong>{{ h.changed_at|date:"d/m/Y H:i" }}</strong> :
+                                {{ h.previous_status|default:"(initial)" }} → {{ h.new_status }}
+                                {% if h.changed_by %}
+                                    <span style="color:#9ca3af;">par {{ h.changed_by.get_username }}</span>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p style="font-size:12px;color:#9ca3af;">Aucun historique disponible.</p>
+                {% endif %}
+            </div>
         </div>
 
-        <div class="gallery-grid">
-            {% for photo in all_photos %}
-                <a href="{{ photo.image.url }}" target="_blank" title="{{ photo.order_item.designation }}">
-                    <img src="{{ photo.image.url }}" alt="Photo commande {{ order.code|default:order.id }}">
-                </a>
-            {% endfor %}
-        </div>
+        <!-- Colonne droite : lignes & totaux -->
+        <div>
+            <div class="card">
+                <h2>Prestations & articles</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Prestation / Désignation</th>
+                            <th class="num">Qté</th>
+                            <th class="num">PU</th>
+                            <th class="num">Total</th>
+                            <th>Photos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                            {% with service=item.service %}
+                            <tr>
+                                <td>
+                                    <div class="line-designation">{{ item.designation }}</div>
+                                    <div class="line-meta">
+                                        {% if service and service.category %}
+                                            <span>{{ service.category.name }}</span> •
+                                        {% endif %}
+                                        <span>ID prestation #{{ service.id|default:"—" }}</span>
+                                    </div>
+                                </td>
+                                <td class="num">
+                                    {{ item.quantity }}
+                                </td>
+                                <td class="num">
+                                    {{ item.unit_price|floatformat:0 }} FCFA
+                                </td>
+                                <td class="num">
+                                    {{ item.total|floatformat:0 }} FCFA
+                                </td>
+                                <td>
+                                    {% with photos=item.photos.all %}
+                                        {% if photos %}
+                                            <div class="photo-thumbs">
+                                                {% for photo in photos %}
+                                                    <a href="{{ photo.image.url }}" target="_blank">
+                                                        <img src="{{ photo.image.url }}"
+                                                             alt="Photo article {{ item.id }}">
+                                                    </a>
+                                                {% endfor %}
+                                            </div>
+                                        {% else %}
+                                            <span style="font-size:11px;color:#9ca3af;">Aucune photo</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                            </tr>
+                            {% endwith %}
+                        {% empty %}
+                            <tr>
+                                <td colspan="5" style="font-size:13px;color:#9ca3af;font-style:italic;">
+                                    Aucune ligne dans cette commande.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
 
-        <div class="legend">
-            Total : {{ all_photos|length }} photo{{ all_photos|length|pluralize:"s" }} sur cette commande.
+                <div class="totals-block" style="margin-top:10px;">
+                    <p>
+                        <span class="label">Total prestation :</span>
+                        <span class="value">
+                            {{ order.total_ht|default:0|floatformat:0 }} FCFA
+                        </span>
+                    </p>
+                    <p>
+                        <span class="label">Service FAGNI :</span>
+                        <span class="value">
+                            {{ order.service_fee|default:0|floatformat:0 }} FCFA
+                        </span>
+                    </p>
+                    <p>
+                        <span class="label">Frais de livraison :</span>
+                        <span class="value">
+                            {{ order.delivery_fee|default:0|floatformat:0 }} FCFA
+                        </span>
+                    </p>
+                    <p>
+                        <span class="label">Total global :</span>
+                        <span class="value grand">
+                            {{ order.grand_total|default:0|floatformat:0 }} FCFA
+                        </span>
+                    </p>
+                </div>
+            </div>
         </div>
     </div>
-    {% endif %}
-
 </div>
+{% endblock %}
 
-</body>
-</html>

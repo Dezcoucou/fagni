@@ -134,29 +134,31 @@
         <nav class="main-nav">
             <div class="nav-group">
                 <a href="{% url 'orders:list' %}" class="nav-link">
-                    📋 <span>Commandes</span>
+                    🧾 <span>Commandes</span>
                 </a>
-                <a href="{% url 'orders:create' %}" class="nav-link primary">
-                    ➕ <span>Nouvelle commande</span>
-                </a>
-            </div>
-            <div class="nav-group">
-                <a href="{% url 'orders:dashboard' %}" class="nav-link">
-                    📊 <span>Dashboard commandes</span>
-                </a>
-                <a href="{% url 'orders:ops_dashboard' %}" class="nav-link">
-                    🚦 <span>Tableau Ops</span>
-                </a>
-                <a href="{% url 'orders:finance_dashboard' %}" class="nav-link">
-                    💰 <span>Finance</span>
-                </a>
-            </div>
-            <div class="nav-group">
                 <a href="{% url 'orders:customers_list' %}" class="nav-link">
                     👥 <span>Clients</span>
                 </a>
                 <a href="{% url 'orders:driver_dashboard' %}" class="nav-link">
-                    🛵 <span>Livreurs</span>
+                    🛵 <span>Tableau livreurs</span>
+                </a>
+                <a href="{% url 'orders:driver_hub' %}" class="nav-link">
+                    🚚 <span>Hub Livreur</span>
+                </a>
+                <a href="{% url 'dashboard:index' %}" class="nav-link">
+                    📊 <span>Dashboard</span>
+                </a>
+                <a href="{% url 'dashboard:analytics' %}" class="nav-link">
+                    📈 <span>Analytics</span>
+                </a>
+                <a href="{% url 'dashboard:top_clients' %}" class="nav-link">
+                    🏆 <span>Top clients</span>
+                </a>
+                <a href="{% url 'orders:finance_dashboard' %}" class="nav-link">
+                    💰 <span>Finances</span>
+                </a>
+                <a href="{% url 'orders:ops_dashboard' %}" class="nav-link">
+                    🚦 <span>Ops</span>
                 </a>
             </div>
         </nav>

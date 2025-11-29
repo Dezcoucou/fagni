@@ -8,6 +8,7 @@ from .models import (
     OrderItemPhoto,
     ServiceCategory,
     ServiceItem,
+    DeliveryLeg,
 )
 
 
@@ -209,3 +210,22 @@ class ServiceItemAdmin(admin.ModelAdmin):
     list_filter = ("category", "is_active")
     search_fields = ("name", "code")
     list_per_page = 100
+
+
+@admin.register(DeliveryLeg)
+class DeliveryLegAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "order",
+        "leg_type",
+        "driver",
+        "status",
+        "distance_km",
+        "client_fee_share",
+        "driver_amount",
+        "fagni_margin",
+        "created_at",
+    )
+    list_filter = ("leg_type", "status", "driver")
+    search_fields = ("order__code", "driver__name")
+    autocomplete_fields = ("order", "driver")

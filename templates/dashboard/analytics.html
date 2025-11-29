@@ -3,60 +3,402 @@
 {% block title %}Analytics – FAGNI{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+<style>
+  .an-page{
+    max-width:1100px;
+    margin:20px auto 30px;
+    padding:0 12px;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    color:#111827;
+  }
+  .an-header h1{
+    margin:0 0 4px;
+    font-size:22px;
+    font-weight:700;
+  }
+  .an-header p{
+    margin:0;
+    font-size:13px;
+    color:#6b7280;
+  }
+  .an-header{
+    margin-bottom:18px;
+  }
 
-  <h1 class="text-2xl font-bold mb-2">Analytics FAGNI</h1>
-  <p class="text-sm text-gray-600 mb-6">
-    Analyse simple : commandes, clients, prestations.
-  </p>
+  /* Filtres (7 jours / 30 jours) */
+  .an-filters{
+    display:inline-flex;
+    border-radius:999px;
+    border:1px solid #e5e7eb;
+    overflow:hidden;
+    font-size:11px;
+    background:#ffffff;
+  }
+  .an-filter-btn{
+    padding:6px 10px;
+    text-decoration:none;
+    color:#374151;
+    border-right:1px solid #e5e7eb;
+    background:#ffffff;
+  }
+  .an-filter-btn:last-child{
+    border-right:none;
+  }
+  .an-filter-btn:hover{
+    background:#f9fafb;
+  }
+  .an-filter-btn-active{
+    background:#0056b3;
+    color:#ffffff;
+    font-weight:600;
+  }
 
-  <!-- Section commandes -->
-  <div class="bg-white shadow rounded-xl p-5 mb-6 border border-gray-100">
-    <h2 class="text-lg font-semibold mb-2 text-gray-800">📦 Commandes</h2>
+  /* KPIs */
+  .an-kpi-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+  }
+  @media(max-width:900px){
+    .an-kpi-grid{grid-template-columns:repeat(2,1fr);}
+  }
+  @media(max-width:640px){
+    .an-kpi-grid{grid-template-columns:1fr;}
+  }
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-      <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        <p class="text-xs text-gray-500 uppercase">Commandes totales</p>
-        <p class="text-2xl font-bold">{{ total_orders }}</p>
+  .an-card{
+    background:#ffffff;
+    border-radius:12px;
+    border:1px solid #e5e7eb;
+    box-shadow:0 4px 10px rgba(15,23,42,0.04);
+    padding:10px 12px;
+  }
+  .an-card-title{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    color:#6b7280;
+    margin-bottom:4px;
+  }
+  .an-card-value{
+    font-size:20px;
+    font-weight:700;
+    margin-bottom:2px;
+  }
+  .an-card-sub{
+    font-size:11px;
+    color:#9ca3af;
+  }
+  .an-tag-pill{
+    display:inline-block;
+    padding:2px 7px;
+    border-radius:999px;
+    background:#eef2ff;
+    color:#3730a3;
+    font-size:10px;
+    margin-left:4px;
+  }
+
+  /* Layout principal */
+  .an-layout{
+    margin-top:18px;
+    display:grid;
+    grid-template-columns:1.7fr 1.1fr;
+    gap:14px;
+  }
+  @media(max-width:900px){
+    .an-layout{grid-template-columns:1fr;}
+  }
+
+  .an-box{
+    background:#ffffff;
+    border-radius:12px;
+    border:1px solid #e5e7eb;
+    box-shadow:0 4px 10px rgba(15,23,42,0.04);
+    padding:14px 16px;
+  }
+  .an-box h2{
+    margin:0 0 6px;
+    font-size:15px;
+  }
+  .an-box p{
+    margin:0 0 4px;
+    font-size:12px;
+    color:#4b5563;
+  }
+
+  .an-note{
+    margin-top:8px;
+    font-size:11px;
+    color:#9ca3af;
+  }
+
+  /* liste explicative (si besoin) */
+  .an-list{
+    padding-left:18px;
+    margin:4px 0 0;
+    font-size:12px;
+    color:#4b5563;
+  }
+  .an-list li{
+    margin-bottom:3px;
+  }
+
+  /* Tableau top prestations */
+  .an-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+    margin-top:8px;
+  }
+  .an-table th,
+  .an-table td{
+    padding:6px 5px;
+    border-bottom:1px solid #e5e7eb;
+    text-align:left;
+  }
+  .an-table th{
+    background:#f9fafb;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+    color:#6b7280;
+  }
+  .an-table tr:hover{
+    background:#f3f4ff;
+  }
+  .an-td-right{
+    text-align:right;
+    white-space:nowrap;
+  }
+
+  .an-empty{
+    font-size:12px;
+    color:#9ca3af;
+    font-style:italic;
+    margin-top:4px;
+  }
+
+  /* Graphiques */
+  .an-chart{
+    height:230px;
+    margin-top:8px;
+  }
+  .an-chart canvas{
+    width:100%;
+    height:100%;
+  }
+</style>
+
+<div class="an-page">
+
+  <!-- En-tête + filtres -->
+  <div class="an-header" style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;">
+    <div>
+      <h1>Analytics FAGNI</h1>
+      <p>
+        Vue synthétique des commandes, du chiffre d’affaires et des meilleures prestations.<br>
+        <span style="font-size:11px;color:#9ca3af;">
+          Période du {{ date_from|date:"d/m/Y" }} au {{ date_to|date:"d/m/Y" }} ({{ days }} jour{{ days|pluralize:"s" }}).
+        </span>
+      </p>
+    </div>
+
+    <div class="an-filters">
+      <a href="{% url 'dashboard:analytics' %}?days=7"
+         class="an-filter-btn {% if days == 7 %}an-filter-btn-active{% endif %}">
+        7 jours
+      </a>
+      <a href="{% url 'dashboard:analytics' %}?days=30"
+         class="an-filter-btn {% if days == 30 %}an-filter-btn-active{% endif %}">
+        30 jours
+      </a>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="an-kpi-grid">
+    <div class="an-card">
+      <div class="an-card-title">Commandes période</div>
+      <div class="an-card-value">
+        {{ total_orders_period|default:0 }}
       </div>
-      <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        <p class="text-xs text-gray-500 uppercase">Montant total TTC</p>
-        <p class="text-xl font-semibold">{{ total_ttc|floatformat:0 }} FCFA</p>
+      <div class="an-card-sub">
+        Volume total de commandes sur {{ days }} jour{{ days|pluralize:"s" }}.
       </div>
-      <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        <p class="text-xs text-gray-500 uppercase">Prestation totale</p>
-        <p class="text-xl font-semibold">{{ total_ht|floatformat:0 }} FCFA</p>
+    </div>
+
+    <div class="an-card">
+      <div class="an-card-title">CA TTC période</div>
+      <div class="an-card-value">
+        {{ total_ttc_period|default:0|floatformat:0 }} FCFA
+      </div>
+      <div class="an-card-sub">
+        Basé sur le champ <code style="font-family:monospace;font-size:11px;">Order.total</code>.
+      </div>
+    </div>
+
+    <div class="an-card">
+      <div class="an-card-title">Panier moyen</div>
+      <div class="an-card-value">
+        {{ avg_basket|default:0|floatformat:0 }} FCFA
+      </div>
+      <div class="an-card-sub">
+        CA TTC / nombre de commandes sur la période.
+      </div>
+    </div>
+
+    <div class="an-card">
+      <div class="an-card-title">Taux de complétion</div>
+      <div class="an-card-value" style="color:#16a34a;">
+        {{ completion_rate|floatformat:1 }} %
+      </div>
+      <div class="an-card-sub">
+        Part des commandes au statut <strong>Terminée</strong>.
       </div>
     </div>
   </div>
 
-  <!-- Section prestations -->
-  <div class="bg-white shadow rounded-xl p-5 border border-gray-100">
-    <h2 class="text-lg font-semibold mb-4 text-gray-800">🧺 Top prestations (montants)</h2>
+  <!-- Layout : graphiques + top prestations -->
+  <div class="an-layout">
 
-    {% if top_services %}
-      <table class="min-w-full text-sm">
-        <thead class="bg-gray-50 text-xs font-semibold text-gray-600 uppercase">
-          <tr>
-            <th class="px-3 py-2 text-left">Prestation</th>
-            <th class="px-3 py-2 text-right">Total vendu (FCFA)</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          {% for s in top_services %}
-            <tr class="hover:bg-gray-50">
-              <td class="px-3 py-2">{{ s.designation }}</td>
-              <td class="px-3 py-2 text-right font-semibold">
-                {{ s.total|floatformat:0 }} FCFA
-              </td>
+    <!-- Colonne gauche : graphiques -->
+    <div class="an-box">
+      <h2>📊 Rythme des commandes & CA</h2>
+      <p>
+        Suivi du volume de commandes et du chiffre d’affaires TTC par jour
+        sur la période sélectionnée.
+      </p>
+
+      <div class="an-chart">
+        <canvas id="ordersChart"></canvas>
+      </div>
+
+      <div class="an-chart">
+        <canvas id="revenueChart"></canvas>
+      </div>
+
+      <div class="an-note">
+        Les données sont agrégées par date de création de la commande.
+      </div>
+    </div>
+
+    <!-- Colonne droite : top prestations -->
+    <div class="an-box">
+      <h2>🧺 Top prestations (montants)</h2>
+      <p>
+        Classement des prestations par montant total vendu sur la période.
+      </p>
+
+      {% if top_services %}
+        <table class="an-table">
+          <thead>
+            <tr>
+              <th>Rang</th>
+              <th>Prestation</th>
+              <th class="an-td-right">Total (FCFA)</th>
             </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    {% else %}
-      <p class="text-sm text-gray-500 italic">Aucune donnée de prestation.</p>
-    {% endif %}
+          </thead>
+          <tbody>
+            {% for s in top_services %}
+              <tr>
+                <td>
+                  {% if forloop.counter == 1 %}
+                    🥇 #{{ forloop.counter }}
+                  {% elif forloop.counter == 2 %}
+                    🥈 #{{ forloop.counter }}
+                  {% elif forloop.counter == 3 %}
+                    🥉 #{{ forloop.counter }}
+                  {% else %}
+                    #{{ forloop.counter }}
+                  {% endif %}
+                </td>
+                <td>
+                  <strong>{{ s.service_label }}</strong>
+                  <div style="font-size:11px;color:#6b7280;">
+                    Sur {{ days }} jour{{ days|pluralize:"s" }}.
+                  </div>
+                </td>
+                <td class="an-td-right">
+                  <strong>{{ s.total|floatformat:0 }}</strong> FCFA
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="an-empty">
+          Aucune donnée de prestation sur la période sélectionnée.
+        </p>
+      {% endif %}
+
+      <div class="an-note">
+        Idée next step : filtrer par type de service (pressing, retouche, cordonnerie…)
+        ou par partenaire blanchisserie.
+      </div>
+    </div>
+
   </div>
 
 </div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  (function() {
+    const labels = {{ labels_json|safe }};
+    const ordersData = {{ orders_series_json|safe }};
+    const revenueData = {{ revenue_series_json|safe }};
+
+    const ordersCtx = document.getElementById('ordersChart');
+    if (ordersCtx) {
+      new Chart(ordersCtx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Commandes',
+            data: ordersData,
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { precision: 0 }
+            }
+          }
+        }
+      });
+    }
+
+    const revenueCtx = document.getElementById('revenueChart');
+    if (revenueCtx) {
+      new Chart(revenueCtx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'CA TTC (FCFA)',
+            data: revenueData,
+            borderWidth: 2,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+  })();
+</script>
 {% endblock %}

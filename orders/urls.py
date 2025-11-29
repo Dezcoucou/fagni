@@ -1,5 +1,5 @@
-from django.urls import path
 
+from django.urls import path, include
 from . import views
 
 app_name = "orders"
@@ -11,6 +11,8 @@ urlpatterns = [
 
     # Détail / édition / suppression simple
     path("<int:order_id>/", views.detail, name="detail"),
+    path("<int:order_id>/status/", views.update_status, name="update_status"),
+
     path("<int:order_id>/edit/", views.update, name="update"),
     path("<int:order_id>/delete/", views.delete, name="delete"),
 
@@ -51,26 +53,17 @@ urlpatterns = [
     path("client-lookup/", views.client_lookup, name="client_lookup"),
 
     # Tickets PDF (A4 + thermique)
-    # Alias historique : 'orders:ticket' utilisé dans tes templates
     path(
         "<int:order_id>/ticket/",
         views.order_ticket_pdf,
-        name="ticket",
-    ),
-    # Nom "officiel" si on veut l'utiliser ailleurs proprement
-    path(
-        "<int:order_id>/ticket-pdf/",
-        views.order_ticket_pdf,
         name="order_ticket_pdf",
     ),
+
     path(
         "<int:order_id>/ticket-thermal/",
         views.order_ticket_thermal_pdf,
         name="order_ticket_thermal_pdf",
     ),
-
-    # Tableau de bord livreurs
-    path("drivers/dashboard/", views.driver_dashboard, name="driver_dashboard"),
 
     # Dashboard financier
     path("finance-dashboard/", views.finance_dashboard, name="finance_dashboard"),
@@ -98,4 +91,72 @@ urlpatterns = [
         views.change_status,
         name="change_status",
     ),
+
+    # Tableau de bord livreurs
+    path("drivers/dashboard/", views.driver_dashboard, name="driver_dashboard"),
+
+    # HUB LIVREUR
+    path("driver/hub/", views.driver_hub, name="driver_hub"),
+    # Application mobile livreurs
+    path("driver/app/", views.driver_app, name="driver_app"),
+    path("driver-app/data/", views.driver_app_data, name="driver_app_data"),
+    path("driver/me/", views.driver_me_app, name="driver_me_app"),
+    path("driver/me/data/", views.driver_me_data, name="driver_me_data"),
+    path("driver/leaderboard/", views.driver_leaderboard, name="driver_leaderboard"),
+    path("driver/me/history/", views.driver_history_me, name="driver_history_me"),
+    path("driver/me/order/<int:order_id>/", views.driver_order_detail, name="driver_order_detail_me"),
+    path(
+        "drivers/app/leg/<int:leg_id>/<str:action>/",
+        views.driver_leg_action,
+        name="driver_leg_action",
+    ),
+
+    path("driver/me/update-location/", views.driver_update_location, name="driver_update_location"),
+    path("driver/map/", views.driver_map, name="driver_map"),
+
+    path(
+        "driver/orders/<int:order_id>/",
+        views.driver_order_detail,
+        name="driver_order_detail",
+    ),
+
+    path(
+        "driver/performance/<int:driver_id>/",
+        views.driver_performance,
+        name="driver_performance",
+    ),
+
+    path(
+        "driver-app/export/",
+        views.driver_app_export_csv,
+        name="driver_app_export_csv",
+    ),
+
+    path("accounts/", include("django.contrib.auth.urls")),
+
+    # --- Scan QR pour accéder à la commande ---
+    path(
+        "scan/<str:order_code>/",
+        views.order_scan_redirect,
+        name="order_scan_redirect",
+    ),
+
+    path(
+        "driver/orders/<int:order_id>/timeline/<str:action>/",
+        views.driver_order_timeline_action,
+        name="driver_timeline_action",
+    ),
+
+    path(
+        "driver/kpi/",
+        views.driver_kpi,
+        name="driver_kpi",
+    ),
+
+    path(
+        "driver/export/csv/",
+        views.driver_orders_csv,
+        name="driver_orders_csv",
+    ),
 ]
+

@@ -138,6 +138,30 @@
         box-shadow: 0 0 0 1px rgba(0,86,179,0.15);
     }
 
+    .field-group textarea {
+        width: 100%;
+        padding: 7px 8px;
+        border-radius: 6px;
+        border: 1px solid #ddd;
+        font-size: 14px;
+        min-height: 60px;
+        resize: vertical;
+        box-sizing: border-box;
+    }
+
+    .field-group textarea:focus {
+        outline: none;
+        border-color: var(--fagni-blue);
+        box-shadow: 0 0 0 1px rgba(0,86,179,0.15);
+    }
+
+    /* Champ prix unitaire non modifiable (visuellement désactivé) */
+    .readonly-input {
+        background: #f8f8f8;
+        cursor: not-allowed;
+        color: #555;
+    }
+
     .address-row {
         display:flex;
         gap:8px;
@@ -271,6 +295,13 @@
         border: 1px solid #ddd;
     }
 
+    .map-note {
+        font-size:11px;
+        color:#777;
+        margin-top:4px;
+        display:block;
+    }
+
     .error {
         background: #ffe5e5;
         color: #b00020;
@@ -339,6 +370,61 @@
         margin-top:2px;
     }
 
+    /* Stepper d'étapes */
+    .steps {
+        display:flex;
+        gap:8px;
+        margin-bottom:14px;
+        flex-wrap:wrap;
+        align-items:center;
+    }
+
+    .step {
+        padding:6px 10px;
+        border-radius:999px;
+        border:1px solid #e5e7eb;
+        font-size:12px;
+        color:#6b7280;
+        background:#f9fafb;
+    }
+
+    .step.active {
+        border-color:var(--fagni-orange);
+        background:#fff7ed;
+        color:#9a3412;
+        font-weight:600;
+    }
+
+    /* Badge compteur d'articles */
+    .section-header {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:8px;
+    }
+
+    .badge-soft {
+        padding:4px 8px;
+        border-radius:999px;
+        background:#eff6ff;
+        color:#1d4ed8;
+        font-size:11px;
+        white-space:nowrap;
+    }
+
+    /* Statut client (trouvé / nouveau) */
+    .client-status {
+        font-size:11px;
+        margin-top:2px;
+        display:block;
+    }
+    .client-status--found {
+        color:#15803d;
+    }
+    .client-status--new {
+        color:#6b7280;
+    }
+
     @media (max-width: 800px) {
         .grid {
             grid-template-columns: 1fr;
@@ -380,6 +466,13 @@
             </div>
         </div>
 
+        <!-- Stepper -->
+        <div class="steps">
+            <div class="step step-1 active">1. Client</div>
+            <div class="step step-2">2. Prestations</div>
+            <div class="step step-3">3. Récap & validation</div>
+        </div>
+
         {% if error %}
             <div class="error">{{ error }}</div>
         {% endif %}
@@ -403,6 +496,7 @@
                             placeholder="Ex : 0700000000"
                             data-lookup-url="{% url 'orders:client_lookup' %}"
                         >
+                        <small id="client_status" class="client-status"></small>
                     </div>
 
                     <div class="field-group">
@@ -412,7 +506,7 @@
                                placeholder="Nom du client">
                     </div>
 
-                    <!-- ✅ Champ CODE PARRAIN rétabli -->
+                    <!-- ✅ Champ CODE PARRAIN -->
                     <div class="field-group">
                         <label for="referral_code">Code parrain :</label>
                         <input type="text"
@@ -444,6 +538,10 @@
 
                     <h2>Localisation</h2>
                     <div id="map"></div>
+                    <small class="map-note">
+                        Si la carte ne se charge pas correctement, tu peux tout de même enregistrer la commande.
+                        La localisation pourra être complétée ou ajustée plus tard.
+                    </small>
                 </div>
 
                 <!-- Colonne droite : prestations + lignes + totaux -->
@@ -488,8 +586,11 @@
                         </div>
                         <div style="flex:1;">
                             <label for="item_price">Prix unitaire (catalogue, non modifiable) :</label>
-                            <input type="number" id="item_price" min="0" value="0"
-                                   readonly style="background:#f8f8f8;">
+                            <input type="text"
+                                   id="item_price"
+                                   value="0"
+                                   readonly
+                                   class="readonly-input">
                             <div style="font-size:11px;color:#777;">
                                 Les prix sont issus du catalogue FAGNI.<br>
                                 Toute mise à jour se fait dans le catalogue.
@@ -501,7 +602,11 @@
                         ➕ Ajouter une nouvelle ligne
                     </button>
 
-                    <h2 style="margin-top:18px;">Lignes de commande</h2>
+                    <div class="section-header">
+                        <h2 style="margin-top:18px;margin-bottom:4px;">Lignes de commande</h2>
+                        <span id="items_count_badge" class="badge-soft">0 article</span>
+                    </div>
+
                     <table id="itemsTable">
                         <thead>
                             <tr>
@@ -516,6 +621,18 @@
                             <!-- Au départ, aucune ligne : tout est ajouté via JS -->
                         </tbody>
                     </table>
+
+                    <!-- ✅ Bloc Notes / instructions (nouveau, aligné sur update) -->
+                    <h2 style="margin-top:16px;">Notes / instructions</h2>
+                    <div class="field-group">
+                        <label for="order_notes">Notes internes / instructions :</label>
+                        <textarea id="order_notes"
+                                  name="order_notes"
+                                  rows="3"></textarea>
+                        <small style="font-size:11px;color:#777;">
+                            Ex : Client absent avant 8h, articles à traiter en urgence, consignes spécifiques, etc.
+                        </small>
+                    </div>
 
                     <div class="totals-block" style="margin-top:10px;">
                         <p>
@@ -569,10 +686,6 @@
 </div>
 
 <script>
-/**
- * Partie Google Maps + géolocalisation ultra précise
- * (logique alignée sur ce que tu utilisais dans update.html)
- */
 let map, marker, geocoder, autocomplete;
 
 function initMap() {
@@ -622,9 +735,11 @@ function initMap() {
             map.setZoom(14);
             marker.setPosition(loc);
 
-            if (latInput && lngInput) {
-                latInput.value = loc.lat();
-                lngInput.value = loc.lng();
+            const latInput2 = document.getElementById('client_lat');
+            const lngInput2 = document.getElementById('client_lng');
+            if (latInput2 && lngInput2) {
+                latInput2.value = loc.lat();
+                lngInput2.value = loc.lng();
             }
         });
     }
@@ -642,6 +757,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const lngInput = document.getElementById('client_lng');
     const locateBtn = document.getElementById('locateBtn');
     const form = document.getElementById('orderForm');
+    const clientStatusEl = document.getElementById('client_status');
 
     const categorySelect = document.getElementById('category_select');
     const serviceSelect = document.getElementById('service_select');
@@ -650,6 +766,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const priceInput = document.getElementById('item_price');
     const addItemBtn = document.getElementById('addItemBtn');
     const itemsTableBody = document.querySelector('#itemsTable tbody');
+    const itemsCountBadge = document.getElementById('items_count_badge');
 
     const totalPrestDisplay = document.getElementById('total_prestation');
     const serviceDisplay = document.getElementById('service_fee_display');
@@ -659,6 +776,21 @@ document.addEventListener('DOMContentLoaded', function () {
     const previewBtn = document.getElementById('previewBtn');
     const summaryBox = document.getElementById('summaryBox');
     const summaryContent = document.getElementById('summaryContent');
+    const submitBtn = document.getElementById('submitBtn');
+
+    const steps = document.querySelectorAll('.step');
+
+    function setStep(index) {
+        steps.forEach((s, i) => {
+            s.classList.toggle('active', i <= index);
+        });
+    }
+
+    function updateItemsCount() {
+        if (!itemsCountBadge || !itemsTableBody) return;
+        const count = itemsTableBody.querySelectorAll('tr').length;
+        itemsCountBadge.textContent = count + (count <= 1 ? ' article' : ' articles');
+    }
 
     // 1) Autocomplétion client par téléphone (JSON + fetch)
     if (phoneInput && nameInput && addressInput) {
@@ -666,6 +798,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         phoneInput.addEventListener('input', function () {
             const phone = phoneInput.value.trim();
+            if (clientStatusEl) {
+                clientStatusEl.textContent = '';
+                clientStatusEl.className = 'client-status';
+            }
             if (phone.length < 4) return;
 
             const url = lookupUrl + (lookupUrl.includes('?') ? '&' : '?') + 'phone=' + encodeURIComponent(phone);
@@ -679,12 +815,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 })
                 .then(data => {
                     console.log('[CLIENT LOOKUP] payload :', data);
-                    if (!data) return;
+                    if (!data) {
+                        if (clientStatusEl) {
+                            clientStatusEl.textContent = 'Nouveau client';
+                            clientStatusEl.className = 'client-status client-status--new';
+                        }
+                        return;
+                    }
 
                     let existsFlag = data.exists;
                     let c = data.customer || data;
 
                     if (existsFlag === false) {
+                        if (clientStatusEl) {
+                            clientStatusEl.textContent = 'Nouveau client';
+                            clientStatusEl.className = 'client-status client-status--new';
+                        }
                         return;
                     }
 
@@ -715,12 +861,19 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (lngInput && lngVal) {
                         lngInput.value = lngVal;
                     }
+
+                    if (clientStatusEl) {
+                        clientStatusEl.textContent = 'Client existant chargé';
+                        clientStatusEl.className = 'client-status client-status--found';
+                    }
                 })
-                .catch(err => console.error('Erreur API client :', err));
+                .catch(err => {
+                    console.error('Erreur API client :', err);
+                });
         });
     }
 
-    // 2) Bouton "Me localiser" : même logique ultra précise que sur update.html
+    // 2) Bouton "Me localiser"
     if (locateBtn && navigator.geolocation) {
         locateBtn.addEventListener('click', function () {
             locateBtn.disabled = true;
@@ -786,9 +939,10 @@ document.addEventListener('DOMContentLoaded', function () {
             const catId = categorySelect.value;
             serviceSelect.value = "";
             designationInput.value = "";
-            priceInput.value = 0;
+            priceInput.value = "0";
             priceInput.readOnly = true;
-            priceInput.style.background = "#f8f8f8";
+            priceInput.classList.add('readonly-input');
+            setStep(1); // on passe à l'étape "Prestations"
 
             if (!catId) {
                 serviceSelect.disabled = true;
@@ -820,15 +974,15 @@ document.addEventListener('DOMContentLoaded', function () {
         serviceSelect.addEventListener('change', function () {
             const opt = serviceSelect.options[serviceSelect.selectedIndex];
             if (!opt || !opt.value) {
-                priceInput.value = 0;
+                priceInput.value = "0";
                 priceInput.readOnly = true;
-                priceInput.style.background = "#f8f8f8";
+                priceInput.classList.add('readonly-input');
                 return;
             }
             const defaultPrice = opt.getAttribute('data-price') || "0";
             priceInput.value = parseFloat(defaultPrice) || 0;
             priceInput.readOnly = true;
-            priceInput.style.background = "#f8f8f8";
+            priceInput.classList.add('readonly-input');
 
             if (!designationInput.value.trim()) {
                 designationInput.value = opt.textContent.trim();
@@ -837,7 +991,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 4) Recalcul des totaux (front)
     function recalcTotals() {
         let total = 0;
         const rows = itemsTableBody.querySelectorAll('tr');
@@ -871,11 +1024,15 @@ document.addEventListener('DOMContentLoaded', function () {
             const grand = total + serviceFee + deliveryFee;
             totalGlobalDisplay.textContent = grand.toLocaleString('fr-FR') + ' FCFA';
         }
+
+        updateItemsCount();
     }
 
     recalcTotals();
+    setStep(0);
+    updateItemsCount();
 
-    // 5) Ajout d'une nouvelle ligne
+    // Ajout d'une nouvelle ligne
     if (addItemBtn && itemsTableBody) {
         addItemBtn.addEventListener('click', function () {
             const serviceId = serviceSelect.value;
@@ -954,9 +1111,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
             designationInput.value = "";
             quantityInput.value = 1;
-            priceInput.value = 0;
+            priceInput.value = "0";
             priceInput.readOnly = true;
-            priceInput.style.background = "#f8f8f8";
+            priceInput.classList.add('readonly-input');
 
             if (serviceSelect) {
                 serviceSelect.value = "";
@@ -964,9 +1121,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             recalcTotals();
+            setStep(1);
         });
 
-        // 6) Boutons photo / suppression + preview
         itemsTableBody.addEventListener('click', function (e) {
             if (e.target.classList.contains('btn-remove')) {
                 const tr = e.target.closest('tr');
@@ -1026,7 +1183,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 7) Résumé
+    // Résumé
     if (previewBtn && summaryBox && summaryContent) {
         previewBtn.addEventListener('click', function (e) {
             e.preventDefault();
@@ -1049,10 +1206,12 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             summaryContent.innerHTML = html;
             summaryBox.classList.remove('hidden');
+            setStep(2);
+            summaryBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
     }
 
-    // 8) Validation avant submit
+    // Validation avant submit
     if (form) {
         form.addEventListener('submit', function (e) {
             const rows = itemsTableBody.querySelectorAll('tr');
@@ -1066,10 +1225,28 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert("Ajoute au moins une ligne de prestation.");
                 return;
             }
+            setStep(2);
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Enregistrement...';
+            }
         });
     }
 });
 </script>
 
-<script src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&libraries=places&callback=initMap" async defer></script>
+{% if GOOGLE_MAPS_API_KEY %}
+<script
+    src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&libraries=places&callback=initMap"
+    async
+    defer>
+</script>
+{% else %}
+<script>
+    console.warn("GOOGLE_MAPS_API_KEY non configurée : la carte ne sera pas chargée.");
+</script>
+{% endif %}
+
 {% endblock %}
+
+

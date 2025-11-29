@@ -29,9 +29,6 @@ SITE_BASE_URL = "https://fagni-t1s8.onrender.com"
 # Pour les QR codes FAGNI (tickets PDF)
 FAGNI_QR_BASE_URL = SITE_BASE_URL
 
-LOGIN_URL = '/admin/login/'
-LOGIN_REDIRECT_URL = '/orders/'   # renvoie vers la liste des commandes
-
 # ========================
 #  APPS
 # ========================
@@ -52,6 +49,8 @@ INSTALLED_APPS = [
     'mlm',
     'api',
     'portal',
+    'wallets',
+    "bonuses",
 ]
 
 # ========================
@@ -124,6 +123,12 @@ LOCALE_PATHS = [BASE_DIR / 'locale']
 #  STATIC & MEDIA
 # ========================
 STATIC_URL = '/static/'
+
+# Dossier static principal du projet (CSS/JS/images globaux)
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
+
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
@@ -216,9 +221,13 @@ FAGNI_LOGISTICS = {
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 GOOGLE_DISTANCE_MATRIX_API_KEY = os.getenv("GOOGLE_DISTANCE_MATRIX_API_KEY", "")
 
-# (Optionnel) Si tu veux garder des constantes de pricing directes,
-# tu peux les décommenter et les utiliser ailleurs :
-# DELIVERY_MIN_FEE = Decimal("2000")
-# DELIVERY_PRICE_PER_KM = Decimal("250")
-# DRIVER_COST_PER_KM = Decimal("150")
+# ==========================
+# Auth / redirections FAGNI
+# ==========================
+LOGIN_URL = "/accounts/login/"
+LOGIN_REDIRECT_URL = "/orders/driver-app/"
+LOGOUT_REDIRECT_URL = "/accounts/login/"
 
+# === EMAILS EN DEV : AFFICHAGE EN CONSOLE ===
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = "no-reply@fagni.local"

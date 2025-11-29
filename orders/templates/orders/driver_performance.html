@@ -1,0 +1,454 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header__left">
+        <h1 class="page-title">
+            Performance livreur – {{ driver.name }}
+        </h1>
+        <p class="page-subtitle">
+            Synthèse des courses, distances et revenus pour ce livreur.
+        </p>
+    </div>
+    <div class="page-header__right">
+        <a href="{% url 'orders:driver_app' %}?driver_id={{ driver.id }}" class="btn btn-secondary">
+            ← Retour app livreur
+        </a>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- Carte identité livreur -->
+    <div class="card mb-4 driver-header-card">
+        <div class="driver-header-main">
+            <div>
+                <div class="driver-name">{{ driver.name }}</div>
+                <div class="driver-meta">
+                    {% if driver.email %}
+                        <span>{{ driver.email }}</span>
+                    {% endif %}
+                    {% if driver.phone %}
+                        · <span>{{ driver.phone }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="driver-tag">
+                Livreurs FAGNI
+            </div>
+        </div>
+    </div>
+
+    <!-- KPIs principaux -->
+    <div class="kpi-grid mb-4">
+        <div class="kpi-card kpi-card--blue kpi-card--full">
+            <div class="kpi-label">Total commandes</div>
+            <div class="kpi-value">{{ total_orders }}</div>
+            <div class="kpi-sub">
+                Terminées : {{ done_count }} • Annulées : {{ canceled_count }}
+            </div>
+        </div>
+
+        <div class="kpi-card kpi-card--orange">
+            <div class="kpi-label">Distance totale A/R</div>
+            <div class="kpi-value">
+                {{ total_distance_km|default:0|floatformat:2 }}
+                <span class="kpi-unit">km</span>
+            </div>
+            <div class="kpi-sub">
+                Moyenne / course :
+                {{ distance_per_order|default:0|floatformat:2 }} km
+            </div>
+        </div>
+
+        <div class="kpi-card kpi-card--green">
+            <div class="kpi-label">Revenu livreur</div>
+            <div class="kpi-value">
+                {{ total_driver_income|default:0|floatformat:0 }}
+                <span class="kpi-unit">FCFA</span>
+            </div>
+            <div class="kpi-sub">
+                Moyenne / course :
+                {{ income_per_order|default:0|floatformat:0 }} FCFA
+            </div>
+        </div>
+
+        <div class="kpi-card kpi-card--blue">
+            <div class="kpi-label">Montant total client (TTC estimé)</div>
+            <div class="kpi-value">
+                {{ grand_total_client|default:0|floatformat:0 }}
+                <span class="kpi-unit">FCFA</span>
+            </div>
+        </div>
+
+        <div class="kpi-card kpi-card--green">
+            <div class="kpi-label">Taux de commandes terminées</div>
+            <div class="kpi-value">
+                {{ done_ratio|default:0|floatformat:1 }}
+                <span class="kpi-unit">%</span>
+            </div>
+            <div class="kpi-sub">
+                Sur {{ total_orders }} commandes
+            </div>
+        </div>
+
+        <div class="kpi-card kpi-card--orange">
+            <div class="kpi-label">Durée moyenne d’une course</div>
+            <div class="kpi-value">
+                {% if avg_duration_minutes %}
+                    ~ {{ avg_duration_minutes }} <span class="kpi-unit">min</span>
+                {% else %}
+                    —
+                {% endif %}
+            </div>
+            <div class="kpi-sub">
+                Calculée entre le démarrage et la livraison.
+            </div>
+        </div>
+    </div>
+
+    <!-- Répartition des statuts -->
+    <div class="card mb-4">
+        <h2 class="section-title">Répartition des statuts</h2>
+        <div class="status-grid">
+            <div class="status-pill status-pill--pending">
+                En attente : <strong>{{ pending_count }}</strong>
+            </div>
+            <div class="status-pill status-pill--in-progress">
+                En cours : <strong>{{ in_progress_count }}</strong>
+            </div>
+            <div class="status-pill status-pill--done">
+                Terminées : <strong>{{ done_count }}</strong>
+            </div>
+            <div class="status-pill status-pill--canceled">
+                Annulées : <strong>{{ canceled_count }}</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- Liste des dernières courses -->
+    <div class="card">
+        <h2 class="section-title">Dernières courses</h2>
+        {% if orders %}
+            <div class="orders-list">
+                {% for order in orders %}
+                    <div class="order-row">
+                        <div class="order-row-main">
+                            <div class="order-code">
+                                {{ order.code|default:order.id }}
+                            </div>
+                            <div class="order-date">
+                                {% if order.created_at %}
+                                    {{ order.created_at|date:"d/m/Y H:i" }}
+                                {% endif %}
+                            </div>
+                            <div class="order-client">
+                                {{ order.customer.name|default:"Client inconnu" }}
+                            </div>
+                        </div>
+                        <div class="order-row-right">
+                            <div class="order-distance">
+                                {% if order.distance_km %}
+                                    {{ order.distance_km|floatformat:2 }} km
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </div>
+                            <div class="order-amount">
+                                {% with total_line=order.total|default:0 service=order.service_fee|default:0 delivery=order.delivery_fee|default:0 %}
+                                    {{ total_line|add:service|add:delivery|floatformat:0 }} FCFA
+                                {% endwith %}
+                            </div>
+                            <div class="order-status-mini order-status-mini--{{ order.status }}">
+                                {{ order.get_status_display }}
+                            </div>
+                            <a href="{% url 'orders:driver_order_detail' order.id %}"
+                               class="btn btn-light btn-sm">
+                                Détail
+                            </a>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>Aucune course pour ce livreur.</p>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .container {
+        max-width: 1100px;
+        margin: 0 auto;
+    }
+
+    .card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 16px 18px;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+        margin-bottom: 1.5rem;
+    }
+
+    .driver-header-card {
+        border-left: 4px solid #0056b3;
+    }
+
+    .driver-header-main {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .driver-name {
+        font-size: 18px;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .driver-meta {
+        font-size: 13px;
+        color: #64748b;
+        margin-top: 2px;
+    }
+
+    .driver-tag {
+        font-size: 11px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-weight: 600;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 13px;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+    .btn-secondary {
+        background: #e2e8f0;
+        color: #1e293b;
+    }
+
+    .btn-light {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+
+    .btn-sm {
+        padding: 4px 10px;
+        font-size: 12px;
+    }
+
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 10px;
+    }
+
+    .kpi-card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 10px 12px;
+        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+        border-left: 4px solid transparent;
+    }
+
+    .kpi-card--full {
+        grid-column: 1 / -1;
+    }
+
+    .kpi-label {
+        font-size: 11px;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .kpi-value {
+        font-size: 20px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-top: 2px;
+    }
+
+    .kpi-sub {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-top: 2px;
+    }
+
+    .kpi-unit {
+        font-size: 12px;
+        font-weight: 500;
+        margin-left: 2px;
+    }
+
+    .kpi-card--blue {
+        border-left-color: #0056b3;
+    }
+
+    .kpi-card--orange {
+        border-left-color: #ff7a00;
+    }
+
+    .kpi-card--green {
+        border-left-color: #16a34a;
+    }
+
+    .section-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: #0f172a;
+        margin: 0 0 8px 0;
+    }
+
+    .status-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .status-pill {
+        font-size: 12px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        background: #f8fafc;
+        color: #0f172a;
+    }
+
+    .status-pill--pending {
+        background: #fef3c7;
+        color: #92400e;
+        border-color: #fde68a;
+    }
+
+    .status-pill--in-progress {
+        background: #dbeafe;
+        color: #1d4ed8;
+        border-color: #bfdbfe;
+    }
+
+    .status-pill--done {
+        background: #dcfce7;
+        color: #166534;
+        border-color: #bbf7d0;
+    }
+
+    .status-pill--canceled {
+        background: #fee2e2;
+        color: #b91c1c;
+        border-color: #fecaca;
+    }
+
+    .orders-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .order-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        flex-wrap: wrap;
+    }
+
+    .order-row-main {
+        min-width: 180px;
+    }
+
+    .order-code {
+        font-weight: 600;
+        font-size: 14px;
+        color: #0f172a;
+    }
+
+    .order-date {
+        font-size: 11px;
+        color: #64748b;
+        margin-top: 2px;
+    }
+
+    .order-client {
+        font-size: 12px;
+        color: #0f172a;
+        margin-top: 2px;
+    }
+
+    .order-row-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 2px;
+        min-width: 150px;
+    }
+
+    .order-distance,
+    .order-amount {
+        font-size: 12px;
+        color: #0f172a;
+    }
+
+    .order-status-mini {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        margin-top: 2px;
+    }
+
+    .order-status-mini--pending {
+        background: #fef3c7;
+        color: #92400e;
+        border-color: #fde68a;
+    }
+
+    .order-status-mini--in_progress {
+        background: #dbeafe;
+        color: #1d4ed8;
+        border-color: #bfdbfe;
+    }
+
+    .order-status-mini--done {
+        background: #dcfce7;
+        color: #166534;
+        border-color: #bbf7d0;
+    }
+
+    .order-status-mini--canceled {
+        background: #fee2e2;
+        color: #b91c1c;
+        border-color: #fecaca;
+    }
+
+    @media (max-width: 640px) {
+        .card {
+            padding: 12px;
+        }
+
+        .order-row {
+            align-items: flex-start;
+        }
+
+        .order-row-right {
+            align-items: flex-start;
+        }
+    }
+</style>
+{% endblock %}

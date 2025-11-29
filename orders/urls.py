@@ -132,6 +132,8 @@ urlpatterns = [
         name="driver_app_export_csv",
     ),
 
+    path("driver-app/export/xlsx/", views.driver_app_export_xlsx, name="driver_app_export_xlsx"),
+
     path("accounts/", include("django.contrib.auth.urls")),
 
     # --- Scan QR pour accéder à la commande ---

@@ -69,12 +69,15 @@
                         </select>  
                     </div>  
 
-                    <div class="filter-actions">  
-                        <button type="submit" class="btn btn-primary driver-btn-full">Filtrer</button>  
-                        <a href="{% url 'orders:driver_app' %}" class="btn btn-secondary btn-reset driver-btn-full">  
-                            Réinitialiser  
-                        </a>  
-                    </div>  
+                    <div class="filter-actions">
+                        <button type="submit" class="btn btn-primary">Filtrer</button>
+                        <a href="{% url 'orders:driver_app' %}" class="btn btn-secondary btn-reset">
+                            Réinitialiser
+                        </a>
+                        <a href="{% url 'orders:driver_app_export_xlsx' %}?{{ request.GET.urlencode }}" class="btn btn-light btn-sm">
+                            📊 Export Excel FAGNI
+                        </a>
+                    </div>
                 </form>  
             </div>  
 

@@ -49,6 +49,7 @@ import os
 import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4, A6, mm
@@ -2959,6 +2960,204 @@ def driver_performance(request, driver_id):
 
 
 @login_required
+def driver_app_export_xlsx(request):
+    """
+    Export Excel 'ultra pro' des courses livreur,
+    avec charte graphique FAGNI.
+    - Si connecté en livreur => uniquement ses courses
+    - Si staff => peut filtrer sur un livreur via ?driver_id=
+    """
+    user = request.user
+    user_email = (user.email or "").strip()
+
+    from partners.models import DeliveryPartner  # au cas où l'import n'est pas global
+
+    connected_driver = None
+    if user_email:
+        try:
+            connected_driver = DeliveryPartner.objects.get(email__iexact=user_email)
+        except DeliveryPartner.DoesNotExist:
+            connected_driver = None
+
+    orders_qs = (
+        Order.objects.select_related(
+            "customer",
+            "delivery_partner",
+            "laundry_partner",
+        )
+        .all()
+        .order_by("-created_at")
+    )
+
+    # --- Filtre livreur ---
+    selected_driver_id = request.GET.get("driver_id") or None
+
+    if connected_driver and not user.is_staff:
+        # Mode LIVREUR : il ne voit QUE ses commandes
+        orders_qs = orders_qs.filter(delivery_partner=connected_driver)
+    else:
+        # Mode OPS / STAFF : filtre optionnel sur un livreur précis
+        if selected_driver_id:
+            orders_qs = orders_qs.filter(delivery_partner_id=selected_driver_id)
+
+    # --- Filtre statut ---
+    status_filter = request.GET.get("status", "active")
+    if status_filter == "active":
+        orders_qs = orders_qs.filter(status__in=["pending", "in_progress"])
+    elif status_filter in ["done", "canceled"]:
+        orders_qs = orders_qs.filter(status=status_filter)
+    elif status_filter == "all":
+        pass
+    else:
+        orders_qs = orders_qs.filter(status__in=["pending", "in_progress"])
+
+    # =======================
+    # 1) Création du workbook
+    # =======================
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Courses livreur"
+
+    # Couleurs FAGNI
+    BLUE = "173B63"
+    ORANGE = "F07C22"
+    LIGHT_BG = "F8FAFC"
+    HEADER_BG = "E5E7EB"
+
+    # Styles
+    title_font = Font(size=14, bold=True, color=BLUE)
+    header_font = Font(size=11, bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor=BLUE)
+    thin_border = Border(
+        left=Side(style="thin", color="D1D5DB"),
+        right=Side(style="thin", color="D1D5DB"),
+        top=Side(style="thin", color="D1D5DB"),
+        bottom=Side(style="thin", color="D1D5DB"),
+    )
+    cell_font = Font(size=10, color="111827")
+
+    # =======================
+    # 2) Titre + sous-titre
+    # =======================
+    ws["A1"] = "FAGNI – Suivi des courses livreur"
+    ws["A1"].font = title_font
+    ws.merge_cells("A1:M1")
+
+    info_txt = "Export généré le " + timezone.localtime(timezone.now()).strftime(
+        "%d/%m/%Y %H:%M"
+    )
+    if connected_driver and not user.is_staff:
+        info_txt += f" • Livreur : {connected_driver.name}"
+    ws["A2"] = info_txt
+    ws["A2"].font = Font(size=9, color="6B7280")
+    ws.merge_cells("A2:M2")
+
+    start_row = 4
+
+    # =======================
+    # 3) Ligne d’en-tête
+    # =======================
+    headers = [
+        "Code",
+        "Client",
+        "Téléphone",
+        "Adresse",
+        "Statut",
+        "Créée le",
+        "Distance A/R (km)",
+        "Total prestations",
+        "Service FAGNI",
+        "Livraison",
+        "Total global client",
+        "Livreur",
+        "Blanchisserie",
+    ]
+
+    for col_index, header in enumerate(headers, start=1):
+        cell = ws.cell(row=start_row, column=col_index, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = thin_border
+
+    # =======================
+    # 4) Lignes de données
+    # =======================
+    row = start_row + 1
+    for order in orders_qs:
+        total_client = (order.total or 0) + (order.service_fee or 0) + (order.delivery_fee or 0)
+
+        values = [
+            order.code or order.id,
+            getattr(order.customer, "name", "") or "",
+            getattr(order.customer, "phone", "") or "",
+            getattr(order.customer, "address", "") or "",
+            order.get_status_display(),
+            order.created_at.strftime("%d/%m/%Y %H:%M") if order.created_at else "",
+            float(order.distance_km or 0),
+            float(order.total or 0),
+            float(order.service_fee or 0),
+            float(order.delivery_fee or 0),
+            float(total_client),
+            order.delivery_partner.name if order.delivery_partner else "",
+            order.laundry_partner.name if order.laundry_partner else "",
+        ]
+
+        for col_index, value in enumerate(values, start=1):
+            cell = ws.cell(row=row, column=col_index, value=value)
+            cell.font = cell_font
+            cell.alignment = Alignment(
+                horizontal="left",
+                vertical="center",
+                wrap_text=True,
+            )
+            cell.border = thin_border
+
+        row += 1
+
+    last_row = row - 1
+
+    # =======================
+    # 5) Formatage colonnes
+    # =======================
+    from openpyxl.utils import get_column_letter
+
+    col_widths = {
+        1: 14,   # Code
+        2: 22,   # Client
+        3: 14,   # Téléphone
+        4: 30,   # Adresse
+        5: 14,   # Statut
+        6: 18,   # Créée le
+        7: 16,   # Distance
+        8: 18,   # Total prestation
+        9: 16,   # Service
+        10: 16,  # Livraison
+        11: 20,  # Total global
+        12: 20,  # Livre
+        13: 20,  # Blanchisserie
+    }
+
+    for col_index, width in col_widths.items():
+        ws.column_dimensions[get_column_letter(col_index)].width = width
+
+    # Filtres + freeze panes
+    ws.auto_filter.ref = f"A{start_row}:M{last_row}"
+    ws.freeze_panes = ws["A5"]  # fige la ligne d’en-tête
+
+    # =======================
+    # 6) Réponse HTTP
+    # =======================
+    filename = "fagni_driver_app_export.xlsx"
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f'attachment; filename=\"{filename}\"'
+    wb.save(response)
+    return response
+
+
+@login_required
 def driver_app_export_csv(request):
     """
     Export CSV des commandes de l'App livreur,
@@ -2967,8 +3166,6 @@ def driver_app_export_csv(request):
     - status
     - date_from / date_to
     """
-
-    from datetime import datetime
 
     driver_id = request.GET.get("driver_id") or ""
     status_filter = request.GET.get("status") or "active"

@@ -1,712 +1,514 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-header__left">
-        <h1 class="page-title">Mes courses du jour</h1>
-        <p class="page-subtitle">
-            Bonjour {{ delivery_partner.name }}, voici tes courses FAGNI.
-        </p>
-    </div>
-</div>
+<div class="driver-me-page">
 
-<div class="container">
-    <!-- URL JSON pour auto-refresh -->
-    <input type="hidden" id="driver-me-data-url" value="{% url 'orders:driver_me_data' %}">
-    <input type="hidden" id="driver-location-url" value="{% url 'orders:driver_update_location' %}">
-
-    <!-- KPI Livreurs - Jour -->
-    <div class="kpi-grid mb-4">
-        <div class="kpi-card kpi-card--blue kpi-card--full">
-            <div class="kpi-label">Aujourd'hui</div>
-            <div class="kpi-value" id="kpi-total-today">{{ total_today }}</div>
-            <div class="kpi-sub">
-                Distance :
-                <span id="kpi-distance">{{ total_distance_km|floatformat:"g" }}</span> km
-                • Revenus estimés :
-                <span id="kpi-earnings">{{ driver_earnings|floatformat:"g" }}</span> FCFA
-            </div>
-        </div>
-
-        <div class="kpi-card kpi-card--orange">
-            <div class="kpi-label">En attente</div>
-            <div class="kpi-value" id="kpi-pending">{{ pending }}</div>
-        </div>
-
-        <div class="kpi-card kpi-card--blue">
-            <div class="kpi-label">En cours</div>
-            <div class="kpi-value" id="kpi-in-progress">{{ in_progress }}</div>
-        </div>
-
-        <div class="kpi-card kpi-card--green">
-            <div class="kpi-label">Terminées</div>
-            <div class="kpi-value" id="kpi-done">{{ done }}</div>
-        </div>
-
-        <div class="kpi-card kpi-card--red">
-            <div class="kpi-label">Annulées</div>
-            <div class="kpi-value" id="kpi-canceled">{{ canceled }}</div>
+    <!-- En-tête / Hero -->
+    <div class="page-header">
+        <div class="page-header__left">
+            <h1 class="page-title">Mon app livreur</h1>
+            <p class="page-subtitle">
+                Vue personnelle pour suivre tes courses FAGNI en temps réel.
+            </p>
         </div>
     </div>
 
-    <!-- KPI SEMAINE & OBJECTIFS -->
-    <div class="kpi-week card mb-4">
-        <h2 class="kpi-week-title">Performance de la semaine</h2>
-
-        <div class="kpi-week-row">
-            <div class="kpi-week-label">
-                Courses réalisées :
-                <strong>
-                    <span id="kpi-week-orders">{{ weekly_orders }}</span>
-                    / {{ weekly_target_orders }}
-                </strong>
+    <div class="driver-hero card">
+        <div class="driver-hero__left">
+            <div class="driver-avatar">
+                {% if connected_driver and connected_driver.name %}
+                    {{ connected_driver.name|first|upper }}
+                {% else %}
+                    {{ request.user.username|first|upper }}
+                {% endif %}
             </div>
-            <div class="kpi-week-bar">
-                <div class="kpi-week-bar-inner"
-                     id="kpi-week-orders-bar"
-                     style="width: {{ weekly_orders_progress }}%;"></div>
-            </div>
-            <div class="kpi-week-percent" id="kpi-week-orders-percent">
-                {{ weekly_orders_progress }}%
-            </div>
-        </div>
-
-        <div class="kpi-week-row">
-            <div class="kpi-week-label">
-                Revenus estimés :
-                <strong>
-                    <span id="kpi-week-earnings">{{ weekly_earnings|floatformat:"g" }}</span>
-                    / {{ weekly_target_earnings }} FCFA
-                </strong>
-            </div>
-            <div class="kpi-week-bar">
-                <div class="kpi-week-bar-inner kpi-week-bar-inner--green"
-                     id="kpi-week-earnings-bar"
-                     style="width: {{ weekly_earnings_progress }}%;"></div>
-            </div>
-            <div class="kpi-week-percent" id="kpi-week-earnings-percent">
-                {{ weekly_earnings_progress }}%
-            </div>
-        </div>
-    </div>
-
-    <!-- PRIME DE LA SEMAINE -->
-    <div class="card mb-4">
-        <h2 class="kpi-week-title">Prime de la semaine</h2>
-        <p class="bonus-line">
-            Montant de ta prime actuelle :
-            <strong class="bonus-amount">{{ weekly_bonus_amount }} FCFA</strong>
-        </p>
-        <p class="bonus-details">
-            Taux de réussite :
-            <strong>{{ weekly_success_rate }}%</strong>
-            • Courses aux heures de pointe :
-            <strong>{{ weekly_peak_rides }}</strong>
-        </p>
-        <p class="bonus-hint">
-            Plus tu termines de courses, plus tu es régulier et actif aux heures de
-            pointe, plus ta prime augmente automatiquement.
-        </p>
-        <p class="filters-info">
-            <a href="{% url 'orders:driver_history_me' %}">
-                Voir l'historique de mes courses
-            </a>
-        </p>
-    </div>
-
-    <!-- Liste des commandes actives du jour -->
-    {% if orders %}
-        <div class="orders-list">
-            {% for order in orders %}
-                <div class="order-card">
-                    <div class="order-card__header">
-                        <div>
-                            <div class="order-code">
-                                <a href="{% url 'orders:driver_me_order_detail' order.id %}">
-                                    {{ order.code|default:order.id }}
-                                </a>
-                            </div>
-                            <div class="order-date">
-                                Créée le :
-                                {% if order.created_at %}
-                                    {{ order.created_at|date:"d/m/Y H:i" }}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="order-status order-status--{{ order.status }}">
-                            {{ order.get_status_display }}
-                        </div>
-                    </div>
-
-                    <div class="order-card__body">
-                        <div class="order-section">
-                            <div class="section-title">Client</div>
-                            <div class="section-line">
-                                <span class="label">Nom :</span>
-                                <span>{{ order.customer.name|default:"-" }}</span>
-                            </div>
-                            <div class="section-line">
-                                <span class="label">Téléphone :</span>
-                                <span>{{ order.customer.phone|default:"-" }}</span>
-                            </div>
-                            <div class="section-line">
-                                <span class="label">Adresse :</span>
-                                <span>{{ order.customer.address|default:"-" }}</span>
-                            </div>
-                        </div>
-
-                        <div class="order-section">
-                            <div class="section-title">Blanchisserie</div>
-                            <div class="section-line">
-                                <span class="label">Partenaire :</span>
-                                <span>
-                                    {% if order.laundry_partner %}
-                                        {{ order.laundry_partner.name }}
-                                    {% else %}
-                                        Non assignée
-                                    {% endif %}
-                                </span>
-                            </div>
-                            <div class="section-line">
-                                <span class="label">Distance A/R :</span>
-                                <span>
-                                    {% if order.distance_km %}
-                                        {{ order.distance_km|floatformat:"g" }} km
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="order-card__footer">
-                        <div class="buttons-row">
-                            <!-- Petit debug texte pour vérifier le statut -->
-                            <span style="font-size:11px;color:#64748b;margin-right:8px;">
-                                Statut actuel : "{{ order.status }}"
-                            </span>
-
-                            <!-- Lien détail commande -->
-                            <a href="{% url 'orders:driver_me_order_detail' order.id %}"
-                               class="btn btn-light btn-sm">
-                                Détails
-                            </a>
-
-                            <!-- Boutons cartes (si URLs disponibles) -->
-                            {% if order.client_maps_url %}
-                                <a href="{{ order.client_maps_url }}" target="_blank" class="btn btn-primary btn-sm">
-                                    Client
-                                </a>
-                            {% endif %}
-
-                            {% if order.laundry_maps_url %}
-                                <a href="{{ order.laundry_maps_url }}" target="_blank" class="btn btn-secondary btn-sm">
-                                    Blanchisserie
-                                </a>
-                            {% endif %}
-
-                            <!-- Formulaire générique de changement de statut (TOUJOURS AFFICHÉ) -->
-                            <form method="post"
-                                  action="{% url 'orders:change_status' order.id %}"
-                                  class="inline-form">
-                                {% csrf_token %}
-                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                <select name="status" class="status-select">
-                                    <option value="pending"
-                                        {% if order.status == "pending" %}selected{% endif %}>
-                                        En attente
-                                    </option>
-                                    <option value="in_progress"
-                                        {% if order.status == "in_progress" %}selected{% endif %}>
-                                        En cours
-                                    </option>
-                                    <option value="done"
-                                        {% if order.status == "done" %}selected{% endif %}>
-                                        Terminée
-                                    </option>
-                                    <option value="canceled"
-                                        {% if order.status == "canceled" %}selected{% endif %}>
-                                        Annulée
-                                    </option>
-                                </select>
-                                <button type="submit" class="btn btn-primary btn-sm" style="margin-left:6px;">
-                                    Mettre à jour
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-
+            <div>
+                <div class="driver-name">
+                    {% if connected_driver and connected_driver.name %}
+                        {{ connected_driver.name }}
+                    {% else %}
+                        {{ request.user.username }}
+                    {% endif %}
                 </div>
-            {% endfor %}
+                <div class="driver-meta">
+                    {% if connected_driver and connected_driver.phone %}
+                        📞 {{ connected_driver.phone }}
+                    {% endif %}
+                    {% if request.user.email %}
+                        <span class="driver-email">• {{ request.user.email }}</span>
+                    {% endif %}
+                </div>
+                <div class="driver-today">
+                    Aujourd’hui – {% now "d/m/Y" %}
+                </div>
+            </div>
         </div>
-    {% else %}
-        <div class="card">
-            <p>Aucune course active pour aujourd'hui.</p>
+        <div class="driver-hero__right">
+            <a href="{% url 'orders:driver_hub' %}" class="btn btn-primary btn-pill btn-sm">
+                🔎 Hub livreur
+            </a>
         </div>
-    {% endif %}
+    </div>
+
+    <!-- Raccourcis rapides -->
+    <div class="quick-actions">
+        <a href="{% url 'orders:driver_hub' %}" class="quick-card">
+            <div class="quick-icon">📊</div>
+            <div class="quick-label">Mes KPI & primes</div>
+            <div class="quick-sub">Statistiques détaillées</div>
+        </a>
+
+        <a href="{% url 'orders:driver_map' %}" class="quick-card">
+            <div class="quick-icon">🗺️</div>
+            <div class="quick-label">Carte</div>
+            <div class="quick-sub">Visualiser mes trajets</div>
+        </a>
+
+        <a href="{% url 'orders:driver_app' %}" class="quick-card">
+            <div class="quick-icon">📋</div>
+            <div class="quick-label">Vue globale</div>
+            <div class="quick-sub">Toutes les courses</div>
+        </a>
+    </div>
+
+    <!-- Bloc courses actives -->
+    <div class="card">
+        <div class="section-header">
+            <div>
+                <h2 class="section-title">Courses actives</h2>
+                <p class="section-subtitle">
+                    Courses en attente ou en cours, à traiter en priorité.
+                </p>
+            </div>
+        </div>
+
+        {% with has_active=False %}
+            <div class="orders-list">
+                {% for order in orders %}
+                    {% if order.status == "pending" or order.status == "in_progress" %}
+                        {% if not has_active %}{% with True as has_active %}{% endwith %}{% endif %}
+                        <div class="order-card">
+                            <div class="order-card__header">
+                                <div>
+                                    <div class="order-code">
+                                        {{ order.code|default:order.id }}
+                                    </div>
+                                    <div class="order-date">
+                                        Créée le :
+                                        {% if order.created_at %}
+                                            {{ order.created_at|date:"d/m/Y H:i" }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="order-status order-status--{{ order.status }}">
+                                    {{ order.get_status_display }}
+                                </div>
+                            </div>
+
+                            <div class="order-card__body">
+                                <div class="order-section">
+                                    <div class="section-line">
+                                        <span class="label">Client :</span>
+                                        <span>{{ order.customer.name|default:"-" }}</span>
+                                    </div>
+                                    <div class="section-line">
+                                        <span class="label">Téléphone :</span>
+                                        <span>{{ order.customer.phone|default:"-" }}</span>
+                                    </div>
+                                    <div class="section-line">
+                                        <span class="label">Adresse :</span>
+                                        <span>{{ order.customer.address|default:"-" }}</span>
+                                    </div>
+                                </div>
+
+                                <div class="order-section order-section--side">
+                                    <div class="section-line">
+                                        <span class="label">Distance A/R :</span>
+                                        <span>
+                                            {% if order.distance_km %}
+                                                {{ order.distance_km|floatformat:"2" }} km
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="section-line">
+                                        <span class="label">Total client :</span>
+                                        <span>{{ order.total|default:0 }} FCFA</span>
+                                    </div>
+                                    <div class="section-line">
+                                        <span class="label">Revenu livreur :</span>
+                                        <span>{{ order.driver_logistic_cost|default:0 }} FCFA</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="order-card__footer">
+                                <div class="buttons-row">
+                                    <a href="{% url 'orders:driver_order_detail_me' order.id %}"
+                                       class="btn btn-primary btn-sm">
+                                        Ouvrir la course
+                                    </a>
+
+                                    {% if order.client_maps_url %}
+                                        <a href="{{ order.client_maps_url }}" target="_blank"
+                                           class="btn btn-secondary btn-sm">
+                                            Itinéraire client
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            {% if not has_active %}
+                <p class="empty-text">
+                    Aucune course active pour le moment. Tu es à jour ✅
+                </p>
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Bloc historique récent -->
+    <div class="card">
+        <div class="section-header">
+            <div>
+                <h2 class="section-title">Historique récent</h2>
+                <p class="section-subtitle">
+                    Dernières courses terminées ou annulées.
+                </p>
+            </div>
+        </div>
+
+        {% with has_history=False %}
+            <div class="orders-list">
+                {% for order in orders %}
+                    {% if order.status == "done" or order.status == "canceled" %}
+                        {% if not has_history %}{% with True as has_history %}{% endwith %}{% endif %}
+                        <div class="order-card order-card--compact">
+                            <div class="order-card__header">
+                                <div>
+                                    <div class="order-code">
+                                        {{ order.code|default:order.id }}
+                                    </div>
+                                    <div class="order-date">
+                                        {% if order.delivered_time %}
+                                            Livrée le {{ order.delivered_time|date:"d/m/Y H:i" }}
+                                        {% else %}
+                                            Créée le {{ order.created_at|date:"d/m/Y H:i" }}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="order-status order-status--{{ order.status }}">
+                                    {{ order.get_status_display }}
+                                </div>
+                            </div>
+
+                            <div class="order-card__body order-card__body--history">
+                                <div class="section-line">
+                                    <span class="label">Client :</span>
+                                    <span>{{ order.customer.name|default:"-" }}</span>
+                                </div>
+                                <div class="section-line">
+                                    <span class="label">Total client :</span>
+                                    <span>{{ order.total|default:0 }} FCFA</span>
+                                </div>
+                                <div class="section-line">
+                                    <span class="label">Revenu livreur :</span>
+                                    <span>{{ order.driver_logistic_cost|default:0 }} FCFA</span>
+                                </div>
+                            </div>
+
+                            <div class="order-card__footer">
+                                <a href="{% url 'orders:driver_order_detail_me' order.id %}"
+                                   class="btn btn-light btn-sm">
+                                    Détail
+                                </a>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            {% if not has_history %}
+                <p class="empty-text">
+                    Aucun historique récent n’est disponible.
+                </p>
+            {% endif %}
+        {% endwith %}
+    </div>
 </div>
-
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    var dataUrlInput = document.getElementById("driver-me-data-url");
-    var locationUrlInput = document.getElementById("driver-location-url");
-
-    var baseUrl = dataUrlInput ? (dataUrlInput.value || "") : "";
-    var locationUrl = locationUrlInput ? (locationUrlInput.value || "") : "";
-
-    function updateText(id, value) {
-        var el = document.getElementById(id);
-        if (el !== null && el !== undefined && value !== undefined && value !== null) {
-            el.textContent = value;
-        }
-    }
-
-    function updateBar(id, percent) {
-        var el = document.getElementById(id);
-        if (el !== null && el !== undefined && percent !== undefined && percent !== null) {
-            if (percent > 100) {
-                percent = 100;
-            }
-            el.style.width = String(percent) + "%";
-        }
-    }
-
-    // --- Helper CSRF pour les POST fetch ---
-    function getCookie(name) {
-        var cookieValue = null;
-        if (document.cookie && document.cookie !== "") {
-            var cookies = document.cookie.split(";");
-            for (var i = 0; i < cookies.length; i++) {
-                var cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + "=")) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-    var csrftoken = getCookie("csrftoken");
-
-    // --- Refresh KPI driver_me ---
-    function refreshDriverMeData() {
-        if (!baseUrl) {
-            return;
-        }
-        fetch(baseUrl, {
-            headers: {
-                "X-Requested-With": "XMLHttpRequest"
-            }
-        })
-        .then(function (resp) {
-            if (!resp.ok) {
-                return null;
-            }
-            return resp.json();
-        })
-        .then(function (data) {
-            if (!data || data.error) {
-                return;
-            }
-            // Jour
-            updateText("kpi-total-today", data.total_today);
-            updateText("kpi-pending", data.pending);
-            updateText("kpi-in-progress", data.in_progress);
-            updateText("kpi-done", data.done);
-            updateText("kpi-canceled", data.canceled);
-            updateText("kpi-distance", data.total_distance_km);
-            updateText("kpi-earnings", data.driver_earnings);
-
-            // Semaine
-            updateText("kpi-week-orders", data.weekly_orders);
-            updateText("kpi-week-earnings", data.weekly_earnings);
-
-            updateText("kpi-week-orders-percent", data.weekly_orders_progress + "%");
-            updateText("kpi-week-earnings-percent", data.weekly_earnings_progress + "%");
-
-            updateBar("kpi-week-orders-bar", data.weekly_orders_progress);
-            updateBar("kpi-week-earnings-bar", data.weekly_earnings_progress);
-        })
-        .catch(function (error) {
-            console.log("Erreur refresh driver_me data:", error);
-        });
-    }
-
-    // Premier refresh immédiat
-    refreshDriverMeData();
-    // Puis toutes les 15 secondes
-    setInterval(refreshDriverMeData, 15000);
-
-    // --- Envoi de la position GPS du livreur ---
-    if (locationUrl && "geolocation" in navigator) {
-        var watchId = navigator.geolocation.watchPosition(
-            function (position) {
-                var lat = position.coords.latitude;
-                var lng = position.coords.longitude;
-
-                var formData = new FormData();
-                formData.append("lat", lat);
-                formData.append("lng", lng);
-
-                fetch(locationUrl, {
-                    method: "POST",
-                    headers: {
-                        "X-Requested-With": "XMLHttpRequest",
-                        "X-CSRFToken": csrftoken || "",
-                    },
-                    body: formData,
-                })
-                .then(function (resp) {
-                    if (!resp.ok) {
-                        return resp.json().catch(function () { return null; });
-                    }
-                    return resp.json();
-                })
-                .then(function (data) {
-                    if (data && data.error) {
-                        console.log("Erreur update location:", data.error);
-                    }
-                })
-                .catch(function (error) {
-                    console.log("Erreur fetch location:", error);
-                });
-            },
-            function (error) {
-                console.log("Erreur geolocalisation:", error);
-            },
-            {
-                enableHighAccuracy: true,
-                maximumAge: 10000,
-                timeout: 20000
-            }
-        );
-    } else {
-        console.log("Geolocation non disponible ou URL manquante.");
-    }
-});
-</script>
 
 <style>
-    .container {
-        max-width: 900px;
-        margin: 0 auto;
-    }
+.driver-me-page {
+    max-width: 1100px;
+    margin: 0 auto 24px;
+    padding: 0 12px;
+}
 
-    .card {
-        background: #ffffff;
-        border-radius: 12px;
-        padding: 14px 16px;
-        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
-    }
+/* Card générique */
+.card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+    border: 1px solid #e2e8f0;
+    margin-bottom: 14px;
+}
 
-    .kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 10px;
-    }
+/* Hero */
+.driver-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
 
-    .kpi-card {
-        background: #ffffff;
-        border-radius: 12px;
-        padding: 10px 12px;
-        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
-        border-left: 4px solid transparent;
-    }
+.driver-hero__left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
 
-    .kpi-card--full {
-        grid-column: 1 / -1;
-    }
+.driver-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 18px;
+}
 
-    .kpi-label {
-        font-size: 11px;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-    }
+.driver-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+}
 
-    .kpi-value {
-        font-size: 20px;
-        font-weight: 700;
-        color: #0f172a;
-        margin-top: 2px;
-    }
+.driver-meta {
+    font-size: 12px;
+    color: #64748b;
+}
 
-    .kpi-sub {
-        font-size: 11px;
-        color: #94a3b8;
-        margin-top: 2px;
-    }
+.driver-email {
+    margin-left: 4px;
+}
 
-    .kpi-card--blue {
-        border-left-color: #0056b3;
-    }
+.driver-today {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 2px;
+}
 
-    .kpi-card--orange {
-        border-left-color: #ff7a00;
-    }
+/* Boutons */
+.btn-pill {
+    border-radius: 999px !important;
+}
 
-    .kpi-card--green {
-        border-left-color: #16a34a;
-    }
+/* Quick actions */
+.quick-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+}
 
-    .kpi-card--red {
-        border-left-color: #dc2626;
-    }
+.quick-card {
+    background: #0f172a;
+    color: #e5e7eb;
+    border-radius: 14px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    box-shadow: 0 1px 5px rgba(15, 23, 42, 0.2);
+}
 
-    /* KPI Semaine */
-    .kpi-week-title {
-        font-size: 15px;
-        font-weight: 600;
-        margin-bottom: 10px;
-    }
+.quick-icon {
+    font-size: 18px;
+}
 
-    .kpi-week-row {
-        display: grid;
-        grid-template-columns: 1fr 3fr auto;
-        gap: 8px;
-        align-items: center;
-        margin-bottom: 8px;
-    }
+.quick-label {
+    font-size: 13px;
+    font-weight: 600;
+}
 
-    .kpi-week-label {
-        font-size: 12px;
-        color: #475569;
-    }
+.quick-sub {
+    font-size: 11px;
+    color: #9ca3af;
+}
 
-    .kpi-week-bar {
-        width: 100%;
-        height: 8px;
-        border-radius: 999px;
-        background: #e2e8f0;
-        overflow: hidden;
-    }
+/* Sections */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 6px;
+}
 
-    .kpi-week-bar-inner {
-        height: 100%;
-        width: 0%;
-        background: #0ea5e9;
-        border-radius: 999px;
-        transition: width 0.3s ease-out;
-    }
+.section-title {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #475569;
+    font-weight: 600;
+}
 
-    .kpi-week-bar-inner--green {
-        background: #22c55e;
-    }
+.section-subtitle {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 2px;
+}
 
-    .kpi-week-percent {
-        font-size: 11px;
-        font-weight: 600;
-        color: #0f172a;
-        text-align: right;
-        min-width: 40px;
-    }
+/* Orders list */
+.orders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
 
-    /* PRIME */
-    .bonus-line {
-        font-size: 13px;
-        color: #0f172a;
-        margin-bottom: 4px;
-    }
+.order-card {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 10px 12px;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+    border: 1px solid #e5e7eb;
+}
 
-    .bonus-amount {
-        font-size: 20px;
-        color: #16a34a;
-    }
+.order-card--compact {
+    padding: 8px 10px;
+}
 
-    .bonus-details {
-        font-size: 12px;
-        color: #475569;
-        margin-bottom: 4px;
-    }
+.order-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 6px;
+}
 
-    .bonus-hint {
-        font-size: 11px;
-        color: #64748b;
-    }
+.order-code {
+    font-weight: 600;
+    color: #0f172a;
+    font-size: 15px;
+}
 
-    .orders-list {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-    }
+.order-date {
+    font-size: 12px;
+    color: #64748b;
+}
 
-    .order-card {
-        background: #ffffff;
-        border-radius: 14px;
-        padding: 12px 14px;
-        box-shadow: 0 1px 5px rgba(15, 23, 42, 0.08);
-        border: 1px solid #e2e8f0;
-    }
+.order-status {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
 
-    .order-card__header {
-        display: flex;
-        justify-content: space-between;
+/* Statuts */
+.order-status--pending {
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
+}
+
+.order-status--in_progress {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+}
+
+.order-status--done {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #bbf7d0;
+}
+
+.order-status--canceled {
+    background: #fee2e2;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.order-card__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.order-card__body--history {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+}
+
+.order-section {
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 6px 8px;
+}
+
+.order-section--side {
+    background: #fefce8;
+}
+
+.section-line {
+    font-size: 12px;
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+    color: #334155;
+}
+
+.section-line .label {
+    font-weight: 500;
+    color: #64748b;
+}
+
+.order-card__footer {
+    border-top: 1px dashed #e2e8f0;
+    padding-top: 6px;
+    margin-top: 4px;
+}
+
+.buttons-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+/* Texte vide */
+.empty-text {
+    font-size: 12px;
+    color: #9ca3af;
+    margin-top: 4px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .driver-me-page {
+        padding: 0 8px;
+    }
+    .driver-hero {
         align-items: flex-start;
-        gap: 8px;
-        margin-bottom: 8px;
     }
-
-    .order-code {
-        font-weight: 600;
-        color: #0f172a;
-        font-size: 15px;
-    }
-
-    .order-code a {
-        color: inherit;
-        text-decoration: none;
-    }
-
-    .order-code a:hover {
-        text-decoration: underline;
-    }
-
-    .order-date {
-        font-size: 12px;
-        color: #64748b;
-    }
-
-    .order-status {
-        font-size: 11px;
-        padding: 3px 8px;
-        border-radius: 999px;
-        font-weight: 600;
-        border: 1px solid transparent;
-        white-space: nowrap;
-    }
-
-    .order-status--pending {
-        background: #fef3c7;
-        color: #92400e;
-        border-color: #fde68a;
-    }
-
-    .order-status--in_progress {
-        background: #dbeafe;
-        color: #1d4ed8;
-        border-color: #bfdbfe;
-    }
-
-    .order-status--done {
-        background: #dcfce7;
-        color: #166534;
-        border-color: #bbf7d0;
-    }
-
-    .order-status--canceled {
-        background: #fee2e2;
-        color: #b91c1c;
-        border-color: #fecaca;
-    }
-
     .order-card__body {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-        gap: 8px;
-        margin-bottom: 8px;
+        grid-template-columns: 1fr;
     }
-
-    .order-section {
-        padding: 6px 8px;
-        border-radius: 8px;
-        background: #f8fafc;
-    }
-
-    .section-title {
-        font-size: 12px;
-        font-weight: 600;
-        color: #0f172a;
-        margin-bottom: 4px;
-    }
-
-    .section-line {
-        display: flex;
-        gap: 6px;
-        font-size: 12px;
-        margin-top: 2px;
-        color: #475569;
-    }
-
-    .section-line .label {
-        font-weight: 500;
-        color: #64748b;
-    }
-
-    .order-card__footer {
-        margin-top: 4px;
-        border-top: 1px dashed #e2e8f0;
-        padding-top: 6px;
-    }
-
-    .buttons-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        align-items: center;
-    }
-
-    .inline-form {
-        display: inline-flex;
-        margin: 0;
-    }
-
-    .status-select {
-        padding: 4px 6px;
-        border-radius: 999px;
-        border: 1px solid #cbd5f5;
-        font-size: 12px;
-        background: #fff;
-    }
-
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 6px 12px;
-        border-radius: 999px;
-        font-size: 13px;
-        text-decoration: none;
-        border: none;
-        cursor: pointer;
-        white-space: nowrap;
-    }
-
-    .btn-sm {
-        padding: 4px 10px;
-        font-size: 12px;
-    }
-
-    .btn-primary {
-        background: #0056b3;
-        color: #fff;
-    }
-
-    .btn-secondary {
-        background: #e2e8f0;
-        color: #1e293b;
-    }
-
-    .btn-light {
-        background: #f1f5f9;
-        color: #0f172a;
-    }
-
-    @media (max-width: 640px) {
-        .container {
-            padding: 0 8px;
-        }
-        .kpi-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-        .kpi-week-row {
-            grid-template-columns: 1fr;
-        }
-        .kpi-week-percent {
-            text-align: left;
-        }
-    }
+}
 </style>
 {% endblock %}

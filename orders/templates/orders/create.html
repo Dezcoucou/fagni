@@ -535,9 +535,15 @@
                            value="{{ initial_customer.latitude|default:'' }}">
                     <input type="hidden" id="client_lng" name="client_lng"
                            value="{{ initial_customer.longitude|default:'' }}">
+                      
+                    <div class="card">
+                        <h2 class="section-title">Localisation</h2>
+                        <p class="section-help">
+                            Positionne le point de collecte sur la carte pour calculer la distance et les frais de livraison.
+                        </p>
 
-                    <h2>Localisation</h2>
-                    <div id="map"></div>
+                        <div id="map" class="map-container"></div>
+                    </div>
                     <small class="map-note">
                         Si la carte ne se charge pas correctement, tu peux tout de même enregistrer la commande.
                         La localisation pourra être complétée ou ajustée plus tard.

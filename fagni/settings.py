@@ -50,7 +50,7 @@ INSTALLED_APPS = [
     'api',
     'portal',
     'wallets',
-    # "bonuses",
+    'bonuses',
 ]
 
 # ========================

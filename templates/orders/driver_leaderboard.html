@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header__left">
+        <h1 class="page-title">Classement des livreurs</h1>
+        <p class="page-subtitle">
+            Performance des livreurs FAGNI pour la semaine du
+            {{ start_of_week|date:"d/m/Y" }} au {{ today|date:"d/m/Y" }}.
+        </p>
+    </div>
+</div>
+
+<div class="container">
+    {% if leaderboard %}
+        <div class="card">
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Livreur</th>
+                        <th>Ville</th>
+                        <th>Courses</th>
+                        <th>Term.</th>
+                        <th>Succès</th>
+                        <th>Distance (km)</th>
+                        <th>Revenus estimés (FCFA)</th>
+                        <th>Prime (FCFA)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in leaderboard %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ row.name }}</td>
+                        <td>{{ row.city|default:"-" }}</td>
+                        <td>{{ row.orders_count }}</td>
+                        <td>{{ row.done_count }}</td>
+                        <td>
+                            <div class="success-cell">
+                                <div class="success-bar">
+                                    <div class="success-bar-inner"
+                                         style="width: {{ row.success_rate }}%;"></div>
+                                </div>
+                                <span class="success-text">{{ row.success_rate }}%</span>
+                            </div>
+                        </td>
+                        <td>{{ row.total_distance_km|floatformat:"g" }}</td>
+                        <td>{{ row.driver_earnings|floatformat:"g" }}</td>
+                        <td>{{ row.bonus_amount }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="card">
+            <p>Aucune course enregistrée pour cette semaine.</p>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+    .container {
+        max-width: 1100px;
+        margin: 0 auto;
+    }
+
+    .card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 16px 18px;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+    }
+
+    .leaderboard-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+
+    .leaderboard-table th,
+    .leaderboard-table td {
+        padding: 8px 6px;
+        border-bottom: 1px solid #e2e8f0;
+        text-align: left;
+        vertical-align: middle;
+    }
+
+    .leaderboard-table th {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #64748b;
+        background: #f8fafc;
+    }
+
+    .leaderboard-table tbody tr:nth-child(even) {
+        background: #f9fafb;
+    }
+
+    .leaderboard-table tbody tr:hover {
+        background: #eff6ff;
+    }
+
+    .success-cell {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .success-bar {
+        width: 70px;
+        height: 6px;
+        border-radius: 999px;
+        background: #e2e8f0;
+        overflow: hidden;
+    }
+
+    .success-bar-inner {
+        height: 100%;
+        width: 0%;
+        background: #22c55e;
+        border-radius: 999px;
+    }
+
+    .success-text {
+        font-size: 11px;
+        font-weight: 600;
+        color: #0f172a;
+        min-width: 32px;
+    }
+
+    @media (max-width: 768px) {
+        .leaderboard-table thead {
+            display: none;
+        }
+
+        .leaderboard-table,
+        .leaderboard-table tbody,
+        .leaderboard-table tr,
+        .leaderboard-table td {
+            display: block;
+            width: 100%;
+        }
+
+        .leaderboard-table tr {
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+        }
+
+        .leaderboard-table td {
+            border-bottom: none;
+            padding: 6px 10px;
+        }
+
+        .leaderboard-table td::before {
+            content: attr(data-label);
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #94a3b8;
+            margin-bottom: 2px;
+        }
+    }
+</style>
+{% endblock %}

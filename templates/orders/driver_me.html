@@ -1,0 +1,712 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header__left">
+        <h1 class="page-title">Mes courses du jour</h1>
+        <p class="page-subtitle">
+            Bonjour {{ delivery_partner.name }}, voici tes courses FAGNI.
+        </p>
+    </div>
+</div>
+
+<div class="container">
+    <!-- URL JSON pour auto-refresh -->
+    <input type="hidden" id="driver-me-data-url" value="{% url 'orders:driver_me_data' %}">
+    <input type="hidden" id="driver-location-url" value="{% url 'orders:driver_update_location' %}">
+
+    <!-- KPI Livreurs - Jour -->
+    <div class="kpi-grid mb-4">
+        <div class="kpi-card kpi-card--blue kpi-card--full">
+            <div class="kpi-label">Aujourd'hui</div>
+            <div class="kpi-value" id="kpi-total-today">{{ total_today }}</div>
+            <div class="kpi-sub">
+                Distance :
+                <span id="kpi-distance">{{ total_distance_km|floatformat:"g" }}</span> km
+                • Revenus estimés :
+                <span id="kpi-earnings">{{ driver_earnings|floatformat:"g" }}</span> FCFA
+            </div>
+        </div>
+
+        <div class="kpi-card kpi-card--orange">
+            <div class="kpi-label">En attente</div>
+            <div class="kpi-value" id="kpi-pending">{{ pending }}</div>
+        </div>
+
+        <div class="kpi-card kpi-card--blue">
+            <div class="kpi-label">En cours</div>
+            <div class="kpi-value" id="kpi-in-progress">{{ in_progress }}</div>
+        </div>
+
+        <div class="kpi-card kpi-card--green">
+            <div class="kpi-label">Terminées</div>
+            <div class="kpi-value" id="kpi-done">{{ done }}</div>
+        </div>
+
+        <div class="kpi-card kpi-card--red">
+            <div class="kpi-label">Annulées</div>
+            <div class="kpi-value" id="kpi-canceled">{{ canceled }}</div>
+        </div>
+    </div>
+
+    <!-- KPI SEMAINE & OBJECTIFS -->
+    <div class="kpi-week card mb-4">
+        <h2 class="kpi-week-title">Performance de la semaine</h2>
+
+        <div class="kpi-week-row">
+            <div class="kpi-week-label">
+                Courses réalisées :
+                <strong>
+                    <span id="kpi-week-orders">{{ weekly_orders }}</span>
+                    / {{ weekly_target_orders }}
+                </strong>
+            </div>
+            <div class="kpi-week-bar">
+                <div class="kpi-week-bar-inner"
+                     id="kpi-week-orders-bar"
+                     style="width: {{ weekly_orders_progress }}%;"></div>
+            </div>
+            <div class="kpi-week-percent" id="kpi-week-orders-percent">
+                {{ weekly_orders_progress }}%
+            </div>
+        </div>
+
+        <div class="kpi-week-row">
+            <div class="kpi-week-label">
+                Revenus estimés :
+                <strong>
+                    <span id="kpi-week-earnings">{{ weekly_earnings|floatformat:"g" }}</span>
+                    / {{ weekly_target_earnings }} FCFA
+                </strong>
+            </div>
+            <div class="kpi-week-bar">
+                <div class="kpi-week-bar-inner kpi-week-bar-inner--green"
+                     id="kpi-week-earnings-bar"
+                     style="width: {{ weekly_earnings_progress }}%;"></div>
+            </div>
+            <div class="kpi-week-percent" id="kpi-week-earnings-percent">
+                {{ weekly_earnings_progress }}%
+            </div>
+        </div>
+    </div>
+
+    <!-- PRIME DE LA SEMAINE -->
+    <div class="card mb-4">
+        <h2 class="kpi-week-title">Prime de la semaine</h2>
+        <p class="bonus-line">
+            Montant de ta prime actuelle :
+            <strong class="bonus-amount">{{ weekly_bonus_amount }} FCFA</strong>
+        </p>
+        <p class="bonus-details">
+            Taux de réussite :
+            <strong>{{ weekly_success_rate }}%</strong>
+            • Courses aux heures de pointe :
+            <strong>{{ weekly_peak_rides }}</strong>
+        </p>
+        <p class="bonus-hint">
+            Plus tu termines de courses, plus tu es régulier et actif aux heures de
+            pointe, plus ta prime augmente automatiquement.
+        </p>
+        <p class="filters-info">
+            <a href="{% url 'orders:driver_history_me' %}">
+                Voir l'historique de mes courses
+            </a>
+        </p>
+    </div>
+
+    <!-- Liste des commandes actives du jour -->
+    {% if orders %}
+        <div class="orders-list">
+            {% for order in orders %}
+                <div class="order-card">
+                    <div class="order-card__header">
+                        <div>
+                            <div class="order-code">
+                                <a href="{% url 'orders:driver_me_order_detail' order.id %}">
+                                    {{ order.code|default:order.id }}
+                                </a>
+                            </div>
+                            <div class="order-date">
+                                Créée le :
+                                {% if order.created_at %}
+                                    {{ order.created_at|date:"d/m/Y H:i" }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="order-status order-status--{{ order.status }}">
+                            {{ order.get_status_display }}
+                        </div>
+                    </div>
+
+                    <div class="order-card__body">
+                        <div class="order-section">
+                            <div class="section-title">Client</div>
+                            <div class="section-line">
+                                <span class="label">Nom :</span>
+                                <span>{{ order.customer.name|default:"-" }}</span>
+                            </div>
+                            <div class="section-line">
+                                <span class="label">Téléphone :</span>
+                                <span>{{ order.customer.phone|default:"-" }}</span>
+                            </div>
+                            <div class="section-line">
+                                <span class="label">Adresse :</span>
+                                <span>{{ order.customer.address|default:"-" }}</span>
+                            </div>
+                        </div>
+
+                        <div class="order-section">
+                            <div class="section-title">Blanchisserie</div>
+                            <div class="section-line">
+                                <span class="label">Partenaire :</span>
+                                <span>
+                                    {% if order.laundry_partner %}
+                                        {{ order.laundry_partner.name }}
+                                    {% else %}
+                                        Non assignée
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="section-line">
+                                <span class="label">Distance A/R :</span>
+                                <span>
+                                    {% if order.distance_km %}
+                                        {{ order.distance_km|floatformat:"g" }} km
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="order-card__footer">
+                        <div class="buttons-row">
+                            <!-- Petit debug texte pour vérifier le statut -->
+                            <span style="font-size:11px;color:#64748b;margin-right:8px;">
+                                Statut actuel : "{{ order.status }}"
+                            </span>
+
+                            <!-- Lien détail commande -->
+                            <a href="{% url 'orders:driver_me_order_detail' order.id %}"
+                               class="btn btn-light btn-sm">
+                                Détails
+                            </a>
+
+                            <!-- Boutons cartes (si URLs disponibles) -->
+                            {% if order.client_maps_url %}
+                                <a href="{{ order.client_maps_url }}" target="_blank" class="btn btn-primary btn-sm">
+                                    Client
+                                </a>
+                            {% endif %}
+
+                            {% if order.laundry_maps_url %}
+                                <a href="{{ order.laundry_maps_url }}" target="_blank" class="btn btn-secondary btn-sm">
+                                    Blanchisserie
+                                </a>
+                            {% endif %}
+
+                            <!-- Formulaire générique de changement de statut (TOUJOURS AFFICHÉ) -->
+                            <form method="post"
+                                  action="{% url 'orders:change_status' order.id %}"
+                                  class="inline-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <select name="status" class="status-select">
+                                    <option value="pending"
+                                        {% if order.status == "pending" %}selected{% endif %}>
+                                        En attente
+                                    </option>
+                                    <option value="in_progress"
+                                        {% if order.status == "in_progress" %}selected{% endif %}>
+                                        En cours
+                                    </option>
+                                    <option value="done"
+                                        {% if order.status == "done" %}selected{% endif %}>
+                                        Terminée
+                                    </option>
+                                    <option value="canceled"
+                                        {% if order.status == "canceled" %}selected{% endif %}>
+                                        Annulée
+                                    </option>
+                                </select>
+                                <button type="submit" class="btn btn-primary btn-sm" style="margin-left:6px;">
+                                    Mettre à jour
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card">
+            <p>Aucune course active pour aujourd'hui.</p>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    var dataUrlInput = document.getElementById("driver-me-data-url");
+    var locationUrlInput = document.getElementById("driver-location-url");
+
+    var baseUrl = dataUrlInput ? (dataUrlInput.value || "") : "";
+    var locationUrl = locationUrlInput ? (locationUrlInput.value || "") : "";
+
+    function updateText(id, value) {
+        var el = document.getElementById(id);
+        if (el !== null && el !== undefined && value !== undefined && value !== null) {
+            el.textContent = value;
+        }
+    }
+
+    function updateBar(id, percent) {
+        var el = document.getElementById(id);
+        if (el !== null && el !== undefined && percent !== undefined && percent !== null) {
+            if (percent > 100) {
+                percent = 100;
+            }
+            el.style.width = String(percent) + "%";
+        }
+    }
+
+    // --- Helper CSRF pour les POST fetch ---
+    function getCookie(name) {
+        var cookieValue = null;
+        if (document.cookie && document.cookie !== "") {
+            var cookies = document.cookie.split(";");
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + "=")) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    var csrftoken = getCookie("csrftoken");
+
+    // --- Refresh KPI driver_me ---
+    function refreshDriverMeData() {
+        if (!baseUrl) {
+            return;
+        }
+        fetch(baseUrl, {
+            headers: {
+                "X-Requested-With": "XMLHttpRequest"
+            }
+        })
+        .then(function (resp) {
+            if (!resp.ok) {
+                return null;
+            }
+            return resp.json();
+        })
+        .then(function (data) {
+            if (!data || data.error) {
+                return;
+            }
+            // Jour
+            updateText("kpi-total-today", data.total_today);
+            updateText("kpi-pending", data.pending);
+            updateText("kpi-in-progress", data.in_progress);
+            updateText("kpi-done", data.done);
+            updateText("kpi-canceled", data.canceled);
+            updateText("kpi-distance", data.total_distance_km);
+            updateText("kpi-earnings", data.driver_earnings);
+
+            // Semaine
+            updateText("kpi-week-orders", data.weekly_orders);
+            updateText("kpi-week-earnings", data.weekly_earnings);
+
+            updateText("kpi-week-orders-percent", data.weekly_orders_progress + "%");
+            updateText("kpi-week-earnings-percent", data.weekly_earnings_progress + "%");
+
+            updateBar("kpi-week-orders-bar", data.weekly_orders_progress);
+            updateBar("kpi-week-earnings-bar", data.weekly_earnings_progress);
+        })
+        .catch(function (error) {
+            console.log("Erreur refresh driver_me data:", error);
+        });
+    }
+
+    // Premier refresh immédiat
+    refreshDriverMeData();
+    // Puis toutes les 15 secondes
+    setInterval(refreshDriverMeData, 15000);
+
+    // --- Envoi de la position GPS du livreur ---
+    if (locationUrl && "geolocation" in navigator) {
+        var watchId = navigator.geolocation.watchPosition(
+            function (position) {
+                var lat = position.coords.latitude;
+                var lng = position.coords.longitude;
+
+                var formData = new FormData();
+                formData.append("lat", lat);
+                formData.append("lng", lng);
+
+                fetch(locationUrl, {
+                    method: "POST",
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest",
+                        "X-CSRFToken": csrftoken || "",
+                    },
+                    body: formData,
+                })
+                .then(function (resp) {
+                    if (!resp.ok) {
+                        return resp.json().catch(function () { return null; });
+                    }
+                    return resp.json();
+                })
+                .then(function (data) {
+                    if (data && data.error) {
+                        console.log("Erreur update location:", data.error);
+                    }
+                })
+                .catch(function (error) {
+                    console.log("Erreur fetch location:", error);
+                });
+            },
+            function (error) {
+                console.log("Erreur geolocalisation:", error);
+            },
+            {
+                enableHighAccuracy: true,
+                maximumAge: 10000,
+                timeout: 20000
+            }
+        );
+    } else {
+        console.log("Geolocation non disponible ou URL manquante.");
+    }
+});
+</script>
+
+<style>
+    .container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 14px 16px;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+    }
+
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+    }
+
+    .kpi-card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 10px 12px;
+        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+        border-left: 4px solid transparent;
+    }
+
+    .kpi-card--full {
+        grid-column: 1 / -1;
+    }
+
+    .kpi-label {
+        font-size: 11px;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .kpi-value {
+        font-size: 20px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-top: 2px;
+    }
+
+    .kpi-sub {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-top: 2px;
+    }
+
+    .kpi-card--blue {
+        border-left-color: #0056b3;
+    }
+
+    .kpi-card--orange {
+        border-left-color: #ff7a00;
+    }
+
+    .kpi-card--green {
+        border-left-color: #16a34a;
+    }
+
+    .kpi-card--red {
+        border-left-color: #dc2626;
+    }
+
+    /* KPI Semaine */
+    .kpi-week-title {
+        font-size: 15px;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+
+    .kpi-week-row {
+        display: grid;
+        grid-template-columns: 1fr 3fr auto;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .kpi-week-label {
+        font-size: 12px;
+        color: #475569;
+    }
+
+    .kpi-week-bar {
+        width: 100%;
+        height: 8px;
+        border-radius: 999px;
+        background: #e2e8f0;
+        overflow: hidden;
+    }
+
+    .kpi-week-bar-inner {
+        height: 100%;
+        width: 0%;
+        background: #0ea5e9;
+        border-radius: 999px;
+        transition: width 0.3s ease-out;
+    }
+
+    .kpi-week-bar-inner--green {
+        background: #22c55e;
+    }
+
+    .kpi-week-percent {
+        font-size: 11px;
+        font-weight: 600;
+        color: #0f172a;
+        text-align: right;
+        min-width: 40px;
+    }
+
+    /* PRIME */
+    .bonus-line {
+        font-size: 13px;
+        color: #0f172a;
+        margin-bottom: 4px;
+    }
+
+    .bonus-amount {
+        font-size: 20px;
+        color: #16a34a;
+    }
+
+    .bonus-details {
+        font-size: 12px;
+        color: #475569;
+        margin-bottom: 4px;
+    }
+
+    .bonus-hint {
+        font-size: 11px;
+        color: #64748b;
+    }
+
+    .orders-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .order-card {
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 12px 14px;
+        box-shadow: 0 1px 5px rgba(15, 23, 42, 0.08);
+        border: 1px solid #e2e8f0;
+    }
+
+    .order-card__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .order-code {
+        font-weight: 600;
+        color: #0f172a;
+        font-size: 15px;
+    }
+
+    .order-code a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .order-code a:hover {
+        text-decoration: underline;
+    }
+
+    .order-date {
+        font-size: 12px;
+        color: #64748b;
+    }
+
+    .order-status {
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-weight: 600;
+        border: 1px solid transparent;
+        white-space: nowrap;
+    }
+
+    .order-status--pending {
+        background: #fef3c7;
+        color: #92400e;
+        border-color: #fde68a;
+    }
+
+    .order-status--in_progress {
+        background: #dbeafe;
+        color: #1d4ed8;
+        border-color: #bfdbfe;
+    }
+
+    .order-status--done {
+        background: #dcfce7;
+        color: #166534;
+        border-color: #bbf7d0;
+    }
+
+    .order-status--canceled {
+        background: #fee2e2;
+        color: #b91c1c;
+        border-color: #fecaca;
+    }
+
+    .order-card__body {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .order-section {
+        padding: 6px 8px;
+        border-radius: 8px;
+        background: #f8fafc;
+    }
+
+    .section-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: #0f172a;
+        margin-bottom: 4px;
+    }
+
+    .section-line {
+        display: flex;
+        gap: 6px;
+        font-size: 12px;
+        margin-top: 2px;
+        color: #475569;
+    }
+
+    .section-line .label {
+        font-weight: 500;
+        color: #64748b;
+    }
+
+    .order-card__footer {
+        margin-top: 4px;
+        border-top: 1px dashed #e2e8f0;
+        padding-top: 6px;
+    }
+
+    .buttons-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .inline-form {
+        display: inline-flex;
+        margin: 0;
+    }
+
+    .status-select {
+        padding: 4px 6px;
+        border-radius: 999px;
+        border: 1px solid #cbd5f5;
+        font-size: 12px;
+        background: #fff;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 13px;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+    .btn-sm {
+        padding: 4px 10px;
+        font-size: 12px;
+    }
+
+    .btn-primary {
+        background: #0056b3;
+        color: #fff;
+    }
+
+    .btn-secondary {
+        background: #e2e8f0;
+        color: #1e293b;
+    }
+
+    .btn-light {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+
+    @media (max-width: 640px) {
+        .container {
+            padding: 0 8px;
+        }
+        .kpi-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .kpi-week-row {
+            grid-template-columns: 1fr;
+        }
+        .kpi-week-percent {
+            text-align: left;
+        }
+    }
+</style>
+{% endblock %}

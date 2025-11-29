@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header__left">
+        <h1 class="page-title">Carte des livreurs FAGNI</h1>
+        <p class="page-subtitle">
+            Visualisation des livreurs actifs avec leur dernière position connue.
+        </p>
+    </div>
+</div>
+
+<div class="container">
+    <div class="card mb-4">
+        <h2 class="card-title">Position des livreurs</h2>
+        <p class="card-subtitle">
+            Si la carte est vide, vérifie qu'au moins un livreur a une latitude et une longitude.
+        </p>
+
+        <!-- Conteneur de la carte -->
+        <div id="drivers-map"></div>
+    </div>
+
+    <div class="card">
+        <h2 class="card-title">Liste des livreurs géolocalisés</h2>
+
+        {% if drivers %}
+            <table class="drivers-table">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Ville</th>
+                        <th>Téléphone</th>
+                        <th>Latitude</th>
+                        <th>Longitude</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in drivers %}
+                        {% if d.latitude and d.longitude %}
+                            <tr>
+                                <td>{{ d.name }}</td>
+                                <td>{{ d.city|default:"-" }}</td>
+                                <td>{{ d.phone|default:"-" }}</td>
+                                <td>{{ d.latitude }}</td>
+                                <td>{{ d.longitude }}</td>
+                            </tr>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Aucun livreur géolocalisé pour le moment.</p>
+        {% endif %}
+    </div>
+</div>
+
+{# Leaflet CSS & JS sans integrity pour éviter les blocages #}
+<link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    // 1) Récupération des données drivers envoyées par Django
+    var driversJsonString = '{{ drivers_json|escapejs }}';
+    var drivers = [];
+
+    try {
+        if (driversJsonString && driversJsonString.length > 0) {
+            drivers = JSON.parse(driversJsonString);
+        }
+    } catch (e) {
+        console.log("Erreur JSON drivers :", e, driversJsonString);
+        drivers = [];
+    }
+
+    // 2) Centre par défaut = Abidjan (valeurs en string + parseFloat pour éviter les erreurs)
+    var defaultLatString = "{{ default_center.lat|default:'5.3453' }}";
+    var defaultLngString = "{{ default_center.lng|default:'-4.0244' }}";
+
+    var defaultLat = parseFloat(defaultLatString);
+    var defaultLng = parseFloat(defaultLngString);
+
+    if (isNaN(defaultLat)) {
+        defaultLat = 5.3453;
+    }
+    if (isNaN(defaultLng)) {
+        defaultLng = -4.0244;
+    }
+
+    var mapElement = document.getElementById("drivers-map");
+    if (!mapElement) {
+        console.log("drivers-map introuvable dans le DOM.");
+        return;
+    }
+
+    // 3) Initialisation de la carte Leaflet
+    var map = L.map("drivers-map").setView(
+        [defaultLat, defaultLng],
+        12
+    );
+
+    // 4) Tuiles OpenStreetMap
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // 5) Ajout des markers
+    console.log("Drivers reçus pour la carte :", drivers);
+
+    if (!Array.isArray(drivers) || drivers.length === 0) {
+        // Aucun driver => marker de test sur Abidjan
+        var marker = L.marker([defaultLat, defaultLng]).addTo(map);
+        marker.bindPopup("Abidjan (marker de test)").openPopup();
+        console.log("Aucun driver JSON, marker de test affiché.");
+        return;
+    }
+
+    var bounds = [];
+
+    drivers.forEach(function (d) {
+        if (!d.lat || !d.lng) {
+            return;
+        }
+
+        var lat = parseFloat(d.lat);
+        var lng = parseFloat(d.lng);
+
+        if (isNaN(lat) || isNaN(lng)) {
+            return;
+        }
+
+        var marker = L.marker([lat, lng]).addTo(map);
+
+        var popupHtml =
+            "<strong>" + (d.name || "Livreur") + "</strong><br>" +
+            (d.city ? d.city + "<br>" : "") +
+            (d.phone ? "Tel : " + d.phone + "<br>" : "");
+
+        marker.bindPopup(popupHtml);
+        bounds.push([lat, lng]);
+    });
+
+    if (bounds.length > 1) {
+        map.fitBounds(bounds, { padding: [20, 20] });
+    } else if (bounds.length === 1) {
+        map.setView(bounds[0], 13);
+    }
+});
+</script>
+
+<style>
+    .container {
+        max-width: 1100px;
+        margin: 0 auto;
+    }
+
+    .card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 16px 18px;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+    }
+
+    .mb-4 {
+        margin-bottom: 1.5rem;
+    }
+
+    .card-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #0f172a;
+        margin-bottom: 4px;
+    }
+
+    .card-subtitle {
+        font-size: 13px;
+        color: #64748b;
+        margin-bottom: 12px;
+    }
+
+    #drivers-map {
+        width: 100%;
+        height: 480px;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+    }
+
+    .drivers-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        margin-top: 8px;
+    }
+
+    .drivers-table th,
+    .drivers-table td {
+        border: 1px solid #e2e8f0;
+        padding: 6px 8px;
+        text-align: left;
+    }
+
+    .drivers-table th {
+        background: #f8fafc;
+        font-weight: 600;
+        color: #0f172a;
+    }
+
+    .drivers-table tr:nth-child(even) {
+        background: #f9fafb;
+    }
+
+    @media (max-width: 640px) {
+        .card {
+            padding: 12px;
+        }
+
+        #drivers-map {
+            height: 380px;
+        }
+
+        .drivers-table {
+            font-size: 12px;
+            display: block;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+    }
+</style>
+{% endblock %}

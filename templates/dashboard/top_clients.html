@@ -3,51 +3,306 @@
 {% block title %}Top clients – FAGNI{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+<style>
+  .tc-page{
+    max-width:1100px;
+    margin:20px auto 30px;
+    padding:0 12px;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    color:#111827;
+  }
+  .tc-header{
+    margin-bottom:18px;
+  }
+  .tc-header h1{
+    margin:0 0 4px;
+    font-size:22px;
+    font-weight:700;
+  }
+  .tc-header p{
+    margin:0;
+    font-size:13px;
+    color:#6b7280;
+  }
 
-  <h1 class="text-2xl font-bold mb-2">Top clients FAGNI</h1>
-  <p class="text-sm text-gray-600 mb-6">
-    Classement des meilleurs clients par total TTC cumulé.
-  </p>
+  .tc-badge{
+    display:inline-block;
+    padding:2px 7px;
+    border-radius:999px;
+    font-size:10px;
+    background:#fef3c7;
+    color:#92400e;
+    margin-bottom:4px;
+  }
 
-  {% if top_clients %}
-  <div class="bg-white shadow rounded-xl overflow-hidden border border-gray-100">
+  .tc-grid-top{
+    display:grid;
+    grid-template-columns:1.3fr 1.7fr;
+    gap:14px;
+  }
+  @media(max-width:900px){
+    .tc-grid-top{grid-template-columns:1fr;}
+  }
 
-    <table class="min-w-full text-sm">
-      <thead class="bg-gray-50 text-xs font-semibold text-gray-600 uppercase">
-        <tr>
-          <th class="px-3 py-2 text-left">Client</th>
-          <th class="px-3 py-2 text-left">Téléphone</th>
-          <th class="px-3 py-2 text-right">Nombre commandes</th>
-          <th class="px-3 py-2 text-right">Montant total (FCFA)</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-100">
+  .tc-box{
+    background:#ffffff;
+    border-radius:12px;
+    border:1px solid #e5e7eb;
+    box-shadow:0 4px 10px rgba(15,23,42,0.04);
+    padding:14px 16px;
+  }
+  .tc-box h2{
+    margin:0 0 6px;
+    font-size:15px;
+  }
+  .tc-box p{
+    margin:0 0 4px;
+    font-size:12px;
+    color:#4b5563;
+  }
 
-        {% for c in top_clients %}
-        <tr class="hover:bg-gray-50">
-          <td class="px-3 py-2">
-            {{ c.customer__name }}
-          </td>
-          <td class="px-3 py-2">
-            {{ c.customer__phone|default:"—" }}
-          </td>
-          <td class="px-3 py-2 text-right">
-            {{ c.total_orders }}
-          </td>
-          <td class="px-3 py-2 text-right font-semibold">
-            {{ c.total_spent|floatformat:0 }} FCFA
-          </td>
-        </tr>
-        {% endfor %}
+  .tc-best-name{
+    font-size:15px;
+    font-weight:600;
+    margin-top:4px;
+  }
+  .tc-best-phone{
+    font-size:12px;
+    color:#4b5563;
+    margin-top:2px;
+  }
+  .tc-best-metrics{
+    margin-top:6px;
+    font-size:12px;
+    color:#374151;
+  }
 
-      </tbody>
-    </table>
+  .tc-client-cards{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:10px;
+    margin-top:6px;
+  }
+  @media(max-width:900px){
+    .tc-client-cards{grid-template-columns:repeat(2,1fr);}
+  }
+  @media(max-width:640px){
+    .tc-client-cards{grid-template-columns:1fr;}
+  }
+  .tc-client-card{
+    border-radius:10px;
+    border:1px solid #e5e7eb;
+    background:#f9fafb;
+    padding:8px 10px;
+  }
+  .tc-rank{
+    font-size:11px;
+    color:#6b7280;
+  }
+  .tc-name{
+    font-size:13px;
+    font-weight:600;
+    margin:2px 0;
+  }
+  .tc-phone{
+    font-size:11px;
+    color:#4b5563;
+  }
+  .tc-metrics{
+    margin-top:4px;
+    font-size:11px;
+    color:#374151;
+  }
+  .tc-segment{
+    margin-top:4px;
+    font-size:11px;
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    padding:2px 7px;
+    border-radius:999px;
+    background:#ecfeff;
+    color:#0f766e;
+  }
 
+  .tc-table-wrapper{
+    margin-top:18px;
+  }
+  .tc-table-title{
+    font-size:15px;
+    font-weight:600;
+    margin-bottom:4px;
+  }
+  .tc-table-sub{
+    font-size:12px;
+    color:#6b7280;
+    margin-bottom:6px;
+  }
+
+  .tc-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+  }
+  .tc-table th,
+  .tc-table td{
+    padding:6px 5px;
+    border-bottom:1px solid #e5e7eb;
+    text-align:left;
+  }
+  .tc-table th{
+    background:#f9fafb;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+    color:#6b7280;
+  }
+  .tc-table tr:hover{
+    background:#f3f4ff;
+  }
+  .tc-td-right{
+    text-align:right;
+    white-space:nowrap;
+  }
+
+  .tc-seg-vip{
+    color:#92400e;
+  }
+  .tc-seg-recurrent{
+    color:#1f2937;
+  }
+  .tc-seg-to-win{
+    color:#047857;
+  }
+
+  .tc-empty{
+    font-size:12px;
+    color:#9ca3af;
+    font-style:italic;
+  }
+</style>
+
+<div class="tc-page">
+
+  <div class="tc-header">
+    <div class="tc-badge">⭐ Segment client premium</div>
+    <h1>Top clients FAGNI</h1>
+    <p>
+      Analyse des meilleurs clients, de leurs revenus cumulés et de la fréquence
+      de leurs commandes. Idéal pour programmes VIP, parrainage et fidélisation.
+    </p>
   </div>
 
+  {% if top_clients %}
+
+    {% with best=top_clients.0 %}
+    <div class="tc-grid-top">
+      <!-- Meilleur client -->
+      <div class="tc-box">
+        <h2>Meilleur client</h2>
+        <p>
+          Client qui génère le plus de chiffre d'affaires cumulé sur FAGNI.
+        </p>
+
+        <div class="tc-best-name">{{ best.customer__name }}</div>
+        <div class="tc-best-phone">
+          📞 {{ best.customer__phone|default:"Non renseigné" }}
+        </div>
+        <div class="tc-best-metrics">
+          Total : <strong>{{ best.total_spent|default:0|floatformat:0 }} FCFA</strong><br>
+          Commandes : <strong>{{ best.orders_count }}</strong>
+        </div>
+      </div>
+      {% endwith %}
+
+      <!-- Top 3 cartes -->
+      <div class="tc-box">
+        <h2>🏆 Top 3 – Clients à chouchouter</h2>
+        <p>
+          Mini “carte” pour repérer tes VIP en un coup d’œil.
+        </p>
+
+        <div class="tc-client-cards">
+          {% for c in top_clients|slice:":3" %}
+            <div class="tc-client-card">
+              <div class="tc-rank">
+                {% if forloop.counter == 1 %}🥇 1er
+                {% elif forloop.counter == 2 %}🥈 2e
+                {% elif forloop.counter == 3 %}🥉 3e
+                {% else %}#{{ forloop.counter }}{% endif %}
+              </div>
+              <div class="tc-name">{{ c.customer__name }}</div>
+              <div class="tc-phone">📞 {{ c.customer__phone|default:"—" }}</div>
+              <div class="tc-metrics">
+                {{ c.orders_count }} commande{{ c.orders_count|pluralize:"s" }}<br>
+                {{ c.total_spent|default:0|floatformat:0 }} FCFA
+              </div>
+              <div class="tc-segment tc-seg-vip">
+                🔑 Client VIP
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Tableau complet -->
+    <div class="tc-table-wrapper">
+      <div class="tc-table-title">Classement détaillé</div>
+      <div class="tc-table-sub">
+        Tous les clients, classés par montant TTC cumulé (Order.total).  
+        <strong>VIP</strong> = top 3 &nbsp; • &nbsp; <strong>Récurrent</strong> = 5+ commandes &nbsp; • &nbsp;
+        <strong>À fidéliser</strong> = potentiel à exploiter.
+      </div>
+
+      <table class="tc-table">
+        <thead>
+          <tr>
+            <th>Rang</th>
+            <th>Client</th>
+            <th>Téléphone</th>
+            <th class="tc-td-right">Nombre commandes</th>
+            <th class="tc-td-right">Montant total (FCFA)</th>
+            <th>Segment</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in top_clients %}
+            {% with rank=forloop.counter %}
+            <tr>
+              <td>
+                {% if rank == 1 %}🥇 1er
+                {% elif rank == 2 %}🥈 2e
+                {% elif rank == 3 %}🥉 3e
+                {% else %}#{{ rank }}{% endif %}
+              </td>
+              <td>{{ c.customer__name }}</td>
+              <td>{{ c.customer__phone|default:"—" }}</td>
+              <td class="tc-td-right">{{ c.orders_count }}</td>
+              <td class="tc-td-right">
+                {{ c.total_spent|default:0|floatformat:0 }} FCFA
+              </td>
+              <td>
+                {% if rank <= 3 %}
+                  <span class="tc-seg-vip">🔑 VIP</span>
+                {% elif c.orders_count|default:0 >= 5 %}
+                  <span class="tc-seg-recurrent">🔁 Récurrent</span>
+                {% else %}
+                  <span class="tc-seg-to-win">🌱 À fidéliser</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
   {% else %}
-    <p class="text-sm text-gray-500 italic">Aucun client trouvé.</p>
+    <p class="tc-empty">
+      Aucun client trouvé pour l’instant. Dès que des commandes seront enregistrées,
+      le classement apparaîtra ici.
+    </p>
   {% endif %}
 
 </div>

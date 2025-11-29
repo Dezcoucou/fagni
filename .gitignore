@@ -36,3 +36,22 @@ Thumbs.db
 /*.pid
 *.sock
 logs/*.log
+
+# LOGS
+logs/
+*.log
+
+# Backups / old
+*.old
+*.backup
+*backup*.html
+
+# Dossiers non utilisés
+bonuses/
+templates/orders/*backup*
+templates/orders/*OLD*
+orders/templates/orders/*old*
+orders/templates/orders/*OLD*
+
+# Virtual envs
+venv/

@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<style>
+    .ticket-wrapper {
+        max-width: 480px;
+        margin: 10px auto;
+        background: #ffffff;
+        border-radius: 10px;
+        border: 1px solid #e5e7eb;
+        padding: 16px;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 13px;
+    }
+    .ticket-header {
+        text-align: center;
+        margin-bottom: 8px;
+    }
+    .ticket-header h1 {
+        font-size: 18px;
+        margin: 0;
+    }
+    .ticket-header p {
+        margin: 3px 0 0;
+        color: #6b7280;
+        font-size: 12px;
+    }
+    .ticket-section-title {
+        font-weight: 600;
+        font-size: 13px;
+        margin: 10px 0 4px;
+        border-bottom: 1px dashed #e5e7eb;
+        padding-bottom: 2px;
+    }
+    .ticket-line {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 2px;
+    }
+    .ticket-line span.label {
+        color: #6b7280;
+    }
+    table.ticket-items {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 6px;
+        font-size: 12px;
+    }
+    table.ticket-items th,
+    table.ticket-items td {
+        border-bottom: 1px solid #f3f4f6;
+        padding: 4px 2px;
+        text-align: left;
+    }
+    table.ticket-items th.num,
+    table.ticket-items td.num {
+        text-align: right;
+        white-space: nowrap;
+    }
+    .ticket-totals {
+        margin-top: 8px;
+        font-size: 12px;
+    }
+    .ticket-totals .line {
+        display:flex;
+        justify-content:space-between;
+        margin-bottom: 2px;
+    }
+    .ticket-totals .grand {
+        font-weight: 700;
+        color: #ff7a00;
+    }
+    .ticket-footer {
+        margin-top: 10px;
+        text-align: center;
+        font-size: 11px;
+        color: #9ca3af;
+    }
+</style>
+
+<div class="ticket-wrapper">
+    <div class="ticket-header">
+        <h1>Ticket FAGNI</h1>
+        <p>Commande {{ order.code }} – {{ order.created_at|date:"d/m/Y H:i" }}</p>
+    </div>
+
+    <div>
+        <div class="ticket-section-title">Client</div>
+        <div class="ticket-line">
+            <span class="label">Nom :</span>
+            <span>{{ order.customer.name|default:"—" }}</span>
+        </div>
+        <div class="ticket-line">
+            <span class="label">Téléphone :</span>
+            <span>{{ order.customer.phone|default:"—" }}</span>
+        </div>
+        <div class="ticket-line">
+            <span class="label">Adresse :</span>
+            <span>{{ order.customer.address|default:"—" }}</span>
+        </div>
+        {% if order.referral_code %}
+        <div class="ticket-line">
+            <span class="label">Code parrain :</span>
+            <span>{{ order.referral_code }}</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <div>
+        <div class="ticket-section-title">Prestations</div>
+        <table class="ticket-items">
+            <thead>
+                <tr>
+                    <th>Article</th>
+                    <th class="num">Qté</th>
+                    <th class="num">PU</th>
+                    <th class="num">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                    <tr>
+                        <td>{{ item.designation }}</td>
+                        <td class="num">{{ item.quantity }}</td>
+                        <td class="num">{{ item.unit_price|floatformat:0 }}</td>
+                        <td class="num">{{ item.total|floatformat:0 }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4">Aucune ligne dans la commande.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="ticket-totals">
+        <div class="line">
+            <span>Total prestation :</span>
+            <span>{{ order.total_ht|default:0|floatformat:0 }} FCFA</span>
+        </div>
+        <div class="line">
+            <span>Service FAGNI :</span>
+            <span>{{ order.service_fee|default:0|floatformat:0 }} FCFA</span>
+        </div>
+        <div class="line">
+            <span>Frais de livraison :</span>
+            <span>{{ order.delivery_fee|default:0|floatformat:0 }} FCFA</span>
+        </div>
+        <div class="line grand">
+            <span>Total global :</span>
+            <span>{{ order.grand_total|default:0|floatformat:0 }} FCFA</span>
+        </div>
+    </div>
+
+    {% if order.notes %}
+        <div class="ticket-section-title">Notes</div>
+        <div style="font-size:12px;white-space:pre-line;">
+            {{ order.notes }}
+        </div>
+    {% endif %}
+
+    <div class="ticket-footer">
+        Merci d'avoir utilisé FAGNI.
+    </div>
+</div>
+{% endblock %}

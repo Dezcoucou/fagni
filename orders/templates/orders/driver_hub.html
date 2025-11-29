@@ -1,0 +1,603 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="page-header">
+    <div class="page-header__left">
+        <h1 class="page-title">Hub livreur FAGNI</h1>
+        <p class="page-subtitle">
+            Vue synthèse pour les livreurs : statistiques, courses actives et dernières courses.
+        </p>
+    </div>
+</div>
+
+<div class="driver-hub container">
+
+    {% if connected_driver %}
+        <!-- Bandeau identité livreur -->
+        <div class="card hub-identity">
+            <div class="hub-identity__left">
+                <div class="hub-identity__label">Connecté en tant que</div>
+                <div class="hub-identity__name">
+                    {{ connected_driver.name }}
+                </div>
+                {% if connected_driver.phone %}
+                    <div class="hub-identity__phone">
+                        📞 {{ connected_driver.phone }}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="hub-identity__right">
+                <a href="{% url 'orders:driver_app' %}?driver_id={{ connected_driver.id }}&status=active"
+                   class="btn btn-primary btn-pill">
+                    🚚 Voir mes courses actives
+                </a>
+                <a href="{% url 'orders:driver_app' %}?driver_id={{ connected_driver.id }}"
+                   class="btn btn-secondary btn-pill">
+                    📋 Toutes mes courses
+                </a>
+            </div>
+        </div>
+
+        <!-- Switch de période -->
+        <div class="card hub-period-card">
+            <div class="hub-period-header">
+                <div class="hub-period-title">
+                    Période d'analyse
+                </div>
+                <div class="hub-period-sub">
+                    Période courante : <strong>{{ period_label }}</strong>
+                    {% if stats %}
+                        • Total historique : <strong>{{ stats.global_total_orders }}</strong> courses
+                    {% endif %}
+                </div>
+            </div>
+            <div class="hub-period-switch">
+                <a href="?period=today"
+                   class="hub-period-pill {% if period == 'today' %}hub-period-pill--active{% endif %}">
+                    Aujourd'hui
+                </a>
+                <a href="?period=7d"
+                   class="hub-period-pill {% if period == '7d' %}hub-period-pill--active{% endif %}">
+                    7 derniers jours
+                </a>
+                <a href="?period=30d"
+                   class="hub-period-pill {% if period == '30d' %}hub-period-pill--active{% endif %}">
+                    30 derniers jours
+                </a>
+                <a href="?period=all"
+                   class="hub-period-pill {% if period == 'all' %}hub-period-pill--active{% endif %}">
+                    Tout l'historique
+                </a>
+            </div>
+        </div>
+
+        <!-- KPIs principaux -->
+        {% if stats %}
+        <div class="hub-kpi-grid">
+            <div class="kpi-card kpi-card--full kpi-card--blue">
+                <div class="kpi-label">Total des courses (période)</div>
+                <div class="kpi-value">
+                    {{ stats.total_orders|default:0 }}
+                </div>
+                <div class="kpi-sub">
+                    Période : {{ period_label }} • Aujourd'hui : <strong>{{ today_orders_count }}</strong> courses créées
+                </div>
+            </div>
+
+            <div class="kpi-card kpi-card--orange">
+                <div class="kpi-label">En attente</div>
+                <div class="kpi-value">
+                    {{ stats.pending_orders|default:0 }}
+                </div>
+            </div>
+
+            <div class="kpi-card kpi-card--blue">
+                <div class="kpi-label">En cours</div>
+                <div class="kpi-value">
+                    {{ stats.in_progress_orders|default:0 }}
+                </div>
+            </div>
+
+            <div class="kpi-card kpi-card--green">
+                <div class="kpi-label">Terminées</div>
+                <div class="kpi-value">
+                    {{ stats.done_orders|default:0 }}
+                </div>
+            </div>
+
+            <div class="kpi-card kpi-card--red">
+                <div class="kpi-label">Annulées</div>
+                <div class="kpi-value">
+                    {{ stats.canceled_orders|default:0 }}
+                </div>
+            </div>
+
+            <div class="kpi-card kpi-card--blue">
+                <div class="kpi-label">Distance totale (A/R) – période</div>
+                <div class="kpi-value">
+                    {{ stats.distance_km|default:0|floatformat:"2" }}
+                    <span class="kpi-unit">km</span>
+                </div>
+            </div>
+
+            <div class="kpi-card kpi-card--green">
+                <div class="kpi-label">Revenu cumulé livreur – période</div>
+                <div class="kpi-value">
+                    {{ stats.driver_income|default:0|floatformat:"2" }}
+                    <span class="kpi-unit">FCFA</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Deux colonnes : courses actives / dernières courses -->
+        <div class="hub-grid">
+            <!-- Colonne gauche : courses actives -->
+            <div class="hub-col">
+                <div class="card">
+                    <div class="hub-section-header">
+                        <h2 class="section-title">Mes courses actives</h2>
+                        <a href="{% url 'orders:driver_app' %}?driver_id={{ connected_driver.id }}&status=active"
+                           class="section-link">
+                            Voir tout &rarr;
+                        </a>
+                    </div>
+
+                    {% if active_orders %}
+                        <div class="hub-orders-list">
+                            {% for order in active_orders %}
+                                <div class="hub-order-card">
+                                    <div class="hub-order-card__header">
+                                        <div>
+                                            <div class="hub-order-code">
+                                                {{ order.code|default:order.id }}
+                                            </div>
+                                            <div class="hub-order-date">
+                                                {% if order.created_at %}
+                                                    Créée le {{ order.created_at|date:"d/m/Y H:i" }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="hub-order-status hub-order-status--{{ order.status }}">
+                                            {{ order.get_status_display }}
+                                        </div>
+                                    </div>
+                                    <div class="hub-order-card__body">
+                                        <div class="hub-order-line">
+                                            <span class="label">Client :</span>
+                                            <span>{{ order.customer.name|default:"-" }}</span>
+                                        </div>
+                                        <div class="hub-order-line">
+                                            <span class="label">Adresse :</span>
+                                            <span>{{ order.customer.address|default:"-" }}</span>
+                                        </div>
+                                        <div class="hub-order-line">
+                                            <span class="label">Montant client :</span>
+                                            <span>
+                                                {{ order.total|default:0 }} FCFA
+                                                {% if order.delivery_fee %}
+                                                    + {{ order.delivery_fee }} (livraison)
+                                                {% endif %}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="hub-order-card__footer">
+                                        <div class="buttons-row">
+                                            <a href="{% url 'orders:driver_order_detail' order.id %}"
+                                               class="btn btn-light btn-sm">
+                                                Détail course
+                                            </a>
+                                            {% if order.client_maps_url %}
+                                                <a href="{{ order.client_maps_url }}" target="_blank"
+                                                   class="btn btn-primary btn-sm">
+                                                    Itinéraire client
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="muted">
+                            Aucune course active pour l’instant (en attente ou en cours).
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Colonne droite : dernières courses -->
+            <div class="hub-col">
+                <div class="card">
+                    <div class="hub-section-header">
+                        <h2 class="section-title">Mes 5 dernières courses (période)</h2>
+                        <a href="{% url 'orders:driver_app' %}?driver_id={{ connected_driver.id }}"
+                           class="section-link">
+                            Voir tout &rarr;
+                        </a>
+                    </div>
+
+                    {% if last_orders %}
+                        <div class="hub-orders-list">
+                            {% for order in last_orders %}
+                                <div class="hub-order-card hub-order-card--compact">
+                                    <div class="hub-order-card__header">
+                                        <div>
+                                            <div class="hub-order-code">
+                                                {{ order.code|default:order.id }}
+                                            </div>
+                                            <div class="hub-order-date">
+                                                {% if order.created_at %}
+                                                    {{ order.created_at|date:"d/m/Y H:i" }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="hub-order-status hub-order-status--{{ order.status }}">
+                                            {{ order.get_status_display }}
+                                        </div>
+                                    </div>
+                                    <div class="hub-order-card__body">
+                                        <div class="hub-order-line">
+                                            <span class="label">Client :</span>
+                                            <span>{{ order.customer.name|default:"-" }}</span>
+                                        </div>
+                                        <div class="hub-order-line">
+                                            <span class="label">Total :</span>
+                                            <span>{{ order.total|default:0 }} FCFA</span>
+                                        </div>
+                                    </div>
+                                    <div class="hub-order-card__footer">
+                                        <a href="{% url 'orders:driver_order_detail' order.id %}"
+                                           class="btn btn-light btn-sm">
+                                            Ouvrir
+                                        </a>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="muted">
+                            Aucune course récente dans la période sélectionnée.
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    {% else %}
+        <!-- Cas où l'utilisateur n'a pas de DeliveryPartner -->
+        <div class="card">
+            <h2 class="section-title">Pas de profil livreur associé</h2>
+            <p class="muted">
+                Votre compte n’est pas rattaché à un profil livreur FAGNI.
+                Vérifiez que l’email de connexion correspond bien à celui
+                enregistré pour le livreur, ou contactez un administrateur.
+            </p>
+            <div class="buttons-row" style="margin-top:10px;">
+                <a href="{% url 'orders:driver_app' %}" class="btn btn-primary">
+                    Accéder à la vue App livreur (mode back-office)
+                </a>
+            </div>
+        </div>
+    {% endif %}
+
+</div>
+
+<style>
+    .driver-hub {
+        max-width: 1100px;
+        margin: 0 auto 24px;
+    }
+
+    .card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 14px 16px;
+        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+        border: 1px solid #e2e8f0;
+        margin-bottom: 14px;
+    }
+
+    .btn-pill {
+        border-radius: 999px !important;
+    }
+
+    .hub-identity {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        border-left: 4px solid #0056b3;
+    }
+
+    .hub-identity__label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #64748b;
+    }
+
+    .hub-identity__name {
+        font-size: 18px;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .hub-identity__phone {
+        font-size: 12px;
+        color: #64748b;
+        margin-top: 2px;
+    }
+
+    .hub-identity__right {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    /* Carte période */
+    .hub-period-card {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .hub-period-header {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .hub-period-title {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #475569;
+        font-weight: 600;
+    }
+
+    .hub-period-sub {
+        font-size: 12px;
+        color: #64748b;
+    }
+
+    .hub-period-switch {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 4px;
+    }
+
+    .hub-period-pill {
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid #cbd5f5;
+        font-size: 12px;
+        color: #1e293b;
+        text-decoration: none;
+        background: #f8fafc;
+    }
+
+    .hub-period-pill--active {
+        background: #0056b3;
+        color: #ffffff;
+        border-color: #0056b3;
+    }
+
+    .hub-kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .kpi-card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 10px 12px;
+        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+        border-left: 4px solid transparent;
+    }
+
+    .kpi-card--full {
+        grid-column: 1 / -1;
+    }
+
+    .kpi-label {
+        font-size: 11px;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    .kpi-value {
+        font-size: 20px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-top: 2px;
+    }
+
+    .kpi-sub {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-top: 2px;
+    }
+
+    .kpi-unit {
+        font-size: 12px;
+        font-weight: 500;
+        margin-left: 4px;
+    }
+
+    .kpi-card--blue {
+        border-left-color: #0056b3;
+    }
+
+    .kpi-card--orange {
+        border-left-color: #ff7a00;
+    }
+
+    .kpi-card--green {
+        border-left-color: #16a34a;
+    }
+
+    .kpi-card--red {
+        border-left-color: #dc2626;
+    }
+
+    .hub-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 14px;
+    }
+
+    .hub-section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 8px;
+        margin-bottom: 6px;
+    }
+
+    .section-title {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #475569;
+        font-weight: 600;
+    }
+
+    .section-link {
+        font-size: 12px;
+        color: #2563eb;
+        text-decoration: none;
+    }
+
+    .section-link:hover {
+        text-decoration: underline;
+    }
+
+    .hub-orders-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .hub-order-card {
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        padding: 8px 10px;
+        background: #f9fafb;
+    }
+
+    .hub-order-card--compact {
+        background: #ffffff;
+    }
+
+    .hub-order-card__header {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: flex-start;
+        margin-bottom: 4px;
+    }
+
+    .hub-order-code {
+        font-size: 14px;
+        font-weight: 600;
+        color: #0f172a;
+    }
+
+    .hub-order-date {
+        font-size: 11px;
+        color: #64748b;
+    }
+
+    .hub-order-status {
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-weight: 600;
+        border: 1px solid transparent;
+        white-space: nowrap;
+    }
+
+    .hub-order-status--pending {
+        background: #fef3c7;
+        color: #92400e;
+        border-color: #fde68a;
+    }
+
+    .hub-order-status--in_progress {
+        background: #dbeafe;
+        color: #1d4ed8;
+        border-color: #bfdbfe;
+    }
+
+    .hub-order-status--done {
+        background: #dcfce7;
+        color: #166534;
+        border-color: #bbf7d0;
+    }
+
+    .hub-order-status--canceled {
+        background: #fee2e2;
+        color: #b91c1c;
+        border-color: #fecaca;
+    }
+
+    .hub-order-card__body {
+        margin-bottom: 4px;
+    }
+
+    .hub-order-line {
+        display: flex;
+        gap: 6px;
+        font-size: 12px;
+        color: #334155;
+        margin-top: 2px;
+    }
+
+    .hub-order-line .label {
+        font-weight: 500;
+        color: #64748b;
+    }
+
+    .hub-order-card__footer {
+        margin-top: 4px;
+        border-top: 1px dashed #e2e8f0;
+        padding-top: 4px;
+    }
+
+    .buttons-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .muted {
+        font-size: 12px;
+        color: #94a3b8;
+    }
+
+    @media (max-width: 900px) {
+        .hub-grid {
+            grid-template-columns: 1fr;
+        }
+        .hub-identity {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .hub-identity__right {
+            justify-content: flex-start;
+        }
+    }
+</style>
+
+{% endblock %}

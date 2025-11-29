@@ -139,6 +139,13 @@ class Order(models.Model):
     created_at = models.DateTimeField("Créée le", auto_now_add=True)
     updated_at = models.DateTimeField("Mise à jour le", auto_now=True)
 
+    notes = models.TextField(
+        "Notes / instructions internes",
+        blank=True,
+        null=True,
+        help_text="Notes internes sur la commande (consignes, contexte, etc.)",
+    )
+
     # --------- Montants ---------
     total = models.DecimalField(
         "Total prestations TTC",
@@ -622,6 +629,110 @@ class Order(models.Model):
 
 
 # =====================
+#  JAMBES DE LIVRAISON
+# =====================
+class DeliveryLeg(models.Model):
+    """
+    Une "jambe" de livraison pour une commande FAGNI.
+
+    Exemples :
+    - leg_type = "pickup" : Client -> Blanchisserie
+    - leg_type = "return" : Blanchisserie -> Client
+
+    But :
+    - Permettre que la collecte et la livraison finale
+      soient réalisées par des livreurs différents.
+    - Pouvoir suivre les montants (part livreur / part FAGNI)
+      par jambe.
+    """
+
+    LEG_TYPE_CHOICES = [
+        ("pickup", "Client → Blanchisserie"),
+        ("return", "Blanchisserie → Client"),
+    ]
+
+    STATUS_CHOICES = [
+        ("pending", "En attente"),
+        ("assigned", "Assignée"),
+        ("in_progress", "En cours"),
+        ("done", "Terminée"),
+        ("canceled", "Annulée"),
+    ]
+
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="legs",
+        verbose_name="Commande",
+    )
+
+    driver = models.ForeignKey(
+        DeliveryPartner,
+        on_delete=models.PROTECT,
+        related_name="delivery_legs",
+        verbose_name="Livreur partenaire",
+    )
+
+    leg_type = models.CharField(
+        "Type de jambe",
+        max_length=20,
+        choices=LEG_TYPE_CHOICES,
+    )
+
+    status = models.CharField(
+        "Statut",
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending",
+    )
+
+    # Distance pour cette jambe (souvent l'aller simple)
+    distance_km = models.DecimalField(
+        "Distance (km)",
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+
+    # Part du prix de livraison rattachée à cette jambe
+    client_fee_share = models.DecimalField(
+        "Part client (FCFA)",
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+    )
+
+    # Montant versé au livreur pour cette jambe
+    driver_amount = models.DecimalField(
+        "Montant livreur (FCFA)",
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+    )
+
+    # Marge FAGNI sur cette jambe
+    fagni_margin = models.DecimalField(
+        "Marge FAGNI (FCFA)",
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+    )
+
+    created_at = models.DateTimeField("Créée le", auto_now_add=True)
+    started_at = models.DateTimeField("Début de la course", null=True, blank=True)
+    finished_at = models.DateTimeField("Fin de la course", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Jambe de livraison"
+        verbose_name_plural = "Jambes de livraison"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.get_leg_type_display()} - {self.order.code} - {self.driver}"
+
+
+# =====================
 #  LIGNE DE COMMANDE
 # =====================
 class OrderItem(models.Model):
@@ -751,3 +862,26 @@ class ServiceItem(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.category})"
+
+
+class OrderStatusHistory(models.Model):
+    order = models.ForeignKey(
+        "Order",
+        related_name="status_history",
+        on_delete=models.CASCADE
+    )
+    previous_status = models.CharField(max_length=50, blank=True, null=True)
+    new_status = models.CharField(max_length=50)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL
+    )
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-changed_at"]
+
+    def __str__(self):
+        return f"{self.order.code} : {self.previous_status} → {self.new_status} ({self.changed_at})"

@@ -1,206 +1,477 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard financier FAGNI{% endblock %}
+{% block title %}Dashboard financier – FAGNI{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+<style>
+  .fin-page{
+    max-width:1100px;
+    margin:20px auto 30px;
+    padding:0 12px;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    color:#111827;
+  }
+  .fin-header{
+    margin-bottom:18px;
+  }
+  .fin-header h1{
+    margin:0 0 4px;
+    font-size:22px;
+    font-weight:700;
+  }
+  .fin-header p{
+    margin:0;
+    font-size:13px;
+    color:#6b7280;
+  }
+  .fin-header-small{
+    margin-top:4px;
+    font-size:11px;
+    color:#9ca3af;
+  }
 
-  <!-- Header + filtres -->
-  <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-    <div>
-      <h1 class="text-2xl font-bold text-gray-900">
-        Dashboard financier FAGNI
-      </h1>
-      <p class="text-sm text-gray-500">
-        Encaissements, restes à payer, structure de paiement des commandes.
-      </p>
+  /* KPI */
+  .fin-kpi-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+  }
+  @media(max-width:900px){
+    .fin-kpi-grid{grid-template-columns:repeat(2,1fr);}
+  }
+  @media(max-width:640px){
+    .fin-kpi-grid{grid-template-columns:1fr;}
+  }
+
+  .fin-card{
+    background:#ffffff;
+    border-radius:12px;
+    border:1px solid #e5e7eb;
+    box-shadow:0 4px 10px rgba(15,23,42,0.04);
+    padding:10px 12px;
+  }
+  .fin-card-title{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    color:#6b7280;
+    margin-bottom:4px;
+  }
+  .fin-card-value{
+    font-size:20px;
+    font-weight:700;
+    margin-bottom:2px;
+  }
+  .fin-card-sub{
+    font-size:11px;
+    color:#9ca3af;
+  }
+  .fin-card-accent-orange{border-top:3px solid #ff7a00;}
+  .fin-card-accent-blue{border-top:3px solid #0056b3;}
+  .fin-card-accent-green{border-top:3px solid #16a34a;}
+  .fin-card-accent-amber{border-top:3px solid #f59e0b;}
+
+  .fin-tag-pill{
+    display:inline-block;
+    padding:2px 7px;
+    border-radius:999px;
+    background:#eef2ff;
+    color:#3730a3;
+    font-size:10px;
+    margin-left:4px;
+  }
+
+  /* Layout bas : répartition + tableau */
+  .fin-layout{
+    margin-top:18px;
+    display:grid;
+    grid-template-columns:1.3fr 1.7fr;
+    gap:14px;
+  }
+  @media(max-width:900px){
+    .fin-layout{grid-template-columns:1fr;}
+  }
+
+  .fin-box{
+    background:#ffffff;
+    border-radius:12px;
+    border:1px solid #e5e7eb;
+    box-shadow:0 4px 10px rgba(15,23,42,0.04);
+    padding:14px 16px;
+  }
+  .fin-box h2{
+    margin:0 0 6px;
+    font-size:15px;
+  }
+  .fin-box p{
+    margin:0 0 4px;
+    font-size:12px;
+    color:#4b5563;
+  }
+
+  .fin-metric-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:4px;
+    padding:4px 0;
+    border-bottom:1px dashed #e5e7eb;
+    font-size:13px;
+  }
+  .fin-metric-row:last-child{
+    border-bottom:none;
+  }
+  .fin-metric-label{
+    color:#4b5563;
+  }
+  .fin-metric-value{
+    font-weight:600;
+  }
+  .fin-metric-badge{
+    font-size:10px;
+    padding:2px 6px;
+    border-radius:999px;
+    background:#f9fafb;
+    color:#6b7280;
+    margin-left:6px;
+  }
+
+  .fin-note{
+    margin-top:8px;
+    font-size:11px;
+    color:#9ca3af;
+  }
+
+  /* Tableau commandes */
+  .fin-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12px;
+    margin-top:8px;
+  }
+  .fin-table th,
+  .fin-table td{
+    padding:6px 5px;
+    border-bottom:1px solid #e5e7eb;
+    vertical-align:top;
+  }
+  .fin-table th{
+    background:#f9fafb;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+    color:#6b7280;
+    white-space:nowrap;
+  }
+  .fin-row{
+    transition:background .12s, transform .06s;
+  }
+  .fin-row:hover{
+    background:#f3f4ff;
+  }
+  .fin-row-alert{
+    background:#fff7f7;
+  }
+  .fin-row-alert:hover{
+    background:#fee2e2;
+  }
+  .fin-row-warning{
+    background:#fffbeb;
+  }
+  .fin-row-warning:hover{
+    background:#fef3c7;
+  }
+
+  .fin-td-right{
+    text-align:right;
+    white-space:nowrap;
+  }
+  .fin-td-nowrap{
+    white-space:nowrap;
+  }
+
+  .fin-status-badge{
+    display:inline-block;
+    padding:2px 7px;
+    border-radius:999px;
+    font-size:10px;
+    font-weight:500;
+  }
+  .fin-status-done{
+    background:#dcfce7;
+    color:#166534;
+  }
+  .fin-status-pending{
+    background:#fef9c3;
+    color:#854d0e;
+  }
+  .fin-status-in{
+    background:#e0f2fe;
+    color:#075985;
+  }
+  .fin-status-canceled{
+    background:#fee2e2;
+    color:#991b1b;
+  }
+
+  .fin-client{
+    font-weight:500;
+    font-size:12px;
+  }
+  .fin-client-sub{
+    font-size:11px;
+    color:#6b7280;
+  }
+
+  .fin-legend{
+    margin-top:8px;
+    font-size:11px;
+    color:#9ca3af;
+  }
+
+  .fin-chip{
+    display:inline-block;
+    padding:2px 6px;
+    border-radius:999px;
+    background:#f3f4ff;
+    font-size:10px;
+    color:#4338ca;
+    margin-right:4px;
+  }
+</style>
+
+<div class="fin-page">
+
+  <!-- En-tête -->
+  <div class="fin-header">
+    <h1>Dashboard financier FAGNI</h1>
+    <p>Vision globale des encaissements, marges et livraisons sur les commandes FAGNI.</p>
+    <div class="fin-header-small">
+      Période analysée :
+      {% if period_label %}
+        {{ period_label }}
+      {% elif start_date and end_date %}
+        du {{ start_date }} au {{ end_date }}
+      {% else %}
+        dernières commandes enregistrées
+      {% endif %}
     </div>
-
-    <form method="get" class="flex flex-wrap items-end gap-3">
-      <div>
-        <label class="block text-xs font-medium text-gray-500 mb-1">Du</label>
-        <input type="date" name="date_from"
-               value="{{ date_from|date:'Y-m-d' }}"
-               class="border rounded-md px-2 py-1 text-sm">
-      </div>
-      <div>
-        <label class="block text-xs font-medium text-gray-500 mb-1">Au</label>
-        <input type="date" name="date_to"
-               value="{{ date_to|date:'Y-m-d' }}"
-               class="border rounded-md px-2 py-1 text-sm">
-      </div>
-      <button type="submit"
-              class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
-        Appliquer
-      </button>
-    </form>
   </div>
 
   <!-- KPIs principaux -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <p class="text-xs font-semibold text-gray-500 uppercase">CA client (période)</p>
-      <p class="mt-2 text-2xl font-bold text-gray-900">
-        {{ total_ca_client|floatformat:0 }} <span class="text-sm font-semibold">FCFA</span>
-      </p>
-      <p class="mt-1 text-xs text-gray-500">
-        Prestations : {{ total_prestations|floatformat:0 }} ·
-        Service : {{ total_service|floatformat:0 }} ·
-        Livraison : {{ total_delivery|floatformat:0 }}
-      </p>
+  <div class="fin-kpi-grid">
+    <div class="fin-card fin-card-accent-blue">
+      <div class="fin-card-title">Chiffre d’affaires cumulé (TTC)</div>
+      <div class="fin-card-value">
+        {{ total_ttc|default:0|floatformat:0 }} FCFA
+      </div>
+      <div class="fin-card-sub">
+        Somme du TTC client (prestations + TVA).
+      </div>
     </div>
 
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <p class="text-xs font-semibold text-gray-500 uppercase">Marge FAGNI</p>
-      <p class="mt-2 text-2xl font-bold text-amber-600">
-        {{ total_marge_fagni|floatformat:0 }} <span class="text-sm font-semibold text-gray-700">FCFA</span>
-      </p>
-      <p class="mt-1 text-xs text-gray-500">
-        Logistique : {{ total_logistic_margin|floatformat:0 }} FCFA
-      </p>
+    <div class="fin-card fin-card-accent-orange">
+      <div class="fin-card-title">Service FAGNI cumulé</div>
+      <div class="fin-card-value">
+        {{ total_service|default:0|floatformat:0 }} FCFA
+      </div>
+      <div class="fin-card-sub">
+        Commissions FAGNI sur la période.
+      </div>
     </div>
 
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <p class="text-xs font-semibold text-gray-500 uppercase">Encaissements</p>
-      <p class="mt-2 text-2xl font-bold text-emerald-600">
-        {{ total_paid|floatformat:0 }} <span class="text-sm font-semibold text-gray-700">FCFA</span>
-      </p>
-      <p class="mt-1 text-xs text-gray-500">
-        Restant dû : <span class="font-semibold text-rose-600">{{ total_due|floatformat:0 }} FCFA</span>
-      </p>
+    <div class="fin-card fin-card-accent-amber">
+      <div class="fin-card-title">Livraison facturée aux clients</div>
+      <div class="fin-card-value">
+        {{ total_delivery|default:0|floatformat:0 }} FCFA
+      </div>
+      <div class="fin-card-sub">
+        Frais de livraison facturés (front client).
+      </div>
+    </div>
+
+    <div class="fin-card fin-card-accent-green">
+      <div class="fin-card-title">Marge logistique FAGNI</div>
+      <div class="fin-card-value">
+        {{ total_logistic_margin|default:0|floatformat:0 }} FCFA
+      </div>
+      <div class="fin-card-sub">
+        Livraison facturée – coût livreur.
+      </div>
     </div>
   </div>
 
-  <!-- Structure des paiements -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <p class="text-xs font-semibold text-gray-500 uppercase">Commandes soldées</p>
-      <p class="mt-2 text-2xl font-bold text-emerald-600">
-        {{ fully_paid_count }}
-      </p>
-      <p class="mt-1 text-xs text-gray-500">
-        Montant encaissé : {{ total_paid|floatformat:0 }} FCFA (toutes commandes)
-      </p>
-    </div>
+  <!-- Layout bas : répartition + tableau -->
+  <div class="fin-layout">
 
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <p class="text-xs font-semibold text-gray-500 uppercase">Partiellement payées</p>
-      <p class="mt-2 text-2xl font-bold text-amber-500">
-        {{ partially_paid_count }}
-      </p>
-      <p class="mt-1 text-xs text-gray-500">
-        Ces commandes ont un payé & un dû.
-      </p>
-    </div>
+    <!-- Colonne gauche : synthèse + repartitions -->
+    <div class="fin-box">
+      <h2>Répartition & synthèse</h2>
+      <p>Vue condensée des flux financiers sur la période sélectionnée.</p>
 
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <p class="text-xs font-semibold text-gray-500 uppercase">Impayées</p>
-      <p class="mt-2 text-2xl font-bold text-rose-600">
-        {{ unpaid_count }}
-      </p>
-      <p class="mt-1 text-xs text-gray-500">
-        Montant encore dû (toutes commandes) : {{ total_due|floatformat:0 }} FCFA
-      </p>
-    </div>
-  </div>
-
-  <!-- Listes: impayées & partiellement payées -->
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <!-- Impayées -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-        <p class="text-sm font-semibold text-gray-800">Commandes impayées (top 20)</p>
+      <div class="fin-metric-row">
+        <div class="fin-metric-label">
+          Commandes totales
+        </div>
+        <div class="fin-metric-value">
+          {{ total_orders|default:0 }}
+          <span class="fin-metric-badge">toutes statuts</span>
+        </div>
       </div>
-      <div class="overflow-x-auto">
-        <table class="min-w-full text-sm">
-          <thead class="bg-gray-50">
+
+      <div class="fin-metric-row">
+        <div class="fin-metric-label">
+          Commandes livrées (done)
+        </div>
+        <div class="fin-metric-value">
+          {{ total_orders_done|default:0 }}
+          <span class="fin-metric-badge">livraison confirmée</span>
+        </div>
+      </div>
+
+      <div class="fin-metric-row">
+        <div class="fin-metric-label">
+          Encaissements enregistrés
+        </div>
+        <div class="fin-metric-value">
+          {{ total_paid|default:0|floatformat:0 }} FCFA
+        </div>
+      </div>
+
+      <div class="fin-metric-row">
+        <div class="fin-metric-label">
+          Restant dû estimé
+        </div>
+        <div class="fin-metric-value">
+          {{ total_due|default:0|floatformat:0 }} FCFA
+        </div>
+      </div>
+
+      <div class="fin-metric-row">
+        <div class="fin-metric-label">
+          Coût livreurs (logistique)
+        </div>
+        <div class="fin-metric-value">
+          {{ total_driver_cost|default:0|floatformat:0 }} FCFA
+        </div>
+      </div>
+
+      <div class="fin-note">
+        Les montants “payé” et “dû” sont calculés à partir des propriétés
+        <code>order.amount_paid</code> et <code>order.amount_due</code> côté modèle,
+        sans champ dédié en base.
+      </div>
+
+      <div class="fin-note" style="margin-top:10px;">
+        <span class="fin-chip">🔴 Ligne rouge</span> commande livrée avec montant dû &gt; 0<br>
+        <span class="fin-chip" style="background:#fef9c3;color:#854d0e;">🟡 Ligne jaune</span>
+        marge logistique ≤ 0 (livraison à perte).
+      </div>
+    </div>
+
+    <!-- Colonne droite : tableau des commandes -->
+    <div class="fin-box">
+      <h2>Commandes détaillées</h2>
+      <p>Liste des commandes prises en compte dans ce dashboard.</p>
+
+      {% if orders %}
+        <table class="fin-table">
+          <thead>
             <tr>
-              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">#</th>
-              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Client</th>
-              <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase">Montant dû</th>
-              <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase">Date</th>
+              <th>Date</th>
+              <th>Code / Client</th>
+              <th class="fin-td-right">TTC</th>
+              <th class="fin-td-right">Service</th>
+              <th class="fin-td-right">Livraison</th>
+              <th class="fin-td-right">Coût livreur</th>
+              <th class="fin-td-right">Marge logi.</th>
+              <th class="fin-td-right">Payé</th>
+              <th class="fin-td-right">Dû</th>
+              <th>Statut</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-100">
-            {% if unpaid_orders %}
-              {% for o in unpaid_orders %}
-                <tr class="hover:bg-gray-50">
-                  <td class="px-3 py-2 text-xs text-gray-500">{{ o.id }}</td>
-                  <td class="px-3 py-2 text-sm text-gray-800">
+          <tbody>
+            {% for o in orders %}
+              {% with due=o.amount_due paid=o.amount_paid %}
+              <tr class="fin-row
+                  {% if due and due > 0 %}
+                    fin-row-alert
+                  {% elif o.logistic_margin and o.logistic_margin <= 0 %}
+                    fin-row-warning
+                  {% endif %}
+              ">
+                <td class="fin-td-nowrap">
+                  {{ o.created_at|date:"d/m/Y" }}<br>
+                  <span class="fin-client-sub">
+                    {{ o.created_at|date:"H:i" }}
+                  </span>
+                </td>
+                <td>
+                  <div class="fin-client">
+                    {{ o.code|default:o.id }}
+                  </div>
+                  <div class="fin-client-sub">
                     {% if o.customer %}
-                      {{ o.customer.name }}<br>
-                      <span class="text-xs text-gray-500">{{ o.customer.phone }}</span>
+                      {{ o.customer.name }}
+                      {% if o.customer.phone %}
+                        • {{ o.customer.phone }}
+                      {% endif %}
                     {% else %}
-                      <span class="text-xs text-gray-400">(Sans client)</span>
+                      Client non renseigné
                     {% endif %}
-                  </td>
-                  <td class="px-3 py-2 text-right text-sm font-semibold text-rose-600">
-                    {{ o.amount_due|floatformat:0 }} FCFA
-                  </td>
-                  <td class="px-3 py-2 text-right text-xs text-gray-500">
-                    {{ o.created_at|date:"d/m/Y H:i" }}
-                  </td>
-                </tr>
-              {% endfor %}
-            {% else %}
-              <tr>
-                <td colspan="4" class="px-3 py-6 text-center text-sm text-gray-500">
-                  Aucune commande impayée sur cette période.
+                  </div>
+                </td>
+                <td class="fin-td-right">
+                  {{ o.total_ttc|default:o.total|default:0|floatformat:0 }}
+                </td>
+                <td class="fin-td-right">
+                  {{ o.service_fee|default:0|floatformat:0 }}
+                </td>
+                <td class="fin-td-right">
+                  {{ o.delivery_fee|default:0|floatformat:0 }}
+                </td>
+                <td class="fin-td-right">
+                  {{ o.driver_logistic_cost|default:0|floatformat:0 }}
+                </td>
+                <td class="fin-td-right">
+                  {{ o.logistic_margin|default:0|floatformat:0 }}
+                </td>
+                <td class="fin-td-right">
+                  {{ paid|default:0|floatformat:0 }}
+                </td>
+                <td class="fin-td-right">
+                  {{ due|default:0|floatformat:0 }}
+                </td>
+                <td>
+                  {% if o.status == "done" %}
+                    <span class="fin-status-badge fin-status-done">Terminée</span>
+                  {% elif o.status == "pending" %}
+                    <span class="fin-status-badge fin-status-pending">En attente</span>
+                  {% elif o.status == "in_progress" %}
+                    <span class="fin-status-badge fin-status-in">En cours</span>
+                  {% elif o.status == "canceled" %}
+                    <span class="fin-status-badge fin-status-canceled">Annulée</span>
+                  {% else %}
+                    <span class="fin-status-badge">{{ o.get_status_display }}</span>
+                  {% endif %}
                 </td>
               </tr>
-            {% endif %}
+              {% endwith %}
+            {% endfor %}
           </tbody>
         </table>
+      {% else %}
+        <p class="fin-legend">
+          Aucune commande à afficher pour cette période / ce filtre.
+        </p>
+      {% endif %}
+
+      <div class="fin-legend">
+        Astuce : utilise ce tableau comme base d’export CSV / XLSX pour la comptabilité,
+        le reporting investisseur ou le suivi mensuel.
       </div>
     </div>
 
-    <!-- Partiellement payées -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-        <p class="text-sm font-semibold text-gray-800">Commandes partiellement payées (top 20)</p>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="min-w-full text-sm">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">#</th>
-              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Client</th>
-              <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase">Payé</th>
-              <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase">Dû</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            {% if partial_orders %}
-              {% for o in partial_orders %}
-                <tr class="hover:bg-gray-50">
-                  <td class="px-3 py-2 text-xs text-gray-500">{{ o.id }}</td>
-                  <td class="px-3 py-2 text-sm text-gray-800">
-                    {% if o.customer %}
-                      {{ o.customer.name }}<br>
-                      <span class="text-xs text-gray-500">{{ o.customer.phone }}</span>
-                    {% else %}
-                      <span class="text-xs text-gray-400">(Sans client)</span>
-                    {% endif %}
-                  </td>
-                  <td class="px-3 py-2 text-right text-sm text-emerald-600">
-                    {{ o.amount_paid|floatformat:0 }} FCFA
-                  </td>
-                  <td class="px-3 py-2 text-right text-sm text-amber-600">
-                    {{ o.amount_due|floatformat:0 }} FCFA
-                  </td>
-                </tr>
-              {% endfor %}
-            {% else %}
-              <tr>
-                <td colspan="4" class="px-3 py-6 text-center text-sm text-gray-500">
-                  Aucune commande partiellement payée sur cette période.
-                </td>
-              </tr>
-            {% endif %}
-          </tbody>
-        </table>
-      </div>
-    </div>
   </div>
 
 </div>

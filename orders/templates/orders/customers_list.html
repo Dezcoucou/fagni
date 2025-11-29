@@ -1,442 +1,517 @@
-{% extends "base.html" %}
-{% load humanize %}
+kk{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Clients FAGNI{% endblock %}
 
 {% block content %}
+
 <style>
-    body{
-        background:#f5f5f7;
-    }
-    header{
-        background:linear-gradient(90deg,#ff7a00,#0056b3);
-        color:#fff;
-        padding:16px 24px;
-        margin:0 -12px 0 -12px;
-    }
-    header h1{
-        margin:0;
-        font-size:20px;
-    }
-    header p{
-        margin:4px 0 0;
-        font-size:13px;
-        opacity:.9;
-    }
-    .page{
-        max-width:1200px;
-        margin:20px auto 30px;
-        padding:0 10px;
-    }
-    .card{
-        background:#fff;
-        border-radius:10px;
-        box-shadow:0 4px 10px rgba(0,0,0,0.05);
-        padding:14px 18px 18px;
-        margin-bottom:14px;
-    }
-    .top-bar{
-        display:flex;
-        justify-content:space-between;
-        align-items:flex-start;
-        gap:10px;
-        flex-wrap:wrap;
-        margin-bottom:10px;
-    }
+/* ========= GLOBAL LAYOUT ========= */
+.fagni-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 16px 16px 32px;
+    font-size: 14px;
+}
 
-    .btn-link{
-        text-decoration:none;
-        display:inline-block;
-        border-radius:999px;
-        padding:7px 12px;
-        font-size:13px;
-    }
-    .btn-primary{
-        background:#0056b3;
-        color:#fff;
-        border:none;
-    }
-    .btn-primary:hover{
-        background:#00408a;
-    }
-    .btn-secondary{
-        background:#fff;
-        border:1px solid #ccc;
-        color:#333;
-    }
-    .btn-secondary:hover{
-        background:#f3f3f3;
-    }
+/* ========= HEADER ========= */
+.fagni-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 20px;
+}
+.fagni-header-left h1 {
+    margin: 0 0 4px;
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: #111827;
+}
+.fagni-header-left p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 0.95rem;
+}
+.fagni-header-right {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+}
 
-    .mini{
-        font-size:11px;
-        color:#666;
-    }
+/* ========= BUTTONS (reuse style proches de base) ========= */
+.fg-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    padding: 7px 14px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.fg-btn-primary {
+    background: linear-gradient(90deg, #ff7a00, #f97316);
+    color: #ffffff;
+    border-color: #f97316;
+}
+.fg-btn-primary:hover {
+    background: linear-gradient(90deg, #ea580c, #c2410c);
+    box-shadow: 0 10px 25px rgba(248, 113, 22, 0.40);
+}
+.fg-btn-dark {
+    background: #0f172a;
+    color: #ffffff;
+    border-color: #111827;
+}
+.fg-btn-dark:hover {
+    background: #020617;
+}
+.fg-btn-outline {
+    background: #ffffff;
+    border-color: #d1d5db;
+    color: #374151;
+}
+.fg-btn-outline:hover {
+    background: #f9fafb;
+}
+.fg-btn-link {
+    border: none;
+    background: transparent;
+    color: #2563eb;
+    padding: 0;
+    font-size: 0.85rem;
+    text-decoration: none;
+}
+.fg-btn-link:hover {
+    text-decoration: underline;
+}
 
-    /* Filtres */
-    .filters{
-        display:flex;
-        flex-wrap:wrap;
-        gap:8px;
-        align-items:flex-end;
-        font-size:12px;
-        margin-bottom:10px;
-    }
-    .filters .field{
-        display:flex;
-        flex-direction:column;
-        gap:2px;
-    }
-    .filters label{
-        font-size:11px;
-        color:#666;
-    }
-    .filters input[type="text"],
-    .filters select{
-        padding:5px 7px;
-        border-radius:999px;
-        border:1px solid #ddd;
-        font-size:12px;
-        min-width:150px;
-    }
-    .filters button{
-        border-radius:999px;
-        border:none;
-        padding:6px 12px;
-        font-size:12px;
-        cursor:pointer;
-    }
-    .btn-filter{
-        background:#0056b3;
-        color:#fff;
-    }
-    .btn-filter:hover{
-        background:#00408a;
-    }
-    .btn-reset{
-        background:#fff;
-        color:#333;
-        border:1px solid #ccc;
-        text-decoration:none;
-        display:inline-block;
-        padding:6px 12px;
-        border-radius:999px;
-        font-size:12px;
-    }
-    .btn-reset:hover{
-        background:#f3f3f3;
-    }
+/* ========= KPIs ========= */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.kpi-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 12px 14px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+    border: 1px solid #e5e7eb;
+}
+.kpi-label {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-bottom: 4px;
+}
+.kpi-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #111827;
+}
+.kpi-unit {
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-left: 4px;
+    color: #6b7280;
+}
+.kpi-extra {
+    margin-top: 4px;
+    font-size: 0.8rem;
+    color: #4b5563;
+}
+.kpi-accent {
+    border-color: #ff7a00;
+    box-shadow: 0 1px 4px rgba(255, 122, 0, 0.18);
+}
 
-    /* Stat cards */
-    .cards{
-        display:grid;
-        grid-template-columns:repeat(4,1fr);
-        gap:10px;
-        margin-top:8px;
-    }
-    @media(max-width:900px){
-        .cards{ grid-template-columns:repeat(2,1fr); }
-    }
-    @media(max-width:600px){
-        .cards{ grid-template-columns:1fr; }
-    }
-    .stat-card{
-        background:#f8f9fb;
-        border-radius:10px;
-        padding:10px 12px;
-    }
-    .stat-label{
-        font-size:11px;
-        color:#666;
-        margin-bottom:2px;
-    }
-    .stat-value{
-        font-size:18px;
-        font-weight:600;
-    }
-    .stat-sub{
-        font-size:11px;
-        color:#777;
-        margin-top:2px;
-    }
+/* ========= FILTERS ========= */
+.filters-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 12px 14px;
+    border: 1px solid #e5e7eb;
+    margin-bottom: 20px;
+}
+.filters-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.filters-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 12px;
+}
+.filters-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+.fg-form-group label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #4b5563;
+    margin-bottom: 4px;
+}
+.fg-form-group input {
+    width: 100%;
+    padding: 7px 9px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.fg-form-group input:focus {
+    border-color: #ff7a00;
+    box-shadow: 0 0 0 1px rgba(255, 122, 0, 0.25);
+}
 
-    /* Tableau clients */
-    table{
-        width:100%;
-        border-collapse:collapse;
-        font-size:13px;
-        margin-top:8px;
-    }
-    th,td{
-        padding:7px 5px;
-        border-bottom:1px solid #eee;
-        vertical-align:top;
-    }
-    th{
-        background:#fafafa;
-        font-weight:600;
-        white-space:nowrap;
-    }
-    tr:hover{
-        background:#fafafa;
-    }
-    .t-right{ text-align:right; }
-    .t-nowrap{ white-space:nowrap; }
+/* ========= TABLE ========= */
+.table-card {
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    padding: 12px 14px 16px;
+}
+.table-header {
+    margin-bottom: 8px;
+}
+.table-header h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #111827;
+}
+.table-header p {
+    margin: 2px 0 0;
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+.table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+}
+.fg-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.fg-table thead {
+    background: #f9fafb;
+}
+.fg-table th,
+.fg-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: left;
+    vertical-align: top;
+}
+.fg-table th {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+.fg-table tr:last-child td {
+    border-bottom: none;
+}
+.table-empty {
+    text-align: center;
+    padding: 18px 8px;
+    font-size: 0.9rem;
+    color: #6b7280;
+}
 
-    .badge-segment{
-        display:inline-block;
-        padding:2px 6px;
-        border-radius:999px;
-        font-size:10px;
-    }
-    .badge-vip{
-        background:#fbe4ff;
-        color:#7b248c;
-    }
-    .badge-regular{
-        background:#edf4ff;
-        color:#234f9c;
-    }
-    .badge-risk{
-        background:#fff3cd;
-        color:#856404;
-    }
+/* ========= CELLS ========= */
+.cell-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.cell-title {
+    font-weight: 500;
+    color: #111827;
+}
+.cell-sub {
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+.cell-actions {
+    text-align: right;
+}
 
-    .link-detail{
-        font-size:11px;
-        color:#0056b3;
-        text-decoration:none;
-    }
-    .link-detail:hover{
-        text-decoration:underline;
-    }
+/* ========= BADGES + ROW STATES ========= */
+.fg-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+.fg-badge-muted {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+.row-inactive {
+    background: #f9fafb;
+}
+.row-inactive .cell-title {
+    color: #6b7280;
+}
 
-    .empty{
-        padding:16px 0;
-        text-align:center;
-        font-size:13px;
-        color:#777;
+/* ========= RESPONSIVE ========= */
+@media (max-width: 900px) {
+    .kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    .legend{
-        margin-top:8px;
-        font-size:11px;
-        color:#666;
+}
+@media (max-width: 640px) {
+    .fagni-header {
+        flex-direction: column;
+        align-items: flex-start;
     }
+    .fagni-header-right {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    .kpi-grid {
+        grid-template-columns: 1fr;
+    }
+    .filters-grid {
+        grid-template-columns: 1fr;
+    }
+    .fg-table th:nth-child(2),
+    .fg-table td:nth-child(2) {
+        display: none;
+    }
+}
 </style>
 
-<header>
-    <h1>Clients FAGNI – Mini CRM</h1>
-    <p>Vue consolidée de vos clients : volume de commandes, montants cumulés et encours.</p>
-</header>
+<div class="fagni-page">
 
-<div class="page">
+    <!-- HEADER -->
+    <div class="fagni-header">
+        <div class="fagni-header-left">
+            <h1>Portefeuille clients FAGNI</h1>
+            <p>
+                Vue globale de tes clients, du nombre de commandes et des montants générés
+                (prestations, service FAGNI, livraison).
+            </p>
+        </div>
+        <div class="fagni-header-right">
+            <a href="{% url 'orders:list' %}" class="fg-btn fg-btn-outline">
+                ← Retour aux commandes
+            </a>
+            <a href="{% url 'orders:export_customers_csv' %}?q={{ q }}&min_orders={{ min_orders }}" class="fg-btn fg-btn-dark">
+                Export CSV
+            </a>
+            <a href="{% url 'orders:export_customers_xlsx' %}?q={{ q }}&min_orders={{ min_orders }}" class="fg-btn fg-btn-primary">
+                Export Excel
+            </a>
+        </div>
+    </div>
 
-    <!-- Carte haut de page -->
-    <div class="card">
-        <div class="top-bar">
-            <div>
-                <div style="font-size:14px;font-weight:600;">
-                    Portefeuille clients
-                </div>
-                <div class="mini">
-                    Filtrez par nom, téléphone ou nombre minimum de commandes pour cibler vos actions.
-                </div>
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-                <a href="{% url 'orders:list' %}" class="btn-link btn-secondary">
-                    📋 Liste des commandes
-                </a>
-                <a href="{% url 'orders:dashboard' %}" class="btn-link btn-secondary">
-                    📊 Dashboard commandes
-                </a>
-                <a href="{% url 'orders:finance_dashboard' %}" class="btn-link btn-secondary">
-                    💰 Dashboard financier
-                </a>
-                <a href="{% url 'orders:ops_dashboard' %}" class="btn-link btn-secondary">
-                    🚦 Tableau Ops
-                </a>
+    <!-- KPIs -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">Nombre total de clients</div>
+            <div class="kpi-value">{{ total_customers }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Clients avec au moins 1 commande</div>
+            <div class="kpi-value">{{ total_with_orders }}</div>
+            <div class="kpi-extra">
+                {% if total_customers %}
+                    {% widthratio total_with_orders total_customers 100 as active_pct %}
+                    {{ active_pct }} % d'activation
+                {% else %}
+                    0 % d'activation
+                {% endif %}
             </div>
         </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Montant total commandes</div>
+            <div class="kpi-value">
+                {{ total_amount|default:"0" }} <span class="kpi-unit">FCFA</span>
+            </div>
+        </div>
+        <div class="kpi-card kpi-accent">
+            <div class="kpi-label">Revenu FAGNI (Service + Livraison)</div>
+            <div class="kpi-value">
+                {{ total_service|default:"0"|add:total_delivery|default_if_none:"0" }} <span class="kpi-unit">FCFA</span>
+            </div>
+            <div class="kpi-extra">
+                Service : {{ total_service|default:"0" }} FCFA •
+                Livraison : {{ total_delivery|default:"0" }} FCFA
+            </div>
+        </div>
+    </div>
 
-        <!-- Filtres -->
-        <form method="get" class="filters">
-            <div class="field">
-                <label for="q">Recherche client</label>
-                <input type="text"
-                       id="q"
-                       name="q"
-                       placeholder="Nom, téléphone, email..."
-                       value="{{ q }}">
+    <!-- FILTERS -->
+    <div class="filters-card">
+        <form method="get" class="filters-form">
+            <div class="filters-grid">
+                <div class="fg-form-group">
+                    <label for="id_q">Recherche</label>
+                    <input
+                        type="text"
+                        id="id_q"
+                        name="q"
+                        value="{{ q }}"
+                        placeholder="Nom, téléphone ou adresse client…"
+                    >
+                </div>
+                <div class="fg-form-group">
+                    <label for="id_min_orders">Nombre min. de commandes</label>
+                    <input
+                        type="number"
+                        id="id_min_orders"
+                        name="min_orders"
+                        value="{{ min_orders }}"
+                        min="0"
+                        placeholder="Ex : 1, 3, 5…"
+                    >
+                </div>
             </div>
-            <div class="field">
-                <label for="min_orders">Min. commandes</label>
-                <select id="min_orders" name="min_orders">
-                    <option value="">Toutes</option>
-                    <option value="1" {% if min_orders == '1' %}selected{% endif %}>1+</option>
-                    <option value="3" {% if min_orders == '3' %}selected{% endif %}>3+</option>
-                    <option value="5" {% if min_orders == '5' %}selected{% endif %}>5+</option>
-                    <option value="10" {% if min_orders == '10' %}selected{% endif %}>10+</option>
-                </select>
-            </div>
-            <div class="field" style="flex-shrink:0;">
-                <label>&nbsp;</label>
-                <button type="submit" class="btn-filter">Appliquer</button>
-            </div>
-            <div class="field" style="flex-shrink:0;">
-                <label>&nbsp;</label>
-                <a href="{% url 'orders:customers_list' %}" class="btn-reset btn-link">Réinitialiser</a>
-            </div>
-            <div class="field" style="flex-shrink:0;margin-left:auto;">
-                <label>&nbsp;</label>
-                <a href="{% url 'orders:export_customers_csv' %}?q={{ q }}&min_orders={{ min_orders }}"
-                   class="btn-link btn-secondary">
-                    📥 Export CSV clients
+            <div class="filters-actions">
+                <button type="submit" class="fg-btn fg-btn-primary">
+                    Filtrer
+                </button>
+                <a href="{% url 'orders:customers_list' %}" class="fg-btn-link">
+                    Réinitialiser
                 </a>
             </div>
         </form>
-
-        <!-- Cartes de synthèse globales (si tu as ces variables en contexte, sinon ça s'affichera vide proprement) -->
-        <div class="cards">
-            <div class="stat-card">
-                <div class="stat-label">Nombre de clients</div>
-                <div class="stat-value">
-                    {{ total_customers|default:customers|length|intcomma }}
-                </div>
-                <div class="stat-sub">
-                    Base filtrée par les critères ci-dessus.
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Total commandes (clients affichés)</div>
-                <div class="stat-value">
-                    {{ total_orders_for_customers|default:0|floatformat:0|intcomma }}
-                </div>
-                <div class="stat-sub">
-                    Somme des commandes sur les clients visibles.
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Montant cumulé (facturé)</div>
-                <div class="stat-value">
-                    {{ total_amount_for_customers|default:0|floatformat:0|intcomma }} FCFA
-                </div>
-                <div class="stat-sub">
-                    Prestations + service FAGNI + livraison.
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Encours total (non encaissé)</div>
-                <div class="stat-value">
-                    {{ total_due_for_customers|default:0|floatformat:0|intcomma }} FCFA
-                </div>
-                <div class="stat-sub">
-                    À suivre en priorité dans les relances.
-                </div>
-            </div>
-        </div>
     </div>
 
-    <!-- Tableau clients -->
-    <div class="card">
-        <h2 style="margin:0 0 8px;font-size:16px;border-left:4px solid #ff7a00;padding-left:8px;">
-            Liste des clients
-        </h2>
-        <p class="mini" style="margin:0 0 8px;">
-            Classement par défaut : clients avec le plus de commandes / CA en premier (selon ta vue).
-        </p>
+    <!-- TABLE -->
+    <div class="table-card">
+        <div class="table-header">
+            <h2>Liste des clients</h2>
+            <p>
+                {{ total_customers }} client{{ total_customers|pluralize }}
+                au total,
+                dont {{ total_with_orders }} avec au moins une commande.
+            </p>
+        </div>
 
-        {% if customers %}
-            <table>
+        <div class="table-wrapper">
+            <table class="fg-table">
                 <thead>
                     <tr>
                         <th>Client</th>
-                        <th class="t-right">Nb commandes</th>
-                        <th class="t-right">Montant cumulé</th>
-                        <th class="t-right">Montant encaissé</th>
-                        <th class="t-right">Encours</th>
-                        <th class="t-nowrap">Dernière commande</th>
-                        <th>Segment / Actions</th>
+                        <th>Contact</th>
+                        <th>Commandes</th>
+                        <th>Montants</th>
+                        <th>Dernière commande</th>
+                        <th style="text-align:right;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                {% for c in customers %}
-                    <tr>
-                        <td>
-                            {{ c.name }}
+                    {% for c in customers %}
+                        <tr class="{% if c.total_orders == 0 %}row-inactive{% endif %}">
+                            <!-- Client -->
+                            <td>
+                                <div class="cell-main">
+                                    <div class="cell-title">
+                                        {{ c.name|default:"(Nom non renseigné)" }}
+                                    </div>
+                                    {% if c.address %}
+                                        <div class="cell-sub">
+                                            {{ c.address }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </td>
 
-                            {% if c.phone %}
-                                <div class="mini">📞 {{ c.phone }}</div>
-                            {% endif %}
+                            <!-- Contact -->
+                            <td>
+                                {% if c.phone %}
+                                    <div class="cell-main">
+                                        <div class="cell-title">
+                                            {{ c.phone }}
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <span class="fg-badge fg-badge-muted">Non renseigné</span>
+                                {% endif %}
+                            </td>
 
-                            {% if c.email %}
-                                <div class="mini">✉️ {{ c.email }}</div>
-                            {% endif %}
+                            <!-- Commandes -->
+                            <td>
+                                {% if c.total_orders %}
+                                    <div class="cell-main">
+                                        <div class="cell-title">
+                                            {{ c.total_orders }}
+                                        </div>
+                                        <div class="cell-sub">
+                                            {% if c.total_orders == 1 %}
+                                                1 commande
+                                            {% else %}
+                                                {{ c.total_orders }} commandes
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <span class="fg-badge fg-badge-muted">0 commande</span>
+                                {% endif %}
+                            </td>
 
-                            {% if c.address %}
-                                <div class="mini">📍 {{ c.address }}</div>
-                            {% endif %}
-                        </td>
-                        <td class="t-right">
-                            {{ c.orders_count|default:0|intcomma }}
-                        </td>
-                        <td class="t-right">
-                            {{ c.total_spent|default:0|intcomma }} FCFA
-                        </td>
-                        <td class="t-right">
-                            {{ c.total_paid|default:0|intcomma }} FCFA
-                        </td>
-                        <td class="t-right">
-                            {{ c.total_due|default:0|intcomma }} FCFA
-                            <br>
-                            {% if c.total_due and c.total_due > 0 %}
-                                <span class="badge-segment badge-risk">À relancer</span>
-                            {% endif %}
-                        </td>
-                        <td class="t-nowrap">
-                            {% if c.last_order_date %}
-                                <span class="mini">
+                            <!-- Montants -->
+                            <td>
+                                <div class="cell-main">
+                                    <div class="cell-title">
+                                        {{ c.total_amount|default:"0" }} FCFA
+                                    </div>
+                                    <div class="cell-sub">
+                                        Service FAGNI : {{ c.total_service_fee|default:"0" }} FCFA<br>
+                                        Livraison : {{ c.total_delivery_fee|default:"0" }} FCFA
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- Dernière commande -->
+                            <td>
+                                {% if c.last_order_date %}
                                     {{ c.last_order_date|date:"d/m/Y H:i" }}
-                                </span>
-                            {% elif c.last_order %}
-                                <span class="mini">
-                                    {{ c.last_order|date:"d/m/Y H:i" }}
-                                </span>
-                            {% else %}
-                                <span class="mini">—</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if c.is_vip %}
-                                <span class="badge-segment badge-vip">VIP</span>
-                            {% else %}
-                                <span class="badge-segment badge-regular">Standard</span>
-                            {% endif %}
-                            <br>
-                            {% if c.id %}
-                                <a href="{% url 'orders:orders_by_customer' c.id %}" class="link-detail">
-                                    Voir fiche client →
+                                {% else %}
+                                    <span class="fg-badge fg-badge-muted">Aucune commande</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Actions -->
+                            <td class="cell-actions">
+                                <a href="{% url 'orders:orders_by_customer' c.id %}" class="fg-btn-link">
+                                    Voir les commandes
                                 </a>
-                            {% elif c.customer__id %}
-                                <a href="{% url 'orders:orders_by_customer' c.customer__id %}" class="link-detail">
-                                    Voir fiche client →
-                                </a>
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% endfor %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6" class="table-empty">
+                                Aucun client trouvé avec ces filtres pour le moment.
+                                Essaie d’élargir ta recherche.
+                            </td>
+                        </tr>
+                    {% endfor %}
                 </tbody>
             </table>
-
-            <div class="legend">
-                💡 <strong>Lecture & usage :</strong><br>
-                – Les clients avec un <strong>encours élevé</strong> et un volume de commandes important sont prioritaires pour les relances.<br>
-                – Les clients <strong>VIP</strong> sont tes meilleurs candidats pour les offres d’abonnement, packs, ou services premium FAGNI.<br>
-                – Tu peux croiser cette vue avec le <strong>dashboard financier</strong> et les <strong>fiches clients détaillées</strong> pour piloter ton portefeuille.
-            </div>
-        {% else %}
-            <div class="empty">
-                Aucun client ne correspond à ces critères pour le moment.
-            </div>
-        {% endif %}
+        </div>
     </div>
 
 </div>
+
 {% endblock %}

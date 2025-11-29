@@ -138,6 +138,23 @@
         box-shadow: 0 0 0 1px rgba(0,86,179,0.15);
     }
 
+    .field-group textarea {
+        width: 100%;
+        padding: 7px 8px;
+        border-radius: 6px;
+        border: 1px solid #ddd;
+        font-size: 14px;
+        min-height: 60px;
+        resize: vertical;
+        box-sizing: border-box;
+    }
+
+    .field-group textarea:focus {
+        outline: none;
+        border-color: var(--fagni-blue);
+        box-shadow: 0 0 0 1px rgba(0,86,179,0.15);
+    }
+
     .address-row {
         display:flex;
         gap:8px;
@@ -339,6 +356,14 @@
         margin-top:2px;
     }
 
+    .sticky-totals {
+        position: sticky;
+        bottom: 0;
+        background: #fff;
+        padding-top: 8px;
+        z-index: 5;
+    }
+
     @media (max-width: 800px) {
         .grid {
             grid-template-columns: 1fr;
@@ -404,14 +429,22 @@
                             value="{{ order.customer.phone|default:'' }}"
                             placeholder="Ex : 0700000000"
                             data-lookup-url="{% url 'orders:client_lookup' %}"
+                            readonly
                         >
+                        <small style="font-size:11px;color:#777;">
+                            Le numéro se modifie depuis le compte client, pas ici.
+                        </small>
                     </div>
 
                     <div class="field-group">
                         <label for="client_name">Nom et prénoms :</label>
                         <input type="text" id="client_name" name="client_name"
                                value="{{ order.customer.name|default:'' }}"
-                               placeholder="Nom du client">
+                               placeholder="Nom du client"
+                               readonly>
+                        <small style="font-size:11px;color:#777;">
+                            Le nom du client se modifie depuis sa fiche client.
+                        </small>
                     </div>
 
                     <div class="field-group">
@@ -545,10 +578,16 @@
                                             {% if photos %}
                                                 <div class="photo-thumbs">
                                                     {% for photo in photos %}
-                                                        <a href="{{ photo.image.url }}" target="_blank">
-                                                            <img src="{{ photo.image.url }}"
-                                                                 alt="Photo article {{ item.id }}">
-                                                        </a>
+                                                        <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;">
+                                                            <a href="{{ photo.image.url }}" target="_blank">
+                                                                <img src="{{ photo.image.url }}"
+                                                                     alt="Photo article {{ item.id }}">
+                                                            </a>
+                                                            <label style="display:inline-flex;align-items:center;gap:4px;font-size:10px;">
+                                                                <input type="checkbox" name="delete_photo_{{ photo.id }}">
+                                                                Supprimer
+                                                            </label>
+                                                        </div>
                                                     {% endfor %}
                                                 </div>
                                             {% endif %}
@@ -559,6 +598,9 @@
                                                multiple
                                                style="display:none;">
                                         <button type="button" class="btn-small btn-photo">📷 Photos</button>
+                                        <button type="button" class="btn-icon btn-duplicate" title="Dupliquer la ligne">
+                                            📄
+                                        </button>
                                         <span class="photo-info"></span>
                                         <button type="button" class="btn-icon btn-remove" title="Supprimer la ligne">
                                             ✖
@@ -573,7 +615,18 @@
                         </tbody>
                     </table>
 
-                    <div class="totals-block" style="margin-top:10px;">
+                    <h2 style="margin-top:16px;">Notes / instructions</h2>
+                    <div class="field-group">
+                        <label for="order_notes">Notes internes / instructions :</label>
+                        <textarea id="order_notes"
+                                  name="order_notes"
+                                  rows="3"
+                                  style="width:100%;padding:7px 8px;border-radius:6px;border:1px solid #ddd;font-size:13px;">{{ order.notes|default:'' }}</textarea>
+                        <small style="font-size:11px;color:#777;">
+                            Ex : Client absent avant 8h, articles à traiter en urgence, consignes spécifiques, etc.
+                        </small>
+                    </div>
+                    <div class="totals-block sticky-totals" style="margin-top:10px;">
                         <p>
                             <span class="label">Total prestation :</span>
                             <span id="total_prestation" class="value">
@@ -714,7 +767,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const summaryBox = document.getElementById('summaryBox');
     const summaryContent = document.getElementById('summaryContent');
 
-    // Autocomplétion client par téléphone
+    // Autocomplétion client par téléphone (lecture seule mais utile pour adresse)
     if (phoneInput && nameInput && addressInput) {
         const lookupUrl = phoneInput.getAttribute('data-lookup-url') || '/orders/api/client/';
 
@@ -736,12 +789,6 @@ document.addEventListener('DOMContentLoaded', function () {
                         return;
                     }
 
-                    const nameVal =
-                        c.name ||
-                        c.full_name ||
-                        c.customer_name ||
-                        '';
-
                     const addressVal =
                         c.address ||
                         c.customer_address ||
@@ -751,9 +798,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     const latVal = c.latitude || c.lat || null;
                     const lngVal = c.longitude || c.lng || null;
 
-                    if (nameVal && !nameInput.value.trim()) {
-                        nameInput.value = nameVal;
-                    }
                     if (addressVal && !addressInput.value.trim()) {
                         addressInput.value = addressVal;
                     }
@@ -923,6 +967,57 @@ document.addEventListener('DOMContentLoaded', function () {
 
     recalcTotals();
 
+    // Helper pour ajouter une nouvelle ligne (création ou duplication)
+    function appendItemRow(serviceId, designation, qty, price, catName) {
+        const rowIndex = itemsTableBody.querySelectorAll('tr').length;
+        const lineTotal = qty * price;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>
+                <div class="line-designation">${designation}</div>
+                <div class="line-meta">
+                    ${catName ? `<span>${catName}</span> • ` : ""}
+                    <span>Prestation ID #${serviceId}</span>
+                </div>
+                <input type="hidden" name="item_index[]" value="${rowIndex}">
+                <input type="hidden" name="item_id[]" value="">
+                <input type="hidden" name="service_id[]" value="${serviceId}">
+                <input type="hidden" name="designation[]" value="${designation}">
+                <input type="hidden" name="quantity[]" value="${qty}">
+                <input type="hidden" name="unit_price[]" value="${price}">
+            </td>
+            <td class="num">
+                ${qty}
+            </td>
+            <td class="num">
+                ${price.toLocaleString('fr-FR')}
+            </td>
+            <td class="num" data-line-total="${lineTotal}">
+                ${lineTotal.toLocaleString('fr-FR')}
+            </td>
+            <td>
+                <input type="file"
+                       name="photos_${rowIndex}"
+                       accept="image/*"
+                       multiple
+                       capture="environment"
+                       style="display:none;">
+                <button type="button" class="btn-small btn-photo">📷 Photos</button>
+                <button type="button" class="btn-icon btn-duplicate" title="Dupliquer la ligne">
+                    📄
+                </button>
+                <span class="photo-info"></span>
+                <button type="button" class="btn-icon btn-remove" title="Supprimer la ligne">
+                    ✖
+                </button>
+                <div class="photos-preview"></div>
+            </td>
+        `;
+        itemsTableBody.appendChild(tr);
+        recalcTotals();
+    }
+
     // Ajout d'une nouvelle ligne
     if (addItemBtn && itemsTableBody) {
         addItemBtn.addEventListener('click', function () {
@@ -958,49 +1053,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 designation = serviceText;
             }
 
-            const lineTotal = qty * price;
-            const rowIndex = itemsTableBody.querySelectorAll('tr').length;
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>
-                    <div class="line-designation">${designation}</div>
-                    <div class="line-meta">
-                        ${catName ? `<span>${catName}</span> • ` : ""}
-                        <span>Prestation ID #${serviceId}</span>
-                    </div>
-                    <input type="hidden" name="item_index[]" value="${rowIndex}">
-                    <input type="hidden" name="item_id[]" value="">
-                    <input type="hidden" name="service_id[]" value="${serviceId}">
-                    <input type="hidden" name="designation[]" value="${designation}">
-                    <input type="hidden" name="quantity[]" value="${qty}">
-                    <input type="hidden" name="unit_price[]" value="${price}">
-                </td>
-                <td class="num">
-                    ${qty}
-                </td>
-                <td class="num">
-                    ${price.toLocaleString('fr-FR')}
-                </td>
-                <td class="num" data-line-total="${lineTotal}">
-                    ${lineTotal.toLocaleString('fr-FR')}
-                </td>
-                <td>
-                    <input type="file"
-                           name="photos_${rowIndex}"
-                           accept="image/*"
-                           multiple
-                           capture="environment"
-                           style="display:none;">
-                    <button type="button" class="btn-small btn-photo">📷 Photos</button>
-                    <span class="photo-info"></span>
-                    <button type="button" class="btn-icon btn-remove" title="Supprimer la ligne">
-                        ✖
-                    </button>
-                    <div class="photos-preview"></div>
-                </td>
-            `;
-            itemsTableBody.appendChild(tr);
+            appendItemRow(serviceId, designation, qty, price, catName);
 
             designationInput.value = "";
             quantityInput.value = 1;
@@ -1012,11 +1065,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 serviceSelect.value = "";
                 serviceSelect.focus();
             }
-
-            recalcTotals();
         });
 
-        // Boutons photo / suppression + preview
+        // Boutons photo / duplication / suppression + preview
         itemsTableBody.addEventListener('click', function (e) {
             if (e.target.classList.contains('btn-remove')) {
                 const tr = e.target.closest('tr');
@@ -1032,6 +1083,37 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (fileInput) {
                     fileInput.click();
                 }
+            }
+
+            if (e.target.classList.contains('btn-duplicate')) {
+                const tr = e.target.closest('tr');
+                if (!tr) return;
+
+                const serviceInput = tr.querySelector('input[name="service_id[]"]');
+                const designationHidden = tr.querySelector('input[name="designation[]"]');
+                const qtyHidden = tr.querySelector('input[name="quantity[]"]');
+                const priceHidden = tr.querySelector('input[name="unit_price[]"]');
+
+                const serviceId = serviceInput ? serviceInput.value : "";
+                const designation = designationHidden ? designationHidden.value : "";
+                const qty = qtyHidden ? parseInt(qtyHidden.value || '0', 10) : 0;
+                const price = priceHidden ? parseFloat(priceHidden.value || '0') : 0;
+
+                const meta = tr.querySelector('.line-meta');
+                let catName = "";
+                if (meta) {
+                    const spans = meta.querySelectorAll('span');
+                    if (spans.length >= 1) {
+                        catName = spans[0].textContent.trim();
+                    }
+                }
+
+                if (!serviceId || !qty || !price) {
+                    alert("Impossible de dupliquer cette ligne (données incomplètes).");
+                    return;
+                }
+
+                appendItemRow(serviceId, designation, qty, price, catName);
             }
         });
 
@@ -1108,7 +1190,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const rows = itemsTableBody.querySelectorAll('tr');
             if (!phoneInput.value.trim() || !nameInput.value.trim()) {
                 e.preventDefault();
-                alert("Veuillez renseigner au moins le nom et le téléphone du client.");
+                alert("Client invalide : vérifie le nom et le téléphone.");
                 return;
             }
             if (!rows.length) {
@@ -1121,5 +1203,15 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
-<script src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&libraries=places&callback=initMap" async defer></script>
+{% if GOOGLE_MAPS_API_KEY %}
+<script
+    src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&libraries=places&callback=initMap"
+    async
+    defer>
+</script>
+{% else %}
+<script>
+    console.warn("GOOGLE_MAPS_API_KEY non configurée : la carte ne sera pas chargée sur update.html.");
+</script>
+{% endif %}
 {% endblock %}

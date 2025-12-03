@@ -1,173 +1,144 @@
 {% load static %}
-<!doctype html>
+{% get_static_prefix as STATIC_PREFIX %}
+<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="utf-8">
-    <title>FAGNI – Plateforme pressing & services</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>{% block title %}FAGNI{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <style>
-        :root{
-            --fagni-orange:#ff7a00;
-            --fagni-blue:#0056b3;
-            --bg-body:#f5f5f7;
-        }
-        *{box-sizing:border-box;}
-        body{
-            margin:0;
-            padding:0;
-            font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-            background:var(--bg-body);
-            color:#222;
-        }
-        a{text-decoration:none;color:inherit;}
+    <link rel="icon" type="image/x-icon" href="{{ STATIC_PREFIX }}img/favicon.ico">
+    <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/site.css">
 
-        header{
-            background:linear-gradient(90deg,var(--fagni-orange),var(--fagni-blue));
-            color:#fff;
-            padding:10px 16px 12px;
-            box-shadow:0 2px 8px rgba(0,0,0,0.18);
-        }
-        .header-inner{
-            max-width:1200px;
-            margin:0 auto;
-            display:flex;
-            align-items:center;
-            justify-content:space-between;
-            gap:12px;
-            flex-wrap:wrap;
-        }
-        .brand{
-            display:flex;
-            align-items:center;
-            gap:8px;
-        }
-        .brand-mark{
-            width:32px;
-            height:32px;
-            border-radius:12px;
-            background:#fff;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            font-weight:700;
-            color:var(--fagni-orange);
-            font-size:16px;
-        }
-        .brand-text{
-            display:flex;
-            flex-direction:column;
-            line-height:1.1;
-        }
-        .brand-title{
-            font-size:18px;
-            font-weight:600;
-        }
-        .brand-sub{
-            font-size:11px;
-            opacity:.9;
-        }
-
-        .main-nav{
-            display:flex;
-            flex-wrap:wrap;
-            gap:6px;
-        }
-        .nav-group{
-            display:flex;
-            flex-wrap:wrap;
-            gap:6px;
-        }
-        .nav-link{
-            display:inline-flex;
-            align-items:center;
-            gap:4px;
-            padding:6px 10px;
-            font-size:12px;
-            border-radius:999px;
-            border:1px solid rgba(255,255,255,0.32);
-            background:rgba(0,0,0,0.08);
-            color:#fff;
-            white-space:nowrap;
-        }
-        .nav-link.primary{
-            background:#fff;
-            color:var(--fagni-blue);
-            font-weight:600;
-        }
-        .nav-link:hover{
-            background:rgba(255,255,255,0.16);
-        }
-        .nav-link.primary:hover{
-            background:#f3f3f3;
-        }
-
-        .page{
-            max-width:1200px;
-            margin:18px auto 30px;
-            padding:0 10px;
-        }
-
-        @media(max-width:800px){
-            .header-inner{
-                align-items:flex-start;
-            }
-            .main-nav{
-                width:100%;
-                justify-content:flex-start;
-            }
-        }
-    </style>
+    {# bloc pour ajouter des CSS/JS spécifiques aux pages #}
+    {% block extra_head %}{% endblock %}
 </head>
 <body>
 
-<header>
-    <div class="header-inner">
-        <div class="brand">
-            <div class="brand-mark">F</div>
-            <div class="brand-text">
-                <span class="brand-title">FAGNI</span>
-                <span class="brand-sub">Ops & Finance – Pressing digital</span>
+<!-- ============================================================
+     HEADER GLOBAL FAGNI — NAVY PREMIUM
+   ============================================================ -->
+<header class="app-shell-header">
+    <div class="app-shell-header-inner">
+
+        <!-- Branding -->
+        <a href="{% url 'orders:list' %}" class="app-shell-brand">
+            <div class="app-shell-logo-mark">
+                <span class="app-shell-logo-f">F</span>
+            </div>
+            <div class="app-shell-brand-text">
+                <span class="app-shell-brand-main">FAGNI</span>
+                <span class="app-shell-brand-sub">Laundry &amp; Logistics</span>
+            </div>
+        </a>
+
+        <!-- Navigation principale -->
+        {% with current=request.resolver_match.url_name %}
+        <nav class="app-shell-nav">
+            <a href="{% url 'orders:list' %}"
+               class="app-shell-nav-link {% if current in 'list orders_list' %}is-active{% endif %}">
+                Commandes
+            </a>
+
+            <a href="{% url 'orders:dashboard' %}"
+               class="app-shell-nav-link {% if current == 'dashboard' %}is-active{% endif %}">
+                Dashboard
+            </a>
+
+            <a href="{% url 'orders:driver_hub' %}"
+               class="app-shell-nav-link {% if current in 'driver_hub driver_app driver_me_app' %}is-active{% endif %}">
+                App livreur
+            </a>
+
+            <a href="{% url 'orders:finance_dashboard' %}"
+               class="app-shell-nav-link {% if current == 'finance_dashboard' %}is-active{% endif %}">
+                Finance
+            </a>
+
+            {# 🔹 Lien vers l’espace affilié (visible pour tout user connecté) #}
+            {% if request.user.is_authenticated %}
+                <a href="{% url 'mlm:affiliate_dashboard' %}"
+                   class="app-shell-nav-link {% if current == 'affiliate_dashboard' %}is-active{% endif %}">
+                    Affiliation
+                </a>
+            {% endif %}
+
+            {# 🔹 Liens réservés staff / admin #}
+            {% if request.user.is_staff %}
+                <a href="{% url 'mlm:global_dashboard' %}"
+                   class="app-shell-nav-link {% if current == 'global_dashboard' %}is-active{% endif %}">
+                    🌍 MLM Global
+                </a>
+
+                <a href="{% url 'orders:portal_dashboard' %}"
+                   class="app-shell-nav-link {% if current == 'portal_dashboard' %}is-active{% endif %}">
+                    ⚙️ Portal
+                </a>
+            {% endif %}
+        </nav>
+        {% endwith %}
+
+        <!-- User mini-profile -->
+        <div class="app-shell-user">
+            <div class="app-shell-user-avatar">
+                {% if request.user.is_authenticated %}
+                    {{ request.user.username|first|upper }}
+                {% else %}
+                    ?
+                {% endif %}
+            </div>
+            <div class="app-shell-user-meta">
+                {% if request.user.is_authenticated %}
+                    <div class="app-shell-user-name">
+                        {{ request.user.username }}
+                    </div>
+                    <div class="app-shell-user-role">
+                        Connecté
+                    </div>
+                {% else %}
+                    <div class="app-shell-user-name">
+                        Invité
+                    </div>
+                    <div class="app-shell-user-role">
+                        Non connecté
+                    </div>
+                {% endif %}
             </div>
         </div>
-
-        <nav class="main-nav">
-            <div class="nav-group">
-                <a href="{% url 'orders:list' %}" class="nav-link">
-                    🧾 <span>Commandes</span>
-                </a>
-                <a href="{% url 'orders:customers_list' %}" class="nav-link">
-                    👥 <span>Clients</span>
-                </a>
-                <a href="{% url 'orders:driver_dashboard' %}" class="nav-link">
-                    🛵 <span>Tableau livreurs</span>
-                </a>
-                <a href="{% url 'orders:driver_hub' %}" class="nav-link">
-                    🚚 <span>Hub Livreur</span>
-                </a>
-                <a href="{% url 'dashboard:index' %}" class="nav-link">
-                    📊 <span>Dashboard</span>
-                </a>
-                <a href="{% url 'dashboard:analytics' %}" class="nav-link">
-                    📈 <span>Analytics</span>
-                </a>
-                <a href="{% url 'dashboard:top_clients' %}" class="nav-link">
-                    🏆 <span>Top clients</span>
-                </a>
-                <a href="{% url 'orders:finance_dashboard' %}" class="nav-link">
-                    💰 <span>Finances</span>
-                </a>
-                <a href="{% url 'orders:ops_dashboard' %}" class="nav-link">
-                    🚦 <span>Ops</span>
-                </a>
-            </div>
-        </nav>
     </div>
 </header>
 
-<div class="page">
-    {% block content %}{% endblock %}
-</div>
+<!-- ============================================================
+     CONTENU PRINCIPAL
+   ============================================================ -->
+<main class="app-shell-main">
+    <div class="app-shell-main-inner">
 
+        {% if messages %}
+            <div class="app-messages">
+                {% for message in messages %}
+                    <div class="app-message app-message--{{ message.tags }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+</main>
+
+<!-- ============================================================
+     FOOTER GLOBAL
+   ============================================================ -->
+<footer class="app-shell-footer">
+    <div class="app-shell-footer-inner">
+        <span>© {% now "Y" %} FAGNI</span>
+        <span class="app-shell-footer-dot">•</span>
+        <span>Plateforme pressing &amp; logistique</span>
+    </div>
+</footer>
+
+{% block extra_scripts %}{% endblock %}
 </body>
 </html>

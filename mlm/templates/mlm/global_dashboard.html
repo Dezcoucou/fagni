@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% load static %}
+
+{# On utilise bien le bon bloc défini dans base.html : extra_head #}
+{% block extra_head %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{{ STATIC_PREFIX }}mlm/mlm.css">
+{% endblock %}
+
+{% block content %}
+<div class="mlm-page">
+
+    <div class="page-header">
+        <div class="page-header__left">
+            <h1 class="page-title">Dashboard MLM – Vue globale</h1>
+            <p class="page-subtitle">
+                Synthèse des commissions, soldes wallets et performances des affiliés FAGNI.
+            </p>
+        </div>
+    </div>
+
+    <!-- STAT CARDS -->
+    <div class="mlm-stats-grid">
+        <div class="mlm-card">
+            <div class="mlm-stat-label">Total commissions versées (MLM)</div>
+            <div class="mlm-stat-value">{{ total_commissions|default:0 }} FCFA</div>
+            <div class="mlm-stat-sub">Toutes commissions payées aux affiliés</div>
+        </div>
+
+        <div class="mlm-card">
+            <div class="mlm-stat-label">Solde cumulé des wallets affiliés</div>
+            <div class="mlm-stat-value">{{ total_wallet_balance|default:0 }} FCFA</div>
+            <div class="mlm-stat-sub">Total actuel dans tous les wallets</div>
+        </div>
+
+        <div class="mlm-card">
+            <div class="mlm-stat-label">Montant total des retraits demandés</div>
+            <div class="mlm-stat-value">{{ total_withdraw_requested|default:0 }} FCFA</div>
+            <div class="mlm-stat-sub">Retraits en attente + traités</div>
+        </div>
+    </div>
+
+    <!-- AFFILIÉS -->
+    <div class="mlm-section">
+        <div class="mlm-section-header">
+            <h2>Affiliés & performances</h2>
+        </div>
+        <p class="mlm-section-subtitle">
+            Liste des profils MLM avec leurs filleuls, commissions et solde wallet estimé.
+        </p>
+
+        {% if affiliates %}
+            <div class="table-responsive">
+                <table class="mlm-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Client</th>
+                            <th>Code parrain</th>
+                            <th>N1</th>
+                            <th>Total commissions</th>
+                            <th>Wallet</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in affiliates %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>
+                                {% if a.customer %}
+                                    <strong>{{ a.customer.name }}</strong><br>
+                                    <span class="text-muted">{{ a.customer.phone }}</span>
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td><code>{{ a.referral_code }}</code></td>
+                            <td>{{ a.nb_filleuls|default:0 }}</td>
+                            <td>{{ a.total_commissions|default:0 }} FCFA</td>
+                            <td>{{ a.wallet_balance|default:0 }} FCFA</td>
+                            <td>
+                                <a href="{% url 'mlm:affiliate_detail' a.referral_code %}"
+                                   class="btn btn-sm btn-primary">
+                                    Voir détail
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="mlm-empty">Aucun affilié trouvé pour le moment.</p>
+        {% endif %}
+        <div class="mlm-actions">
+            <a href="{% url 'mlm:affiliate_dashboard' %}" class="btn btn-primary">
+                🌱 Mon espace affilié
+            </a>
+            <a href="{% url 'mlm:admin_dashboard' %}" class="btn btn-light">
+                📊 Dashboard Admin MLM
+            </a>
+            <a href="{% url 'mlm:admin_withdrawals' %}" class="btn btn-light">
+                💸 Demandes de retrait
+            </a>
+            <a href="{% url 'mlm:finance_dashboard' %}" class="btn btn-light">
+                🧮 Vue finance MLM
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

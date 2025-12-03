@@ -166,4 +166,15 @@
         }
     }
 </style>
+<div class="driver-leaderboard-actions" style="margin-top: 24px;">
+    <a href="{% url 'orders:driver_hub' %}" class="btn btn-light">
+        🚚 Retour à l'app livreur
+    </a>
+    <a href="{% url 'orders:dashboard' %}" class="btn btn-light">
+        📊 Dashboard opérations
+    </a>
+    <a href="{% url 'orders:finance_dashboard' %}" class="btn btn-light">
+        💰 Dashboard finance
+    </a>
+</div>
 {% endblock %}

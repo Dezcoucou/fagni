@@ -1,0 +1,294 @@
+k/* ============================================
+   STYLE GLOBAL PAGES MLM FAGNI
+   ============================================ */
+
+.mlm-page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 0 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Titres / sous-titres */
+
+.mlm-page h1.page-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin: 0 0 4px;
+}
+
+.mlm-page .page-subtitle {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #6b7280;
+}
+
+/* ============================================
+   STAT CARDS
+   ============================================ */
+
+.mlm-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-top: 8px;
+}
+
+.mlm-card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.mlm-stat-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+}
+
+.mlm-stat-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.mlm-stat-sub {
+    font-size: 0.8rem;
+    color: #9ca3af;
+}
+
+/* Badge / pill (si tu en ajoutes plus tard) */
+
+.mlm-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    background: #f97316;
+    color: #ffffff;
+}
+
+/* ============================================
+   SECTIONS
+   ============================================ */
+
+.mlm-section {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 18px 18px 20px;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.mlm-section-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+}
+
+.mlm-section-header h2 {
+    font-size: 1.1rem;
+    margin: 0;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.mlm-section-subtitle {
+    margin: 0 0 10px;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.mlm-empty {
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: #f9fafb;
+    border: 1px dashed #d1d5db;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+/* ============================================
+   TABLEAUX MLM
+   ============================================ */
+
+.mlm-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 0.85rem;
+}
+
+.mlm-table thead {
+    background: #f9fafb;
+}
+
+.mlm-table th,
+.mlm-table td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.mlm-table th {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6b7280;
+}
+
+.mlm-table tbody tr:hover {
+    background: #f3f4f6;
+}
+
+.mlm-table code {
+    background: #f3f4f6;
+    padding: 2px 6px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+}
+
+/* Responsive (mobile) */
+
+@media (max-width: 768px) {
+    .mlm-page {
+        padding: 16px 0 24px;
+    }
+
+    .mlm-section {
+        padding: 14px 12px 16px;
+    }
+
+    .mlm-table th:nth-child(1),
+    .mlm-table td:nth-child(1) {
+        display: none; /* masque la colonne # en mobile */
+    }
+}
+
+/* ============================================
+   ACTIONS / BOUTONS
+   ============================================ */
+
+.mlm-actions {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.mlm-actions .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid #e5e7eb;
+    font-size: 0.8rem;
+    text-decoration: none;
+    background: #f9fafb;
+    color: #111827;
+    transition: all 0.15s ease;
+}
+
+.mlm-actions .btn:hover {
+    background: #111827;
+    color: #ffffff;
+    border-color: #111827;
+}
+
+/* Boutons dans les tableaux */
+
+.mlm-table .btn {
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid #e5e7eb;
+    font-size: 0.75rem;
+    background: #f9fafb;
+    text-decoration: none;
+    color: #111827;
+}
+
+.mlm-table .btn:hover {
+    background: #111827;
+    color: #ffffff;
+}
+
+/* ============================================
+   CARTES / BLOCS POUR ESPACE AFFILIÉ
+   ============================================ */
+
+.mlm-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin-top: 10px;
+}
+
+.mlm-kpi-card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 12px 14px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.mlm-kpi-label {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+    margin-bottom: 2px;
+}
+
+.mlm-kpi-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 2px;
+}
+
+.mlm-kpi-sub {
+    font-size: 0.78rem;
+    color: #9ca3af;
+}
+
+/* Lien de parrainage */
+
+.mlm-referral-box {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #f9fafb;
+    border: 1px dashed #d1d5db;
+    font-size: 0.85rem;
+}
+
+.mlm-referral-box code {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #111827;
+    color: #ffffff;
+    font-size: 0.8rem;
+}
+
+/* Petites notes / hints */
+
+.mlm-note {
+    font-size: 0.78rem;
+    color: #9ca3af;
+    margin-top: 4px;
+}

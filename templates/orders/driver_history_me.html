@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="driver-history-page">
+
+    <div class="page-header driver-history-header">
+        <div class="page-header__left">
+            <h1 class="page-title">Historique de mes courses</h1>
+            <p class="page-subtitle">
+                Toutes les courses terminées ou annulées, classées par ordre récent.
+            </p>
+        </div>
+        <div class="driver-history-actions">
+            <a href="{% url 'orders:driver_me_app' %}" class="btn btn-light btn-sm btn-pill">
+                ← Retour à “Moi”
+            </a>
+            <a href="{% url 'orders:driver_app' %}" class="btn btn-secondary btn-sm btn-pill">
+                📋 Mes courses
+            </a>
+        </div>
+    </div>
+
+    <div class="card driver-history-filters">
+        <div class="driver-section-header">
+            <div>
+                <div class="driver-section-title">Filtrage simple</div>
+                <p class="driver-section-subtitle">
+                    Par défaut, tu vois les dernières courses de ton historique.
+                </p>
+            </div>
+        </div>
+        <!-- Pour l’instant, on ne met pas de vrais filtres complexes.
+             On pourra brancher date_from / date_to / status plus tard. -->
+        <p class="driver-history-info">
+            Les filtres avancés (par période, statut, etc.) pourront être ajoutés
+            dans une V2. Pour l’instant, l’historique affiche l’ensemble de tes courses
+            <strong>done</strong> et <strong>canceled</strong>.
+        </p>
+    </div>
+
+    <div class="driver-orders-list">
+        {% with has_history=False %}
+            {% for order in orders %}
+                {% if order.status == "done" or order.status == "canceled" %}
+                    {% if not has_history %}{% with True as has_history %}{% endwith %}{% endif %}
+                    <article class="driver-order-card driver-order-card--compact card">
+                        <header class="driver-order-header">
+                            <div>
+                                <div class="driver-order-code">
+                                    {{ order.code|default:order.id }}
+                                </div>
+                                <div class="driver-order-date">
+                                    {% if order.delivered_time %}
+                                        Livrée le {{ order.delivered_time|date:"d/m/Y H:i" }}
+                                    {% else %}
+                                        Créée le {{ order.created_at|date:"d/m/Y H:i" }}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <span class="badge-status badge-status--{{ order.status }}">
+                                {{ order.get_status_display }}
+                            </span>
+                        </header>
+
+                        <div class="driver-order-body driver-order-body--history">
+                            <div class="driver-order-line">
+                                <span class="order-label">Client :</span>
+                                <span class="order-value">
+                                    {{ order.customer.name|default:"-" }}
+                                </span>
+                            </div>
+                            <div class="driver-order-line">
+                                <span class="order-label">Total client :</span>
+                                <span class="order-value">
+                                    {{ order.total|default:0 }} FCFA
+                                </span>
+                            </div>
+                            <div class="driver-order-line">
+                                <span class="order-label">Revenu livreur :</span>
+                                <span class="order-value">
+                                    {{ order.driver_logistic_cost|default:0 }} FCFA
+                                </span>
+                            </div>
+                        </div>
+
+                        <footer class="driver-order-footer">
+                            {% if order.id %}
+                                <a href="{% url 'orders:driver_order_detail_me' order.id %}"
+                                   class="btn btn-light btn-sm btn-pill">
+                                    Détail
+                                </a>
+                            {% endif %}
+                        </footer>
+                    </article>
+                {% endif %}
+            {% endfor %}
+
+            {% if not has_history %}
+                <p class="driver-empty-text">
+                    Tu n’as pas encore d’historique de courses terminées ou annulées.
+                </p>
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="driver-bottom-spacer"></div>
+</div>
+
+<nav class="driver-bottom-nav">
+    <a href="{% url 'orders:driver_hub' %}" class="driver-bottom-nav__item">
+        <div>🏠</div>
+        <div>Hub</div>
+    </a>
+    <a href="{% url 'orders:driver_app' %}" class="driver-bottom-nav__item">
+        <div>📋</div>
+        <div>Courses</div>
+    </a>
+    <a href="{% url 'orders:driver_map' %}" class="driver-bottom-nav__item">
+        <div>🗺️</div>
+        <div>Carte</div>
+    </a>
+    <a href="{% url 'orders:driver_me_app' %}" class="driver-bottom-nav__item driver-bottom-nav__item--active">
+        <div>👤</div>
+        <div>Moi</div>
+    </a>
+</nav>
+
+<style>
+.driver-history-page {
+    max-width: 1100px;
+    margin: 0 auto 80px;
+    padding: 8px 12px;
+}
+
+.driver-history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.driver-history-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.driver-history-filters {
+    margin-bottom: 12px;
+}
+
+.driver-history-info {
+    font-size: 12px;
+    color: var(--fagni-text-soft);
+}
+
+/* Réutilisation des styles driver-order-* déjà utilisés sur driver_me */
+.driver-orders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.driver-order-card {
+    border-radius: var(--fagni-radius-lg);
+    border: 1px solid var(--fagni-border);
+    padding: 8px 10px;
+    background: #fff;
+    box-shadow: var(--fagni-shadow-soft);
+}
+
+.driver-order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.driver-order-code {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--fagni-text);
+}
+
+.driver-order-date {
+    font-size: 12px;
+    color: var(--fagni-muted);
+}
+
+.driver-order-body--history {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+}
+
+.driver-order-line {
+    font-size: 12px;
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+    color: var(--fagni-text);
+}
+
+.order-label {
+    font-weight: 500;
+    color: var(--fagni-text-soft);
+}
+
+.order-value {
+    color: var(--fagni-text);
+}
+
+.driver-order-footer {
+    border-top: 1px dashed var(--fagni-border);
+    padding-top: 6px;
+    margin-top: 4px;
+}
+
+.driver-empty-text {
+    font-size: 12px;
+    color: var(--fagni-muted);
+    margin-top: 4px;
+}
+
+.driver-bottom-spacer {
+    height: 60px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .driver-history-page {
+        padding: 6px;
+    }
+}
+</style>
+{% endblock %}

@@ -55,3 +55,24 @@ orders/templates/orders/*OLD*
 
 # Virtual envs
 venv/
+
+# === Dossiers de sauvegarde personnels ===
+Z_CREATE_BACKUP/
+Z_CSS_ARCHIVE/
+Z_DOUBLONS_SAUVEGARDE/
+
+# === Fichiers de sauvegarde / temporaires ===
+*.save
+*.bak
+*.tmp
+
+# === Scripts temporaires ===
+clean_mlm_*.py
+fix_mlm_*.py
+
+# === Templates historiques ===
+templates/orders/*save*
+orders/templates/orders/*save*
+
+# === Tests temporaires ===
+test_chain.py

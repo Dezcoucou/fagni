@@ -17,60 +17,40 @@
         box-sizing: border-box;
     }
 
-    body {
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: var(--bg-soft);
-        margin: 0;
-        padding: 0;
-        color: var(--text-main);
-    }
-
-    header {
-        background: linear-gradient(90deg, #ff7a00, #0056b3);
-        color: #fff;
-        padding: 16px 24px;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
-        margin: 0 -12px 0 -12px;
-    }
-    header h1 {
-        margin: 0;
-        font-size: 20px;
-    }
-    header p {
-        margin: 4px 0 0;
-        font-size: 13px;
-        opacity: 0.9;
-    }
-
-    .page {
+    .order-edit-page {
         max-width: 1100px;
-        margin: 20px auto;
-        padding: 0 10px 30px;
+        margin: 0 auto 30px;
+        padding: 0 10px;
     }
 
-    .card {
+    .card-order {
         background: #fff;
-        border-radius: 12px;
-        padding: 16px 20px;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
-        margin-bottom: 16px;
+        border-radius: 16px;
+        padding: 18px 20px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+        margin-top: 12px;
         border: 1px solid var(--border-soft);
     }
 
-    .card h2 {
+    .card-order h2 {
         margin-top: 0;
         font-size: 18px;
         border-left: 4px solid #ff7a00;
         padding-left: 8px;
     }
 
-    .top-actions {
+    .top-actions-inline {
         display:flex;
         justify-content:space-between;
         align-items:center;
         gap:10px;
         margin-bottom:14px;
         flex-wrap:wrap;
+    }
+
+    .top-actions-inline-title {
+        font-size: 14px;
+        color: var(--text-muted);
     }
 
     .btn-link {
@@ -81,26 +61,22 @@
         display:inline-flex;
         align-items:center;
         gap:6px;
-    }
-
-    .btn-secondary {
+        white-space: nowrap;
+        border: 1px solid #e5e7eb;
         background:#fff;
-        border:1px solid #ccc;
-        color:#333;
+        color:#374151;
+        transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
     }
 
-    .btn-secondary:hover {
-        background:#f3f3f3;
+    .btn-link:hover {
+        background:#f3f4f6;
+        box-shadow: 0 4px 10px rgba(15,23,42,0.08);
+        transform: translateY(-1px);
     }
 
-    .btn-primary {
-        background:#0056b3;
-        color:#fff;
-        border:none;
-    }
-
-    .btn-primary:hover{
-        background:#00408a;
+    .btn-link-primary {
+        border-color: var(--fagni-blue);
+        color: var(--fagni-blue);
     }
 
     .grid {
@@ -117,6 +93,8 @@
         display: block;
         font-size: 13px;
         margin-bottom: 4px;
+        color: var(--text-main);
+        font-weight: 500;
     }
 
     .field-group input[type="text"],
@@ -128,6 +106,7 @@
         border: 1px solid #ddd;
         font-size: 14px;
         box-sizing: border-box;
+        background:#fff;
     }
 
     .field-group input[type="text"]:focus,
@@ -147,6 +126,7 @@
         min-height: 60px;
         resize: vertical;
         box-sizing: border-box;
+        background:#fff;
     }
 
     .field-group textarea:focus {
@@ -177,10 +157,13 @@
         display:inline-flex;
         align-items:center;
         gap:4px;
+        transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
     }
 
     .btn-small:hover {
         background:#fff5eb;
+        box-shadow: 0 4px 10px rgba(248, 115, 22, 0.2);
+        transform: translateY(-1px);
     }
 
     .btn-icon {
@@ -190,11 +173,14 @@
         background:#fff;
         font-size:11px;
         cursor:pointer;
+        transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
     }
 
     .btn-icon:hover {
         background:#fee2e2;
         border-color:#fecaca;
+        box-shadow: 0 4px 10px rgba(220, 38, 38, 0.15);
+        transform: translateY(-1px);
     }
 
     table {
@@ -368,49 +354,56 @@
         .grid {
             grid-template-columns: 1fr;
         }
+
+        .top-actions-inline {
+            align-items:flex-start;
+        }
     }
 </style>
 
-<header>
-    <h1>Modifier la commande {{ order.code }}</h1>
-    <p>Mise à jour client, prestations du catalogue, localisation & montants.</p>
-</header>
+<div class="page-header">
+    <div class="page-header__left">
+        <h1 class="page-title">Modifier la commande {{ order.code }}</h1>
+        <p class="page-subtitle">
+            Mise à jour du client, des prestations FAGNI, de la localisation et des montants.
+        </p>
+    </div>
+    <div class="page-header__right">
+        <a href="{% url 'orders:detail' order.id %}" class="btn-link">
+            ← Détail commande
+        </a>
+        <a href="{% url 'orders:list' %}" class="btn-link">
+            📋 Liste des commandes
+        </a>
+        <a href="{% url 'orders:ops_dashboard' %}" class="btn-link">
+            🚦 Suivi OPS
+        </a>
+        <a href="{% url 'orders:dashboard' %}" class="btn-link">
+            📊 Dashboard commandes
+        </a>
+        <a href="{% url 'orders:finance_dashboard' %}" class="btn-link">
+            💰 Dashboard financier
+        </a>
+        <a href="{% url 'orders:customers_list' %}" class="btn-link btn-link-primary">
+            👥 Clients (mini-CRM)
+        </a>
+    </div>
+</div>
 
-<div class="page">
-    <div class="card">
+<div class="order-edit-page">
+    {% if error %}
+        <div class="error">{{ error }}</div>
+    {% endif %}
 
-        <div class="top-actions">
+    <div class="card-order">
+        <div class="top-actions-inline">
             <div>
                 <strong>Commande {{ order.code }}</strong><br>
-                <span style="font-size:12px;color:#555;">
-                    Créée le {{ order.created_at|date:"d/m/Y H:i" }}, statut : {{ order.get_status_display }}
+                <span class="top-actions-inline-title">
+                    Créée le {{ order.created_at|date:"d/m/Y H:i" }} — Statut : {{ order.get_status_display }}
                 </span>
             </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <a href="{% url 'orders:detail' order.id %}" class="btn-link btn-secondary">
-                    ← Retour au détail
-                </a>
-                <a href="{% url 'orders:list' %}" class="btn-link btn-secondary">
-                    📋 Liste des commandes
-                </a>
-                <a href="{% url 'orders:ops_dashboard' %}" class="btn-link btn-secondary">
-                    🚦 Suivi OPS
-                </a>
-                <a href="{% url 'orders:dashboard' %}" class="btn-link btn-secondary">
-                    📊 Dashboard commandes
-                </a>
-                <a href="{% url 'orders:finance_dashboard' %}" class="btn-link btn-secondary">
-                    💰 Dashboard financier
-                </a>
-                <a href="{% url 'orders:customers_list' %}" class="btn-link btn-secondary">
-                    👥 Clients (mini-CRM)
-                </a>
-            </div>
         </div>
-
-        {% if error %}
-            <div class="error">{{ error }}</div>
-        {% endif %}
 
         <form id="orderForm" method="post" enctype="multipart/form-data">
             {% csrf_token %}
@@ -540,7 +533,7 @@
                                 <th>Prestation / Désignation</th>
                                 <th class="num">Qté</th>
                                 <th class="num">PU</th>
-                                <th class="num">Total</th>
+                                <th class="num">Total TTC</th>
                                 <th>Photos / Actions</th>
                             </tr>
                         </thead>
@@ -620,8 +613,7 @@
                         <label for="order_notes">Notes internes / instructions :</label>
                         <textarea id="order_notes"
                                   name="order_notes"
-                                  rows="3"
-                                  style="width:100%;padding:7px 8px;border-radius:6px;border:1px solid #ddd;font-size:13px;">{{ order.notes|default:'' }}</textarea>
+                                  rows="3">{{ order.notes|default:'' }}</textarea>
                         <small style="font-size:11px;color:#777;">
                             Ex : Client absent avant 8h, articles à traiter en urgence, consignes spécifiques, etc.
                         </small>
@@ -646,7 +638,7 @@
                             </span>
                         </p>
                         <p>
-                            <span class="label">Total global estimé :</span>
+                            <span class="label">Total global estimé (TTC) :</span>
                             <span id="total_global_display" class="value grand">
                                 {{ order.grand_total|default:0|floatformat:0 }} FCFA
                             </span>
@@ -663,7 +655,7 @@
 
                     <div class="btn-row">
                         <button type="button" id="previewBtn">Voir le résumé</button>
-                        <button type="submit" id="submitBtn" class="btn-primary">
+                        <button type="submit" id="submitBtn">
                             Enregistrer les modifications
                         </button>
                     </div>

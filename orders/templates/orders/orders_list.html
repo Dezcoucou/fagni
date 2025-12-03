@@ -1,491 +1,488 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block content %}
+{% block title %}Commandes – FAGNI{% endblock %}
 
+{% block extra_head %}
 <style>
-    .link-mini{
-        font-size:11px;
-        color:#0056b3;
-        text-decoration:none;
-    }
-    .link-mini:hover{
-        text-decoration:underline;
+    .page {
+        max-width: 1100px;
+        margin: 0 auto 32px;
+        padding: 8px 10px 24px;
     }
 
-    body {
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #f5f5f7;
-        margin: 0;
-        padding: 0;
-        color: #222;
-    }
-    header {
-        background: linear-gradient(90deg, #ff7a00, #0056b3);
-        color: #fff;
-        padding: 16px 24px;
-    }
-    header h1 {
-        margin: 0;
-        font-size: 20px;
-    }
-    header p {
-        margin: 4px 0 0;
-        font-size: 13px;
-        opacity: 0.9;
-    }
-    .page {
-        max-width: 1200px;
-        margin: 20px auto;
-        padding: 0 10px 30px;
-    }
-    .card {
-        background: #fff;
-        border-radius: 10px;
-        padding: 16px 20px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-    }
-    .top-actions {
+    .page-header {
         display:flex;
         justify-content:space-between;
         align-items:flex-start;
-        gap:10px;
+        gap:12px;
         margin-bottom:12px;
-        flex-wrap:wrap;
     }
-    .btn-link {
-        text-decoration:none;
-        display:inline-block;
-        border-radius:999px;
-        padding:7px 12px;
+
+    .page-title {
+        font-size:20px;
+        font-weight:700;
+        color:#0f172a;
+        margin:0;
+    }
+
+    .page-subtitle {
         font-size:13px;
+        color:#6b7280;
+        margin:4px 0 0;
     }
-    .btn-primary {
-        background:#0056b3;
-        color:#fff;
-        border:none;
+
+    .page-header__left {
+        max-width: 70%;
     }
-    .btn-primary:hover {
-        background:#00408a;
+
+    .page-header__right {
+        display:flex;
+        align-items:flex-start;
+        justify-content:flex-end;
     }
-    .btn-secondary {
-        background:#fff;
-        border:1px solid #ccc;
-        color:#333;
-    }
-    .btn-secondary:hover {
-        background:#f3f3f3;
-    }
-    .summary-box {
-        font-size:13px;
-    }
-    .summary-box strong {
-        font-weight:600;
-    }
-    .summary-line2 {
-        font-size:11px;
-        color:#666;
-        margin-top:4px;
-    }
+
     .pill {
         display:inline-flex;
-        align-items:center;
-        gap:4px;
-        padding:2px 8px;
-        border-radius:999px;
-        background:#f1f3f5;
-        font-size:11px;
-        margin-right:5px;
-    }
-
-    /* Barre filtres / recherche */
-    .filters-bar {
-        margin-bottom:10px;
-        display:flex;
-        flex-wrap:wrap;
-        gap:8px;
-        align-items:flex-end;
-        font-size:12px;
-    }
-    .filters-bar .field {
-        display:flex;
         flex-direction:column;
-        gap:2px;
-    }
-    .filters-bar label {
+        align-items:flex-end;
+        padding:6px 10px;
+        border-radius:999px;
         font-size:11px;
-        color:#666;
-    }
-    .filters-bar input[type="text"],
-    .filters-bar input[type="date"] {
-        padding:5px 7px;
-        border-radius:999px;
-        border:1px solid #ddd;
-        font-size:12px;
-        min-width:150px;
-    }
-    .filters-bar button {
-        border-radius:999px;
-        border:none;
-        padding:6px 12px;
-        font-size:12px;
-        cursor:pointer;
-    }
-    .btn-filter {
-        background:#0056b3;
-        color:#fff;
-    }
-    .btn-filter:hover {
-        background:#00408a;
+        border:1px solid #e5e7eb;
+        background:#f9fafb;
+        min-width:140px;
     }
 
-    /* Filtres par statut */
-    .status-filters {
-        margin-bottom:12px;
+    .pill-label {
+        text-transform:uppercase;
+        letter-spacing:0.08em;
+        color:#9ca3af;
+        font-weight:600;
+    }
+
+    .pill-value {
+        color:#0f172a;
+        font-weight:600;
+        margin-top:2px;
+    }
+
+    .card {
+        background:#ffffff;
+        border-radius:16px;
+        padding:12px 14px;
+        box-shadow:0 2px 6px rgba(15,23,42,0.08);
+        border:1px solid #e5e7eb;
+        margin-bottom:10px;
+    }
+
+    /* FILTRES */
+    .filters-grid {
+        display:grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap:10px;
+        align-items:flex-end;
+    }
+
+    .filter-item label {
+        display:block;
+        font-size:12px;
+        font-weight:500;
+        color:#4b5563;
+        margin-bottom:3px;
+    }
+
+    .filter-item input[type="date"],
+    .filter-item input[type="text"],
+    .filter-item select {
+        width:100%;
+        padding:6px 8px;
+        border-radius:8px;
+        border:1px solid #d1d5db;
+        font-size:13px;
+    }
+
+    .filter-item input:focus,
+    .filter-item select:focus {
+        outline:none;
+        border-color:#0f172a;
+        box-shadow:0 0 0 1px rgba(15,23,42,0.1);
+    }
+
+    .filter-actions {
+        display:flex;
+        gap:6px;
+        flex-wrap:wrap;
+        justify-content:flex-end;
+        margin-top:4px;
+    }
+
+    .btn {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:4px;
+        border-radius:999px;
+        border:1px solid transparent;
+        font-size:12px;
+        padding:6px 10px;
+        cursor:pointer;
+        text-decoration:none;
+        white-space:nowrap;
+    }
+
+    .btn-sm {
+        padding:6px 10px;
+        font-size:12px;
+    }
+
+    .btn-xs {
+        padding:4px 8px;
+        font-size:11px;
+    }
+
+    .btn-primary {
+        background:#0f172a;
+        border-color:#0f172a;
+        color:#ffffff;
+    }
+
+    .btn-primary:hover {
+        opacity:0.95;
+    }
+
+    .btn-light {
+        background:#ffffff;
+        border-color:#e5e7eb;
+        color:#374151;
+    }
+
+    .btn-light:hover {
+        background:#f9fafb;
+    }
+
+    .btn-secondary {
+        background:#f97316;
+        border-color:#ea580c;
+        color:#ffffff;
+    }
+
+    .btn-secondary:hover {
+        background:#ea580c;
+    }
+
+    /* TABLE */
+    .finance-table-header {
+        display:flex;
+        justify-content:space-between;
+        align-items:baseline;
+        gap:8px;
+        margin-bottom:8px;
+    }
+
+    .finance-table-title {
+        font-size:14px;
+        font-weight:600;
+        margin:0;
+        color:#0f172a;
+    }
+
+    .finance-table-subtitle {
+        font-size:12px;
+        color:#9ca3af;
+        margin:0;
+    }
+
+    .finance-table-wrapper {
+        width:100%;
+        overflow-x:auto;
+        border-radius:12px;
+        border:1px solid #e5e7eb;
+    }
+
+    .finance-table {
+        width:100%;
+        border-collapse:collapse;
+        font-size:13px;
+        min-width:780px;
+        background:#ffffff;
+    }
+
+    .finance-table th,
+    .finance-table td {
+        padding:7px 8px;
+        border-bottom:1px solid #e5e7eb;
+        text-align:left;
+        vertical-align:middle;
+    }
+
+    .finance-table thead th {
+        background:#f9fafb;
+        font-weight:600;
+        font-size:12px;
+        color:#6b7280;
+    }
+
+    .finance-table tbody tr:nth-child(even) {
+        background:#fcfcfd;
+    }
+
+    .finance-table tbody tr:hover {
+        background:#f1f5f9;
+    }
+
+    .finance-table-col-actions {
+        width:190px;
+    }
+
+    .finance-table-actions {
         display:flex;
         flex-wrap:wrap;
-        gap:6px;
-        font-size:12px;
+        gap:4px;
+    }
+
+    .finance-order-link {
+        color:#0f172a;
+        font-weight:600;
+        text-decoration:none;
+    }
+
+    .finance-order-link:hover {
+        text-decoration:underline;
+    }
+
+    /* Badges statut (cohérents avec le reste du produit) */
+    .badge-status {
+        display:inline-flex;
         align-items:center;
-    }
-
-    .status-filters .btn-link {
-        padding:4px 10px;
-    }
-
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 13px;
-        margin-top:8px;
-    }
-    th, td {
-        padding: 8px 6px;
-        border-bottom: 1px solid #eee;
-        text-align: left;
-    }
-    th {
-        background: #fafafa;
-        font-weight: 600;
-        white-space: nowrap;
-    }
-    tr:hover {
-        background:#fafafa;
-    }
-    .badge {
-        padding: 3px 8px;
-        border-radius: 999px;
-        font-size: 11px;
-        white-space: nowrap;
-    }
-    .badge-pending {
-        background:#fff3cd;
-        color:#856404;
-    }
-    .badge-in-progress {
-        background:#cce5ff;
-        color:#004085;
-    }
-    .badge-done {
-        background:#d4edda;
-        color:#155724;
-    }
-    .badge-canceled {
-        background:#f8d7da;
-        color:#721c24;
-    }
-    .actions a {
-        font-size: 12px;
-        text-decoration: none;
-        color: #0056b3;
-    }
-    .actions a:hover {
-        text-decoration: underline;
-    }
-    .empty {
-        padding: 20px 0;
-        text-align: center;
-        color: #777;
-        font-size: 13px;
-    }
-    .mini {
-        font-size:11px;
-        color:#555;
-    }
-    .pill-logi {
-        display:inline-block;
-        padding:2px 6px;
+        justify-content:center;
+        padding:3px 8px;
         border-radius:999px;
-        background:#edf4ff;
         font-size:11px;
-        color:#1850a8;
+        border:1px solid transparent;
+        white-space:nowrap;
     }
-    .t-right { text-align:right; }
-    .t-nowrap { white-space:nowrap; }
-    .legend {
-        margin-top:8px;
-        font-size:11px;
-        color:#666;
+
+    .badge-status--pending {
+        background:#fef3c7;
+        color:#92400e;
+        border-color:#fde68a;
+    }
+
+    .badge-status--in_progress {
+        background:#dbeafe;
+        color:#1d4ed8;
+        border-color:#bfdbfe;
+    }
+
+    .badge-status--done {
+        background:#dcfce7;
+        color:#166534;
+        border-color:#bbf7d0;
+    }
+
+    .badge-status--canceled {
+        background:#fee2e2;
+        color:#b91c1c;
+        border-color:#fecaca;
+    }
+
+    .driver-empty-text {
+        font-size:12px;
+        color:#9ca3af;
+        margin:8px 0 4px;
     }
 
     @media (max-width: 900px) {
-        table {
-            font-size:12px;
-        }
-        th, td {
-            padding:6px 4px;
-        }
-        .top-actions {
+        .page-header {
+            flex-direction:column;
             align-items:flex-start;
+        }
+        .filters-grid {
+            grid-template-columns:1fr 1fr;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .filters-grid {
+            grid-template-columns:1fr;
+        }
+        .filter-actions {
+            justify-content:flex-start;
         }
     }
 </style>
+{% endblock extra_head %}
 
-<header>
-    <h1>Commandes FAGNI</h1>
-    <p>Vue d’ensemble des commandes, prestations, service FAGNI et logistique.</p>
-</header>
-
+{% block content %}
 <div class="page">
-    <div class="card">
 
-        <!-- Barre du haut : stats + boutons -->
-        <div class="top-actions">
-            <div class="summary-box">
-                <strong>Total commandes :</strong> {{ total_count }}<br>
-                <span class="summary-line2">
-                    Commandes terminées :
-                    <strong>{{ done_count }}</strong> |
-                    Montant prestations livrées :
-                    <strong>{{ done_total }} FCFA</strong>
+    <!-- HEADER PAGE -->
+    <div class="page-header">
+        <div class="page-header__left">
+            <h1 class="page-title">Liste des commandes</h1>
+            <p class="page-subtitle">
+                Vue centralisée de toutes les commandes FAGNI : statut, client, logistique &amp; montants.
+            </p>
+        </div>
+        <div class="page-header__right">
+            <div class="pill pill--soft">
+                <span class="pill-label">Total</span>
+                <span class="pill-value">
+                    {{ orders|length|default:0 }} commande{{ orders|length|pluralize:"s" }}
                 </span>
             </div>
-
-            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-                <a href="{% url 'orders:ops_dashboard' %}" class="btn-link btn-secondary">
-                    🚦 Suivi Ops
-                </a>
-                <a href="{% url 'orders:finance_dashboard' %}" class="btn-link btn-secondary">
-                    💰 Dashboard financier
-                </a>
-                <a href="{% url 'orders:dashboard' %}" class="btn-link btn-secondary">
-                    📊 Dashboard commandes
-                </a>
-                <a href="{% url 'orders:export_orders_csv' %}{% if current_status and current_status != 'all' %}?status={{ current_status }}{% endif %}"
-                   class="btn-link btn-secondary">
-                    📥 Export CSV
-                </a>
-                <a href="{% url 'orders:export_orders_xlsx' %}?status={{ current_status }}&q={{ q }}&date_from={{ date_from }}&date_to={{ date_to }}"
-                   class="btn-link btn-primary">
-                    ⬇️ Export Excel
-                </a>
-                <a href="{% url 'orders:create' %}" class="btn-link btn-primary">
-                    + Nouvelle commande
-                </a>
-                <a href="{% url 'orders:customers_list' %}" class="btn-link btn-secondary">
-                    👥 Clients (mini-CRM)
-                </a>
-            </div>
         </div>
+    </div>
 
-        <!-- Barre recherche / filtres date -->
-        <form method="get" class="filters-bar">
-            <div class="field">
-                <label for="q">Recherche</label>
-                <input type="text"
-                       id="q"
-                       name="q"
-                       placeholder="Code, client, téléphone..."
-                       value="{{ q }}">
-            </div>
-            <div class="field">
+    <!-- FILTRES -->
+    <section class="card">
+        <form method="get" class="filters-grid">
+            <div class="filter-item">
                 <label for="date_from">Du</label>
-                <input type="date" id="date_from" name="date_from" value="{{ date_from }}">
+                <input type="date" id="date_from" name="date_from"
+                       value="{{ request.GET.date_from|default_if_none:'' }}">
             </div>
-            <div class="field">
+
+            <div class="filter-item">
                 <label for="date_to">Au</label>
-                <input type="date" id="date_to" name="date_to" value="{{ date_to }}">
+                <input type="date" id="date_to" name="date_to"
+                       value="{{ request.GET.date_to|default_if_none:'' }}">
             </div>
 
-            <!-- On garde le statut courant dans les filtres -->
-            {% if current_status and current_status != 'all' %}
-                <input type="hidden" name="status" value="{{ current_status }}">
-            {% endif %}
+            <div class="filter-item">
+                <label for="status">Statut</label>
+                <select id="status" name="status">
+                    <option value="">Tous</option>
+                    <option value="pending" {% if request.GET.status == "pending" %}selected{% endif %}>
+                        En attente
+                    </option>
+                    <option value="in_progress" {% if request.GET.status == "in_progress" %}selected{% endif %}>
+                        En cours
+                    </option>
+                    <option value="done" {% if request.GET.status == "done" %}selected{% endif %}>
+                        Terminée
+                    </option>
+                    <option value="canceled" {% if request.GET.status == "canceled" %}selected{% endif %}>
+                        Annulée
+                    </option>
+                </select>
+            </div>
 
-            <div class="field" style="flex-shrink:0;">
-                <label>&nbsp;</label>
-                <button type="submit" class="btn-filter">Appliquer</button>
+            <div class="filter-item">
+                <label for="search">Recherche</label>
+                <input type="text" id="search" name="search"
+                       value="{{ request.GET.search|default_if_none:'' }}"
+                       placeholder="Code, client, téléphone…">
+            </div>
+
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    Filtrer
+                </button>
+                <a href="{% url 'orders:list' %}" class="btn btn-light btn-sm">
+                    Réinitialiser
+                </a>
+                <a href="{% url 'orders:finance_dashboard' %}" class="btn btn-secondary btn-sm">
+                    💰 Vue finance
+                </a>
             </div>
         </form>
+    </section>
 
-        <!-- Filtres par statut -->
-        <div class="status-filters">
-            <span style="margin-right:4px;">Filtrer par statut :</span>
-
-            <a href="{% url 'orders:list' %}"
-               class="btn-link btn-secondary"
-               style="{% if current_status == 'all' or not current_status %}background:#0056b3;color:#fff;border-color:#0056b3;{% endif %}">
-                Toutes ({{ total_count }})
-            </a>
-
-            <a href="{% url 'orders:list' %}?status=pending{% if q %}&q={{ q }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}"
-               class="btn-link btn-secondary"
-               style="{% if current_status == 'pending' %}background:#fff3cd;color:#856404;border-color:#856404;{% endif %}">
-                En attente ({{ pending_count }})
-            </a>
-
-            <a href="{% url 'orders:list' %}?status=in_progress{% if q %}&q={{ q }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}"
-               class="btn-link btn-secondary"
-               style="{% if current_status == 'in_progress' %}background:#cce5ff;color:#004085;border-color:#004085;{% endif %}">
-                En cours ({{ in_progress_count }})
-            </a>
-
-            <a href="{% url 'orders:list' %}?status=done{% if q %}&q={{ q }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}"
-               class="btn-link btn-secondary"
-               style="{% if current_status == 'done' %}background:#d4edda;color:#155724;border-color:#155724;{% endif %}">
-                Terminées ({{ done_count }})
-            </a>
-
-            <a href="{% url 'orders:list' %}?status=canceled{% if q %}&q={{ q }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}"
-               class="btn-link btn-secondary"
-               style="{% if current_status == 'canceled' %}background:#f8d7da;color:#721c24;border-color:#721c24;{% endif %}">
-                Annulées ({{ canceled_count }})
-            </a>
+    <!-- TABLEAU COMMANDES -->
+    <section class="card">
+        <div class="finance-table-header">
+            <h2 class="finance-table-title">Commandes</h2>
+            <p class="finance-table-subtitle">
+                Dernières commandes avec accès rapide au détail, à la modification et aux tickets.
+            </p>
         </div>
 
         {% if orders %}
-            <table>
-                <thead>
-                    <tr>
-                        <th>Code</th>
-                        <th>Client</th>
-                        <th>Blanchisserie / Livreur</th>
-                        <th class="t-right">
-                            Prestations<br><span class="mini">Total HT</span>
-                        </th>
-                        <th class="t-right">
-                            Service FAGNI<br><span class="mini">5% min 500</span>
-                        </th>
-                        <th class="t-right">
-                            Livraison<br><span class="mini">Client</span>
-                        </th>
-                        <th class="t-right">
-                            Total global<br><span class="mini">TTC + service + livr.</span>
-                        </th>
-                        <th>Statut</th>
-                        <th>Logistique</th>
-                        <th>Créée le</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for order in orders %}
-                    <tr>
-                        <td class="t-nowrap">
-                            {{ order.code }}
-                            <div class="mini">
-                                #{{ order.id }}
-                            </div>
-                        </td>
-
-                        <td>
-                            {{ order.customer.name }}
-                            <div class="mini">
-                                {{ order.customer.phone }}
-                            </div>
-                            {% if order.customer %}
-                                <div class="mini">
-                                    <a href="{% url 'orders:orders_by_customer' order.customer.id %}"
-                                       class="link-mini">
-                                        Fiche client →
+            <div class="finance-table-wrapper">
+                <table class="finance-table">
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Date</th>
+                            <th>Client</th>
+                            <th>Téléphone</th>
+                            <th>Statut</th>
+                            <th>Total</th>
+                            <th>Livreur</th>
+                            <th>Blanchisserie</th>
+                            <th class="finance-table-col-actions">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for o in orders %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'orders:detail' o.id %}" class="finance-order-link">
+                                        {{ o.code|default:o.id }}
                                     </a>
-                                </div>
-                            {% endif %}
-                        </td>
-
-                        <td>
-                            {% if order.laundry_partner %}
-                                🧺 {{ order.laundry_partner.name }}<br>
-                            {% endif %}
-                            {% if order.delivery_partner %}
-                                <span class="mini">🛵 {{ order.delivery_partner.name }}</span>
-                            {% else %}
-                                <span class="mini" style="color:#999;">Livreur non assigné</span>
-                            {% endif %}
-                        </td>
-
-                        <td class="t-right">
-                            {{ order.total_ht }} FCFA
-                        </td>
-
-                        <td class="t-right">
-                            {{ order.service_fee }} FCFA
-                        </td>
-
-                        <td class="t-right">
-                            {{ order.delivery_fee }} FCFA
-                        </td>
-
-                        <td class="t-right">
-                            {{ order.grand_total }} FCFA
-                        </td>
-
-                        <td>
-                            {% if order.status == "pending" %}
-                                <span class="badge badge-pending">En attente</span>
-                            {% elif order.status == "in_progress" %}
-                                <span class="badge badge-in-progress">En cours</span>
-                            {% elif order.status == "done" %}
-                                <span class="badge badge-done">Terminée</span>
-                            {% elif order.status == "canceled" %}
-                                <span class="badge badge-canceled">Annulée</span>
-                            {% else %}
-                                <span class="badge">{{ order.status }}</span>
-                            {% endif %}
-                        </td>
-
-                        <td>
-                            {% if order.distance_km %}
-                                <span class="pill-logi"
-                                      title="Coût livreur : {{ order.driver_logistic_cost }} FCFA&#10;Marge FAGNI (logistique) : {{ order.logistic_margin }} FCFA">
-                                    {{ order.distance_km }} km
-                                </span>
-                            {% else %}
-                                <span class="mini" style="color:#999;">N/A</span>
-                            {% endif %}
-                        </td>
-
-                        <td class="t-nowrap">
-                            {{ order.created_at|date:"d/m/Y H:i" }}
-                        </td>
-
-                        <td class="actions">
-                            <a href="{% url 'orders:detail' order.id %}">Détail</a> |
-                            <a href="{% url 'orders:update' order.id %}">Modifier</a> |
-                            <a href="{% url 'orders:order_ticket_pdf' order.id %}" target="_blank">
-                                Ticket PDF
-                            </a>
-                        </td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-
-            <div class="legend">
-                🔍 Survolez la pastille de la colonne <strong>Logistique</strong> pour voir :  
-                – le <strong>coût livreur</strong> (ce que FAGNI doit payer au partenaire livraison)  
-                – la <strong>marge logistique FAGNI</strong> sur cette course.
+                                </td>
+                                <td>
+                                    {% if o.created_at %}
+                                        {{ o.created_at|date:"d/m/Y H:i" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ o.customer.name|default:"—" }}
+                                </td>
+                                <td>
+                                    {{ o.customer.phone|default:"—" }}
+                                </td>
+                                <td>
+                                    <span class="badge-status badge-status--{{ o.status }}">
+                                        {{ o.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {{ o.grand_total|default:o.total|default:0 }} FCFA
+                                </td>
+                                <td>
+                                    {% if o.delivery_partner %}
+                                        {{ o.delivery_partner.name|default:o.delivery_partner.email }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if o.laundry_partner %}
+                                        {{ o.laundry_partner.name|default:o.laundry_partner.email }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td class="finance-table-actions">
+                                    <a href="{% url 'orders:detail' o.id %}"
+                                       class="btn btn-light btn-xs">
+                                        Détail
+                                    </a>
+                                    <a href="{% url 'orders:update' o.id %}"
+                                       class="btn btn-secondary btn-xs">
+                                        ✏️ Modifier
+                                    </a>
+                                    <a href="{% url 'orders:order_ticket_pdf' o.id %}"
+                                       target="_blank"
+                                       class="btn btn-light btn-xs">
+                                        🧾 Ticket
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         {% else %}
-            <div class="empty">
-                Aucune commande enregistrée pour le moment.
-                <br>
-                <a href="{% url 'orders:create' %}" class="btn-link btn-secondary" style="margin-top:8px;display:inline-block;">
-                    + Créer une première commande
-                </a>
-            </div>
+            <p class="driver-empty-text">
+                Aucune commande trouvée pour ces filtres.
+            </p>
         {% endif %}
-    </div>
+    </section>
 </div>
-
-{% endblock %}
+{% endblock content %}

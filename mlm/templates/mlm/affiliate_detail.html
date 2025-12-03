@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_head %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{{ STATIC_PREFIX }}mlm/mlm.css">
+{% endblock %}
+
+{% block content %}
+<div class="mlm-page">
+
+    <!-- HEADER -->
+    <div class="page-header">
+        <div class="page-header__left">
+            <h1 class="page-title">
+                Fiche affilié – {{ profile.customer.name|default:profile.referral_code }}
+            </h1>
+            <p class="page-subtitle">
+                Détails du programme de parrainage pour le code
+                <code>{{ profile.referral_code }}</code>.
+            </p>
+        </div>
+
+        <div class="mlm-header-actions">
+            <a href="{% url 'mlm:global_dashboard' %}" class="btn btn-light">
+                ⬅️ Dashboard MLM global
+            </a>
+
+            {% if profile.customer %}
+                <a href="{% url 'wallets:customer_wallet_detail' profile.customer.id %}"
+                   class="btn btn-light">
+                    💰 Portefeuille client
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="mlm-stats-grid">
+        <div class="mlm-card">
+            <div class="mlm-stat-label">Total commissions MLM</div>
+            <div class="mlm-stat-value">
+                {{ total_comm|default:"0" }} FCFA
+            </div>
+            <div class="mlm-stat-sub">
+                Somme de toutes les commissions rattachées à cet affilié.
+            </div>
+        </div>
+
+        <div class="mlm-card">
+            <div class="mlm-stat-label">Solde portefeuille affilié</div>
+            <div class="mlm-stat-value">
+                {{ customer_wallet_balance|default:"0.00" }} FCFA
+            </div>
+            <div class="mlm-stat-sub">
+                Montant disponible sur le portefeuille client (vue wallets).
+            </div>
+        </div>
+
+        <div class="mlm-card">
+            <div class="mlm-stat-label">Filleuls directs (N1)</div>
+            <div class="mlm-stat-value">
+                {{ n1_children|length|default:"0" }}
+            </div>
+            <div class="mlm-stat-sub">
+                Clients inscrits directement avec ce code affilié.
+            </div>
+        </div>
+    </div>
+
+    <!-- 2 COLONNES : PROFIL + STRUCTURE -->
+    <div class="mlm-two-columns">
+        <!-- Colonne gauche : Profil affilié -->
+        <section class="mlm-section">
+            <div class="mlm-section-header">
+                <h2>Profil affilié</h2>
+            </div>
+
+            <div class="mlm-card">
+                <div class="mlm-profile-block">
+                    <p>
+                        <strong>Client :</strong>
+                        {% if profile.customer %}
+                            {{ profile.customer.name }}
+                            {% if profile.customer.phone %}
+                                – <span class="text-muted">{{ profile.customer.phone }}</span>
+                            {% endif %}
+                        {% else %}
+                            <em>Non relié à un client</em>
+                        {% endif %}
+                    </p>
+                    <p>
+                        <strong>Code affilié :</strong>
+                        <code>{{ profile.referral_code }}</code>
+                    </p>
+                    <p>
+                        <strong>Date de création :</strong>
+                        {% if profile.created_at %}
+                            {{ profile.created_at|date:"d/m/Y H:i" }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </p>
+
+                    <hr class="mlm-separator">
+
+                    <p>
+                        <strong>Parrain :</strong>
+                        {% if profile.sponsor and profile.sponsor.customer %}
+                            {{ profile.sponsor.customer.name }}
+                            (<code>{{ profile.sponsor.referral_code }}</code>)
+                            <br>
+                            <a href="{% url 'mlm:affiliate_detail' profile.sponsor.referral_code %}"
+                               class="btn btn-sm btn-light">
+                                Voir fiche affilié du parrain
+                            </a>
+                        {% else %}
+                            <em>Aucun parrain enregistré.</em>
+                        {% endif %}
+                    </p>
+
+                    <hr class="mlm-separator">
+
+                    <p>
+                        <strong>Lien de parrainage :</strong><br>
+                        <code>https://fagni.app/invite/{{ profile.referral_code }}</code>
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Colonne droite : Structure de parrainage -->
+        <section class="mlm-section">
+            <div class="mlm-section-header">
+                <h2>Structure & activité</h2>
+            </div>
+
+            <div class="mlm-card">
+                <p>
+                    <strong>Filleuls directs (N1) :</strong>
+                    {{ n1_children|length|default:"0" }}
+                </p>
+                <p>
+                    <strong>Nombre de commandes commissionnées :</strong>
+                    {{ paginator.count|default:"0" }}
+                </p>
+
+                <hr class="mlm-separator">
+
+                <p>
+                    <strong>Dernière commission :</strong><br>
+                    {% if last_tx %}
+                        {{ last_tx.amount }} FCFA –
+                        {% if last_tx.order %}
+                            commande {{ last_tx.order.code|default:last_tx.order.id }}
+                        {% else %}
+                            commande inconnue
+                        {% endif %}
+                        le {{ last_tx.created_at|date:"d/m/Y H:i" }}
+                    {% else %}
+                        <em>Aucune commission enregistrée pour le moment.</em>
+                    {% endif %}
+                </p>
+            </div>
+        </section>
+    </div>
+
+    <!-- FILLEULS DIRECTS N1 -->
+    <section class="mlm-section">
+        <div class="mlm-section-header">
+            <h2>Filleuls directs (N1)</h2>
+        </div>
+        <p class="mlm-section-subtitle">
+            Clients inscrits directement avec le code
+            <code>{{ profile.referral_code }}</code>.
+        </p>
+
+        {% if n1_children %}
+            <div class="table-responsive">
+                <table class="mlm-table">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Téléphone</th>
+                            <th>Date d'inscription</th>
+                            <th>Code affilié</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for child in n1_children %}
+                            <tr>
+                                <td>{{ child.customer.name|default:"—" }}</td>
+                                <td>{{ child.customer.phone|default:"—" }}</td>
+                                <td>
+                                    {% if child.created_at %}
+                                        {{ child.created_at|date:"d/m/Y" }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <code>{{ child.referral_code }}</code>
+                                </td>
+                                <td>
+                                    <a href="{% url 'mlm:affiliate_detail' child.referral_code %}"
+                                       class="btn btn-sm btn-light">
+                                        Voir fiche affilié
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="mlm-empty">
+                Aucun filleul direct pour le moment.
+            </p>
+        {% endif %}
+    </section>
+
+    <!-- COMMANDES & COMMISSIONS (AVEC PAGINATION) -->
+    <section class="mlm-section">
+        <div class="mlm-section-header">
+            <h2>Commandes & commissions générées</h2>
+        </div>
+        <p class="mlm-section-subtitle">
+            Liste des commandes FAGNI ayant généré une commission pour cet affilié.
+        </p>
+
+        {% if tx_page and tx_page.object_list %}
+            <div class="table-responsive">
+                <table class="mlm-table">
+                    <thead>
+                        <tr>
+                            <th>Commande</th>
+                            <th>Client final</th>
+                            <th>Montant commission</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tx in tx_page %}
+                            <tr>
+                                <td>
+                                    {% if tx.order %}
+                                        <a href="{% url 'orders:detail' tx.order.id %}">
+                                            {{ tx.order.code|default:tx.order.id }}
+                                        </a>
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if tx.order and tx.order.customer %}
+                                        {{ tx.order.customer.name }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>{{ tx.amount }} FCFA</td>
+                                <td>{{ tx.created_at|date:"d/m/Y H:i" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- PAGINATION -->
+            {% if tx_page.has_other_pages %}
+                <div class="mlm-pagination">
+                    {% if tx_page.has_previous %}
+                        <a href="?page={{ tx_page.previous_page_number }}" class="btn btn-light btn-sm">
+                            ← Page précédente
+                        </a>
+                    {% endif %}
+
+                    <span class="mlm-pagination-info">
+                        Page {{ tx_page.number }} / {{ tx_page.paginator.num_pages }}
+                    </span>
+
+                    {% if tx_page.has_next %}
+                        <a href="?page={{ tx_page.next_page_number }}" class="btn btn-light btn-sm">
+                            Page suivante →
+                        </a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% else %}
+            <p class="mlm-empty">
+                Aucune transaction MLM enregistrée pour cet affilié.
+            </p>
+        {% endif %}
+    </section>
+
+    <!-- ACTIONS BAS DE PAGE -->
+    <div class="mlm-actions">
+        <a href="{% url 'mlm:global_dashboard' %}" class="btn btn-light">
+            🌍 Dashboard MLM global
+        </a>
+        <a href="{% url 'mlm:finance_dashboard' %}" class="btn btn-light">
+            🧮 Vue finance MLM
+        </a>
+        <a href="{% url 'mlm:admin_withdrawals' %}" class="btn btn-light">
+            💸 Demandes de retrait
+        </a>
+    </div>
+
+</div>
+{% endblock %}

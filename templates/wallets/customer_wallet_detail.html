@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="wallet-page">
+
+    <!-- HEADER -->
+    <div class="page-header">
+        <div class="page-header__left">
+            <h1 class="page-title">Portefeuille client</h1>
+            <p class="page-subtitle">
+                Suivi des mouvements FAGNI pour ce client.
+            </p>
+        </div>
+        <div class="page-actions" style="margin-top: 24px; display:flex; flex-wrap:wrap; gap:8px;">
+            <a href="{% url 'orders:list' %}" class="btn btn-light">
+                📋 Liste des commandes
+            </a>
+
+            <a href="{% url 'orders:finance_dashboard' %}" class="btn btn-light">
+                💰 Dashboard finance
+            </a>
+
+            <a href="{% url 'mlm:global_dashboard' %}" class="btn btn-light btn-sm">
+                🌍 Dashboard MLM
+            </a>
+
+            {% if customer and customer.referral_profiles.first %}
+                {% with profile=customer.referral_profiles.first %}
+                    <a href="{% url 'mlm:affiliate_detail' profile.referral_code %}" class="btn btn-primary">
+                        🌱 Fiche affilié de ce client
+                    </a>
+                {% endwith %}
+            {% endif %}
+
+            <a href="{% url 'mlm:affiliate_dashboard' %}" class="btn btn-light">
+                👤 Mon espace affilié
+            </a>
+        </div>
+
+    <!-- INFO CLIENT + SOLDE -->
+    <section class="card" style="margin-bottom: 20px;">
+        <div style="display:flex; justify-content:space-between; gap:24px; flex-wrap:wrap;">
+            <div>
+                <h2 style="margin:0 0 4px 0;">{{ customer.name|default:"Client sans nom" }}</h2>
+                <p style="margin:0; color:#6b7280;">
+                    {% if customer.phone %}
+                        📞 {{ customer.phone }}
+                    {% else %}
+                        <span class="text-muted">Téléphone non renseigné</span>
+                    {% endif %}
+                    <br>
+                    {% if customer.address %}
+                        📍 {{ customer.address }}
+                    {% endif %}
+                </p>
+            </div>
+
+            <div style="text-align:right;">
+                <div style="font-size:0.9rem; color:#6b7280;">Solde portefeuille</div>
+                <div style="font-size:1.8rem; font-weight:700;">
+                    {{ balance|default:"0.00" }} <span style="font-size:0.9rem;">FCFA</span>
+                </div>
+                {% if not wallet %}
+                    <div style="color:#b91c1c; font-size:0.85rem; margin-top:4px;">
+                        Aucun portefeuille n'est encore ouvert pour ce client.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <!-- HISTORIQUE DES MOUVEMENTS -->
+    <section class="card">
+        <div class="finance-table-header" style="margin-bottom: 12px;">
+            <h2 class="finance-table-title">Historique des transactions</h2>
+            <p class="finance-table-subtitle">
+                Tous les mouvements crédit / débit du portefeuille FAGNI.
+            </p>
+        </div>
+
+        {% if transactions_page.object_list %}
+            <div class="finance-table-wrapper">
+                <table class="finance-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th class="finance-col-number">Montant</th>
+                            <th>Description</th>
+                            <th>Commande liée</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tx in transactions_page %}
+                            <tr>
+                                <td>
+                                    {{ tx.created_at|date:"d/m/Y H:i" }}
+                                </td>
+                                <td>
+                                    {{ tx.get_type_display|default:tx.type }}
+                                </td>
+                                <td class="finance-col-number">
+                                    {% if tx.amount >= 0 %}
+                                        <span style="color:#15803d;">+{{ tx.amount }} FCFA</span>
+                                    {% else %}
+                                        <span style="color:#b91c1c;">{{ tx.amount }} FCFA</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ tx.description|default:"—" }}
+                                </td>
+                                <td>
+                                    {% if tx.order %}
+                                        <a href="{% url 'orders:detail' tx.order.id %}"
+                                           class="finance-order-link">
+                                            {{ tx.order.code|default:tx.order.id }}
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- PAGINATION -->
+            <div class="pagination" style="margin-top:16px; display:flex; justify-content:flex-end; gap:8px; align-items:center;">
+                {% if transactions_page.has_previous %}
+                    <a class="btn btn-light btn-sm"
+                       href="?page={{ transactions_page.previous_page_number }}">
+                        ← Précédent
+                    </a>
+                {% else %}
+                    <span class="btn btn-light btn-sm" style="opacity:0.5; pointer-events:none;">
+                        ← Précédent
+                    </span>
+                {% endif %}
+
+                <span style="font-size:0.9rem; color:#6b7280;">
+                    Page {{ transactions_page.number }} / {{ transactions_page.paginator.num_pages }}
+                </span>
+
+                {% if transactions_page.has_next %}
+                    <a class="btn btn-light btn-sm"
+                       href="?page={{ transactions_page.next_page_number }}">
+                        Suivant →
+                    </a>
+                {% else %}
+                    <span class="btn btn-light btn-sm" style="opacity:0.5; pointer-events:none;">
+                        Suivant →
+                    </span>
+                {% endif %}
+            </div>
+        {% else %}
+            <p class="driver-empty-text">
+                Aucun mouvement enregistré sur ce portefeuille pour le moment.
+            </p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

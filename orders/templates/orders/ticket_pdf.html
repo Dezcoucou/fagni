@@ -137,6 +137,7 @@
             border-top:1px solid #ddd;
             font-size:12px;
             font-weight:700;
+            color:#ff7a00;
         }
 
         /* QR & signature */
@@ -203,201 +204,123 @@
     </style>
 </head>
 <body>
-
 <div class="ticket">
-
-    <!-- En-tête -->
     <div class="header">
         <div class="brand">FAGNI<span>.</span></div>
-        <div class="subtitle">Plateforme pressing &amp; services – Ticket de commande</div>
+        <div class="subtitle">Pressing & services à domicile</div>
         <div class="ticket-code">
-            Commande {{ order.code|default:order.id }}
-        </div>
-        <div style="font-size:10px;color:#777;margin-top:2px;">
-            Créée le {{ order.created_at|date:"d/m/Y H:i" }}
-            {% if order.delivered_time %}
-                • Livrée le {{ order.delivered_time|date:"d/m/Y H:i" }}
-            {% endif %}
+            Ticket commande {{ order.code|default:order.id }}<br>
+            <small>{{ order.created_at|date:"d/m/Y H:i" }}</small>
         </div>
     </div>
 
     <hr>
 
-    <!-- Client + logistique courte -->
-    <div class="row">
-        <div class="col">
-            <div class="section-title">Client</div>
-            <div class="line">
-                <span class="label">Nom :</span>
-                <strong>{{ order.customer.name|default:"—" }}</strong>
-            </div>
-            {% if order.customer.phone %}
-            <div class="line">
-                <span class="label">Téléphone :</span>
-                {{ order.customer.phone }}
-            </div>
-            {% endif %}
-            {% if order.customer.address %}
-            <div class="line">
-                <span class="label">Adresse :</span>
-                {{ order.customer.address }}
-            </div>
-            {% endif %}
-            {% if order.referral_code %}
-            <div class="line">
-                <span class="label">Code parrain :</span>
-                {{ order.referral_code }}
-            </div>
-            {% endif %}
+    <!-- Client -->
+    <div>
+        <div class="section-title">Client</div>
+        <div class="line">
+            <span class="label">Nom :</span>
+            <span>{{ order.customer.name|default:"—" }}</span>
         </div>
-        <div class="col">
-            <div class="section-title">Partenaires</div>
-            <div class="line">
-                <span class="label">Blanchisserie :</span>
-                {% if order.laundry_partner %}
-                    {{ order.laundry_partner.name }}
-                {% else %}
-                    <span style="color:#999;">Non assignée</span>
-                {% endif %}
-            </div>
-            <div class="line">
-                <span class="label">Livreur :</span>
-                {% if order.delivery_partner %}
-                    {{ order.delivery_partner.name }}
-                {% else %}
-                    <span style="color:#999;">Non assigné</span>
-                {% endif %}
-            </div>
-            {% if order.distance_km %}
-            <div class="line">
-                <span class="label">Distance A/R :</span>
-                {{ order.distance_km }} km
-            </div>
-            {% endif %}
-            <div class="line">
-                <span class="label">Statut :</span>
-                {{ order.get_status_display }}
-            </div>
+        <div class="line">
+            <span class="label">Téléphone :</span>
+            <span>{{ order.customer.phone|default:"—" }}</span>
         </div>
+        <div class="line">
+            <span class="label">Adresse :</span>
+            <span>{{ order.customer.address|default:"—" }}</span>
+        </div>
+        {% if order.referral_code %}
+        <div class="line">
+            <span class="label">Parrain :</span>
+            <span>{{ order.referral_code }}</span>
+        </div>
+        {% endif %}
     </div>
-
-    {% if order.notes %}
-        <div class="section-title" style="margin-top:8px;">Notes / instructions</div>
-        <div class="note-box">
-            {{ order.notes }}
-        </div>
-    {% endif %}
 
     <hr>
 
-    <!-- Détail des prestations -->
-    <div class="section-title">Détail des prestations</div>
-
-    {% if order.items.all %}
+    <!-- Prestations -->
+    <div>
+        <div class="section-title">Prestations</div>
         <table>
             <thead>
-                <tr>
-                    <th>Article</th>
-                    <th class="t-center">Qté</th>
-                    <th class="t-right">PU</th>
-                    <th class="t-right">Total</th>
-                </tr>
+            <tr>
+                <th>Article</th>
+                <th class="t-right">Qté</th>
+                <th class="t-right">PU</th>
+                <th class="t-right">Total</th>
+            </tr>
             </thead>
             <tbody>
-            {% for item in order.items.all %}
+            {% for item in items %}
                 <tr>
                     <td>{{ item.designation }}</td>
-                    <td class="t-center">{{ item.quantity }}</td>
-                    <td class="t-right">
-                        {{ item.unit_price|floatformat:0 }} F
-                    </td>
-                    <td class="t-right">
-                        {{ item.total|floatformat:0 }} F
-                    </td>
+                    <td class="t-right">{{ item.quantity }}</td>
+                    <td class="t-right">{{ item.unit_price|floatformat:0 }}</td>
+                    <td class="t-right">{{ item.total|floatformat:0 }}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="4">Aucune ligne dans la commande.</td>
                 </tr>
             {% endfor %}
             </tbody>
         </table>
-    {% else %}
-        <div style="font-size:11px;color:#777;margin-top:4px;">
-            Aucune ligne de prestation enregistrée.
-        </div>
-    {% endif %}
+    </div>
 
-    <!-- Totaux harmonisés avec la commande -->
+    <!-- Totaux -->
     <div class="totals">
         <div class="totals-row">
-            <span>Total prestations</span>
-            <span>
-                <strong>
-                    {{ order.total_ht|default:0|floatformat:0 }} FCFA
-                </strong>
-            </span>
+            <span>Sous-total prestations :</span>
+            <span>{{ base_ht|default:0|floatformat:0 }} FCFA</span>
         </div>
         <div class="totals-row">
-            <span>Service FAGNI</span>
+            <span>Service FAGNI :</span>
             <span>{{ order.service_fee|default:0|floatformat:0 }} FCFA</span>
         </div>
         <div class="totals-row">
-            <span>Livraison</span>
+            <span>Frais de livraison :</span>
             <span>{{ order.delivery_fee|default:0|floatformat:0 }} FCFA</span>
         </div>
-
-        <div class="totals-global">
-            <span>Total global client</span>
-            <span style="float:right;">
-                {{ order.grand_total|default:0|floatformat:0 }} FCFA
-            </span>
-        </div>
-
-        <div class="totals-row" style="margin-top:4px;">
-            <span>Montant payé</span>
-            <span>{{ order.amount_paid|default:0|floatformat:0 }} FCFA</span>
-        </div>
         <div class="totals-row">
-            <span>Montant dû</span>
-            <span>
-                {% if order.amount_due and order.amount_due > 0 %}
-                    {{ order.amount_due|floatformat:0 }} FCFA
-                {% else %}
-                    0 FCFA (commande soldée)
-                {% endif %}
-            </span>
+            <span>TVA (18 %) :</span>
+            <span>{{ tva_amount|default:0|floatformat:0 }} FCFA</span>
+        </div>
+        <div class="totals-row totals-global">
+            <span>Total TTC client :</span>
+            <span>{{ grand_total|default:0|floatformat:0 }} FCFA</span>
         </div>
     </div>
 
-    <!-- QR + Signature -->
+    {% if order.notes %}
+    <div class="section-title">Notes</div>
+    <div class="note-box">
+        {{ order.notes }}
+    </div>
+    {% endif %}
+
     <div class="footer-row">
         <div class="qr-box">
-            <img
-                src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={{ order.code|default:order.id|urlencode }}"
-                alt="QR Code commande {{ order.code|default:order.id }}">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=110x110&data={{ qr_data|urlencode }}"
+                 alt="QR commande {{ order.code }}">
             <div class="qr-caption">
-                Scanner pour retrouver rapidement la commande<br>
-                Code : {{ order.code|default:order.id }}
+                Scanner pour voir les détails
             </div>
         </div>
-
         <div class="sign-box">
-            <div class="sign-title">
-                Signature / Cachet FAGNI
-            </div>
-            <div style="font-size:9px;color:#777;">
-                Ce ticket est généré automatiquement par la plateforme FAGNI
-                pour confirmer la prise en charge de la commande pressing / services.
-            </div>
+            <div class="sign-title">Signature client</div>
             <div class="sign-line">
-                <span>Signature responsable</span>
+                <span>&nbsp;</span>
             </div>
         </div>
     </div>
 
     <div class="legal">
-        FAGNI – Plateforme digitale de pressing &amp; services en Côte d'Ivoire.<br>
-        Ce document ne vaut pas facture fiscale mais bon de prise en charge.
+        Merci d'avoir utilisé FAGNI.  
+        Ce ticket tient lieu de justificatif de dépôt.
     </div>
-
 </div>
-
 </body>
 </html>

@@ -82,7 +82,7 @@
 <div class="ticket-wrapper">
     <div class="ticket-header">
         <h1>Ticket FAGNI</h1>
-        <p>Commande {{ order.code }} – {{ order.created_at|date:"d/m/Y H:i" }}</p>
+        <p>Commande {{ order.code|default:order.id }} – {{ order.created_at|date:"d/m/Y H:i" }}</p>
     </div>
 
     <div>
@@ -137,8 +137,8 @@
 
     <div class="ticket-totals">
         <div class="line">
-            <span>Total prestation :</span>
-            <span>{{ order.total_ht|default:0|floatformat:0 }} FCFA</span>
+            <span>Sous-total prestations :</span>
+            <span>{{ order.total|default:0|floatformat:0 }} FCFA</span>
         </div>
         <div class="line">
             <span>Service FAGNI :</span>
@@ -148,8 +148,14 @@
             <span>Frais de livraison :</span>
             <span>{{ order.delivery_fee|default:0|floatformat:0 }} FCFA</span>
         </div>
+        {% if tva_amount %}
+        <div class="line">
+            <span>TVA (18 %) :</span>
+            <span>{{ tva_amount|floatformat:0 }} FCFA</span>
+        </div>
+        {% endif %}
         <div class="line grand">
-            <span>Total global :</span>
+            <span>Total TTC client :</span>
             <span>{{ order.grand_total|default:0|floatformat:0 }} FCFA</span>
         </div>
     </div>

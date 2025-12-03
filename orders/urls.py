@@ -26,9 +26,11 @@ urlpatterns = [
 
     # Dashboard global des commandes
     path("dashboard/", views.orders_dashboard, name="dashboard"),
+    path("portal/dashboard/", views.portal_dashboard, name="portal_dashboard"),
 
     # Exports commandes
     path("export/csv/", views.export_orders_csv, name="export_orders_csv"),
+
     path("export/xlsx/", views.export_orders_xlsx, name="export_orders_xlsx"),
 
     # Clients / mini CRM
@@ -118,6 +120,13 @@ urlpatterns = [
         "driver/orders/<int:order_id>/",
         views.driver_order_detail,
         name="driver_order_detail",
+    ),
+
+    # Nouvelle route "ME" : sans ID → trouve le livreur connecté
+    path(
+        "driver/performance/",
+        views.driver_performance_me,
+        name="driver_performance_me",
     ),
 
     path(

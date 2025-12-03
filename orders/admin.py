@@ -1,5 +1,9 @@
+from decimal import Decimal
+
 from django.contrib import admin
+from django.utils.html import format_html
 from django.db.models import Sum
+from django.urls import reverse
 
 from .models import (
     Customer,
@@ -66,6 +70,8 @@ class OrderAdmin(admin.ModelAdmin):
         "delivery_fee",
         "distance_km",
         "montant_global",
+        "front_detail_link",       # lien vers fiche front
+        "customer_wallet_link",    # lien vers portefeuille client
         "created_at",
     )
     list_filter = (
@@ -89,7 +95,7 @@ class OrderAdmin(admin.ModelAdmin):
     )
     inlines = [OrderItemInline]
 
-    # On ne les modifie pas à la main : ce sont des champs calculés
+    # Champs calculés / read-only
     readonly_fields = (
         "created_at",
         "updated_at",
@@ -104,6 +110,9 @@ class OrderAdmin(admin.ModelAdmin):
         "delivery_fee",
         "driver_logistic_cost",
         "logistic_margin",
+        # blocs d’info custom
+        "mlm_info_display",
+        "wallet_info_display",
     )
 
     autocomplete_fields = (
@@ -150,6 +159,15 @@ class OrderAdmin(admin.ModelAdmin):
             },
         ),
         (
+            "Programme Parrainage & Portefeuille",
+            {
+                "fields": (
+                    "mlm_info_display",
+                    "wallet_info_display",
+                )
+            },
+        ),
+        (
             "Timeline opérationnelle",
             {
                 "fields": (
@@ -163,14 +181,138 @@ class OrderAdmin(admin.ModelAdmin):
         ),
     )
 
+    # --- Total TTC calculé ---
+
     def montant_global(self, obj):
         """
-        Total global facturé au client :
-        prestations TTC + service FAGNI + livraison.
-        """
-        return obj.grand_total
+        Montant TTC complet (prestations + service FAGNI + livraison + TVA).
 
-    montant_global.short_description = "Total global client (FCFA)"
+        compute_totals(save=False) prépare les attributs calculés (dont grand_total)
+        sans modifier la BD.
+        """
+        try:
+            obj.compute_totals(save=False)
+        except Exception:
+            # Si compute_totals n'existe pas ou échoue, fallback sur total
+            return obj.total or Decimal("0.00")
+
+        return getattr(obj, "grand_total", obj.total or Decimal("0.00"))
+
+    montant_global.short_description = "Total TTC"
+    montant_global.admin_order_field = "total"
+
+    # --- Liens pratiques dans la liste admin ---
+
+    def front_detail_link(self, obj):
+        """
+        Lien vers la fiche front de la commande (/orders/<id>/).
+        """
+        try:
+            url = reverse("orders:detail", args=[obj.pk])
+            return format_html('<a href="{}" target="_blank">🔍 Voir fiche</a>', url)
+        except Exception:
+            return "-"
+
+    front_detail_link.short_description = "Fiche front"
+
+    def customer_wallet_link(self, obj):
+        """
+        Lien vers le portefeuille du client (wallets:customer_wallet_detail).
+        """
+        if not obj.customer:
+            return "-"
+        try:
+            url = reverse("wallets:customer_wallet_detail", args=[obj.customer.pk])
+            return format_html('<a href="{}" target="_blank">💰 Portefeuille</a>', url)
+        except Exception:
+            return "-"
+
+    customer_wallet_link.short_description = "Wallet client"
+
+
+    # --- Bloc d’info MLM dans la fiche commande ---
+    def mlm_info_display(self, obj):
+        """
+        Affiche les infos de parrainage du client (profil affilié + parrain)
+        sous forme de texte simple + lien.
+        """
+        customer = obj.customer
+        if not customer:
+            return "Aucun client associé."
+
+        profiles_manager = getattr(customer, "referral_profiles", None)
+        profile = profiles_manager.first() if profiles_manager else None
+
+        if not profile:
+            return "Aucun profil de parrainage pour ce client."
+
+        sponsor = profile.sponsor
+        if sponsor and sponsor.customer:
+            sponsor_txt = f"Parrain : {sponsor.customer.name} ({sponsor.referral_code})"
+        else:
+            sponsor_txt = "Parrain : aucun parrain enregistré."
+
+        # Lien vers la fiche affilié MLM
+        try:
+            affiliate_url = reverse("mlm:affiliate_detail", args=[profile.referral_code])
+            link = format_html(
+                " – <a href='{}' target='_blank'>Voir fiche affilié MLM</a>",
+                affiliate_url,
+            )
+        except Exception:
+            link = ""
+
+        # Affichage compact : tout sur une ligne
+        return format_html(
+            "Code affilié client : {} – {}{}",
+            profile.referral_code,
+            sponsor_txt,
+            link,
+        )
+
+    mlm_info_display.short_description = "Programme Parrainage (MLM)"
+
+
+    # --- Bloc d’info Portefeuille client dans la fiche commande ---
+    def wallet_info_display(self, obj):
+        """
+        Affiche un résumé du portefeuille FAGNI du client (texte + lien).
+        """
+        from wallets.models import Wallet  # import local pour éviter les cycles
+
+        customer = obj.customer
+        if not customer:
+            return "Aucun client associé."
+
+        try:
+            wallet = Wallet.objects.get(customer=customer, owner_type="customer")
+            solde = wallet.balance
+        except Wallet.DoesNotExist:
+            wallet = None
+            solde = Decimal("0.00")
+
+        if wallet:
+            try:
+                wallet_url = reverse(
+                    "wallets:customer_wallet_detail",
+                    args=[customer.pk],
+                )
+                link = format_html(
+                    " – <a href='{}' target='_blank'>Voir portefeuille client</a>",
+                    wallet_url,
+                )
+            except Exception:
+                link = ""
+        else:
+            link = " – Aucun portefeuille ouvert pour ce client."
+
+        return format_html(
+            "Solde portefeuille client : {} FCFA{}",
+            solde,
+            link,
+        )
+
+    wallet_info_display.short_description = "Portefeuille client"
 
 
 # ==============

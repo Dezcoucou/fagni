@@ -6,317 +6,397 @@
 {% block content %}
 
 <style>
-    .page-ops{
-        max-width:1200px;
-        margin:20px auto 30px;
-        padding:0 10px;
-    }
-    .ops-header{
-        margin-bottom:14px;
-    }
-    .ops-header h1{
-        margin:0;
-        font-size:20px;
-    }
-    .ops-header p{
-        margin:4px 0 0;
-        font-size:13px;
-        color:#555;
+    :root {
+        --fagni-orange: #ff7a00;
+        --fagni-blue: #0056b3;
+        --ops-bg: #f5f5f7;
+        --ops-border: #e5e7eb;
+        --ops-text-main: #111827;
+        --ops-text-muted: #6b7280;
     }
 
-    .card{
-        background:#fff;
-        border-radius:10px;
-        box-shadow:0 4px 10px rgba(0,0,0,0.04);
-        padding:14px 16px 18px;
-        margin-bottom:14px;
-    }
-    .top-bar{
-        display:flex;
-        justify-content:space-between;
-        align-items:flex-start;
-        gap:10px;
-        flex-wrap:wrap;
-        margin-bottom:10px;
+    .ops-page {
+        max-width: 1200px;
+        margin: 0 auto 30px;
+        padding: 0 10px;
     }
 
-    .summary{
-        font-size:13px;
-        color:#333;
-    }
-    .summary span{
-        margin-right:10px;
-    }
-    .summary-row2{
-        font-size:11px;
-        color:#666;
-        margin-top:3px;
-    }
-    .pill-global{
-        display:inline-flex;
-        align-items:center;
-        gap:4px;
-        padding:2px 8px;
-        border-radius:999px;
-        background:#f1f3f5;
-        font-size:11px;
-        margin-right:5px;
-    }
-    .pill-global span{
-        opacity:.85;
+    .ops-card {
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+        padding: 16px 18px 18px;
+        margin-bottom: 16px;
+        border: 1px solid var(--ops-border);
     }
 
-    .btn-link{
-        text-decoration:none;
-        display:inline-block;
-        border-radius:999px;
-        padding:7px 12px;
-        font-size:13px;
-    }
-    .btn-primary{
-        background:#0056b3;
-        color:#fff;
-        border:none;
-    }
-    .btn-primary:hover{
-        background:#00408a;
-    }
-    .btn-secondary{
-        background:#fff;
-        border:1px solid #ccc;
-        color:#333;
-    }
-    .btn-secondary:hover{
-        background:#f3f3f3;
+    .ops-top-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 6px;
     }
 
-    .board{
-        display:grid;
-        grid-template-columns:repeat(3,1fr);
-        gap:14px;
+    .ops-summary {
+        font-size: 13px;
+        color: var(--ops-text-main);
     }
-    @media(max-width:900px){
-        .board{
-            grid-template-columns:1fr;
+
+    .ops-summary span {
+        margin-right: 12px;
+    }
+
+    .ops-summary-row2 {
+        font-size: 11px;
+        color: var(--ops-text-muted);
+        margin-top: 4px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .ops-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        background: #f3f4f6;
+        font-size: 11px;
+        border: 1px solid #e5e7eb;
+    }
+
+    .ops-pill strong {
+        font-weight: 600;
+    }
+
+    .ops-actions-right,
+    .ops-actions-left {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .ops-btn {
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        padding: 7px 12px;
+        font-size: 13px;
+        border: 1px solid #e5e7eb;
+        background: #ffffff;
+        color: #374151;
+        cursor: pointer;
+        transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease, border-color 0.15s ease;
+        white-space: nowrap;
+    }
+
+    .ops-btn:hover {
+        background: #f3f4f6;
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.10);
+        transform: translateY(-1px);
+    }
+
+    .ops-btn-primary {
+        border-color: var(--fagni-blue);
+        background: var(--fagni-blue);
+        color: #ffffff;
+    }
+
+    .ops-btn-primary:hover {
+        background: #00408a;
+        border-color: #00408a;
+    }
+
+    .ops-btn-secondary {
+        /* même base, juste pour lisibilité sémantique */
+    }
+
+    .ops-mini-legend {
+        font-size: 11px;
+        color: var(--ops-text-muted);
+        margin-top: 8px;
+    }
+
+    .ops-board {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+    }
+
+    @media (max-width: 900px) {
+        .ops-board {
+            grid-template-columns: 1fr;
         }
     }
-    .col{
-        background:#fff;
-        border-radius:10px;
-        box-shadow:0 2px 6px rgba(0,0,0,0.03);
-        padding:10px 10px 12px;
-    }
-    .col-header{
-        display:flex;
-        justify-content:space-between;
-        align-items:flex-end;
-        gap:6px;
-        margin-bottom:6px;
-    }
-    .col h2{
-        margin:0;
-        font-size:15px;
-        display:flex;
-        align-items:center;
-        gap:6px;
-    }
-    .col small{
-        display:block;
-        font-size:11px;
-        color:#666;
-    }
-    .badge-total{
-        background:#eee;
-        border-radius:999px;
-        padding:2px 8px;
-        font-size:11px;
+
+    .ops-col {
+        background: #ffffff;
+        border-radius: 14px;
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+        padding: 10px 10px 12px;
+        border: 1px solid #e5e7eb;
     }
 
-    table{
-        width:100%;
-        border-collapse:collapse;
-        font-size:12px;
-    }
-    th,td{
-        padding:6px 4px;
-        border-bottom:1px solid #f0f0f0;
-        vertical-align:top;
-    }
-    th{
-        background:#fafafa;
-        font-weight:600;
-        white-space:nowrap;
-    }
-    tr:hover{
-        background:#fafafa;
+    .ops-col-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 6px;
+        margin-bottom: 6px;
     }
 
-    .link-detail{
-        font-size:11px;
-        text-decoration:none;
-        color:#0056b3;
-    }
-    .link-detail:hover{
-        text-decoration:underline;
-    }
-
-    form{ margin:0; }
-    button{
-        font-size:11px;
-        border-radius:999px;
-        border:none;
-        padding:3px 8px;
-        cursor:pointer;
+    .ops-col h2 {
+        margin: 0;
+        font-size: 15px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
     }
 
-    .subtext{
-        display:block;
-        font-size:11px;
-        color:#666;
-        margin-top:2px;
-    }
-    .metric{
-        display:block;
-        font-size:10px;
-        color:#777;
-        margin-top:1px;
-    }
-    .metric strong{
-        font-weight:600;
-    }
-    .empty-col{
-        font-size:12px;
-        color:#777;
-        padding:8px 0;
+    .ops-col small {
+        display: block;
+        font-size: 11px;
+        color: var(--ops-text-muted);
     }
 
-    /* Boutons statut / étapes */
-    .btn-step-pickup{
-        background:#0056b3;
-        color:#fff;
+    .ops-badge-total {
+        background: #f3f4ff;
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 11px;
+        color: #3730a3;
+        border: 1px solid #e0e7ff;
     }
-    .btn-step-dropoff{
-        background:#ffc107;
-        color:#212529;
+
+    .ops-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
     }
-    .btn-step-wash{
-        background:#17a2b8;
-        color:#fff;
+
+    .ops-table th,
+    .ops-table td {
+        padding: 6px 4px;
+        border-bottom: 1px solid #f0f0f0;
+        vertical-align: top;
     }
-    .btn-step-return{
-        background:#6c757d;
-        color:#fff;
+
+    .ops-table th {
+        background: #f9fafb;
+        font-weight: 600;
+        white-space: nowrap;
+        color: #374151;
     }
-    .btn-step-delivered{
-        background:#28a745;
-        color:#fff;
+
+    .ops-table tr:hover {
+        background: #f9fafb;
+    }
+
+    .ops-link-detail {
+        font-size: 11px;
+        text-decoration: none;
+        color: var(--fagni-blue);
+    }
+
+    .ops-link-detail:hover {
+        text-decoration: underline;
+    }
+
+    .ops-subtext {
+        display: block;
+        font-size: 11px;
+        color: var(--ops-text-muted);
+        margin-top: 2px;
+    }
+
+    .ops-metric {
+        display: block;
+        font-size: 10px;
+        color: #6b7280;
+        margin-top: 1px;
+    }
+
+    .ops-metric strong {
+        font-weight: 600;
+    }
+
+    .ops-empty-col {
+        font-size: 12px;
+        color: #9ca3af;
+        padding: 10px 0;
+    }
+
+    /* Boutons étapes Ops */
+    .ops-step-btn {
+        font-size: 11px;
+        border-radius: 999px;
+        border: none;
+        padding: 4px 9px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+        white-space: nowrap;
+    }
+
+    .ops-step-btn:hover {
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.15);
+        transform: translateY(-1px);
+    }
+
+    .ops-step-pickup {
+        background: var(--fagni-blue);
+        color: #ffffff;
+    }
+
+    .ops-step-dropoff {
+        background: #fbbf24;
+        color: #1f2933;
+    }
+
+    .ops-step-wash {
+        background: #0ea5e9;
+        color: #ffffff;
+    }
+
+    .ops-step-return {
+        background: #6b7280;
+        color: #ffffff;
+    }
+
+    .ops-step-delivered {
+        background: #22c55e;
+        color: #ffffff;
     }
 
     /* Pastilles statut */
-    .badge-status{
-        padding:3px 8px;
-        border-radius:999px;
-        font-size:11px;
-        white-space:nowrap;
-    }
-    .badge-pending{
-        background:#fff3cd;
-        color:#856404;
-    }
-    .badge-in-progress{
-        background:#cce5ff;
-        color:#004085;
-    }
-    .badge-done{
-        background:#d4edda;
-        color:#155724;
+    .ops-badge-status {
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        white-space: nowrap;
+        border: 1px solid transparent;
     }
 
-    .mini-legend{
-        font-size:10px;
-        color:#777;
-        margin-top:6px;
+    .ops-badge-pending {
+        background: #fff7ed;
+        color: #9a3412;
+        border-color: #fed7aa;
     }
-    .timeline-inline{
-        display:block;
-        font-size:10px;
-        margin-top:3px;
-        color:#555;
+
+    .ops-badge-in-progress {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border-color: #bfdbfe;
     }
-    .timeline-inline span{
-        margin-right:4px;
+
+    .ops-badge-done {
+        background: #ecfdf3;
+        color: #15803d;
+        border-color: #bbf7d0;
+    }
+
+    .ops-timeline-inline {
+        display: block;
+        font-size: 10px;
+        margin-top: 4px;
+        color: #4b5563;
+    }
+
+    .ops-timeline-inline span {
+        margin-right: 4px;
     }
 </style>
 
-<div class="page-ops">
-
-    <div class="ops-header">
-        <h1>Tableau Ops – Commandes FAGNI</h1>
-        <p>Suivi opérationnel : collecte, dépôt blanchisserie, lavage, retour et livraison.</p>
+<div class="page-header">
+    <div class="page-header__left">
+        <h1 class="page-title">Tableau Ops – Commandes FAGNI</h1>
+        <p class="page-subtitle">
+            Suivi opérationnel : collecte, dépôt blanchisserie, lavage, retour et livraison.
+        </p>
     </div>
+    <div class="page-header__right">
+        <a href="{% url 'orders:list' %}" class="ops-btn ops-btn-secondary">
+            ← Liste des commandes
+        </a>
+        <a href="{% url 'orders:create' %}" class="ops-btn ops-btn-primary">
+            + Nouvelle commande
+        </a>
+    </div>
+</div>
+
+<div class="ops-page">
 
     <!-- Carte globale Ops -->
-    <div class="card">
-        <div class="top-bar">
+    <div class="ops-card">
+        <div class="ops-top-bar">
 
-            <!-- 🔹 Bouton vers tableau livreurs -->
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
-                <a href="{% url 'orders:driver_dashboard' %}" class="btn-link btn-secondary">
+            <!-- 🔹 Liens OPS / Livreur -->
+            <div class="ops-actions-left">
+                <a href="{% url 'orders:driver_dashboard' %}" class="ops-btn ops-btn-secondary">
                     🛵 Tableau livreurs
                 </a>
             </div>
 
             <!-- Résumé global -->
             <div>
-                <div class="summary">
-                    <span><strong>Total en attente :</strong> {{ pending_orders|length }}</span>
+                <div class="ops-summary">
+                    <span><strong>En attente :</strong> {{ pending_orders|length }}</span>
                     <span><strong>En cours :</strong> {{ in_progress_orders|length }}</span>
                     <span><strong>Terminées :</strong> {{ done_orders|length }}</span>
                 </div>
-                <div class="summary-row2">
-                    <span class="pill-global">
+                <div class="ops-summary-row2">
+                    <span class="ops-pill">
                         💰 <span>Total prestations livrées :</span>
                         <strong>{{ done_total|default:0 }} FCFA</strong>
                     </span>
-                    <span class="pill-global">
+                    <span class="ops-pill">
                         🚦 <span>Vue temps réel des commandes actives.</span>
                     </span>
                 </div>
             </div>
 
-            <!-- Navigation -->
-            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-                <a href="{% url 'orders:list' %}" class="btn-link btn-secondary">
-                    ← Liste des commandes
+            <!-- Actions (rappel) -->
+            <div class="ops-actions-right">
+                <a href="{% url 'orders:finance_dashboard' %}" class="ops-btn ops-btn-secondary">
+                    💰 Dashboard financier
                 </a>
-                <a href="{% url 'orders:create' %}" class="btn-link btn-primary">
-                    + Nouvelle commande
+                <a href="{% url 'orders:dashboard' %}" class="ops-btn ops-btn-secondary">
+                    📊 Dashboard commandes
                 </a>
             </div>
         </div>
 
-        <div class="mini-legend">
+        <div class="ops-mini-legend">
             💡 Astuce : valide les étapes dans la colonne « En cours » pour mettre à jour automatiquement
             la timeline et le statut des commandes.
         </div>
     </div>
 
     <!-- Board 3 colonnes -->
-    <div class="board">
+    <div class="ops-board">
 
         <!-- Colonne En attente -->
-        <div class="col">
-            <div class="col-header">
+        <div class="ops-col">
+            <div class="ops-col-header">
                 <div>
-                    <h2>En attente
-                        <span class="badge-total">{{ pending_orders|length }}</span>
+                    <h2>
+                        En attente
+                        <span class="ops-badge-total">{{ pending_orders|length }}</span>
                     </h2>
                     <small>Commandes créées, en attente de collecte.</small>
                 </div>
             </div>
 
             {% if pending_orders %}
-                <table>
+                <table class="ops-table">
                     <thead>
                         <tr>
                             <th>Code</th>
@@ -331,29 +411,29 @@
                         <tr>
                             <td>
                                 <strong>{{ order.code }}</strong>
-                                <span class="subtext">
+                                <span class="ops-subtext">
                                     Créée le {{ order.created_at|date:"d/m H:i" }}
                                 </span>
-                                <span class="subtext">
-                                    <span class="badge-status badge-pending">En attente</span>
+                                <span class="ops-subtext">
+                                    <span class="ops-badge-status ops-badge-pending">En attente</span>
                                 </span>
                             </td>
                             <td>
                                 <strong>{{ order.customer.name }}</strong>
                                 {% if order.customer.phone %}
-                                    <span class="subtext">📞 {{ order.customer.phone }}</span>
+                                    <span class="ops-subtext">📞 {{ order.customer.phone }}</span>
                                 {% endif %}
                                 {% if order.customer.address %}
-                                    <span class="metric">📍 {{ order.customer.address }}</span>
+                                    <span class="ops-metric">📍 {{ order.customer.address }}</span>
                                 {% endif %}
                             </td>
                             <td>
                                 <strong>{{ order.total|default:0 }} FCFA</strong>
-                                <span class="metric">
+                                <span class="ops-metric">
                                     Service FAGNI :
                                     <strong>{{ order.service_fee|default:0 }} FCFA</strong>
                                 </span>
-                                <span class="metric">
+                                <span class="ops-metric">
                                     Livraison :
                                     <strong>{{ order.delivery_fee|default:0 }} FCFA</strong>
                                 </span>
@@ -362,23 +442,24 @@
                                 {% if order.laundry_partner %}
                                     🧺 {{ order.laundry_partner.name }}
                                 {% else %}
-                                    <span class="metric" style="color:#999;">Blanchisserie ?</span>
+                                    <span class="ops-metric" style="color:#9ca3af;">Blanchisserie ?</span>
                                 {% endif %}
                                 <br>
                                 {% if order.delivery_partner %}
-                                    <span class="metric">🛵 {{ order.delivery_partner.name }}</span>
+                                    <span class="ops-metric">🛵 {{ order.delivery_partner.name }}</span>
                                 {% else %}
-                                    <span class="metric" style="color:#999;">Livreur ?</span>
+                                    <span class="ops-metric" style="color:#9ca3af;">Livreur ?</span>
                                 {% endif %}
                             </td>
 
                             <td>
-                                <a href="{% url 'orders:detail' order.id %}" class="link-detail">
+                                <a href="{% url 'orders:detail' order.id %}" class="ops-link-detail">
                                     Détail
                                 </a>
                                 <br>
                                 <a href="{% url 'orders:order_ticket_pdf' order.id %}"
-                                   class="btn-link btn-secondary"
+                                   class="ops-btn ops-btn-secondary"
+                                   style="margin-top:4px;"
                                    target="_blank">
                                     📄 Ticket PDF
                                 </a>
@@ -387,7 +468,7 @@
                                       action="{% url 'orders:ops_update_step' order.id 'pickup' %}"
                                       style="margin-top:4px;">
                                     {% csrf_token %}
-                                    <button type="submit" class="btn-step-pickup">
+                                    <button type="submit" class="ops-step-btn ops-step-pickup">
                                         ✅ Confirmer collecte
                                     </button>
                                 </form>
@@ -397,25 +478,26 @@
                     </tbody>
                 </table>
             {% else %}
-                <div class="empty-col">
+                <div class="ops-empty-col">
                     Aucune commande en attente.
                 </div>
             {% endif %}
         </div>
 
         <!-- Colonne En cours -->
-        <div class="col">
-            <div class="col-header">
+        <div class="ops-col">
+            <div class="ops-col-header">
                 <div>
-                    <h2>En cours
-                        <span class="badge-total">{{ in_progress_orders|length }}</span>
+                    <h2>
+                        En cours
+                        <span class="ops-badge-total">{{ in_progress_orders|length }}</span>
                     </h2>
                     <small>Commandes en collecte, lavage ou retour livreur.</small>
                 </div>
             </div>
 
             {% if in_progress_orders %}
-                <table>
+                <table class="ops-table">
                     <thead>
                         <tr>
                             <th>Code</th>
@@ -430,33 +512,33 @@
                         <tr>
                             <td>
                                 <strong>{{ order.code }}</strong>
-                                <span class="subtext">
+                                <span class="ops-subtext">
                                     Créée le {{ order.created_at|date:"d/m H:i" }}
                                 </span>
-                                <span class="subtext">
-                                    <span class="badge-status badge-in-progress">En cours</span>
+                                <span class="ops-subtext">
+                                    <span class="ops-badge-status ops-badge-in-progress">En cours</span>
                                 </span>
                             </td>
                             <td>
                                 <strong>{{ order.customer.name }}</strong>
                                 {% if order.customer.phone %}
-                                    <span class="subtext">📞 {{ order.customer.phone }}</span>
+                                    <span class="ops-subtext">📞 {{ order.customer.phone }}</span>
                                 {% endif %}
                                 {% if order.customer.address %}
-                                    <span class="metric">📍 {{ order.customer.address }}</span>
+                                    <span class="ops-metric">📍 {{ order.customer.address }}</span>
                                 {% endif %}
                             </td>
                             <td>
                                 <strong>{{ order.total|default:0 }} FCFA</strong>
-                                <span class="metric">
+                                <span class="ops-metric">
                                     Service FAGNI :
                                     <strong>{{ order.service_fee|default:0 }} FCFA</strong>
                                 </span>
-                                <span class="metric">
+                                <span class="ops-metric">
                                     Livraison :
                                     <strong>{{ order.delivery_fee|default:0 }} FCFA</strong>
                                 </span>
-                                <span class="metric">
+                                <span class="ops-metric">
                                     Distance AR :
                                     <strong>
                                         {% if order.distance_km %}
@@ -469,7 +551,7 @@
                                 </span>
 
                                 <!-- Mini timeline inline -->
-                                <span class="timeline-inline">
+                                <span class="ops-timeline-inline">
                                     {% if order.pickup_time %}
                                         ✅ Collectée
                                     {% else %}
@@ -505,48 +587,49 @@
                                 {% if order.laundry_partner %}
                                     🧺 {{ order.laundry_partner.name }}
                                 {% else %}
-                                    <span class="metric" style="color:#999;">Blanchisserie ?</span>
+                                    <span class="ops-metric" style="color:#9ca3af;">Blanchisserie ?</span>
                                 {% endif %}
                                 <br>
                                 {% if order.delivery_partner %}
-                                    <span class="metric">🛵 {{ order.delivery_partner.name }}</span>
+                                    <span class="ops-metric">🛵 {{ order.delivery_partner.name }}</span>
                                 {% else %}
-                                    <span class="metric" style="color:#999;">Livreur ?</span>
+                                    <span class="ops-metric" style="color:#9ca3af;">Livreur ?</span>
                                 {% endif %}
                             </td>
                             <td>
-                                <a href="{% url 'orders:detail' order.id %}" class="link-detail">
+                                <a href="{% url 'orders:detail' order.id %}" class="ops-link-detail">
                                     Détail
                                 </a>
                                 <br>
                                 <a href="{% url 'orders:order_ticket_pdf' order.id %}" 
-                                   class="btn-link btn-secondary" 
+                                   class="ops-btn ops-btn-secondary" 
+                                   style="margin-top:4px;"
                                    target="_blank">
                                     📄 Ticket PDF
                                 </a>
 
-                                <div style="margin-top:4px;display:flex;flex-direction:column;gap:3px;">
+                                <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">
                                     <form method="post" action="{% url 'orders:ops_update_step' order.id 'dropoff' %}">
                                         {% csrf_token %}
-                                        <button type="submit" class="btn-step-dropoff">
+                                        <button type="submit" class="ops-step-btn ops-step-dropoff">
                                             🧺 Dépôt blanchisserie
                                         </button>
                                     </form>
                                     <form method="post" action="{% url 'orders:ops_update_step' order.id 'wash_done' %}">
                                         {% csrf_token %}
-                                        <button type="submit" class="btn-step-wash">
+                                        <button type="submit" class="ops-step-btn ops-step-wash">
                                             ✅ Lavage terminé
                                         </button>
                                     </form>
                                     <form method="post" action="{% url 'orders:ops_update_step' order.id 'return' %}">
                                         {% csrf_token %}
-                                        <button type="submit" class="btn-step-return">
+                                        <button type="submit" class="ops-step-btn ops-step-return">
                                             🚚 Reprise livreur
                                         </button>
                                     </form>
                                     <form method="post" action="{% url 'orders:ops_update_step' order.id 'delivered' %}">
                                         {% csrf_token %}
-                                        <button type="submit" class="btn-step-delivered">
+                                        <button type="submit" class="ops-step-btn ops-step-delivered">
                                             🏠 Livrée au client
                                         </button>
                                     </form>
@@ -557,25 +640,26 @@
                     </tbody>
                 </table>
             {% else %}
-                <div class="empty-col">
+                <div class="ops-empty-col">
                     Aucune commande en cours.
                 </div>
             {% endif %}
         </div>
 
         <!-- Colonne Terminées -->
-        <div class="col">
-            <div class="col-header">
+        <div class="ops-col">
+            <div class="ops-col-header">
                 <div>
-                    <h2>Terminées
-                        <span class="badge-total">{{ done_orders|length }}</span>
+                    <h2>
+                        Terminées
+                        <span class="ops-badge-total">{{ done_orders|length }}</span>
                     </h2>
                     <small>Commandes livrées au client.</small>
                 </div>
             </div>
 
             {% if done_orders %}
-                <table>
+                <table class="ops-table">
                     <thead>
                         <tr>
                             <th>Code</th>
@@ -589,30 +673,30 @@
                         <tr>
                             <td>
                                 <strong>{{ order.code }}</strong>
-                                <span class="subtext">
+                                <span class="ops-subtext">
                                     Créée le {{ order.created_at|date:"d/m H:i" }}
                                 </span>
-                                <span class="subtext">
-                                    <span class="badge-status badge-done">Terminée</span>
+                                <span class="ops-subtext">
+                                    <span class="ops-badge-status ops-badge-done">Terminée</span>
                                 </span>
                             </td>
                             <td>
                                 <strong>{{ order.customer.name }}</strong>
                                 {% if order.customer.phone %}
-                                    <span class="subtext">📞 {{ order.customer.phone }}</span>
+                                    <span class="ops-subtext">📞 {{ order.customer.phone }}</span>
                                 {% endif %}
                             </td>
                             <td>
                                 <strong>{{ order.total|default:0 }} FCFA</strong>
-                                <span class="metric">
+                                <span class="ops-metric">
                                     Service FAGNI :
                                     <strong>{{ order.service_fee|default:0 }} FCFA</strong>
                                 </span>
-                                <span class="metric">
+                                <span class="ops-metric">
                                     Livraison :
                                     <strong>{{ order.delivery_fee|default:0 }} FCFA</strong>
                                 </span>
-                                <span class="metric">
+                                <span class="ops-metric">
                                     Distance AR :
                                     <strong>
                                         {% if order.distance_km %}
@@ -632,7 +716,7 @@
                                 {% endif %}
                                 <br>
                                 <a href="{% url 'orders:order_ticket_pdf' order.id %}"
-                                   class="link-detail"
+                                   class="ops-link-detail"
                                    target="_blank">
                                     📄 Ticket PDF
                                 </a>
@@ -642,7 +726,7 @@
                     </tbody>
                 </table>
             {% else %}
-                <div class="empty-col">
+                <div class="ops-empty-col">
                     Aucune commande terminée pour le moment.
                 </div>
             {% endif %}

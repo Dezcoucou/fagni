@@ -1,11 +1,11 @@
-import csv
-import json
-from decimal import Decimal, InvalidOperation
+from bonuses.models import BonusWeek
+from collections import Counter, defaultdict
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from datetime import timedelta
 from django.template.loader import render_to_string
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db import models
 from django.contrib import messages
-from weasyprint import HTML
 from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
@@ -23,7 +23,7 @@ from django.db.models import (
     DurationField,
 )
 from django.db import transaction
-from django.db.models.functions import Coalesce, Cast
+from django.db.models.functions import Coalesce, Cast, TruncDate
 from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.utils import timezone
@@ -45,8 +45,6 @@ from partners.models import LaundryPartner, DeliveryPartner
 from mlm.services import attach_customer_to_sponsor
 
 from io import BytesIO
-import os
-import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -60,15 +58,56 @@ from reportlab.lib.utils import ImageReader
 from reportlab.graphics.barcode import qr
 from reportlab.graphics.shapes import Drawing
 from reportlab.graphics import renderPDF
-from collections import Counter, defaultdict
+from math import radians, sin, cos, asin, sqrt, atan2
+from weasyprint import HTML
+import uuid
+import os
+import io
 import qrcode
-from bonuses.models import BonusWeek
+import csv
+import json
+import datetime
+
+
+def haversine_distance_km(lat1, lng1, lat2, lng2):
+    """
+    Distance en kilomètres entre deux points GPS.
+    Retourne None si une coordonnée manque.
+    """
+    if not lat1 or not lng1 or not lat2 or not lng2:
+        return None
+
+    try:
+        lat1, lng1 = float(lat1), float(lng1)
+        lat2, lng2 = float(lat2), float(lng2)
+    except Exception:
+        return None
+
+    R = 6371.0  # Rayon de la Terre en KM
+
+    lat1_r = radians(lat1)
+    lng1_r = radians(lng1)
+    lat2_r = radians(lat2)
+    lng2_r = radians(lng2)
+
+    dlat = lat2_r - lat1_r
+    dlng = lng2_r - lng1_r
+
+    a = sin(dlat/2)**2 + cos(lat1_r) * cos(lat2_r) * sin(dlng/2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+
+    return Decimal(str(R * c)).quantize(Decimal("0.01"))
+
+
+def generate_order_code():
+    return uuid.uuid4().hex[:10].upper()
 
 # Champ décimal générique pour les expressions
 DEC = DecimalField(max_digits=12, decimal_places=2)
 DECIMAL_ZERO = Decimal("0")
 
 # -------------------------------------------------
+
 # Helpers FAGNI : parsing des lignes + calcul frais
 # -------------------------------------------------
 def fagni_parse_items_from_post(request):
@@ -119,6 +158,17 @@ def fagni_parse_items_from_post(request):
         })
 
     return items, total_ht
+
+
+@login_required
+def portal_dashboard(request):
+    """
+    Dashboard central FAGNI (PORTAL) :
+    - accès rapide aux stats commandes
+    - liens vers OPS, finance, livreurs, etc.
+    - tu pourras le rendre ultra premium visuellement dans orders/portal_dashboard.html
+    """
+    return render(request, "orders/portal_dashboard.html", {})
 
 
 def fagni_compute_fees(total_ht: Decimal):
@@ -293,6 +343,11 @@ def ops_update_step(request, order_id, action):
     Met à jour les timestamps opérationnels :
     - pickup, dropoff, wash_done, return, delivered
     + bascule éventuellement le statut.
+
+    ⚠️ Hook MLM :
+    - quand l'action est "delivered"
+    - et que la commande n'a pas encore distribué ses commissions
+    → on déclenche distribute_mlm_commissions UNE seule fois.
     """
     order = get_object_or_404(Order, pk=order_id)
     now = timezone.now()
@@ -301,16 +356,31 @@ def ops_update_step(request, order_id, action):
         order.pickup_time = now
         if order.status == "pending":
             order.status = "in_progress"
+
     elif action == "dropoff":
         order.dropoff_time = now
+
     elif action == "wash_done":
         order.wash_complete_time = now
+
     elif action == "return":
         order.return_time = now
+
     elif action == "delivered":
         order.delivered_time = now
         order.status = "done"
 
+        # 🔗 HOOK MLM : distribution des commissions à la livraison
+        # - pas déjà distribué
+        # - service_fee > 0
+        if (
+            not order.mlm_distributed
+            and order.service_fee
+            and order.service_fee > 0
+        ):
+            _ = order.distribute_mlm_commissions  # propriété avec effets de bord
+
+    # On sauvegarde les changements (timestamps, statut, mlm_distributed éventuel)
     order.save()
     return redirect("orders:ops_dashboard")
 
@@ -523,145 +593,6 @@ def customers_list(request):
         "total_delivery": agg["total_delivery_global"],
     }
     return render(request, "orders/customers_list.html", context)
-
-
-@login_required
-def finance_dashboard(request):
-    """
-    Dashboard financier FAGNI :
-    - Filtres : date_from, date_to, status (paid/partial/unpaid/all), min_amount
-    - Totaux calculés EN PYTHON pour éviter les problèmes de types
-    """
-
-    date_from = request.GET.get("date_from") or ""
-    date_to = request.GET.get("date_to") or ""
-    status_filter = request.GET.get("status") or "all"   # paid / partial / unpaid / all
-    min_amount_input = request.GET.get("min_amount") or ""
-
-    qs = (
-        Order.objects
-        .select_related("customer", "laundry_partner", "delivery_partner")
-        .order_by("-created_at")
-    )
-
-    # --- Période ---
-    if date_from:
-        df = parse_date(date_from)
-        if df:
-            qs = qs.filter(created_at__date__gte=df)
-
-    if date_to:
-        dt = parse_date(date_to)
-        if dt:
-            qs = qs.filter(created_at__date__lte=dt)
-
-    # On limite le nombre de lignes affichées (sécurité)
-    raw_orders = list(qs[:500])
-
-    # Helper décimal local
-    def d(val):
-        return _safe_dec(val)
-
-    enriched_orders = []
-    for o in raw_orders:
-        # Montant "prestations" (total / grand_total / total_ttc / total_ht)
-        base = _order_effective_total(o)
-
-        service = d(getattr(o, "service_fee", None))
-        delivery = d(getattr(o, "delivery_fee", None))
-        logi_margin = d(getattr(o, "logistic_margin", None))
-
-        paid = d(getattr(o, "amount_paid", None))
-        due = d(getattr(o, "amount_due", None))
-
-        o.base_total = base
-        o.total_global_client = base + service + delivery
-        o.margin_fagni = service + logi_margin
-        o.paid = paid
-        o.due = due
-        o.is_fully_paid = (due <= DECIMAL_ZERO)
-
-        enriched_orders.append(o)
-
-    # --- Filtre montant minimum ---
-    try:
-        min_amount = Decimal(min_amount_input) if min_amount_input else DECIMAL_ZERO
-    except Exception:
-        min_amount = DECIMAL_ZERO
-
-    filtered_orders = []
-    for o in enriched_orders:
-        if min_amount > DECIMAL_ZERO and o.total_global_client < min_amount:
-            continue
-
-        if status_filter == "paid":
-            # Soldées
-            if not o.is_fully_paid:
-                continue
-        elif status_filter == "partial":
-            # Partiellement payées
-            if not (o.paid > DECIMAL_ZERO and o.due > DECIMAL_ZERO):
-                continue
-        elif status_filter == "unpaid":
-            # Non payées
-            if not (o.paid == DECIMAL_ZERO and o.due > DECIMAL_ZERO):
-                continue
-
-        filtered_orders.append(o)
-
-    # --- Totaux globaux ---
-    total_orders = len(filtered_orders)
-
-    total_prestations = DECIMAL_ZERO
-    total_service = DECIMAL_ZERO
-    total_delivery = DECIMAL_ZERO
-    total_logistic_margin = DECIMAL_ZERO
-    total_paid = DECIMAL_ZERO
-    total_due = DECIMAL_ZERO
-
-    count_paid = 0
-    count_partial = 0
-    count_unpaid = 0
-
-    for o in filtered_orders:
-        total_prestations += d(o.base_total)
-        total_service += d(getattr(o, "service_fee", None))
-        total_delivery += d(getattr(o, "delivery_fee", None))
-        total_logistic_margin += d(getattr(o, "logistic_margin", None))
-        total_paid += d(o.paid)
-        total_due += d(o.due)
-
-        if o.is_fully_paid:
-            count_paid += 1
-        elif o.paid > DECIMAL_ZERO and o.due > DECIMAL_ZERO:
-            count_partial += 1
-        elif o.paid == DECIMAL_ZERO and o.due > DECIMAL_ZERO:
-            count_unpaid += 1
-
-    total_margin_fagni = total_service + total_logistic_margin
-
-    context = {
-        "orders": filtered_orders,
-
-        "date_from": date_from,
-        "date_to": date_to,
-        "status_filter": status_filter,
-        "min_amount": min_amount_input,
-
-        "total_orders": total_orders,
-        "total_prestations": total_prestations,
-        "total_service": total_service,
-        "total_delivery": total_delivery,
-        "total_logistic_margin": total_logistic_margin,
-        "total_margin_fagni": total_margin_fagni,
-        "total_paid": total_paid,
-        "total_due": total_due,
-
-        "count_paid": count_paid,
-        "count_partial": count_partial,
-        "count_unpaid": count_unpaid,
-    }
-    return render(request, "orders/finance_dashboard.html", context)
 
 
 @login_required
@@ -956,6 +887,204 @@ def export_finance_xlsx(request):
     )
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
+
+
+from decimal import Decimal, InvalidOperation
+from django.contrib.auth.decorators import login_required
+from django.utils import timezone
+
+# ... tes autres imports déjà présents (Order, etc.)
+
+
+def _safe_dec(value):
+    """
+    Convertit proprement une valeur en Decimal.
+    Renvoie Decimal('0') si la valeur n’est pas convertible.
+    """
+    if value is None:
+        return Decimal("0")
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return Decimal("0")
+
+
+def _order_effective_total(order):
+    """
+    Retourne le montant réellement facturé pour une commande,
+    en utilisant la valeur disponible (total, grand_total, total_ttc, etc.)
+    """
+    fields = ["grand_total", "total_ttc", "total_ht", "total"]
+
+    for field in fields:
+        if hasattr(order, field):
+            val = getattr(order, field)
+            d = _safe_dec(val)
+            if d > 0:
+                return d
+
+    return Decimal("0")
+
+
+@login_required
+def finance_dashboard(request):
+    """
+    Dashboard finance FAGNI – version ultra pro.
+    KPIs + filtres + tableau des commandes avec pagination.
+    """
+    from datetime import datetime
+    from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
+
+    # -------- Filtres --------
+    date_from_str = request.GET.get("date_from", "") or ""
+    date_to_str = request.GET.get("date_to", "") or ""
+    status_filter = request.GET.get("status", "all") or "all"
+    driver_id = request.GET.get("driver_id", "") or ""
+    laundry_id = request.GET.get("laundry_id", "") or ""
+
+    qs = (
+        Order.objects
+        .select_related("customer", "delivery_partner", "laundry_partner")
+        .order_by("-created_at")
+    )
+
+    period_parts = []
+
+    # Filtre dates : date_from
+    if date_from_str:
+        try:
+            df = datetime.strptime(date_from_str, "%Y-%m-%d").date()
+            qs = qs.filter(created_at__date__gte=df)
+            period_parts.append(f"du {df.strftime('%d/%m/%Y')}")
+        except ValueError:
+            pass
+
+    # Filtre dates : date_to
+    if date_to_str:
+        try:
+            dt = datetime.strptime(date_to_str, "%Y-%m-%d").date()
+            qs = qs.filter(created_at__date__lte=dt)
+            period_parts.append(f"au {dt.strftime('%d/%m/%Y')}")
+        except ValueError:
+            pass
+
+    if not period_parts:
+        period_label = "Aujourd’hui"
+    else:
+        period_label = " ".join(period_parts)
+
+    # Filtre statut
+    if status_filter == "done":
+        qs = qs.filter(status="done")
+    elif status_filter == "pending":
+        qs = qs.filter(status="pending")
+    elif status_filter == "in_progress":
+        qs = qs.filter(status="in_progress")
+    elif status_filter == "canceled":
+        qs = qs.filter(status="canceled")
+    elif status_filter == "active":
+        qs = qs.filter(status__in=["pending", "in_progress"])
+    # "all" => pas de filtre supplémentaire
+
+    # Filtre livreur
+    if driver_id:
+        qs = qs.filter(delivery_partner_id=driver_id)
+
+    # Filtre blanchisserie
+    if laundry_id:
+        qs = qs.filter(laundry_partner_id=laundry_id)
+
+    # -------- KPIs Finance (sur TOUT l’ensemble filtré) --------
+    all_orders = list(qs)  # on calcule les stats sur l'ensemble des résultats filtrés
+
+    total_orders = len(all_orders)
+    if total_orders == 0:
+        total_revenue = Decimal("0")
+        total_service_fee = Decimal("0")
+        total_delivery_fee = Decimal("0")
+        total_driver_income = Decimal("0")
+        total_distance_km = Decimal("0")
+        done_orders = 0
+        canceled_orders = 0
+        avg_basket = Decimal("0")
+        fagni_margin = Decimal("0")
+    else:
+        total_revenue = Decimal("0")
+        total_service_fee = Decimal("0")
+        total_delivery_fee = Decimal("0")
+        total_driver_income = Decimal("0")
+        total_distance_km = Decimal("0")
+        done_orders = 0
+        canceled_orders = 0
+
+        for o in all_orders:
+            total_revenue += _order_effective_total(o)
+            total_service_fee += _safe_dec(getattr(o, "service_fee", 0))
+            total_delivery_fee += _safe_dec(getattr(o, "delivery_fee", 0))
+            total_driver_income += _safe_dec(getattr(o, "driver_logistic_cost", 0))
+            total_distance_km += _safe_dec(getattr(o, "distance_km", 0))
+
+            if getattr(o, "status", None) == "done":
+                done_orders += 1
+            elif getattr(o, "status", None) == "canceled":
+                canceled_orders += 1
+
+        if total_orders > 0:
+            avg_basket = (total_revenue / total_orders).quantize(Decimal("0.01"))
+        else:
+            avg_basket = Decimal("0")
+
+        fagni_margin = (
+            total_service_fee + total_delivery_fee - total_driver_income
+        ).quantize(Decimal("0.01"))
+
+    # -------- Pagination du tableau de commandes --------
+    page = request.GET.get("page", 1)
+    page_size = 50  # tu peux ajuster à 25 / 100 si tu préfères
+
+    paginator = Paginator(qs, page_size)
+
+    try:
+        orders_page = paginator.page(page)
+    except PageNotAnInteger:
+        orders_page = paginator.page(1)
+    except EmptyPage:
+        orders_page = paginator.page(paginator.num_pages)
+
+    # -------- Listes pour les filtres --------
+    drivers = DeliveryPartner.objects.all().order_by("name")
+    laundries = LaundryPartner.objects.all().order_by("name")
+
+    stats = {
+        "total_orders": total_orders,
+        "total_revenue": total_revenue,
+        "total_service_fee": total_service_fee,
+        "total_delivery_fee": total_delivery_fee,
+        "total_driver_income": total_driver_income,
+        "fagni_margin": fagni_margin,
+        "avg_basket": avg_basket,
+        "total_distance_km": total_distance_km,
+        "done_orders": done_orders,
+        "canceled_orders": canceled_orders,
+    }
+
+    context = {
+        "orders": orders_page,         # pour compat avec ton template actuel
+        "page_obj": orders_page,       # pour la navigation de page
+        "paginator": paginator,
+        "stats": stats,
+        "period_label": period_label,
+        "date_from": date_from_str,
+        "date_to": date_to_str,
+        "status_filter": status_filter,
+        "driver_id": driver_id,
+        "laundry_id": laundry_id,
+        "drivers": drivers,
+        "laundries": laundries,
+    }
+
+    return render(request, "orders/finance_dashboard.html", context)
+
 
 
 # ============================================================
@@ -1681,225 +1810,450 @@ def create(request):
     - Client (nom, téléphone, adresse, lat/lng)
     - Lignes de prestations issues du catalogue
     - Photos multiples par ligne (photos_0, photos_1, ...)
-    - Assignation automatique blanchisserie + livreur
-    - Calcul frais de livraison (Haversine)
-    - Rattachement éventuel à un code affilié (MLM)
+    - Assignation automatique d’un livreur si possible
+    - Option : code parrain (referral_code) transmis par GET (?ref= / ?aff=)
+      ou saisi manuellement dans le formulaire.
     """
+
     service_categories = ServiceCategory.objects.all()
     service_items = ServiceItem.objects.select_related("category").all()
 
-    # Paramètres logistiques
+    # Paramètres logistiques (pour l’UI, create.html)
     logi = getattr(settings, "FAGNI_LOGISTICS", {})
 
-    # Pour garder / pré-remplir le code affilié
+    # --- Gestion du code parrain initial (GET ou POST) ---
     if request.method == "POST":
-        affiliate_code_initial = request.POST.get("affiliate_code", "").strip()
+        referral_initial = (request.POST.get("referral_code") or "").strip()
     else:
-        affiliate_code_initial = (
-            (request.GET.get("aff") or "").strip()
-            or (request.GET.get("ref") or "").strip()
+        # Si on arrive depuis un lien de parrainage : ?ref=CODE ou ?aff=CODE
+        referral_initial = (
+            (request.GET.get("ref") or "").strip()
+            or (request.GET.get("aff") or "").strip()
         )
 
+    # Contexte de base (utile aussi en cas d’erreur POST)
     context = {
         "service_categories": service_categories,
         "service_items": service_items,
         "error": None,
-        # valeurs par défaut pour pré-remplir le formulaire en cas d'erreur
         "client_phone": request.POST.get("client_phone", "") if request.method == "POST" else "",
         "client_name": request.POST.get("client_name", "") if request.method == "POST" else "",
         "client_address": request.POST.get("client_address", "") if request.method == "POST" else "",
         "client_lat": request.POST.get("client_lat", "") if request.method == "POST" else "",
         "client_lng": request.POST.get("client_lng", "") if request.method == "POST" else "",
-        # on garde aussi le code affilié saisi en cas d'erreur ou pré-rempli via ?aff= / ?ref=
-        "affiliate_code": affiliate_code_initial,
+        # 👉 CE QUI SERT AU CHAMP "Code parrain" DANS create.html
+        "referral_code": referral_initial,
+        "order_notes": request.POST.get("order_notes", "") if request.method == "POST" else "",
         "GOOGLE_MAPS_API_KEY": getattr(settings, "GOOGLE_MAPS_API_KEY", ""),
         "delivery_min_fee": logi.get("client_min_fee", 1000),
         "delivery_price_per_km": logi.get("client_price_per_km", 150),
         "delivery_fixed_fee": logi.get("client_fixed_fee", 300),
     }
 
-    if request.method == "POST":
-        phone = request.POST.get("client_phone", "").strip()
-        name = request.POST.get("client_name", "").strip()
-        address = request.POST.get("client_address", "").strip()
-        lat_raw = request.POST.get("client_lat", "").strip()
-        lng_raw = request.POST.get("client_lng", "").strip()
+    context["drivers"] = get_active_drivers()
 
-        # 🔹 Code affilié (MLM) : prioritaire via POST, sinon via GET ?aff= / ?ref=
-        affiliate_code = (
-            request.POST.get("affiliate_code", "").strip()
-            or (request.GET.get("aff") or "").strip()
-            or (request.GET.get("ref") or "").strip()
+    # --- GET : on affiche juste le formulaire ---
+    if request.method != "POST":
+        return render(request, "orders/create.html", context)
+
+    # --- POST : on traite la commande ---
+
+    phone = (request.POST.get("client_phone") or "").strip()
+    name = (request.POST.get("client_name") or "").strip()
+    address = (request.POST.get("client_address") or "").strip()
+    lat_raw = (request.POST.get("client_lat") or "").strip()
+    lng_raw = (request.POST.get("client_lng") or "").strip()
+    # On réutilise referral_initial (priorité au POST)
+    referral_code = referral_initial
+    notes = (request.POST.get("order_notes") or "").strip()
+
+    # 1) Validation minimale client
+    if not phone or not name:
+        context["error"] = "Merci de renseigner au moins le nom et le téléphone du client."
+        return render(request, "orders/create.html", context)
+
+    # 2) Création / mise à jour du client
+    try:
+        customer, created = Customer.objects.get_or_create(
+            phone=phone,
+            defaults={
+                "name": name,
+                "address": address,
+            },
         )
-        # pour le cas d'erreur, on le remet dans le context
-        context["affiliate_code"] = affiliate_code
+    except Customer.MultipleObjectsReturned:
+        customer = (
+            Customer.objects.filter(phone=phone)
+            .order_by("-id")
+            .first()
+        )
+        created = False
 
-        # 1) Validation minimale client
-        if not phone or not name:
-            context["error"] = "Merci de renseigner au moins le nom et le téléphone du client."
-            return render(request, "orders/create.html", context)
-
-        # 2) Création / mise à jour du client
-        # Il peut déjà exister PLUSIEURS clients avec le même téléphone,
-        # donc on protège le get_or_create contre MultipleObjectsReturned.
-        try:
-            customer, created = Customer.objects.get_or_create(
-                phone=phone,
-                defaults={
-                    "name": name,
-                    "address": address,
-                },
-            )
-        except Customer.MultipleObjectsReturned:
-            # On prend le plus récent avec ce téléphone
-            customer = (
-                Customer.objects.filter(phone=phone)
-                .order_by("-id")
-                .first()
-            )
-            created = False
-
-            # On met éventuellement à jour nom / adresse si on a mieux
-            changed = False
-            if name and customer.name != name:
-                customer.name = name
-                changed = True
-            if address and customer.address != address:
-                customer.address = address
-                changed = True
-
-            if changed:
-                customer.save()
-        else:
-            # Cas normal : 0 ou 1 client trouvé
-            # On peut aussi rafraîchir les infos si elles ont changé
-            updated = False
-            if name and customer.name != name:
-                customer.name = name
-                updated = True
-            if address and customer.address != address:
-                customer.address = address
-                updated = True
-
-            if updated:
-                customer.save()
-
-        # Mise à jour systématique
+    # Mise à jour des infos si elles ont évolué
+    changed = False
+    if name and customer.name != name:
         customer.name = name
+        changed = True
+    if address and customer.address != address:
         customer.address = address
+        changed = True
 
-        # latitude / longitude si présentes
-        try:
-            if lat_raw:
-                customer.latitude = Decimal(lat_raw)
-            if lng_raw:
-                customer.longitude = Decimal(lng_raw)
-        except Exception:
-            customer.latitude = None
-            customer.longitude = None
+    # latitude / longitude si présentes
+    try:
+        if lat_raw:
+            customer.latitude = Decimal(lat_raw)
+            changed = True
+        if lng_raw:
+            customer.longitude = Decimal(lng_raw)
+            changed = True
+    except Exception:
+        # on ne bloque pas la commande pour un problème de lat/lng
+        pass
 
+    if changed:
         customer.save()
 
-        # 🔹 Rattachement MLM si un code affilié est présent
-        if affiliate_code:
-            attach_customer_to_sponsor(customer, affiliate_code)
+    # 3) Création de la commande "vide" rattachée au client
+    #    → on génère d'abord un code UNIQUE pour éviter l'erreur SQLite
+    code = uuid.uuid4().hex[:8].upper()
+    while Order.objects.filter(code=code).exists():
+        code = uuid.uuid4().hex[:8].upper()
 
-        # 3) Création de la commande "vide"
-        order = Order.objects.create(
-            customer=customer,
-            status="pending",
+    order = Order.objects.create(
+        customer=customer,
+        status="pending",
+        code=code,
+        referral_code=referral_code or None,
+        notes=notes,
+    )
+
+    # 4) Assignation automatique d’une blanchisserie (intelligente = la plus proche)
+    laundry = assign_best_laundry(customer)
+    if laundry:
+        order.laundry_partner = laundry
+
+    # 5) Assignation automatique d’un livreur (si coordonnées client disponibles)
+    driver = assign_best_driver(customer.latitude, customer.longitude)
+
+    if driver:
+        order.delivery_partner = driver
+        order.delivery_partner_unassigned_reason = None
+    else:
+        order.delivery_partner_unassigned_reason = (
+            "Aucun livreur disponible au moment de la commande."
         )
 
-        # 4) Lecture des lignes du formulaire
-        service_ids = request.POST.getlist("service_id[]")
-        designations = request.POST.getlist("designation[]")
-        quantities = request.POST.getlist("quantity[]")
-        unit_prices = request.POST.getlist("unit_price[]")
+    # 6) Calcul automatique des frais de livraison (basé sur la distance client ↔ blanchisserie)
+    try:
+        delivery_fee = order.compute_delivery_fee()
+    except Exception:
+        # Si le calcul échoue (coords manquantes ou autre), on retombe au minimum défini
+        logi = getattr(settings, "FAGNI_LOGISTICS", {})
+        delivery_fee = Decimal(str(logi.get("client_min_fee", 1000)))
 
-        created_any_item = False
+    order.delivery_fee = delivery_fee
+    order.save()
 
-        for idx, (sid, desc, qty_str, pu_str) in enumerate(
-            zip(service_ids, designations, quantities, unit_prices)
-        ):
-            desc = (desc or "").strip()
-            if not desc:
-                continue
+    # 7) Lecture des lignes du formulaire (array JS : service_id[], designation[], quantity[], unit_price[])
+    service_ids = request.POST.getlist("service_id[]")
+    designations = request.POST.getlist("designation[]")
+    quantities = request.POST.getlist("quantity[]")
+    unit_prices = request.POST.getlist("unit_price[]")
 
-            # quantité
-            try:
-                qty = int(qty_str)
-            except Exception:
-                qty = 0
+    created_any_item = False
 
-            # prix unitaire
-            try:
-                pu = Decimal(pu_str)
-            except Exception:
-                pu = Decimal("0.00")
+    for idx, (sid, desc, qty_str, pu_str) in enumerate(
+        zip(service_ids, designations, quantities, unit_prices)
+    ):
+        desc = (desc or "").strip()
+        if not desc:
+            continue
 
-            if qty <= 0 or pu <= 0:
-                # on ignore les lignes non valides
-                continue
+        # quantité
+        try:
+            qty = int(qty_str)
+        except Exception:
+            qty = 0
 
-            # service lié (facultatif)
+        # prix unitaire
+        try:
+            pu = Decimal(pu_str)
+        except Exception:
+            pu = Decimal("0")
+
+        if qty <= 0 or pu <= 0:
+            continue
+
+        try:
+            service_obj = ServiceItem.objects.get(pk=sid)
+        except ServiceItem.DoesNotExist:
             service_obj = None
-            if sid:
-                try:
-                    service_obj = ServiceItem.objects.get(pk=int(sid))
-                except (ServiceItem.DoesNotExist, ValueError, TypeError):
-                    service_obj = None
 
-            item = OrderItem.objects.create(
-                order=order,
-                service=service_obj,
-                designation=desc,
-                quantity=qty,
-                unit_price=pu,
+        line_total = (pu * qty).quantize(Decimal("0.01"))
+
+        item = OrderItem.objects.create(
+            order=order,
+            service=service_obj,
+            designation=desc,
+            quantity=qty,
+            unit_price=pu,
+            total=line_total,
+        )
+        created_any_item = True
+
+        # 8) Photos associées à cette ligne (photos_0, photos_1, etc.)
+        file_field_name = f"photos_{idx}"
+        for photo_file in request.FILES.getlist(file_field_name):
+            if not photo_file:
+                continue
+            OrderItemPhoto.objects.create(
+                order_item=item,
+                image=photo_file,
             )
 
-            created_any_item = True
+    if not created_any_item:
+        # pas de lignes -> on supprime la commande et on affiche une erreur
+        order.delete()
+        context["error"] = "Ajoute au moins une ligne de prestation à la commande."
+        return render(request, "orders/create.html", context)
 
-            # 5) Gestion des photos multiples pour cette ligne
-            photos_field_name = f"photos_{idx}"
-            files = request.FILES.getlist(photos_field_name)
-            for f in files:
-                OrderItemPhoto.objects.create(
-                    order_item=item,
-                    image=f,
-                )
+    # 9) On laisse la vue détail recalculer proprement le total, service_fee, etc.
+    return redirect("orders:detail", order_id=order.id)
 
-        # si aucune ligne valide => on annule la commande
-        if not created_any_item:
-            order.delete()
-            context["error"] = (
-                "Ajoute au moins une ligne de prestation avec quantité "
-                "et prix unitaire > 0."
-            )
-            return render(request, "orders/create.html", context)
 
-        order.notes = request.POST.get("order_notes", "").strip()
+# Statuts qu'on considère comme "en cours" pour la charge du livreur
+ACTIVE_DRIVER_STATUSES = [
+    "pending",      # commande créée mais pas encore collectée
+    "assigned",     # assignée à un livreur
+    "picked_up",    # collectée mais pas encore livrée/blanchie
+    "in_laundry",   # en traitement
+    "on_route",     # en cours de livraison
+]
 
-        # 6) Assignation automatique blanchisserie & livreur
-        laundry_partner = auto_assign_laundry(order)
-        if laundry_partner:
-            order.laundry_partner = laundry_partner
 
-        delivery_partner = auto_assign_delivery(order)
-        if delivery_partner:
-            order.delivery_partner = delivery_partner
 
-        # 7) Calcul des frais de livraison (si une blanchisserie est affectée)
-        if order.laundry_partner:
-            order.delivery_fee = order.compute_delivery_fee()
+def get_active_drivers():
+    return DeliveryPartner.objects.filter(is_active=True)
 
-        # 8) Sauvegarde finale (recalcule total + service_fee + éventuels signaux)
-        order.save()
 
-        # Redirection : liste des commandes
+def assign_best_driver(lat, lng):
+    """
+    Assigne automatiquement un livreur 'intelligent' :
+
+    - On filtre les livreurs actifs avec coordonnées.
+    - On calcule la distance client ↔ livreur.
+    - On regarde la charge de travail (nb de commandes non terminées).
+    - On choisit d'abord celui qui a le moins de commandes actives,
+      puis le plus proche en distance.
+    """
+    if not lat or not lng:
+        return None
+
+    # Livreur actifs avec latitude / longitude
+    drivers = DeliveryPartner.objects.filter(
+        is_active=True,
+        latitude__isnull=False,
+        longitude__isnull=False,
+    )
+
+    if not drivers.exists():
+        return None
+
+    best_driver = None
+    best_key = None  # (nb_commandes_actives, distance_km)
+
+    for d in drivers:
+        d_lat = d.latitude
+        d_lng = d.longitude
+        if not d_lat or not d_lng:
+            continue
+
+        # Distance en km
+        dist = haversine_distance_km(lat, lng, d_lat, d_lng)
+        if dist is None:
+            continue
+
+        # Charge de travail = nb de commandes non terminées / non annulées
+        active_orders = d.orders.exclude(status__in=["done", "canceled"]).count()
+
+        current_key = (active_orders, dist)
+
+        if best_key is None or current_key < best_key:
+            best_key = current_key
+            best_driver = d
+
+    return best_driver
+
+
+def assign_best_laundry(customer):
+    """
+    Assigne automatiquement la blanchisserie 'intelligente' :
+
+    - On utilise la position du client.
+    - On filtre les blanchisseries actives avec coordonnées.
+    - On calcule la distance client ↔ blanchisserie.
+    - On regarde la charge de travail (nb de commandes non terminées).
+    - On choisit d'abord celle qui a le moins de commandes actives,
+      puis la plus proche.
+    """
+    if not customer or not customer.latitude or not customer.longitude:
+        return None
+
+    origin_lat = customer.latitude
+    origin_lng = customer.longitude
+
+    laundries = LaundryPartner.objects.filter(
+        is_active=True,
+        latitude__isnull=False,
+        longitude__isnull=False,
+    )
+
+    if not laundries.exists():
+        return None
+
+    best_laundry = None
+    best_key = None  # (nb_commandes_actives, distance_km)
+
+    for l in laundries:
+        dest_lat = getattr(l, "latitude", None)
+        dest_lng = getattr(l, "longitude", None)
+        if not dest_lat or not dest_lng:
+            continue
+
+        dist = haversine_distance_km(origin_lat, origin_lng, dest_lat, dest_lng)
+        if dist is None:
+            continue
+
+        active_orders = l.orders.exclude(status__in=["done", "canceled"]).count()
+        current_key = (active_orders, dist)
+
+        if best_key is None or current_key < best_key:
+            best_key = current_key
+            best_laundry = l
+
+    return best_laundry
+
+
+# ============================================================
+#   DETAIL COMMANDE
+# ============================================================
+@login_required
+def detail(request, order_id):
+    order = (
+        Order.objects
+        .filter(pk=order_id)
+        .select_related(
+            "customer",
+            "laundry_partner",
+            "delivery_partner",
+        )
+        .first()
+    )
+
+    if not order:
         return redirect("orders:list")
 
-    # GET => affichage simple du formulaire
-    return render(request, "orders/create.html", context)
+    # Lignes de commande avec services & photos
+    items = (
+        OrderItem.objects
+        .filter(order=order)
+        .select_related("service", "service__category")
+        .prefetch_related("photos")
+    )
+
+    # On utilise uniquement compute_totals() qui met à jour :
+    # - order.total
+    # - order.service_fee
+    # - order.delivery_fee
+    # - order.vat_amount
+    # - order.grand_total
+    order.compute_totals()
+
+    # ---- FRAIS DE LIVRAISON (recalcul si 0 ou null) ----
+    if not order.delivery_fee or Decimal(str(order.delivery_fee)) == Decimal("0"):
+
+        logi = getattr(settings, "FAGNI_LOGISTICS", {})
+        client_min_fee = Decimal(str(logi.get("client_min_fee", 1000)))
+        client_price_per_km = Decimal(str(logi.get("client_price_per_km", 100)))
+        client_fixed_fee = Decimal(str(logi.get("client_fixed_fee", 300)))
+        client_max_fee = Decimal(str(logi.get("client_max_fee", 5000)))
+
+        origin_lat = getattr(order.customer, "latitude", None)
+        origin_lng = getattr(order.customer, "longitude", None)
+        dest_lat = getattr(order.laundry_partner, "latitude", None) if order.laundry_partner else None
+        dest_lng = getattr(order.laundry_partner, "longitude", None) if order.laundry_partner else None
+
+        one_way = haversine_distance_km(origin_lat, origin_lng, dest_lat, dest_lng)
+
+        if one_way is None:
+            delivery_fee = client_min_fee
+        else:
+            distance_totale = (one_way * Decimal("2.0")).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+
+            raw_fee = (client_fixed_fee + distance_totale * client_price_per_km).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+
+            if raw_fee < client_min_fee:
+                raw_fee = client_min_fee
+            if client_max_fee > 0 and raw_fee > client_max_fee:
+                raw_fee = client_max_fee
+
+            delivery_fee = raw_fee
+
+        order.delivery_fee = delivery_fee
+    else:
+        order.delivery_fee = Decimal(str(order.delivery_fee))
+
+    # ---- BASE HT = prestations + service fee + livraison ----
+    base_ht = (
+        (order.total or Decimal("0"))
+        + (order.service_fee or Decimal("0"))
+        + (order.delivery_fee or Decimal("0"))
+    )
+
+    # ---- TVA 18% ----
+    vat_rate = Decimal("0.18")
+    tva_amount = (base_ht * vat_rate).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+
+    # ---- TOTAL TTC ----
+    grand_total = (base_ht + tva_amount).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+
+    # Stockage temporaire pour le template
+    order.vat_amount = tva_amount
+    order.grand_total = grand_total
+
+    # ---- Historique ----
+    status_history = (
+        OrderStatusHistory.objects
+        .filter(order=order)
+        .order_by("changed_at")
+    )
+
+    all_photos = OrderItemPhoto.objects.filter(order_item__order=order)
+
+    ticket_url = reverse("orders:order_ticket_pdf", args=[order.id])
+    ticket_thermal_url = reverse("orders:order_ticket_thermal_pdf", args=[order.id])
+
+    context = {
+        "order": order,
+        "items": items,
+        "status_history": status_history,
+        "all_photos": all_photos,
+        "ticket_url": ticket_url,
+        "ticket_thermal_url": ticket_thermal_url,
+        "base_ht": base_ht,
+        "tva_amount": tva_amount,
+        "grand_total": grand_total,
+    }
+
+    return render(request, "orders/detail.html", context)
 
 
 @require_GET
@@ -1941,42 +2295,6 @@ def delete(request):
     return HttpResponse("delete - placeholder", content_type="text/plain; charset=utf-8")
 
 
-# ============================================================
-#  DÉTAIL COMMANDE
-# ============================================================
-def detail(request, order_id):
-    """
-    Détail d’une commande FAGNI :
-    - infos client + adresse + notes
-    - timeline statuts (lecture)
-    - lignes + photos
-    - totaux
-    - formulaire de changement de statut (POST vers update_status)
-    """
-    order = get_object_or_404(
-        Order.objects.select_related("customer", "laundry_partner", "delivery_partner"),
-        pk=order_id,
-    )
-
-    # Lignes préchargées avec les services & photos
-    items = (
-        order.items.all()
-        .select_related("service")
-        .prefetch_related("photos")
-        .order_by("id")
-    )
-
-    # Choices de statut pour le <select> sur la page
-    status_choices = getattr(Order, "STATUS_CHOICES", getattr(Order, "STATUS", []))
-
-    context = {
-        "order": order,
-        "items": items,
-        "status_choices": status_choices,
-    }
-    return render(request, "orders/detail.html", context)
-
-
 @require_POST
 def update_status(request, order_id):
     order = get_object_or_404(Order, pk=order_id)
@@ -2015,374 +2333,235 @@ def _build_order_public_url(request, order, viewname="orders:detail"):
     return request.build_absolute_uri(relative)
 
 
-def order_ticket_thermal_pdf(request, order_id):
-    """
-    Ticket PDF au format 'thermique' (80 mm) :
-
-    - logo FAGNI (si présent)
-    - infos client
-    - partenaires (blanchisserie / livreur)
-    - lignes de commande
-    - totaux (total prestations, service, livraison, total global, payé, dû)
-    - QR code vers le ticket thermique lui-même
-    """
-    order = get_object_or_404(
-        Order.objects
-             .select_related("customer", "laundry_partner", "delivery_partner")
-             .prefetch_related("items__service"),
-        pk=order_id,
-    )
-
-    items = list(order.items.all())
-
-    # ---------- Format ticket thermique ----------
-    base_height = 260 + (len(items) * 22)
-    page_width = 226  # ~80 mm
-    page_height = max(420, min(base_height, 900))
-    margin_x = 10
-
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=(page_width, page_height))
-
-    y = page_height - 12
-
-    title_color = (0, 0, 0)
-    grey = 0.3
-    light_grey = 0.7
-
-    # ---------- Header : logo + nom FAGNI ----------
-    logo_path = os.path.join(settings.BASE_DIR, "static", "img", "fagni_logo.png")
-    has_logo = os.path.exists(logo_path)
-
-    if has_logo:
-        logo_width = 50
-        logo_height = 28
-        c.drawImage(
-            logo_path,
-            margin_x,
-            y - logo_height,
-            width=logo_width,
-            height=logo_height,
-            preserveAspectRatio=True,
-            mask="auto",
-        )
-        c.setFont("Helvetica-Bold", 12)
-        c.setFillColorRGB(*title_color)
-        c.drawString(margin_x + logo_width + 6, y - 8, "FAGNI")
-        c.setFont("Helvetica", 8)
-        c.drawString(margin_x + logo_width + 6, y - 20, "Pressing & Services")
-        y -= logo_height + 8
-    else:
-        c.setFont("Helvetica-Bold", 14)
-        c.setFillColorRGB(*title_color)
-        c.drawCentredString(page_width / 2, y, "FAGNI")
-        y -= 18
-
-    # Ligne de séparation
-    c.setStrokeColorRGB(light_grey, light_grey, light_grey)
-    c.setLineWidth(0.5)
-    c.line(margin_x, y, page_width - margin_x, y)
-    y -= 8
-
-    # ---------- Infos commande ----------
-    c.setFont("Helvetica-Bold", 9)
-    c.setFillColorRGB(*title_color)
-    code_txt = f"Commande : {order.code or order.id}"
-    c.drawString(margin_x, y, code_txt)
-    y -= 12
-
-    c.setFont("Helvetica", 8)
-    created_txt = f"Créée le : {order.created_at.strftime('%d/%m/%Y %H:%M')}"
-    c.drawString(margin_x, y, created_txt)
-    y -= 10
-
-    status_label = dict(order.STATUS_CHOICES).get(order.status, order.status)
-    status_txt = f"Statut : {status_label}"
-    c.drawString(margin_x, y, status_txt)
-    y -= 14
-
-    # ---------- Infos client ----------
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(margin_x, y, "Client")
-    y -= 10
-
-    c.setFont("Helvetica", 8)
-    client_name = order.customer.name or ""
-    c.drawString(margin_x, y, f"Nom : {client_name}")
-    y -= 10
-
-    if order.customer.phone:
-        c.drawString(margin_x, y, f"Tél : {order.customer.phone}")
-        y -= 10
-
-    if order.customer.address:
-        addr = order.customer.address
-        max_len = 45
-        if len(addr) > max_len:
-            addr_line = addr[:max_len - 3] + "..."
-        else:
-            addr_line = addr
-        c.drawString(margin_x, y, f"Adr : {addr_line}")
-        y -= 10
-
-    # Code parrain : on regarde d'abord sur la commande si le champ existe,
-    # sinon on essaye de le prendre sur le client.
-    referral_code = getattr(order, "referral_code", None)
-    if not referral_code and hasattr(order.customer, "referral_code"):
-        referral_code = order.customer.referral_code
-
-    if referral_code:
-        c.drawString(margin_x, y, f"Code parrain : {referral_code}")
-        y -= 10
-
-    if getattr(order, "distance_km", None):
-        c.drawString(margin_x, y, f"Distance A/R : {order.distance_km} km")
-        y -= 10
-
-    # ---------- Partenaires ----------
-    y -= 4
-    c.setStrokeColorRGB(light_grey, light_grey, light_grey)
-    c.line(margin_x, y, page_width - margin_x, y)
-    y -= 8
-
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(margin_x, y, "Partenaires")
-    y -= 10
-
-    c.setFont("Helvetica", 8)
-    laundry_name = order.laundry_partner.name if order.laundry_partner else "Non assignée"
-    delivery_name = order.delivery_partner.name if order.delivery_partner else "Non assigné"
-    c.drawString(margin_x, y, f"Blanchisserie : {laundry_name}")
-    y -= 10
-    c.drawString(margin_x, y, f"Livreur     : {delivery_name}")
-    y -= 12
-
-    # ---------- Notes éventuelles ----------
-    if order.notes:
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(margin_x, y, "Notes / instructions")
-        y -= 10
-        c.setFont("Helvetica", 8)
-        # on tronque si très long
-        notes = order.notes.replace("\r\n", " ").replace("\n", " ")
-        max_len = 90
-        if len(notes) > max_len:
-            notes_line = notes[:max_len - 3] + "..."
-        else:
-            notes_line = notes
-        c.drawString(margin_x, y, notes_line)
-        y -= 12
-
-    # Ligne de séparation avant articles
-    y -= 4
-    c.setStrokeColorRGB(light_grey, light_grey, light_grey)
-    c.line(margin_x, y, page_width - margin_x, y)
-    y -= 8
-
-    # ---------- Détail des articles ----------
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(margin_x, y, "Articles")
-    y -= 12
-
-    c.setFont("Helvetica-Bold", 8)
-    c.drawString(margin_x, y, "Libellé")
-    c.drawRightString(page_width - margin_x - 72, y, "Qté")
-    c.drawRightString(page_width - margin_x - 40, y, "PU")
-    c.drawRightString(page_width - margin_x, y, "Total")
-    y -= 8
-
-    c.setStrokeColorRGB(light_grey, light_grey, light_grey)
-    c.line(margin_x, y, page_width - margin_x, y)
-    y -= 6
-
-    c.setFont("Helvetica", 8)
-    for item in items:
-        if y < 80:
-            c.showPage()
-            y = page_height - 20
-            c.setFont("Helvetica", 8)
-
-        label = item.designation or ""
-        max_len = 26
-        if len(label) > max_len:
-            label = label[:max_len - 3] + "..."
-
-        c.drawString(margin_x, y, label)
-        c.drawRightString(page_width - margin_x - 72, y, str(item.quantity))
-        c.drawRightString(
-            page_width - margin_x - 40,
-            y,
-            f"{int(item.unit_price):,}".replace(",", " "),
-        )
-        c.drawRightString(
-            page_width - margin_x,
-            y,
-            f"{int(item.total):,}".replace(",", " "),
-        )
-        y -= 10
-
-    # Ligne avant totaux
-    y -= 4
-    c.setStrokeColorRGB(light_grey, light_grey, light_grey)
-    c.line(margin_x, y, page_width - margin_x, y)
-    y -= 8
-
-    # ---------- Totaux (harmonisés) ----------
-    total_ht = order.total_ht or Decimal("0")
-    service_fee = order.service_fee or Decimal("0")
-    delivery_fee = order.delivery_fee or Decimal("0")
-    grand_total = order.grand_total or (total_ht + service_fee + delivery_fee)
-    amount_paid = order.amount_paid or Decimal("0")
-    amount_due = order.amount_due or Decimal("0")
-
-    c.setFont("Helvetica", 8)
-    c.setFillColorRGB(grey, grey, grey)
-    c.drawString(margin_x, y, "Total prestations :")
-    c.setFillColorRGB(0, 0, 0)
-    c.drawRightString(
-        page_width - margin_x,
-        y,
-        f"{int(total_ht):,} FCFA".replace(",", " "),
-    )
-    y -= 10
-
-    c.setFont("Helvetica", 8)
-    c.setFillColorRGB(grey, grey, grey)
-    c.drawString(margin_x, y, "Service FAGNI :")
-    c.setFillColorRGB(0, 0, 0)
-    c.drawRightString(
-        page_width - margin_x,
-        y,
-        f"{int(service_fee):,} FCFA".replace(",", " "),
-    )
-    y -= 10
-
-    c.setFont("Helvetica", 8)
-    c.setFillColorRGB(grey, grey, grey)
-    c.drawString(margin_x, y, "Livraison :")
-    c.setFillColorRGB(0, 0, 0)
-    c.drawRightString(
-        page_width - margin_x,
-        y,
-        f"{int(delivery_fee):,} FCFA".replace(",", " "),
-    )
-    y -= 12
-
-    c.setStrokeColorRGB(light_grey, light_grey, light_grey)
-    c.line(margin_x, y, page_width - margin_x, y)
-    y -= 10
-
-    c.setFont("Helvetica-Bold", 10)
-    c.setFillColorRGB(0, 0, 0)
-    c.drawString(margin_x, y, "Total à payer :")
-    c.drawRightString(
-        page_width - margin_x,
-        y,
-        f"{int(grand_total):,} FCFA".replace(",", " "),
-    )
-    y -= 12
-
-    c.setFont("Helvetica", 8)
-    c.setFillColorRGB(grey, grey, grey)
-    c.drawString(margin_x, y, "Montant payé :")
-    c.setFillColorRGB(0, 0, 0)
-    c.drawRightString(
-        page_width - margin_x,
-        y,
-        f"{int(amount_paid):,} FCFA".replace(",", " "),
-    )
-    y -= 10
-
-    c.setFont("Helvetica", 8)
-    c.setFillColorRGB(grey, grey, grey)
-    c.drawString(margin_x, y, "Montant dû :")
-    c.setFillColorRGB(0, 0, 0)
-    if amount_due > 0:
-        due_txt = f"{int(amount_due):,} FCFA".replace(",", " ")
-    else:
-        due_txt = "0 FCFA (soldée)"
-    c.drawRightString(page_width - margin_x, y, due_txt)
-    y -= 18
-
-    # ---------- URL POUR LE QR-CODE (lien direct vers ce ticket) ----------
-    ticket_url = _build_order_public_url(
-        request,
-        order,
-        viewname="orders:order_ticket_thermal_pdf",
-    )
-
-    # ---------- Génération du QR code ----------
-    qr = qrcode.QRCode(
-        version=1,
-        box_size=6,
-        border=2,
-    )
-    qr.add_data(ticket_url)
-    qr.make(fit=True)
-    qr_img = qr.make_image(fill_color="black", back_color="white")
-
-    qr_buffer = BytesIO()
-    qr_img.save(qr_buffer, format="PNG")
-    qr_buffer.seek(0)
-
-    # ---------- Dessin du QR code ----------
-    try:
-        qr_reader = ImageReader(qr_buffer)
-        qr_size = 80  # pixels (~28–30 mm)
-        qr_x = (page_width - qr_size) / 2
-        qr_y = 40
-        c.drawImage(
-            qr_reader,
-            qr_x,
-            qr_y,
-            width=qr_size,
-            height=qr_size,
-            mask="auto",
-        )
-    except Exception:
-        # si le QR plante, on ne bloque pas l'impression
-        pass
-
-    # ---------- Footer ----------
-    c.setFont("Helvetica", 7)
-    c.setFillColorRGB(grey, grey, grey)
-    c.drawCentredString(
-        page_width / 2,
-        18,
-        "Merci d'avoir utilisé FAGNI 🧺",
-    )
-
-    c.showPage()
-    c.save()
-
-    pdf = buffer.getvalue()
-    buffer.close()
-
-    filename = f"ticket_thermal_{order.code or order.id}.pdf"
-    response = HttpResponse(pdf, content_type="application/pdf")
-    response["Content-Disposition"] = f'inline; filename=\"{filename}\"'
-    return response
-
+from decimal import Decimal, ROUND_HALF_UP
+from django.shortcuts import get_object_or_404, render
+from django.db.models import Sum
+from django.urls import reverse
 
 def order_ticket_pdf(request, order_id):
     """
-    Ticket simple de la commande.
-    Pour l'instant on renvoie du HTML.
-    Plus tard, on pourra convertir ce HTML en PDF.
+    Ticket "joli" pour impression A4 / PDF.
+    Même logique de calcul que le ticket thermique.
     """
     order = get_object_or_404(
-        Order.objects.select_related("customer", "laundry_partner", "delivery_partner")
-                     .prefetch_related("items__service", "items__photos"),
+        Order.objects.select_related(
+            "customer",
+            "laundry_partner",
+            "delivery_partner",
+        ).prefetch_related(
+            "items__service",
+            "items__photos",
+        ),
         pk=order_id,
     )
 
     items = order.items.all()
 
+    # --- 1) Sous-total prestations ---
+    agg = items.aggregate(
+        total_prestation=Sum("total"),
+    )
+    total_prestation = agg["total_prestation"] or Decimal("0")
+    order.total = total_prestation
+
+    # --- 2) Service FAGNI : 5% min 500 si total > 0 ---
+    service_fee = Decimal("0")
+    if total_prestation > 0:
+        service_fee = (total_prestation * Decimal("0.05")).quantize(Decimal("1"))
+        if service_fee < Decimal("500"):
+            service_fee = Decimal("500")
+    order.service_fee = service_fee
+
+    # --- 3) Frais de livraison ---
+    if not order.delivery_fee or Decimal(str(order.delivery_fee)) == Decimal("0"):
+        logi = getattr(settings, "FAGNI_LOGISTICS", {})
+        client_min_fee = Decimal(str(logi.get("client_min_fee", 1000)))
+        client_price_per_km = Decimal(str(logi.get("client_price_per_km", 100)))
+        client_fixed_fee = Decimal(str(logi.get("client_fixed_fee", 300)))
+        client_max_fee = Decimal(str(logi.get("client_max_fee", 5000)))
+
+        origin_lat = getattr(order.customer, "latitude", None)
+        origin_lng = getattr(order.customer, "longitude", None)
+        dest_lat = getattr(order.laundry_partner, "latitude", None) if order.laundry_partner else None
+        dest_lng = getattr(order.laundry_partner, "longitude", None) if order.laundry_partner else None
+
+        one_way = haversine_distance_km(origin_lat, origin_lng, dest_lat, dest_lng)
+
+        if one_way is None:
+            delivery_fee = client_min_fee
+        else:
+            distance_totale = (one_way * Decimal("2.0")).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+
+            fee_raw = (client_fixed_fee + distance_totale * client_price_per_km).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+
+            if fee_raw < client_min_fee:
+                fee_raw = client_min_fee
+            if client_max_fee > 0 and fee_raw > client_max_fee:
+                fee_raw = client_max_fee
+
+            delivery_fee = fee_raw
+
+        order.delivery_fee = delivery_fee
+    else:
+        order.delivery_fee = Decimal(str(order.delivery_fee))
+
+    # --- 4) Base HT ---
+    base_ht = (
+        (order.total or Decimal("0"))
+        + (order.service_fee or Decimal("0"))
+        + (order.delivery_fee or Decimal("0"))
+    )
+
+    # --- 5) TVA 18% ---
+    vat_rate = Decimal("0.18")
+    tva_amount = (base_ht * vat_rate).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
+    )
+
+    # --- 6) Total TTC ---
+    grand_total = (base_ht + tva_amount).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
+    )
+
+    order.vat_amount = tva_amount
+    order.grand_total = grand_total
+
+    # --- 7) QR data (lien vers la page détail commande) ---
+    detail_url = request.build_absolute_uri(
+        reverse("orders:detail", args=[order.id])
+    )
+    qr_data = detail_url  # tu peux aussi mettre juste order.code si tu préfères
+
     context = {
         "order": order,
         "items": items,
+        "base_ht": base_ht,
+        "tva_amount": tva_amount,
+        "grand_total": grand_total,
+        "qr_data": qr_data,
     }
     return render(request, "orders/ticket_pdf.html", context)
+
+
+def order_ticket_thermal_pdf(request, order_id):
+    """
+    Ticket thermique (imprimante ticket 80mm).
+    Logique de calcul alignée avec la vue detail :
+    - total = somme des lignes
+    - service_fee = 5% min 500
+    - delivery_fee = calcul distance (client ↔ blanchisserie) ou min
+    - TVA 18% sur (total + service_fee + delivery_fee)
+    - grand_total = base_ht + TVA
+    """
+    order = get_object_or_404(
+        Order.objects.select_related(
+            "customer",
+            "laundry_partner",
+            "delivery_partner",
+        ).prefetch_related(
+            "items__service",
+            "items__photos",
+        ),
+        pk=order_id,
+    )
+
+    items = order.items.all()
+
+    # --- 1) Sous-total prestations ---
+    agg = items.aggregate(total_prestation=Sum("total"))
+    total_prestation = agg["total_prestation"] or Decimal("0")
+    order.total = total_prestation
+
+    # --- 2) Service FAGNI : 5% min 500 si total > 0 ---
+    service_fee = Decimal("0")
+    if total_prestation > 0:
+        service_fee = (total_prestation * Decimal("0.05")).quantize(Decimal("1"))
+        if service_fee < Decimal("500"):
+            service_fee = Decimal("500")
+    order.service_fee = service_fee
+
+    # --- 3) Frais de livraison (même logique que detail) ---
+    if not order.delivery_fee or Decimal(str(order.delivery_fee)) == Decimal("0"):
+        logi = getattr(settings, "FAGNI_LOGISTICS", {})
+        client_min_fee = Decimal(str(logi.get("client_min_fee", 1000)))
+        client_price_per_km = Decimal(str(logi.get("client_price_per_km", 100)))
+        client_fixed_fee = Decimal(str(logi.get("client_fixed_fee", 300)))
+        client_max_fee = Decimal(str(logi.get("client_max_fee", 5000)))
+
+        origin_lat = getattr(order.customer, "latitude", None)
+        origin_lng = getattr(order.customer, "longitude", None)
+        dest_lat = getattr(order.laundry_partner, "latitude", None) if order.laundry_partner else None
+        dest_lng = getattr(order.laundry_partner, "longitude", None) if order.laundry_partner else None
+
+        one_way = haversine_distance_km(origin_lat, origin_lng, dest_lat, dest_lng)
+
+        if one_way is None:
+            delivery_fee = client_min_fee
+        else:
+            distance_totale = (one_way * Decimal("2.0")).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+
+            fee_raw = (client_fixed_fee + distance_totale * client_price_per_km).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+
+            if fee_raw < client_min_fee:
+                fee_raw = client_min_fee
+            if client_max_fee > 0 and fee_raw > client_max_fee:
+                fee_raw = client_max_fee
+
+            delivery_fee = fee_raw
+
+        order.delivery_fee = delivery_fee
+    else:
+        order.delivery_fee = Decimal(str(order.delivery_fee))
+
+    # --- 4) Base HT ---
+    base_ht = (
+        (order.total or Decimal("0"))
+        + (order.service_fee or Decimal("0"))
+        + (order.delivery_fee or Decimal("0"))
+    )
+
+    # --- 5) TVA 18% ---
+    vat_rate = Decimal("0.18")
+    tva_amount = (base_ht * vat_rate).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
+    )
+
+    # --- 6) Total TTC ---
+    grand_total = (base_ht + tva_amount).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
+    )
+
+    order.vat_amount = tva_amount
+    order.grand_total = grand_total
+
+    # --- 7) Données pour le QR code ---
+    qr_data = f"CMD:{order.code}|TEL:{order.customer.phone or ''}|TOTAL:{grand_total}"
+
+    context = {
+        "order": order,
+        "items": items,
+        "base_ht": base_ht,
+        "tva_amount": tva_amount,
+        "grand_total": grand_total,
+        "qr_data": qr_data,
+    }
+    return render(request, "orders/ticket_thermal_pdf.html", context)
 
 
 def safe_decimal(value, default=Decimal("0")):
@@ -2872,88 +3051,181 @@ def driver_order_timeline_action(request, order_id, action):
 
 
 @login_required
+def driver_performance_me(request):
+    """
+    Redirige le livreur connecté vers sa page de performance,
+    en se basant sur son email (DeliveryPartner.email).
+    """
+    user = request.user
+    email = (user.email or "").strip()
+
+    from partners.models import DeliveryPartner  # import local pour éviter les cycles
+
+    driver = None
+    if email:
+        try:
+            driver = DeliveryPartner.objects.get(email__iexact=email)
+        except DeliveryPartner.DoesNotExist:
+            driver = None
+
+    if not driver:
+        # Pas de profil livreur lié → retour au hub
+        return redirect("orders:driver_hub")
+
+    # Redirection vers la vue existante qui prend un driver_id
+    return redirect("orders:driver_performance", driver_id=driver.id)
+
+
+@login_required
 def driver_performance(request, driver_id):
     """
-    Dashboard performance d’un livreur FAGNI :
-    - nombre de courses
-    - distances A/R
-    - revenus livreur
-    - stats de statut
-    - temps moyen d’une course
+    Dashboard avancé de performance pour un livreur :
+    - KPIs (commandes, distance, revenu, taux de complétion, etc.)
+    - Séries journalières pour graphiques (Chart.js)
+    - Classement parmi les autres livreurs
     """
+    # 1) Récupération du livreur
     driver = get_object_or_404(DeliveryPartner, pk=driver_id)
 
-    # Toutes les commandes assignées à ce livreur
+    # 2) Filtre de période (7 / 30 / 90 / 180 jours)
+    period = request.GET.get("period", "30")
+    try:
+        days = int(period)
+    except (TypeError, ValueError):
+        days = 30
+
+    if days not in (7, 30, 90, 180):
+        days = 30
+
+    end = timezone.now()
+    start = end - datetime.timedelta(days=days)
+
+    # 3) Query de base : toutes les commandes du livreur sur la période
     orders_qs = (
-        Order.objects.filter(delivery_partner=driver)
+        Order.objects.filter(
+            delivery_partner=driver,
+            created_at__gte=start,
+            created_at__lte=end,
+        )
         .select_related("customer")
         .order_by("-created_at")
     )
 
+    # 4) KPIs globaux
     total_orders = orders_qs.count()
+    done_orders = orders_qs.filter(status="done").count()
+    in_progress_orders = orders_qs.filter(status="in_progress").count()
+    pending_orders = orders_qs.filter(status="pending").count()
+    canceled_orders = orders_qs.filter(status="canceled").count()
 
-    # Agrégats simples (sans amount_paid, qui n'existe pas dans Order)
     aggregates = orders_qs.aggregate(
         total_distance_km=Sum("distance_km"),
-        total_driver_income=Sum("driver_logistic_cost"),
+        total_income=Sum("driver_logistic_cost"),
     )
-
     total_distance_km = aggregates["total_distance_km"] or 0
-    total_driver_income = aggregates["total_driver_income"] or 0
+    total_income = aggregates["total_income"] or 0
 
-    # Montant total client TTC (total + service_fee + delivery_fee)
-    grand_total_client = 0
-    for o in orders_qs:
-        grand_total_client += (o.total or 0) + (o.service_fee or 0) + (o.delivery_fee or 0)
+    # Taux de complétion / annulation
+    completion_rate = 0
+    cancel_rate = 0
+    if total_orders > 0:
+        completion_rate = round(done_orders * 100 / total_orders, 1)
+        cancel_rate = round(canceled_orders * 100 / total_orders, 1)
 
     # Moyennes
-    distance_per_order = total_distance_km / total_orders if total_orders else 0
-    income_per_order = total_driver_income / total_orders if total_orders else 0
+    avg_income_per_order = 0
+    avg_income_per_km = 0
+    if done_orders > 0:
+        avg_income_per_order = round(total_income / done_orders, 2)
+    if total_distance_km:
+        avg_income_per_km = round(total_income / total_distance_km, 2)
 
-    # Statuts
-    done_count = orders_qs.filter(status="done").count()
-    canceled_count = orders_qs.filter(status="canceled").count()
-    pending_count = orders_qs.filter(status="pending").count()
-    in_progress_count = orders_qs.filter(status="in_progress").count()
-
-    done_ratio = (done_count / total_orders * 100) if total_orders else 0
-
-    # Durée moyenne d’une course (pickup -> delivered)
-    duration_qs = orders_qs.filter(
-        pickup_time__isnull=False,
-        delivered_time__isnull=False,
-    ).annotate(
-        duration=ExpressionWrapper(
-            F("delivered_time") - F("pickup_time"),
-            output_field=DurationField(),
+    # 5) Statistiques journalières (séries pour graphiques)
+    daily_stats_qs = (
+        orders_qs
+        .annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(
+            orders_count=Count("id"),
+            day_income=Sum("driver_logistic_cost"),
+            day_distance=Sum("distance_km"),
         )
+        .order_by("day")
     )
 
-    avg_duration_td = None
-    avg_duration_minutes = None
-    if duration_qs.exists():
-        duration_agg = duration_qs.aggregate(avg_duration=Avg("duration"))
-        avg_duration_td = duration_agg["avg_duration"]
-        if avg_duration_td:
-            total_seconds = avg_duration_td.total_seconds()
-            avg_duration_minutes = round(total_seconds / 60)
+    daily_labels = []
+    daily_orders_series = []
+    daily_income_series = []
+    daily_distance_series = []
+
+    for row in daily_stats_qs:
+        day = row["day"]
+        daily_labels.append(day.strftime("%d/%m"))
+        daily_orders_series.append(row["orders_count"] or 0)
+        daily_income_series.append(float(row["day_income"] or 0))
+        daily_distance_series.append(float(row["day_distance"] or 0))
+
+    # 6) Classement des livreurs (leaderboard)
+    leaderboard_qs = (
+        Order.objects.filter(
+            created_at__gte=start,
+            created_at__lte=end,
+            status="done",
+            delivery_partner__isnull=False,
+        )
+        .values("delivery_partner_id", "delivery_partner__name")
+        .annotate(
+            total_income=Sum("driver_logistic_cost"),
+            total_orders=Count("id"),
+            total_distance=Sum("distance_km"),
+        )
+        .order_by("-total_income")
+    )
+
+    leaderboard = list(leaderboard_qs[:10])
+    current_rank = None
+    for idx, row in enumerate(leaderboard_qs, start=1):
+        if row["delivery_partner_id"] == driver.id:
+            current_rank = idx
+            break
+
+    # On ne garde que les 10 premiers pour l'affichage
+    leaderboard = leaderboard[:10]
+
+    # 7) Quelques dernières commandes pour le bas de page
+    last_orders = orders_qs[:10]
 
     context = {
         "driver": driver,
+        "period_days": days,
+        "start_date": start,
+        "end_date": end,
+
+        # KPIs
         "total_orders": total_orders,
+        "done_orders": done_orders,
+        "in_progress_orders": in_progress_orders,
+        "pending_orders": pending_orders,
+        "canceled_orders": canceled_orders,
         "total_distance_km": total_distance_km,
-        "distance_per_order": distance_per_order,
-        "total_driver_income": total_driver_income,
-        "income_per_order": income_per_order,
-        "grand_total_client": grand_total_client,
-        "done_count": done_count,
-        "canceled_count": canceled_count,
-        "pending_count": pending_count,
-        "in_progress_count": in_progress_count,
-        "done_ratio": done_ratio,
-        "avg_duration_minutes": avg_duration_minutes,
-        # On affiche une liste de courses (limite raisonnable)
-        "orders": orders_qs[:50],
+        "total_income": total_income,
+        "completion_rate": completion_rate,
+        "cancel_rate": cancel_rate,
+        "avg_income_per_order": avg_income_per_order,
+        "avg_income_per_km": avg_income_per_km,
+
+        # Séries pour les graphiques
+        "daily_labels": daily_labels,
+        "daily_orders_series": daily_orders_series,
+        "daily_income_series": daily_income_series,
+        "daily_distance_series": daily_distance_series,
+
+        # Classement
+        "leaderboard": leaderboard,
+        "current_rank": current_rank,
+
+        # Dernières commandes
+        "last_orders": last_orders,
     }
 
     return render(request, "orders/driver_performance.html", context)
@@ -3482,17 +3754,6 @@ def driver_me_app(request):
     print("DEBUG driver_me_app – commandes affichées :", orders.count())
 
     return render(request, "orders/driver_me.html", context)
-
-
-# orders/views.py
-
-from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Sum
-from django.http import JsonResponse, HttpResponseForbidden
-from django.shortcuts import get_object_or_404, render
-from django.utils import timezone
-
-from .models import Order, DeliveryPartner  # adapte si ton import est différent
 
 
 # ===========================================================

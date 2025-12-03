@@ -10,6 +10,7 @@ from django.utils import timezone
 from partners.models import LaundryPartner, DeliveryPartner, RelayPointPartner
 
 
+
 # =====================
 #  UTILITAIRE DISTANCE
 # =====================
@@ -97,6 +98,14 @@ class Order(models.Model):
         verbose_name="Statut",
     )
 
+    # 🔹 Collecte programmée (option)
+    scheduled_pickup_at = models.DateTimeField(
+        "Date/heure de collecte programmée",
+        null=True,
+        blank=True,
+        help_text="Si renseigné, la collecte est prévue à cette date/heure.",
+    )
+
     # Identifiant lisible
     code = models.CharField("Code", max_length=20, unique=True, blank=True)
 
@@ -144,6 +153,15 @@ class Order(models.Model):
         blank=True,
         null=True,
         help_text="Notes internes sur la commande (consignes, contexte, etc.)",
+    )
+
+    # --------- Parrainage / MLM ---------
+    referral_code = models.CharField(
+        "Code parrain saisi",
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="Code parrain saisi lors de la création de la commande.",
     )
 
     # --------- Montants ---------
@@ -220,6 +238,11 @@ class Order(models.Model):
         blank=True,
     )
 
+    mlm_distributed = models.BooleanField(
+        "Commissions MLM déjà distribuées",
+        default=False,
+    )
+
     class Meta:
         verbose_name = "Commande"
         verbose_name_plural = "Commandes"
@@ -228,13 +251,88 @@ class Order(models.Model):
     def __str__(self):
         return f"{self.code or 'SANS-CODE'} - {self.customer}"
 
+
+    def compute_totals(self, save: bool = True):
+        """
+        Recalcule les montants de la commande à partir des lignes :
+
+        - total = somme des OrderItem.total
+        - service_fee = 5 % du total, minimum 500 FCFA si total > 0
+        - delivery_fee : laissé tel quel (ou 0 si None)
+        - vat_amount = TVA 18 % sur (total + service_fee + delivery_fee)
+        - grand_total = base_ht + vat_amount
+
+        Si save=True, on persiste total / service_fee / delivery_fee en base.
+        vat_amount et grand_total restent des attributs "en mémoire".
+        """
+        from django.db.models import Sum
+
+        # 1) Sous-total prestations (somme des lignes)
+        agg = self.items.aggregate(s=Sum("total"))
+        total_ht = (agg["s"] or Decimal("0.00")).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
+
+        # On stocke ce sous-total dans le champ total
+        self.total = total_ht
+
+        # 2) Service FAGNI : 5 % min 500 FCFA si total > 0
+        service_fee = Decimal("0.00")
+        if total_ht > 0:
+            service_fee = (total_ht * Decimal("0.05")).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+            if service_fee < Decimal("500.00"):
+                service_fee = Decimal("500.00")
+        self.service_fee = service_fee
+
+        # 3) Frais de livraison : on garde ce qui est en base, sinon 0
+        if self.delivery_fee is None:
+            self.delivery_fee = Decimal("0.00")
+        else:
+            self.delivery_fee = Decimal(str(self.delivery_fee)).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+
+        # 4) Base HT : total prestations + service FAGNI + livraison
+        base_ht = (
+            (self.total or Decimal("0.00"))
+            + (self.service_fee or Decimal("0.00"))
+            + (self.delivery_fee or Decimal("0.00"))
+        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        # 5) TVA 18 %
+        vat_rate = Decimal("0.18")
+        self.vat_amount = (base_ht * vat_rate).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
+
+        # 6) Total TTC
+        self.grand_total = (base_ht + self.vat_amount).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
+
+        # 7) Sauvegarde des champs persistés si demandé
+        if save and self.pk:
+            type(self).objects.filter(pk=self.pk).update(
+                total=self.total,
+                service_fee=self.service_fee,
+                delivery_fee=self.delivery_fee,
+            )
+
     # ---------- Propriétés de calcul ----------
     @property
     def total_ht(self):
         """
         Somme des lignes (quantité x PU) SANS TVA.
+        Ici on utilise OrderItem.total (déjà qty x PU) comme base HT.
         """
-        total = sum((li.line_total for li in self.items.all()), Decimal("0.00"))
+        total = sum((item.total for item in self.items.all()), Decimal("0.00"))
         return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     @property
@@ -242,7 +340,7 @@ class Order(models.Model):
         """
         TVA (actuellement 0%). Tu pourras mettre 0.18 pour 18%.
         """
-        tva_rate = Decimal("0.00")
+        tva_rate = Decimal("0.18")
         return (self.total_ht * tva_rate).quantize(
             Decimal("0.01"),
             rounding=ROUND_HALF_UP,
@@ -257,20 +355,6 @@ class Order(models.Model):
             Decimal("0.01"),
             rounding=ROUND_HALF_UP,
         )
-
-    @property
-    def grand_total(self):
-        """
-        Total global facturé au client :
-        - total_ttc (prestations)
-        + service_fee FAGNI
-        + delivery_fee (transport)
-        """
-        return (
-            self.total_ttc
-            + (self.service_fee or Decimal("0.00"))
-            + (self.delivery_fee or Decimal("0.00"))
-        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     # ---------- BASE PRICING (MODELE 3) ----------
     def compute_delivery_pricing(self, one_way_km: Decimal):
@@ -340,7 +424,7 @@ class Order(models.Model):
 
         return distance_totale, client_fee_base, driver_cost_base, margin_base
 
-    # petit alias pour tes tests interactifs
+    # petit alias pour tests interactifs
     def _compute_delivery_pricing(self, one_way_km, is_peak=False, is_night=False, is_rain=False):
         return self.compute_delivery_pricing(one_way_km)
 
@@ -513,56 +597,43 @@ class Order(models.Model):
             rounding=ROUND_HALF_UP,
         )
 
-    # ---------- Recalcul centralisé ----------
-    def save(self, *args, **kwargs):
-        """
-        On laisse la vue / les signaux gérer :
-        - distance_km
-        - delivery_fee
-        - driver_logistic_cost
-        - génération des commissions MLM
 
-        Ici on recalcule seulement :
-        - code
-        - total (somme des lignes)
-        - service_fee
-        """
-        # Génération automatique d’un code lisible si absent
-        if not self.code:
-            self.code = str(uuid.uuid4())[:8]
-
-        # On sauve d’abord pour avoir un PK
-        super().save(*args, **kwargs)
-
-        # Recalcul du total des lignes
-        agg = self.items.aggregate(s=Sum("total"))
-        total = (agg["s"] or Decimal("0.00")).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
-
-        # Recalcul du service FAGNI
-        fee_service = self.compute_service_fee()
-
-        # Mise à jour en base sans re-déclencher de save()
-        type(self).objects.filter(pk=self.pk).update(
-            total=total,
-            service_fee=fee_service,
-        )
-
-    # ---------- MLM ----------
+    @property
     def distribute_mlm_commissions(self):
         """
         Distribue les commissions MLM sur 3 niveaux à partir du service_fee :
 
-        - N1 = 10 %
-        - N2 = 3 %
-        - N3 = 2 %
+        - N1 = n1_percent (MLMSettings)
+        - N2 = n2_percent
+        - N3 = n3_percent
 
-        Soit 15 % du service_fee distribués au réseau.
+        Les paramètres (pourcentages, seuils, activation) sont pilotés
+        par le modèle MLMSettings (configuration MLM active).
+
+        ⚠️ Cette propriété a des effets de bord :
+        elle crée des ReferralCommission ET des WalletTransaction (wallets app).
+        À appeler UNE SEULE FOIS au bon moment (ex : commande payée / livrée).
         """
-        from mlm.models import ReferralLink, ReferralCommission, WalletTransaction
+        from mlm.models import ReferralLink, ReferralCommission, MLMSettings
+        from wallets.models import Wallet, WalletTransaction
 
-        # 1) Récupérer le lien de parrainage du client
+        # 🔒 Sécurité 1 : commande déjà marquée comme distribuée
+        if self.mlm_distributed:
+            return
+
+        # 🔒 Sécurité 2 : commissions déjà enregistrées pour cette commande
+        if ReferralCommission.objects.filter(order=self).exists():
+            if not self.mlm_distributed and self.pk:
+                type(self).objects.filter(pk=self.pk).update(mlm_distributed=True)
+                self.mlm_distributed = True
+            return
+
+        # 0) Charger la config MLM active
+        mlm_cfg = MLMSettings.get_active()
+        if not mlm_cfg.enabled:
+            return
+
+        # 1) Récupérer le profil MLM du client
         try:
             link = ReferralLink.objects.get(customer=self.customer)
         except ReferralLink.DoesNotExist:
@@ -578,14 +649,23 @@ class Order(models.Model):
         if fee_base_decimal <= 0:
             return
 
-        # Pour stockage « propre » en entier FCFA
-        fee_base = int(fee_base_decimal)
+        fee_base_decimal = fee_base_decimal.quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
 
-        # 4) Pourcentages par niveau
+        # Seuil minimum pour générer des commissions
+        min_fee = Decimal(str(mlm_cfg.min_service_fee_for_commission or 0))
+        if fee_base_decimal < min_fee:
+            return
+
+        fee_base_int = int(fee_base_decimal)
+
+        # 4) Pourcentages par niveau issus de la config active
         percent_levels = [
-            Decimal("10.00"),  # N1
-            Decimal("3.00"),   # N2
-            Decimal("2.00"),   # N3
+            mlm_cfg.n1_percent or Decimal("0.00"),
+            mlm_cfg.n2_percent or Decimal("0.00"),
+            mlm_cfg.n3_percent or Decimal("0.00"),
         ]
 
         # 5) Boucle sur les parrains de la lignée
@@ -593,7 +673,14 @@ class Order(models.Model):
             if idx >= len(percent_levels):
                 break  # sécurité
 
-            percent = percent_levels[idx]
+            sponsor_customer = getattr(sponsor_link, "customer", None)
+            if sponsor_customer is None:
+                continue
+
+            percent = percent_levels[idx] or Decimal("0.00")
+            if percent <= 0:
+                continue
+
             rate = percent / Decimal("100")
 
             # Commission théorique
@@ -601,31 +688,56 @@ class Order(models.Model):
                 Decimal("0.01"),
                 rounding=ROUND_HALF_UP,
             )
-            commission_amount = int(commission_decimal)
+            commission_int = int(commission_decimal)
 
-            if commission_amount <= 0:
+            if commission_int <= 0:
                 continue
 
             level = idx + 1  # N1, N2, N3...
 
-            # Enregistrer la commission détaillée
+            # 5.a Enregistrer la commission détaillée MLM
             ReferralCommission.objects.create(
                 beneficiary_profile=sponsor_link,
                 level=level,
                 order=self,
-                service_fee_base=fee_base,
+                service_fee_base=fee_base_int,
                 commission_percent=percent,
-                commission_amount=commission_amount,
+                commission_amount=commission_int,
             )
 
-            # Enregistrer le mouvement sur le wallet
+            # 5.b Crédite le wallet client du parrain (Wallet FAGNI)
+            wallet, _ = Wallet.objects.get_or_create(
+                owner_type="customer",
+                customer=sponsor_customer,
+                defaults={"currency": "XOF"},
+            )
+
+            commission_amount_decimal = Decimal(commission_int).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+
+            # 🔹 Met à jour le solde du wallet
+            wallet.balance = (wallet.balance + commission_amount_decimal).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+            wallet.save(update_fields=["balance", "updated_at"])
+
+            # 🔹 Trace la transaction MLM
             WalletTransaction.objects.create(
-                profile=sponsor_link,
-                type="mlm_commission",
-                amount=commission_amount,
+                wallet=wallet,
                 order=self,
+                type="mlm_commission",
+                direction="in",
+                amount=commission_amount_decimal,
                 description=f"Commission niveau {level} pour commande {self.code}",
             )
+
+        # 6) Marquer la commande comme distribuée (une seule fois)
+        if self.pk:
+            type(self).objects.filter(pk=self.pk).update(mlm_distributed=True)
+        self.mlm_distributed = True
 
 
 # =====================

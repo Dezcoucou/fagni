@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block content %}
+{% block title %}Nouvelle commande – FAGNI{% endblock %}
+
+{% block extra_head %}
 <style>
     :root {
         --fagni-orange: #ff7a00;
@@ -9,174 +11,134 @@
         --bg-soft: #f5f5f7;
         --card-bg: #ffffff;
         --border-soft: #e5e7eb;
-        --text-main: #222222;
+        --text-main: #111827;
         --text-muted: #6b7280;
-    }
-
-    * {
-        box-sizing: border-box;
-    }
-
-    body {
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: var(--bg-soft);
-        margin: 0;
-        padding: 0;
-        color: var(--text-main);
-    }
-
-    header {
-        background: linear-gradient(90deg, #ff7a00, #0056b3);
-        color: #fff;
-        padding: 16px 24px;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
-        margin: 0 -12px 0 -12px;
-    }
-    header h1 {
-        margin: 0;
-        font-size: 20px;
-    }
-    header p {
-        margin: 4px 0 0;
-        font-size: 13px;
-        opacity: 0.9;
     }
 
     .page {
         max-width: 1100px;
-        margin: 20px auto;
-        padding: 0 10px 30px;
+        margin: 0 auto 32px;
+        padding: 12px 10px 24px;
+    }
+
+    .page-header {
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:12px;
+        margin-bottom:18px;
+    }
+
+    .page-title {
+        font-size:20px;
+        font-weight:700;
+        color:#0f172a;
+        margin:0;
+    }
+
+    .page-subtitle {
+        font-size:13px;
+        color:#64748b;
+        margin:4px 0 0;
+    }
+
+    .page-header__right {
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px;
+        justify-content:flex-end;
     }
 
     .card {
-        background: #fff;
-        border-radius: 12px;
-        padding: 16px 20px;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
-        margin-bottom: 16px;
-        border: 1px solid var(--border-soft);
-    }
-
-    .card h2 {
-        margin-top: 0;
-        font-size: 18px;
-        border-left: 4px solid #ff7a00;
-        padding-left: 8px;
-    }
-
-    .top-actions {
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        gap:10px;
+        background:#ffffff;
+        border-radius:16px;
+        padding:16px 16px;
         margin-bottom:14px;
-        flex-wrap:wrap;
+        border:1px solid #e5e7eb;
+        box-shadow:0 2px 6px rgba(15,23,42,0.06);
     }
 
-    .btn-link {
-        text-decoration:none;
-        border-radius:999px;
-        padding:7px 12px;
-        font-size:13px;
-        display:inline-flex;
+    .card-title {
+        font-size:15px;
+        font-weight:600;
+        margin:0 0 10px;
+        color:#0f172a;
+        display:flex;
         align-items:center;
         gap:6px;
     }
 
-    .btn-secondary {
-        background:#fff;
-        border:1px solid #ccc;
-        color:#333;
+    .card-title .emoji {
+        font-size:18px;
     }
 
-    .btn-secondary:hover {
-        background:#f3f3f3;
+    label {
+        font-size:13px;
+        font-weight:500;
+        color:#374151;
+        display:block;
+        margin-bottom:4px;
+    }
+
+    input, select, textarea {
+        width:100%;
+        padding:7px 9px;
+        font-size:13px;
+        border-radius:10px;
+        border:1px solid #d1d5db;
+        margin-bottom:8px;
+        box-sizing:border-box;
+    }
+
+    input:focus, select:focus, textarea:focus {
+        outline:none;
+        border-color:#0f172a;
+        box-shadow:0 0 0 1px rgba(15,23,42,0.1);
+    }
+
+    textarea {
+        min-height:70px;
+        resize:vertical;
+    }
+
+    .btn {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        padding:8px 14px;
+        border-radius:999px;
+        font-size:13px;
+        border:1px solid transparent;
+        cursor:pointer;
+        text-decoration:none;
+        white-space:nowrap;
     }
 
     .btn-primary {
-        background:#0056b3;
+        background:#0f172a;
+        border-color:#0f172a;
         color:#fff;
-        border:none;
     }
 
-    .btn-primary:hover{
-        background:#00408a;
+    .btn-primary:hover {
+        opacity:0.95;
     }
 
-    .grid {
-        display: grid;
-        grid-template-columns: 1.1fr 0.9fr;
-        gap: 16px;
+    .btn-light {
+        background:#fff;
+        border-color:#e5e7eb;
+        color:#374151;
     }
 
-    .field-group {
-        margin-bottom: 10px;
-    }
-
-    .field-group label {
-        display: block;
-        font-size: 13px;
-        margin-bottom: 4px;
-    }
-
-    .field-group input[type="text"],
-    .field-group input[type="number"],
-    .field-group select {
-        width: 100%;
-        padding: 7px 8px;
-        border-radius: 6px;
-        border: 1px solid #ddd;
-        font-size: 14px;
-        box-sizing: border-box;
-    }
-
-    .field-group input[type="text"]:focus,
-    .field-group input[type="number"]:focus,
-    .field-group select:focus {
-        outline: none;
-        border-color: var(--fagni-blue);
-        box-shadow: 0 0 0 1px rgba(0,86,179,0.15);
-    }
-
-    .field-group textarea {
-        width: 100%;
-        padding: 7px 8px;
-        border-radius: 6px;
-        border: 1px solid #ddd;
-        font-size: 14px;
-        min-height: 60px;
-        resize: vertical;
-        box-sizing: border-box;
-    }
-
-    .field-group textarea:focus {
-        outline: none;
-        border-color: var(--fagni-blue);
-        box-shadow: 0 0 0 1px rgba(0,86,179,0.15);
-    }
-
-    /* Champ prix unitaire non modifiable (visuellement désactivé) */
-    .readonly-input {
-        background: #f8f8f8;
-        cursor: not-allowed;
-        color: #555;
-    }
-
-    .address-row {
-        display:flex;
-        gap:8px;
-        align-items:center;
-    }
-
-    .address-row input[type="text"] {
-        flex:1;
+    .btn-light:hover {
+        background:#f9fafb;
     }
 
     .btn-small {
         border-radius:999px;
-        border:1px solid #ff7a00;
+        border:1px solid var(--fagni-orange);
         background:#fff;
-        color:#ff7a00;
+        color:var(--fagni-orange);
         padding:6px 10px;
         font-size:12px;
         cursor:pointer;
@@ -204,24 +166,109 @@
         border-color:#fecaca;
     }
 
+    .form-grid {
+        display:grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap:10px 14px;
+    }
+
+    .two-cols {
+        display:grid;
+        grid-template-columns:1.1fr 0.9fr;
+        gap:14px;
+    }
+
+    .address-row {
+        display:flex;
+        gap:8px;
+        align-items:center;
+    }
+
+    .address-row input {
+        margin-bottom:0;
+    }
+
+    .small-help {
+        font-size:11px;
+        color:var(--text-muted);
+        margin-top:2px;
+        margin-bottom:6px;
+        display:block;
+    }
+
+    .client-status {
+        font-size:11px;
+        margin-top:0;
+        display:block;
+    }
+    .client-status--found {
+        color:#15803d;
+    }
+    .client-status--new {
+        color:#6b7280;
+    }
+
+    /* Map */
+    #map {
+        width:100%;
+        height:240px;
+        border-radius:12px;
+        border:1px solid #e5e7eb;
+        margin-top:4px;
+    }
+
+    .map-note {
+        font-size:11px;
+        color:#6b7280;
+        margin-top:4px;
+    }
+
+    /* Articles */
+    .section-header {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:8px;
+        margin-top:4px;
+        margin-bottom:6px;
+    }
+
+    .badge-soft {
+        padding:4px 8px;
+        border-radius:999px;
+        background:#eff6ff;
+        color:#1d4ed8;
+        font-size:11px;
+        white-space:nowrap;
+    }
+
+    .articles-table-wrapper {
+        width:100%;
+        overflow-x:auto;
+        border:1px solid #e5e7eb;
+        border-radius:12px;
+        margin-top:4px;
+    }
+
     table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 13px;
-        margin-top: 4px;
+        width:100%;
+        border-collapse:collapse;
+        font-size:13px;
+        min-width:680px;
     }
 
     th, td {
-        padding: 6px 4px;
-        border-bottom: 1px solid #f1f1f1;
-        text-align: left;
-        vertical-align: top;
+        padding:7px 8px;
+        border-bottom:1px solid #e5e7eb;
+        text-align:left;
+        vertical-align:top;
     }
 
-    th {
-        background: #fafafa;
-        font-weight: 600;
-        font-size: 12px;
+    thead th {
+        background:#f9fafb;
+        font-weight:600;
+        color:#6b7280;
+        font-size:12px;
     }
 
     tbody tr:nth-child(even) {
@@ -237,104 +284,14 @@
         white-space:nowrap;
     }
 
-    .btn-row {
-        display: flex;
-        gap: 10px;
-        margin-top: 12px;
-        flex-wrap:wrap;
+    .line-designation {
+        font-weight:500;
     }
 
-    button {
-        border: none;
-        padding: 8px 14px;
-        border-radius: 999px;
-        font-size: 14px;
-        cursor: pointer;
-    }
-
-    #previewBtn {
-        background: #fff;
-        border: 1px solid #ff7a00;
-        color: #ff7a00;
-    }
-
-    #previewBtn:hover {
-        background: #fff5eb;
-    }
-
-    #submitBtn {
-        background: #0056b3;
-        color: #fff;
-    }
-
-    #submitBtn:hover {
-        background: #00408a;
-    }
-
-    #summaryBox {
-        margin-top: 10px;
-        border-radius: 8px;
-        border: 1px solid #eee;
-        padding: 10px;
-        background: #fafafa;
-    }
-
-    #summaryBox.hidden {
-        display: none;
-    }
-
-    .summary-item {
-        margin: 0 0 4px;
-    }
-
-    #map {
-        width: 100%;
-        height: 260px;
-        margin-top: 8px;
-        border-radius: 8px;
-        border: 1px solid #ddd;
-    }
-
-    .map-note {
-        font-size:11px;
-        color:#777;
-        margin-top:4px;
-        display:block;
-    }
-
-    .error {
-        background: #ffe5e5;
-        color: #b00020;
-        padding: 8px 10px;
-        border-radius: 8px;
-        font-size: 13px;
-        margin-bottom: 8px;
-    }
-
-    .totals-block p {
-        margin: 3px 0;
-        font-size: 13px;
-        clear: both;
-    }
-
-    .totals-block .label {
-        font-weight:600;
-    }
-
-    .totals-block .value {
-        float:right;
-    }
-
-    .totals-block .grand {
-        color:#ff7a00;
-        font-weight:700;
-    }
-
-    .note {
-        font-size:11px;
-        color:#777;
-        margin-top:6px;
-        clear:both;
+    .line-meta {
+        font-size:10px;
+        color:#6b7280;
+        margin-top:2px;
     }
 
     .photo-thumbs,
@@ -345,7 +302,6 @@
         flex-wrap:wrap;
     }
 
-    .photo-thumbs img,
     .photos-preview img {
         width:36px;
         height:36px;
@@ -360,34 +316,80 @@
         margin-left:4px;
     }
 
-    .line-designation {
-        font-weight:500;
+    .readonly-input {
+        background:#f8fafc;
+        cursor:not-allowed;
+        color:#4b5563;
     }
 
-    .line-meta {
-        font-size:10px;
+    .totals-box {
+        margin-top:12px;
+        padding:12px;
+        border-radius:12px;
+        background:#f9fafb;
+        border:1px solid #e5e7eb;
+        font-size:13px;
+    }
+
+    .totals-row {
+        display:flex;
+        justify-content:space-between;
+        margin-bottom:4px;
+    }
+
+    .totals-row strong {
+        color:#0f172a;
+    }
+
+    .totals-row.total-grand {
+        margin-top:6px;
+        font-size:15px;
+    }
+
+    .totals-row.total-grand strong:last-child {
+        color:var(--fagni-orange);
+    }
+
+    .note {
+        font-size:11px;
         color:#6b7280;
-        margin-top:2px;
+        margin-top:6px;
     }
 
-    /* Stepper d'étapes */
+    .actions {
+        margin-top:20px;
+        display:flex;
+        gap:10px;
+        justify-content:flex-end;
+        flex-wrap:wrap;
+    }
+
+    .error {
+        background:#fee2e2;
+        border:1px solid #fecaca;
+        color:#b91c1c;
+        padding:8px 10px;
+        border-radius:10px;
+        font-size:13px;
+        margin-bottom:10px;
+    }
+
+    /* Stepper simple */
     .steps {
         display:flex;
         gap:8px;
-        margin-bottom:14px;
+        margin-top:4px;
+        margin-bottom:10px;
         flex-wrap:wrap;
-        align-items:center;
     }
-
     .step {
-        padding:6px 10px;
+        padding:4px 9px;
         border-radius:999px;
         border:1px solid #e5e7eb;
-        font-size:12px;
+        font-size:11px;
         color:#6b7280;
         background:#f9fafb;
     }
-
     .step.active {
         border-color:var(--fagni-orange);
         background:#fff7ed;
@@ -395,99 +397,69 @@
         font-weight:600;
     }
 
-    /* Badge compteur d'articles */
-    .section-header {
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap:8px;
-    }
-
-    .badge-soft {
-        padding:4px 8px;
-        border-radius:999px;
-        background:#eff6ff;
-        color:#1d4ed8;
-        font-size:11px;
-        white-space:nowrap;
-    }
-
-    /* Statut client (trouvé / nouveau) */
-    .client-status {
-        font-size:11px;
-        margin-top:2px;
-        display:block;
-    }
-    .client-status--found {
-        color:#15803d;
-    }
-    .client-status--new {
-        color:#6b7280;
-    }
-
-    @media (max-width: 800px) {
-        .grid {
-            grid-template-columns: 1fr;
+    @media (max-width: 900px) {
+        .two-cols {
+            grid-template-columns:1fr;
+        }
+        table {
+            min-width:0;
         }
     }
 </style>
+{% endblock %}
 
-<header>
-    <h1>Nouvelle commande FAGNI</h1>
-    <p>Saisie client, prestations du catalogue, localisation & montants.</p>
-</header>
-
+{% block content %}
 <div class="page">
-    <div class="card">
 
-        <div class="top-actions">
-            <div>
-                <strong>Nouvelle commande</strong><br>
-                <span style="font-size:12px;color:#555;">
-                    Renseigne le client, choisis les prestations depuis le catalogue, ajoute les photos et valide.
-                </span>
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <a href="{% url 'orders:list' %}" class="btn-link btn-secondary">
-                    📋 Liste des commandes
-                </a>
-                <a href="{% url 'orders:ops_dashboard' %}" class="btn-link btn-secondary">
-                    🚦 Suivi OPS
-                </a>
-                <a href="{% url 'orders:dashboard' %}" class="btn-link btn-secondary">
-                    📊 Dashboard commandes
-                </a>
-                <a href="{% url 'orders:finance_dashboard' %}" class="btn-link btn-secondary">
-                    💰 Dashboard financier
-                </a>
-                <a href="{% url 'orders:customers_list' %}" class="btn-link btn-secondary">
-                    👥 Clients (mini-CRM)
-                </a>
+    <!-- HEADER -->
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Créer une nouvelle commande</h1>
+            <p class="page-subtitle">
+                Renseigne le client, choisis les prestations dans le catalogue, ajoute les photos et valide.
+            </p>
+            <div class="steps">
+                <div class="step step-1 active">1. Client & localisation</div>
+                <div class="step step-2">2. Prestations</div>
+                <div class="step step-3">3. Récap & validation</div>
             </div>
         </div>
-
-        <!-- Stepper -->
-        <div class="steps">
-            <div class="step step-1 active">1. Client</div>
-            <div class="step step-2">2. Prestations</div>
-            <div class="step step-3">3. Récap & validation</div>
+        <div class="page-header__right">
+            <a href="{% url 'orders:list' %}" class="btn btn-light">
+                📋 Liste des commandes
+            </a>
+            <a href="{% url 'orders:ops_dashboard' %}" class="btn btn-light">
+                🚦 Suivi OPS
+            </a>
+            <a href="{% url 'orders:dashboard' %}" class="btn btn-light">
+                📊 Dashboard commandes
+            </a>
+            <a href="{% url 'orders:finance_dashboard' %}" class="btn btn-light">
+                💰 Dashboard financier
+            </a>
+            <a href="{% url 'orders:customers_list' %}" class="btn btn-light">
+                👥 Clients (mini-CRM)
+            </a>
         </div>
+    </div>
+
+    <form id="orderForm" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
 
         {% if error %}
             <div class="error">{{ error }}</div>
         {% endif %}
 
-        <!-- ⚠️ enctype pour gérer les photos -->
-        <form id="orderForm" method="post" enctype="multipart/form-data">
-            {% csrf_token %}
+        <div class="two-cols">
+            <!-- COLONNE GAUCHE : CLIENT + LOCALISATION -->
+            <section class="card">
+                <h2 class="card-title">
+                    <span class="emoji">👤</span> Client & coordonnées
+                </h2>
 
-            <div class="grid">
-                <!-- Colonne gauche : client + adresse + map -->
-                <div>
-                    <h2>Client</h2>
-
-                    <div class="field-group">
-                        <label for="client_phone">Téléphone :</label>
+                <div class="form-grid">
+                    <div>
+                        <label for="client_phone">Téléphone</label>
                         <input
                             type="text"
                             id="client_phone"
@@ -496,66 +468,121 @@
                             placeholder="Ex : 0700000000"
                             data-lookup-url="{% url 'orders:client_lookup' %}"
                         >
-                        <small id="client_status" class="client-status"></small>
+                        <span id="client_status" class="client-status"></span>
                     </div>
 
-                    <div class="field-group">
-                        <label for="client_name">Nom et prénoms :</label>
-                        <input type="text" id="client_name" name="client_name"
-                               value="{{ initial_customer.name|default:'' }}"
-                               placeholder="Nom du client">
+                    <div>
+                        <label for="client_name">Nom et prénoms</label>
+                        <input
+                            type="text"
+                            id="client_name"
+                            name="client_name"
+                            value="{{ initial_customer.name|default:'' }}"
+                            placeholder="Nom du client"
+                        >
                     </div>
 
-                    <!-- ✅ Champ CODE PARRAIN -->
-                    <div class="field-group">
-                        <label for="referral_code">Code parrain :</label>
-                        <input type="text"
-                               id="referral_code"
-                               name="referral_code"
-                               value="{{ initial_customer.referral_code|default:'' }}"
-                               placeholder="Ex : CODEPARRAIN123">
+                    <div>
+                        <label for="referral_code">Code parrain (optionnel)</label>
+                        <input
+                            type="text"
+                            id="referral_code"
+                            name="referral_code"
+                            value="{{ referral_code }}"
+                            placeholder="Ex : PARRAIN123"
+                        >
                     </div>
 
-                    <div class="field-group">
-                        <label for="client_address">Adresse :</label>
+                    <div style="grid-column:1/-1;">
+                        <label for="client_address">Adresse</label>
                         <div class="address-row">
-                            <input type="text" id="client_address" name="client_address"
-                                   value="{{ initial_customer.address|default:'' }}"
-                                   placeholder="Ex : Cocody Angré 8ème tranche">
+                            <input
+                                type="text"
+                                id="client_address"
+                                name="client_address"
+                                value="{{ initial_customer.address|default:'' }}"
+                                placeholder="Ex : Cocody Angré 8ème tranche"
+                            >
                             <button type="button" id="locateBtn" class="btn-small">
                                 📍 Me localiser
                             </button>
                         </div>
-                        <small style="font-size:11px;color:#777;">
+                        <span class="small-help">
                             Suggestions Google + géolocalisation si tu es chez le client.
-                        </small>
+                        </span>
                     </div>
-
-                    <input type="hidden" id="client_lat" name="client_lat"
-                           value="{{ initial_customer.latitude|default:'' }}">
-                    <input type="hidden" id="client_lng" name="client_lng"
-                           value="{{ initial_customer.longitude|default:'' }}">
-                      
-                    <div class="card">
-                        <h2 class="section-title">Localisation</h2>
-                        <p class="section-help">
-                            Positionne le point de collecte sur la carte pour calculer la distance et les frais de livraison.
-                        </p>
-
-                        <div id="map" class="map-container"></div>
-                    </div>
-                    <small class="map-note">
-                        Si la carte ne se charge pas correctement, tu peux tout de même enregistrer la commande.
-                        La localisation pourra être complétée ou ajustée plus tard.
-                    </small>
                 </div>
 
-                <!-- Colonne droite : prestations + lignes + totaux -->
-                <div>
-                    <h2>Prestations FAGNI</h2>
+                <input type="hidden" id="client_lat" name="client_lat"
+                       value="{{ initial_customer.latitude|default:'' }}">
+                <input type="hidden" id="client_lng" name="client_lng"
+                       value="{{ initial_customer.longitude|default:'' }}">
 
-                    <div class="field-group">
-                        <label for="category_select">Catégorie de service :</label>
+                <h2 class="card-title" style="margin-top:10px;">
+                    <span class="emoji">📍</span> Localisation
+                </h2>
+                <h2>Collecte</h2>
+                <div class="field-group">
+                    <label>Mode de collecte :</label>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <label style="font-size:13px;">
+                        <input type="radio" name="pickup_mode" value="now" checked>
+                        Immédiate (dès que possible)
+                    </label>
+                    <label style="font-size:13px;">
+                        <input type="radio" name="pickup_mode" value="later">
+                        Programmée
+                    </label>
+                </div>
+            </div>
+
+            <div id="scheduled_fields" class="form-grid" style="display:none;">
+                <div>
+                    <label for="pickup_date">Date de collecte programmée</label>
+                    <input type="date" id="pickup_date" name="pickup_date">
+                </div>
+                <div>
+                    <label for="pickup_time">Heure de collecte programmée</label>
+                    <input type="time" id="pickup_time" name="pickup_time">
+                </div>
+            </div>
+
+            <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const radios = document.querySelectorAll('input[name="pickup_mode"]');
+                const scheduledFields = document.getElementById('scheduled_fields');
+
+                function toggleScheduled() {
+                    const mode = document.querySelector('input[name="pickup_mode"]:checked').value;
+                    if (mode === 'later') {
+                            scheduledFields.style.display = 'grid';
+                    } else {
+                        scheduledFields.style.display = 'none';
+                    }
+                }
+
+                radios.forEach(r => r.addEventListener('change', toggleScheduled));
+                toggleScheduled();
+            });
+            </script>
+
+                <div id="map"></div>
+                <div class="map-note">
+                    Si la carte ne se charge pas, tu peux quand même enregistrer la commande.
+                    La localisation pourra être complétée plus tard.
+                </div>
+            </section>
+
+
+            <!-- COLONNE DROITE : PRESTATIONS + LIGNES + TOTAUX -->
+            <section class="card">
+                <h2 class="card-title">
+                    <span class="emoji">🧺</span> Prestations FAGNI
+                </h2>
+
+                <div class="form-grid">
+                    <div>
+                        <label for="category_select">Catégorie de service</label>
                         <select id="category_select">
                             <option value="">-- Choisir une catégorie --</option>
                             {% for cat in service_categories %}
@@ -564,8 +591,8 @@
                         </select>
                     </div>
 
-                    <div class="field-group">
-                        <label for="service_select">Prestation / Article :</label>
+                    <div>
+                        <label for="service_select">Prestation / Article</label>
                         <select id="service_select" disabled>
                             <option value="">-- Choisir une catégorie d'abord --</option>
                             {% for s in service_items %}
@@ -579,116 +606,125 @@
                             {% endfor %}
                         </select>
                     </div>
+                </div>
 
-                    <div class="field-group">
-                        <label for="item_designation">Désignation (modifiable) :</label>
-                        <input type="text" id="item_designation" placeholder="Texte qui apparaîtra sur la commande">
+                <div class="form-grid" style="margin-top:4px;">
+                    <div style="grid-column:1/-1;">
+                        <label for="item_designation">Désignation (modifiable)</label>
+                        <input
+                            type="text"
+                            id="item_designation"
+                            placeholder="Texte qui apparaîtra sur la commande"
+                        >
                     </div>
 
-                    <div class="field-group" style="display:flex;gap:8px;align-items:flex-end;">
-                        <div style="flex:0.7;">
-                            <label for="item_quantity">Quantité :</label>
-                            <input type="number" id="item_quantity" min="1" value="1">
-                        </div>
-                        <div style="flex:1;">
-                            <label for="item_price">Prix unitaire (catalogue, non modifiable) :</label>
-                            <input type="text"
-                                   id="item_price"
-                                   value="0"
-                                   readonly
-                                   class="readonly-input">
-                            <div style="font-size:11px;color:#777;">
-                                Les prix sont issus du catalogue FAGNI.<br>
-                                Toute mise à jour se fait dans le catalogue.
-                            </div>
-                        </div>
+                    <div>
+                        <label for="item_quantity">Quantité</label>
+                        <input
+                            type="number"
+                            id="item_quantity"
+                            min="1"
+                            value="1"
+                        >
                     </div>
 
-                    <button type="button" id="addItemBtn" class="btn-small" style="margin-top:4px;">
-                        ➕ Ajouter une nouvelle ligne
-                    </button>
-
-                    <div class="section-header">
-                        <h2 style="margin-top:18px;margin-bottom:4px;">Lignes de commande</h2>
-                        <span id="items_count_badge" class="badge-soft">0 article</span>
+                    <div>
+                        <label for="item_price">Prix unitaire (catalogue, non modifiable)</label>
+                        <input
+                            type="text"
+                            id="item_price"
+                            value="0"
+                            readonly
+                            class="readonly-input"
+                        >
+                        <span class="small-help">
+                            Les prix proviennent du catalogue FAGNI. Toute mise à jour se fait dans le catalogue.
+                        </span>
                     </div>
+                </div>
 
+                <button type="button" id="addItemBtn" class="btn-small" style="margin-top:4px;">
+                    ➕ Ajouter une ligne
+                </button>
+
+                <div class="section-header">
+                    <h2 class="card-title" style="margin:8px 0 4px;">
+                        <span class="emoji">📦</span> Lignes de commande
+                    </h2>
+                    <span id="items_count_badge" class="badge-soft">0 article</span>
+                </div>
+
+                <div class="articles-table-wrapper">
                     <table id="itemsTable">
                         <thead>
                             <tr>
                                 <th>Prestation / Désignation</th>
                                 <th class="num">Qté</th>
                                 <th class="num">PU</th>
-                                <th class="num">Total</th>
+                                <th class="num">Total ttc</th>
                                 <th>Photos / Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <!-- Au départ, aucune ligne : tout est ajouté via JS -->
+                            <!-- Lignes ajoutées en JS -->
                         </tbody>
                     </table>
-
-                    <!-- ✅ Bloc Notes / instructions (nouveau, aligné sur update) -->
-                    <h2 style="margin-top:16px;">Notes / instructions</h2>
-                    <div class="field-group">
-                        <label for="order_notes">Notes internes / instructions :</label>
-                        <textarea id="order_notes"
-                                  name="order_notes"
-                                  rows="3"></textarea>
-                        <small style="font-size:11px;color:#777;">
-                            Ex : Client absent avant 8h, articles à traiter en urgence, consignes spécifiques, etc.
-                        </small>
-                    </div>
-
-                    <div class="totals-block" style="margin-top:10px;">
-                        <p>
-                            <span class="label">Total prestation :</span>
-                            <span id="total_prestation" class="value">
-                                0 FCFA
-                            </span>
-                        </p>
-                        <p>
-                            <span class="label">Service FAGNI (5% min 500 FCFA) :</span>
-                            <span id="service_fee_display" class="value">
-                                0 FCFA
-                            </span>
-                        </p>
-                        <p>
-                            <span class="label">Frais de livraison (estimation front) :</span>
-                            <span id="delivery_fee_display" class="value">
-                                0 FCFA
-                            </span>
-                        </p>
-                        <p>
-                            <span class="label">Total global estimé :</span>
-                            <span id="total_global_display" class="value grand">
-                                0 FCFA
-                            </span>
-                        </p>
-
-                        <p class="note">
-                            * Transport (estimation) :
-                            min <strong>{{ delivery_min_fee|default:0 }} FCFA</strong>,
-                            environ {{ delivery_price_per_km|default:0 }} FCFA / km AR
-                            (+ fixe {{ delivery_fixed_fee|default:0 }} FCFA).<br>
-                            Le montant officiel est recalculé côté serveur selon la distance réelle client ↔ blanchisserie.
-                        </p>
-                    </div>
-
-                    <div class="btn-row">
-                        <button type="button" id="previewBtn">Voir le résumé</button>
-                        <button type="submit" id="submitBtn" class="btn-primary">Enregistrer la commande</button>
-                    </div>
-
-                    <div id="summaryBox" class="hidden">
-                        <h3 style="margin-top:0;">Résumé des articles</h3>
-                        <div id="summaryContent"></div>
-                    </div>
-
                 </div>
-            </div>
-        </form>
-    </div>
+
+                <h2 class="card-title" style="margin-top:14px;">
+                    <span class="emoji">📝</span> Notes / instructions
+                </h2>
+                <div>
+                    <textarea id="order_notes"
+                              name="order_notes"
+                              placeholder="Ex : Client absent avant 8h, articles à traiter en urgence, consignes spécifiques…"></textarea>
+                </div>
+
+                <div class="totals-box">
+                    <div class="totals-row">
+                        <span>Sous-total prestations</span>
+                        <strong><span id="total_prestation">0</span> FCFA</strong>
+                    </div>
+                    <div class="totals-row">
+                        <span>Service FAGNI (5% min 500 FCFA)</span>
+                        <strong><span id="service_fee_display">0</span> FCFA</strong>
+                    </div>
+                    <div class="totals-row">
+                        <span>Livraison (estimation front)</span>
+                        <strong><span id="delivery_fee_display">0</span> FCFA</strong>
+                    </div>
+                    <div class="totals-row total-grand">
+                        <span><strong>Total global estimé(TTC)</strong></span>
+                        <strong><span id="total_global_display">0</span> FCFA</strong>
+                    </div>
+                    <div class="note">
+                        * Transport (estimation) :
+                        min <strong>{{ delivery_min_fee|default:0 }} FCFA</strong>,
+                        environ {{ delivery_price_per_km|default:0 }} FCFA / km AR
+                        (+ fixe {{ delivery_fixed_fee|default:0 }} FCFA).<br>
+                        Le montant officiel est recalculé côté serveur en fonction de la distance réelle client ↔ blanchisserie.
+                    </div>
+                </div>
+
+                <div id="summaryBox" style="margin-top:10px; display:none;">
+                    <h3 style="margin-top:0;font-size:14px;">Résumé des articles</h3>
+                    <div id="summaryContent"></div>
+                </div>
+            </section>
+        </div>
+
+        <!-- ACTIONS -->
+        <div class="actions">
+            <a href="{% url 'orders:list' %}" class="btn btn-light">Annuler</a>
+            <button type="button" id="previewBtn" class="btn btn-light">
+                Voir le résumé
+            </button>
+            <button type="submit" id="submitBtn" class="btn btn-primary">
+                Créer la commande
+            </button>
+        </div>
+
+    </form>
 </div>
 
 <script>
@@ -741,11 +777,9 @@ function initMap() {
             map.setZoom(14);
             marker.setPosition(loc);
 
-            const latInput2 = document.getElementById('client_lat');
-            const lngInput2 = document.getElementById('client_lng');
-            if (latInput2 && lngInput2) {
-                latInput2.value = loc.lat();
-                lngInput2.value = loc.lng();
+            if (latInput && lngInput) {
+                latInput.value = loc.lat();
+                lngInput.value = loc.lng();
             }
         });
     }
@@ -798,7 +832,7 @@ document.addEventListener('DOMContentLoaded', function () {
         itemsCountBadge.textContent = count + (count <= 1 ? ' article' : ' articles');
     }
 
-    // 1) Autocomplétion client par téléphone (JSON + fetch)
+    // Autocomplétion client par téléphone
     if (phoneInput && nameInput && addressInput) {
         const lookupUrl = phoneInput.getAttribute('data-lookup-url') || '/orders/api/client/';
 
@@ -811,16 +845,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (phone.length < 4) return;
 
             const url = lookupUrl + (lookupUrl.includes('?') ? '&' : '?') + 'phone=' + encodeURIComponent(phone);
-            console.log('[CLIENT LOOKUP] appel API :', url);
 
             fetch(url)
-                .then(res => {
-                    console.log('[CLIENT LOOKUP] status :', res.status);
-                    if (!res.ok) return null;
-                    return res.json();
-                })
+                .then(res => res.ok ? res.json() : null)
                 .then(data => {
-                    console.log('[CLIENT LOOKUP] payload :', data);
                     if (!data) {
                         if (clientStatusEl) {
                             clientStatusEl.textContent = 'Nouveau client';
@@ -879,7 +907,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 2) Bouton "Me localiser"
+    // Bouton "Me localiser"
     if (locateBtn && navigator.geolocation) {
         locateBtn.addEventListener('click', function () {
             locateBtn.disabled = true;
@@ -932,7 +960,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 3) Filtrage prestations par catégorie + prix catalogue non modifiable
+    // Filtrage prestations par catégorie + prix catalogue non modifiable
     if (categorySelect && serviceSelect) {
         serviceSelect.disabled = true;
         Array.from(serviceSelect.options).forEach(opt => {
@@ -948,7 +976,7 @@ document.addEventListener('DOMContentLoaded', function () {
             priceInput.value = "0";
             priceInput.readOnly = true;
             priceInput.classList.add('readonly-input');
-            setStep(1); // on passe à l'étape "Prestations"
+            setStep(1);
 
             if (!catId) {
                 serviceSelect.disabled = true;
@@ -1018,17 +1046,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (totalPrestDisplay) {
-            totalPrestDisplay.textContent = total.toLocaleString('fr-FR') + ' FCFA';
+            totalPrestDisplay.textContent = total.toLocaleString('fr-FR');
         }
         if (serviceDisplay) {
-            serviceDisplay.textContent = serviceFee.toLocaleString('fr-FR') + ' FCFA';
+            serviceDisplay.textContent = serviceFee.toLocaleString('fr-FR');
         }
         if (deliveryDisplay) {
-            deliveryDisplay.textContent = deliveryFee.toLocaleString('fr-FR') + ' FCFA';
+            deliveryDisplay.textContent = deliveryFee.toLocaleString('fr-FR');
         }
         if (totalGlobalDisplay) {
             const grand = total + serviceFee + deliveryFee;
-            totalGlobalDisplay.textContent = grand.toLocaleString('fr-FR') + ' FCFA';
+            totalGlobalDisplay.textContent = grand.toLocaleString('fr-FR');
         }
 
         updateItemsCount();
@@ -1065,7 +1093,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
             if (price <= 0) {
-                alert("Cette prestation du catalogue doit avoir un prix valide.");
+                alert("Cette prestation doit avoir un prix valide dans le catalogue.");
                 return;
             }
 
@@ -1115,6 +1143,7 @@ document.addEventListener('DOMContentLoaded', function () {
             `;
             itemsTableBody.appendChild(tr);
 
+            // reset inputs
             designationInput.value = "";
             quantityInput.value = 1;
             priceInput.value = "0";
@@ -1211,7 +1240,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 html = '<p class="summary-item">Aucune ligne dans la commande.</p>';
             }
             summaryContent.innerHTML = html;
-            summaryBox.classList.remove('hidden');
+            summaryBox.style.display = 'block';
             setStep(2);
             summaryBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
@@ -1252,7 +1281,4 @@ document.addEventListener('DOMContentLoaded', function () {
     console.warn("GOOGLE_MAPS_API_KEY non configurée : la carte ne sera pas chargée.");
 </script>
 {% endif %}
-
 {% endblock %}
-
-

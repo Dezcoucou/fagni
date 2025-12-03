@@ -1,591 +1,417 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block content %}
-<div class="driver-order-page">
+{% block title %}Course {{ order.code }} – Vue livreur{% endblock %}
 
-    <div class="page-header page-header--compact">
-        <div class="page-header__left">
-            <h1 class="page-title">Détail course</h1>
-            <p class="page-subtitle">
-                Commande {{ order.code|default:order.id }} – Vue livreur FAGNI.
-            </p>
-        </div>
-    </div>
-
-    <div class="driver-order-shell">
-        <div class="driver-order-inner container">
-
-            <!-- Barre d'actions principale -->
-            <div class="card driver-actions">
-                <div class="driver-actions__left">
-                    <a href="{% url 'orders:driver_app' %}" class="btn btn-secondary btn-pill">
-                        ← Mes courses
-                    </a>
-                </div>
-                <div class="driver-actions__right">
-                    <a href="{% url 'orders:order_ticket_pdf' order.id %}" class="btn btn-light btn-pill">
-                        🎫 Ticket client
-                    </a>
-                    <a href="{% url 'orders:order_ticket_thermal_pdf' order.id %}" class="btn btn-light btn-pill">
-                        🧾 Ticket thermique
-                    </a>
-                </div>
-            </div>
-
-            <!-- Résumé en tête -->
-            <div class="card driver-summary">
-                <div class="driver-summary__main">
-                    <div class="summary-code">
-                        Commande {{ order.code|default:order.id }}
-                    </div>
-                    <div class="summary-status summary-status--{{ order.status }}">
-                        {{ order.get_status_display }}
-                    </div>
-                </div>
-                <div class="driver-summary__meta">
-                    <div class="summary-line">
-                        <span class="label">Créée le :</span>
-                        <span>
-                            {% if order.created_at %}
-                                {{ order.created_at|date:"d/m/Y H:i" }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </span>
-                    </div>
-                    {% if order.pickup_time %}
-                    <div class="summary-line">
-                        <span class="label">Collecte :</span>
-                        <span>{{ order.pickup_time|date:"d/m/Y H:i" }}</span>
-                    </div>
-                    {% endif %}
-                    {% if order.delivered_time %}
-                    <div class="summary-line">
-                        <span class="label">Livraison :</span>
-                        <span>{{ order.delivered_time|date:"d/m/Y H:i" }}</span>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Grille principale -->
-            <div class="driver-order-grid">
-                <!-- Colonne gauche : Client + partenaires + montants -->
-                <div class="driver-col">
-
-                    <!-- Client -->
-                    <div class="card">
-                        <h2 class="section-title">Client</h2>
-                        <div class="section-line">
-                            <span class="label">Nom :</span>
-                            <span>{{ order.customer.name|default:"-" }}</span>
-                        </div>
-                        <div class="section-line">
-                            <span class="label">Téléphone :</span>
-                            <span>
-                                {% if order.customer.phone %}
-                                    <a href="tel:{{ order.customer.phone }}">{{ order.customer.phone }}</a>
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </span>
-                        </div>
-                        <div class="section-line">
-                            <span class="label">Adresse :</span>
-                            <span>{{ order.customer.address|default:"-" }}</span>
-                        </div>
-
-                        <div class="buttons-row buttons-row--compact">
-                            {% if order.client_maps_url %}
-                                <a href="{{ order.client_maps_url }}" target="_blank" class="btn btn-primary btn-sm driver-btn-full-width">
-                                    🧭 Itinéraire client
-                                </a>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    <!-- Partenaires / logistique -->
-                    <div class="card">
-                        <h2 class="section-title">Partenaires & logistique</h2>
-
-                        <div class="section-line">
-                            <span class="label">Blanchisserie :</span>
-                            <span>
-                                {% if order.laundry_partner %}
-                                    {{ order.laundry_partner.name }}
-                                {% else %}
-                                    <span class="muted">Non assignée</span>
-                                {% endif %}
-                            </span>
-                        </div>
-
-                        <div class="section-line">
-                            <span class="label">Livreur :</span>
-                            <span>
-                                {% if order.delivery_partner %}
-                                    {{ order.delivery_partner.name }}
-                                {% else %}
-                                    <span class="muted">Non assigné</span>
-                                {% endif %}
-                            </span>
-                        </div>
-
-                        <div class="section-line">
-                            <span class="label">Distance A/R :</span>
-                            <span>
-                                {% if order.distance_km %}
-                                    {{ order.distance_km|floatformat:"2" }} km
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- Montants -->
-                    <div class="card">
-                        <h2 class="section-title">Montants</h2>
-
-                        <div class="section-line">
-                            <span class="label">Total prestations :</span>
-                            <span>{{ order.total|default:0 }} FCFA</span>
-                        </div>
-                        <div class="section-line">
-                            <span class="label">Service FAGNI :</span>
-                            <span>{{ order.service_fee|default:0 }} FCFA</span>
-                        </div>
-                        <div class="section-line">
-                            <span class="label">Livraison client :</span>
-                            <span>{{ order.delivery_fee|default:0 }} FCFA</span>
-                        </div>
-
-                        <hr class="divider">
-
-                        <div class="section-line section-line--strong">
-                            <span class="label">Total global client :</span>
-                            <span>{{ total_client|default:0 }} FCFA</span>
-                        </div>
-
-                        <div class="section-line driver-income">
-                            <span class="label">Revenu livreur :</span>
-                            <span>{{ driver_income|default:0 }} FCFA</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Colonne droite : timeline + articles -->
-                <div class="driver-col">
-
-                    <!-- Timeline -->
-                    <div class="card">
-                        <h2 class="section-title">Timeline de la course</h2>
-                        <ul class="timeline">
-                            {% for label, dt in timeline %}
-                                <li class="timeline-step {% if dt %}timeline-step--done{% else %}timeline-step--pending{% endif %}">
-                                    <div class="timeline-step__dot"></div>
-                                    <div class="timeline-step__content">
-                                        <div class="timeline-step__label">{{ label }}</div>
-                                        <div class="timeline-step__date">
-                                            {% if dt %}
-                                                {{ dt|date:"d/m/Y H:i" }}
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                        <p class="timeline-note">
-                            La timeline se met à jour automatiquement en fonction des actions
-                            effectuées sur la commande (collecte, dépôt, lavage, retour, livraison).
-                        </p>
-                    </div>
-
-                    <!-- Articles -->
-                    <div class="card">
-                        <h2 class="section-title">Articles de la commande</h2>
-
-                        {% if order.items.all %}
-                            <div class="items-table-wrapper">
-                                <table class="items-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Article</th>
-                                            <th class="t-center">Qté</th>
-                                            <th class="t-right">PU</th>
-                                            <th class="t-right">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for item in order.items.all %}
-                                        <tr>
-                                            <td>{{ item.designation }}</td>
-                                            <td class="t-center">{{ item.quantity }}</td>
-                                            <td class="t-right">{{ item.unit_price|default:0 }} FCFA</td>
-                                            <td class="t-right">{{ item.total|default:0 }} FCFA</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <p class="muted">
-                                Aucun article enregistré sur cette commande.
-                            </p>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Barre sticky bas (navigation rapide) -->
-    <div class="driver-order-sticky">
-        <a href="{% url 'orders:driver_hub' %}" class="driver-sticky-btn">
-            🏠 Hub
-        </a>
-        <a href="{% url 'orders:driver_app' %}" class="driver-sticky-btn driver-sticky-btn--primary">
-            🚚 Mes courses
-        </a>
-    </div>
-</div>
-
+{% block extra_head %}
 <style>
-    .driver-order-page {
-        background: #020617;
-        min-height: calc(100vh - 60px);
-        padding-bottom: 70px;
+    .page {
+        max-width: 780px;
+        margin: 0 auto 80px;
+        padding: 12px 10px 24px;
     }
 
-    .driver-order-shell {
-        padding: 8px 0 16px;
+    .page-header {
+        display:flex;
+        justify-content:space-between;
+        gap:10px;
+        align-items:flex-start;
+        margin-bottom:14px;
     }
 
-    .driver-order-inner {
-        max-width: 480px;
-        margin: 0 auto;
+    .page-title {
+        font-size:18px;
+        font-weight:700;
+        color:#0f172a;
+        margin:0;
+    }
+
+    .page-subtitle {
+        font-size:12px;
+        color:#64748b;
+        margin:4px 0 0;
+    }
+
+    .badge {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        padding:4px 10px;
+        border-radius:999px;
+        font-size:11px;
+        font-weight:500;
+        border:1px solid transparent;
+        white-space:nowrap;
+    }
+
+    .badge-status {
+        background:#eff6ff;
+        border-color:#dbeafe;
+        color:#1d4ed8;
+    }
+
+    .badge-warning {
+        background:#fef9c3;
+        border-color:#facc15;
+        color:#854d0e;
     }
 
     .card {
-        background: #020617;
-        border-radius: 16px;
-        padding: 14px 16px;
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.45);
-        border: 1px solid #1f2937;
-        margin-bottom: 14px;
+        background:#ffffff;
+        border-radius:14px;
+        padding:12px 14px;
+        margin-bottom:10px;
+        border:1px solid #e5e7eb;
+        box-shadow:0 2px 5px rgba(15,23,42,0.05);
     }
 
-    .page-header--compact .page-title {
-        color: #e5e7eb;
+    .card-title {
+        font-size:14px;
+        font-weight:600;
+        margin:0 0 6px;
+        display:flex;
+        align-items:center;
+        gap:6px;
+        color:#0f172a;
     }
 
-    .page-header--compact .page-subtitle {
-        color: #9ca3af;
+    .card-title .emoji {
+        font-size:18px;
     }
 
-    .btn-pill {
-        border-radius: 999px !important;
+    .field-row {
+        display:flex;
+        justify-content:space-between;
+        gap:8px;
+        font-size:13px;
+        margin-bottom:3px;
     }
 
-    .driver-actions {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        flex-wrap: wrap;
+    .field-label {
+        color:#6b7280;
     }
 
-    .driver-actions__right {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
+    .field-value {
+        font-weight:500;
+        color:#111827;
+        text-align:right;
+        max-width:60%;
     }
 
-    .driver-summary {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        align-items: flex-start;
-        flex-wrap: wrap;
-        background: radial-gradient(circle at top left, #1e293b, #020617);
+    .articles-table {
+        width:100%;
+        border-collapse:collapse;
+        font-size:12px;
+        margin-top:4px;
     }
 
-    .summary-code {
-        font-size: 18px;
-        font-weight: 700;
-        color: #f9fafb;
+    .articles-table th,
+    .articles-table td {
+        padding:4px 4px;
+        border-bottom:1px solid #e5e7eb;
+        vertical-align:top;
     }
 
-    .summary-status {
-        font-size: 12px;
-        padding: 4px 10px;
-        border-radius: 999px;
-        font-weight: 600;
-        border: 1px solid transparent;
-        display: inline-block;
-        margin-top: 4px;
+    .articles-table thead th {
+        background:#f9fafb;
+        font-weight:600;
+        color:#6b7280;
     }
 
-    .summary-status--pending {
-        background: #fef3c7;
-        color: #92400e;
-        border-color: #fde68a;
+    .articles-table td.num {
+        text-align:right;
+        white-space:nowrap;
     }
 
-    .summary-status--in_progress {
-        background: #dbeafe;
-        color: #1d4ed8;
-        border-color: #bfdbfe;
+    .line-designation {
+        font-weight:500;
+        color:#111827;
+        font-size:12px;
     }
 
-    .summary-status--done {
-        background: #dcfce7;
-        color: #166534;
-        border-color: #bbf7d0;
+    .line-meta {
+        font-size:10px;
+        color:#6b7280;
     }
 
-    .summary-status--canceled {
-        background: #fee2e2;
-        color: #b91c1c;
-        border-color: #fecaca;
+    .gallery-grid {
+        display:grid;
+        grid-template-columns:repeat(auto-fill, minmax(82px, 1fr));
+        gap:6px;
+        margin-top:6px;
     }
 
-    .driver-summary__meta {
-        min-width: 220px;
+    .gallery-grid a {
+        display:block;
     }
 
-    .summary-line {
-        font-size: 12px;
-        display: flex;
-        gap: 6px;
-        margin-top: 2px;
-        color: #cbd5f5;
+    .gallery-grid img {
+        width:100%;
+        height:82px;
+        object-fit:cover;
+        border-radius:10px;
+        border:1px solid #e5e7eb;
     }
 
-    .summary-line .label {
-        font-weight: 500;
-        color: #9ca3af;
+    .totals-row {
+        display:flex;
+        justify-content:space-between;
+        font-size:13px;
+        margin-bottom:3px;
     }
 
-    .driver-order-grid {
-        display: grid;
-        grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-        gap: 14px;
+    .totals-row strong {
+        color:#0f172a;
     }
 
-    .section-title {
-        font-size: 13px;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: #9ca3af;
-        font-weight: 600;
-        margin-bottom: 6px;
-    }
-
-    .section-line {
-        font-size: 12px;
-        display: flex;
-        gap: 6px;
-        margin-top: 3px;
-        color: #e5e7eb;
-    }
-
-    .section-line .label {
-        font-weight: 500;
-        color: #9ca3af;
-    }
-
-    .section-line--strong {
-        font-weight: 600;
-        color: #f9fafb;
-    }
-
-    .driver-income {
-        margin-top: 4px;
-        padding-top: 4px;
-        border-top: 1px dashed #1f2937;
-    }
-
-    .muted {
-        color: #6b7280;
-        font-size: 12px;
-    }
-
-    .buttons-row {
-        margin-top: 8px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-
-    .buttons-row--compact {
-        margin-top: 6px;
-    }
-
-    .driver-btn-full-width {
-        width: 100%;
-    }
-
-    .divider {
-        border: none;
-        border-top: 1px dashed #1f2937;
-        margin: 6px 0;
-    }
-
-    /* Timeline */
-    .timeline {
-        list-style: none;
-        padding: 0;
-        margin: 4px 0 0;
-    }
-
-    .timeline-step {
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        position: relative;
-        padding-bottom: 8px;
-    }
-
-    .timeline-step__dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 999px;
-        margin-top: 4px;
-        border: 2px solid #334155;
-        background: #020617;
-        flex-shrink: 0;
-    }
-
-    .timeline-step--done .timeline-step__dot {
-        background: #16a34a;
-        border-color: #16a34a;
-    }
-
-    .timeline-step--pending .timeline-step__dot {
-        background: #020617;
-        border-color: #334155;
-    }
-
-    .timeline-step__content {
-        flex: 1;
-        border-left: 1px dashed #1f2937;
-        padding-left: 8px;
-        margin-left: 2px;
-    }
-
-    .timeline-step:last-child .timeline-step__content {
-        border-left-color: transparent;
-    }
-
-    .timeline-step__label {
-        font-size: 12px;
-        font-weight: 500;
-        color: #f9fafb;
-    }
-
-    .timeline-step__date {
-        font-size: 11px;
-        color: #9ca3af;
-        margin-top: 2px;
-    }
-
-    .timeline-note {
-        font-size: 11px;
-        color: #6b7280;
-        margin-top: 6px;
-    }
-
-    /* Tableau articles */
-    .items-table-wrapper {
-        overflow-x: auto;
-    }
-
-    .items-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 12px;
-        margin-top: 4px;
-    }
-
-    .items-table th,
-    .items-table td {
-        padding: 4px 3px;
-        border-bottom: 1px solid #1f2937;
-        vertical-align: top;
-    }
-
-    .items-table th {
-        text-align: left;
-        background: #020617;
-        font-weight: 600;
-        color: #9ca3af;
-    }
-
-    .items-table td {
-        color: #e5e7eb;
-    }
-
-    .t-center {
-        text-align: center;
-    }
-
-    .t-right {
-        text-align: right;
-        white-space: nowrap;
-    }
-
-    /* Barre sticky bas */
-    .driver-order-sticky {
+    /* NAVBAR BASSE LIVREUR */
+    .driver-bottom-nav {
         position: fixed;
+        bottom: 0;
         left: 0;
         right: 0;
-        bottom: 0;
-        padding: 6px 10px;
-        background: rgba(15, 23, 42, 0.98);
-        border-top: 1px solid #1f2937;
+        height: 56px;
+        background: #ffffff;
+        border-top: 1px solid #e2e8f0;
         display: flex;
-        gap: 8px;
-        justify-content: center;
-        z-index: 50;
+        justify-content: space-around;
+        align-items: center;
+        z-index: 40;
     }
 
-    .driver-sticky-btn {
-        flex: 1 1 0;
-        max-width: 220px;
+    .driver-bottom-nav__item {
+        flex: 1;
         text-align: center;
-        padding: 8px 10px;
-        border-radius: 999px;
-        border: 1px solid #374151;
-        background: #020617;
-        color: #e5e7eb;
-        font-size: 13px;
+        font-size: 11px;
+        color: #94a3b8;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
         text-decoration: none;
     }
 
-    .driver-sticky-btn--primary {
-        background: #ff7a00;
-        border-color: #f97316;
-        color: #111827;
+    .driver-bottom-nav__item--active {
+        color: #0f172a;
         font-weight: 600;
     }
 
-    @media (max-width: 800px) {
-        .driver-order-grid {
-            grid-template-columns: 1fr;
+    .driver-bottom-nav__icon {
+        font-size: 16px;
+        line-height: 1;
+    }
+
+    @media (max-width: 640px) {
+        .page {
+            padding-left:6px;
+            padding-right:6px;
         }
-        .driver-summary {
-            flex-direction: column;
-            align-items: flex-start;
+        .page-header {
+            flex-direction:column;
         }
-        .driver-actions {
-            flex-direction: column;
-            align-items: stretch;
-        }
-        .driver-actions__right {
-            justify-content: flex-start;
+        .field-value {
+            max-width:55%;
         }
     }
 </style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+
+    <!-- HEADER -->
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Détail de la course</h1>
+            <p class="page-subtitle">
+                Course {{ order.code|default:order.id }} – vue livreur FAGNI.
+            </p>
+        </div>
+        <div style="text-align:right;">
+            <div class="badge badge-status">
+                {{ order.get_status_display|default:order.status }}
+            </div>
+            <div style="font-size:11px;color:#6b7280;margin-top:4px;">
+                Créée le
+                {% if order.created_at %}
+                    {{ order.created_at|date:"d/m/Y H:i" }}
+                {% else %}
+                    —
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- RÉSUMÉ RAPIDE -->
+    <section class="card">
+        <h2 class="card-title">
+            <span class="emoji">📌</span> Résumé de la commande
+        </h2>
+
+        <div class="field-row">
+            <span class="field-label">Code :</span>
+            <span class="field-value">{{ order.code|default:order.id }}</span>
+        </div>
+
+        <div class="field-row">
+            <span class="field-label">Client :</span>
+            <span class="field-value">{{ order.customer.name|default:"—" }}</span>
+        </div>
+
+        <div class="field-row">
+            <span class="field-label">Téléphone :</span>
+            <span class="field-value">{{ order.customer.phone|default:"—" }}</span>
+        </div>
+
+        <div class="field-row">
+            <span class="field-label">Adresse :</span>
+            <span class="field-value">
+                {{ order.customer.address|default:"—" }}
+            </span>
+        </div>
+
+        <div class="field-row">
+            <span class="field-label">Parrain :</span>
+            <span class="field-value">
+                {{ order.referral_code|default:"—" }}
+            </span>
+        </div>
+
+        <div class="field-row">
+            <span class="field-label">Blanchisserie :</span>
+            <span class="field-value">
+                {{ order.laundry_partner|default:"—" }}
+            </span>
+        </div>
+
+        <div class="field-row">
+            <span class="field-label">Total à contrôler :</span>
+            <span class="field-value">
+                {{ order.grand_total|default:order.total|default:0|floatformat:0 }} FCFA
+            </span>
+        </div>
+    </section>
+
+    <!-- ARTICLES POUR CONTRÔLE -->
+    <section class="card">
+        <h2 class="card-title">
+            <span class="emoji">📦</span> Articles à vérifier
+        </h2>
+
+        <table class="articles-table">
+            <thead>
+                <tr>
+                    <th>Article</th>
+                    <th class="num">Qté</th>
+                    <th class="num">PU</th>
+                    <th class="num">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in order.items.all %}
+                    {% with service=item.service %}
+                    <tr>
+                        <td>
+                            <div class="line-designation">
+                                {{ item.designation|default:service.name }}
+                            </div>
+                            <div class="line-meta">
+                                {% if service and service.category %}
+                                    {{ service.category.name }} •
+                                {% endif %}
+                                ID #{{ service.id|default:"—" }}
+                            </div>
+                        </td>
+                        <td class="num">{{ item.quantity }}</td>
+                        <td class="num">{{ item.unit_price|floatformat:0 }}</td>
+                        <td class="num">{{ item.total|floatformat:0 }}</td>
+                    </tr>
+                    {% endwith %}
+                {% empty %}
+                    <tr>
+                        <td colspan="4" style="font-size:12px;color:#6b7280;">
+                            Aucune ligne dans cette commande.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div style="margin-top:6px;border-top:1px dashed #e5e7eb;padding-top:6px;">
+            <div class="totals-row">
+                <span>Sous-total prestations</span>
+                <strong>{{ order.total_ht|default:order.total|default:0|floatformat:0 }} FCFA</strong>
+            </div>
+            <div class="totals-row">
+                <span>Livraison</span>
+                <strong>{{ order.delivery_fee|default:0|floatformat:0 }} FCFA</strong>
+            </div>
+            <div class="totals-row">
+                <span><strong>Total client</strong></span>
+                <strong>{{ order.grand_total|default:order.total|default:0|floatformat:0 }} FCFA</strong>
+            </div>
+        </div>
+    </section>
+
+    <!-- GALERIE GLOBALE DES PHOTOS -->
+    <section class="card">
+        <h2 class="card-title">
+            <span class="emoji">📷</span> Photos de la commande
+        </h2>
+
+        {% if order.items.all|length %}
+            {% if order.items.all.0.photos.all %}
+                <div class="gallery-grid">
+                    {% for item in order.items.all %}
+                        {% for photo in item.photos.all %}
+                            <a href="{{ photo.image.url }}" target="_blank" title="Article {{ item.id }}">
+                                <img src="{{ photo.image.url }}" alt="Photo course {{ order.code }}">
+                            </a>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p style="font-size:12px;color:#6b7280;margin:4px 0 0;">
+                    Aucune photo enregistrée pour cette commande.
+                </p>
+            {% endif %}
+        {% else %}
+            <p style="font-size:12px;color:#6b7280;margin:4px 0 0;">
+                Aucune photo enregistrée pour cette commande.
+            </p>
+        {% endif %}
+    </section>
+
+    {% if order.notes %}
+        <section class="card">
+            <h2 class="card-title">
+                <span class="emoji">📝</span> Notes & consignes
+            </h2>
+            <p style="font-size:12px;color:#111827;white-space:pre-line;margin:0;">
+                {{ order.notes }}
+            </p>
+        </section>
+    {% endif %}
+</div>
+
+<!-- NAVBAR BASSE LIVREUR -->
+<nav class="driver-bottom-nav">
+    <a href="{% url 'orders:driver_hub' %}" class="driver-bottom-nav__item">
+        <span class="driver-bottom-nav__icon">🏠</span>
+        <span class="driver-bottom-nav__label">Hub</span>
+    </a>
+    <a href="{% url 'orders:driver_app' %}" class="driver-bottom-nav__item driver-bottom-nav__item--active">
+        <span class="driver-bottom-nav__icon">📋</span>
+        <span class="driver-bottom-nav__label">Courses</span>
+    </a>
+    <a href="{% url 'orders:driver_map' %}" class="driver-bottom-nav__item">
+        <span class="driver-bottom-nav__icon">🗺️</span>
+        <span class="driver-bottom-nav__label">Carte</span>
+    </a>
+    <a href="{% url 'orders:driver_me_app' %}" class="driver-bottom-nav__item">
+        <span class="driver-bottom-nav__icon">👤</span>
+        <span class="driver-bottom-nav__label">Moi</span>
+    </a>
+</nav>
 {% endblock %}

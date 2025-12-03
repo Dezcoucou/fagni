@@ -1,0 +1,461 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="portal-page">
+
+    <!-- HEADER PAGE -->
+    <div class="page-header">
+        <div class="page-header__left">
+            <h1 class="page-title">Portail FAGNI</h1>
+            <p class="page-subtitle">
+                Vue synthèse des opérations : commandes du jour, performance et alertes.
+            </p>
+        </div>
+        <div class="page-header__right portal-header-pill">
+            <span class="portal-header-pill__label">Aujourd’hui</span>
+            <span class="portal-header-pill__value">
+                {% now "d/m/Y" %}
+            </span>
+        </div>
+    </div>
+
+    <!-- KPI PRINCIPAUX -->
+    <section class="portal-kpi-grid">
+        <article class="kpi-card kpi-card--primary">
+            <div class="kpi-card__label">Commandes du jour</div>
+            <div class="kpi-card__value">
+                {{ stats.orders_today|default:0 }}
+            </div>
+            <div class="kpi-card__sub">
+                Actives :
+                <strong>{{ stats.active_today|default:0 }}</strong> •
+                Terminées :
+                <strong>{{ stats.done_today|default:0 }}</strong>
+            </div>
+        </article>
+
+        <article class="kpi-card kpi-card--orange">
+            <div class="kpi-card__label">Chiffre d’affaires du jour</div>
+            <div class="kpi-card__value">
+                {{ stats.revenue_today|default:0 }} <span class="kpi-card__unit">FCFA</span>
+            </div>
+            <div class="kpi-card__sub">
+                Hors commandes annulées
+            </div>
+        </article>
+
+        <article class="kpi-card kpi-card--blue">
+            <div class="kpi-card__label">Livreurs actifs</div>
+            <div class="kpi-card__value">
+                {{ stats.active_drivers|default:0 }}
+            </div>
+            <div class="kpi-card__sub">
+                Sur au moins une course aujourd’hui
+            </div>
+        </article>
+
+        <article class="kpi-card kpi-card--green">
+            <div class="kpi-card__label">Blanchisseries actives</div>
+            <div class="kpi-card__value">
+                {{ stats.active_laundries|default:0 }}
+            </div>
+            <div class="kpi-card__sub">
+                Ayant reçu au moins une commande
+            </div>
+        </article>
+    </section>
+
+    <!-- DEUX COLONNES PRINCIPALES -->
+    <section class="portal-main-grid">
+
+        <!-- COLONNE GAUCHE : COMMANDES DU JOUR -->
+        <div class="card portal-card">
+            <div class="portal-card-header">
+                <div>
+                    <h2 class="portal-card-title">Commandes du jour</h2>
+                    <p class="portal-card-subtitle">
+                        Dernières commandes créées ou mises à jour aujourd’hui.
+                    </p>
+                </div>
+                <a href="{% url 'orders:list' %}" class="btn btn-light btn-sm portal-card-link">
+                    Voir toutes les commandes →
+                </a>
+            </div>
+
+            {% if todays_orders %}
+                <div class="portal-orders-list">
+                    {% for o in todays_orders %}
+                        <article class="portal-order-row">
+                            <div class="portal-order-main">
+                                <div class="portal-order-code">
+                                    {{ o.code|default:o.id }}
+                                </div>
+                                <span class="badge-status badge-status--{{ o.status }}">
+                                    {{ o.get_status_display }}
+                                </span>
+                            </div>
+
+                            <div class="portal-order-meta">
+                                <span class="portal-order-client">
+                                    👤 {{ o.customer.name|default:"Client inconnu" }}
+                                </span>
+                                <span class="portal-order-time">
+                                    {% if o.updated_at %}
+                                        {{ o.updated_at|date:"H:i" }}
+                                    {% else %}
+                                        {{ o.created_at|date:"H:i" }}
+                                    {% endif %}
+                                </span>
+                            </div>
+
+                            <div class="portal-order-bottom">
+                                <span class="portal-order-amount">
+                                    {{ o.total|default:0 }} FCFA
+                                </span>
+                                <div class="portal-order-actions">
+                                    <a href="{% url 'orders:detail' o.id %}" class="btn btn-light btn-sm">
+                                        Détail
+                                    </a>
+                                    {% if o.customer.address %}
+                                        <a href="https://www.google.com/maps/search/?api=1&query={{ o.customer.address|urlencode }}"
+                                           target="_blank"
+                                           class="btn btn-light btn-sm">
+                                            🧭 Itinéraire
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="portal-empty-text">
+                    Aucune commande aujourd’hui pour le moment.
+                </p>
+            {% endif %}
+        </div>
+
+        <!-- COLONNE DROITE : STATUTS + ALERTES -->
+        <div class="portal-right-column">
+
+            <!-- STATUTS TEMPS RÉEL -->
+            <div class="card portal-card">
+                <div class="portal-card-header">
+                    <div>
+                        <h2 class="portal-card-title">Statuts temps réel</h2>
+                        <p class="portal-card-subtitle">
+                            Répartition des commandes par statut.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="portal-status-grid">
+                    <div class="portal-status-item">
+                        <div class="portal-status-label">En attente</div>
+                        <div class="portal-status-value">
+                            {{ stats.pending_orders|default:0 }}
+                        </div>
+                    </div>
+                    <div class="portal-status-item">
+                        <div class="portal-status-label">En cours</div>
+                        <div class="portal-status-value">
+                            {{ stats.in_progress_orders|default:0 }}
+                        </div>
+                    </div>
+                    <div class="portal-status-item">
+                        <div class="portal-status-label">Terminées</div>
+                        <div class="portal-status-value">
+                            {{ stats.done_orders|default:0 }}
+                        </div>
+                    </div>
+                    <div class="portal-status-item">
+                        <div class="portal-status-label">Annulées</div>
+                        <div class="portal-status-value">
+                            {{ stats.canceled_orders|default:0 }}
+                        </div>
+                    </div>
+                </div>
+
+                <a href="{% url 'orders:ops_dashboard' %}" class="btn btn-light btn-sm portal-card-link-inline">
+                    Ouvrir le suivi OPS →
+                </a>
+            </div>
+
+            <!-- ALERTES / TÂCHES -->
+            <div class="card portal-card">
+                <div class="portal-card-header">
+                    <div>
+                        <h2 class="portal-card-title">Alertes & tâches</h2>
+                        <p class="portal-card-subtitle">
+                            Points d’attention pour la journée.
+                        </p>
+                    </div>
+                </div>
+
+                {% if alerts %}
+                    <ul class="portal-alerts-list">
+                        {% for a in alerts %}
+                            <li class="portal-alert-item portal-alert-item--{{ a.level|default:"info" }}">
+                                <div class="portal-alert-title">
+                                    {{ a.title }}
+                                </div>
+                                {% if a.description %}
+                                    <div class="portal-alert-desc">
+                                        {{ a.description }}
+                                    </div>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="portal-empty-text">
+                        Aucune alerte particulière. Journée sous contrôle ✅
+                    </p>
+                {% endif %}
+            </div>
+
+        </div>
+    </section>
+
+    <div class="portal-bottom-spacer"></div>
+</div>
+
+<style>
+.portal-page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 10px 12px 32px;
+}
+
+/* Header pill */
+.portal-header-pill {
+    background: #0f172a;
+    color: #f9fafb;
+    padding: 8px 14px;
+    border-radius: 999px;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 130px;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.portal-header-pill__label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.8;
+}
+
+.portal-header-pill__value {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* KPI Grid */
+.portal-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+/* Grille principale */
+.portal-main-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 12px;
+}
+
+/* Cartes */
+.portal-card {
+    margin-bottom: 10px;
+}
+
+.portal-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.portal-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 2px;
+    color: #0f172a;
+}
+
+.portal-card-subtitle {
+    font-size: 11px;
+    color: #94a3b8;
+    margin: 0;
+}
+
+.portal-card-link,
+.portal-card-link-inline {
+    font-size: 11px;
+    color: #0f172a;
+    text-decoration: none;
+    opacity: 0.8;
+}
+
+/* Liste commandes du jour */
+.portal-orders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.portal-order-row {
+    border-radius: 10px;
+    padding: 8px 10px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
+
+.portal-order-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+    gap: 6px;
+}
+
+.portal-order-code {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.portal-order-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #64748b;
+    margin-bottom: 3px;
+    gap: 6px;
+}
+
+.portal-order-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    margin-top: 2px;
+    gap: 8px;
+}
+
+.portal-order-amount {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.portal-order-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+/* Colonne droite */
+.portal-right-column {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Statuts temps réel */
+.portal-status-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.portal-status-item {
+    border-radius: 10px;
+    padding: 6px 8px;
+    border: 1px solid #e2e8f0;
+    background: #f9fafb;
+}
+
+.portal-status-label {
+    font-size: 11px;
+    color: #64748b;
+    margin-bottom: 2px;
+}
+
+.portal-status-value {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+/* Alertes */
+.portal-alerts-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.portal-alert-item {
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 12px;
+    border: 1px solid #e2e8f0;
+    background: #f9fafb;
+}
+
+.portal-alert-item--warning {
+    border-color: #fbbf24;
+    background: #fef9c3;
+}
+
+.portal-alert-item--danger {
+    border-color: #f97373;
+    background: #fee2e2;
+}
+
+.portal-alert-item--success {
+    border-color: #22c55e;
+    background: #dcfce7;
+}
+
+.portal-alert-title {
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 2px;
+}
+
+.portal-alert-desc {
+    color: #64748b;
+}
+
+/* Empty state */
+.portal-empty-text {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 4px;
+}
+
+/* Spacer bas */
+.portal-bottom-spacer {
+    height: 24px;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .portal-page {
+        padding: 8px 8px 24px;
+    }
+    .portal-main-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}

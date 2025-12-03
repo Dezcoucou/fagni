@@ -1,0 +1,185 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Ticket thermique – {{ order.code }}</title>
+    <style>
+        /* Style adapté à une imprimante thermique (80mm) en PDF */
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: monospace;
+            font-size: 12px;
+            background: #ffffff;
+        }
+
+        .ticket {
+            width: 300px; /* largeur adaptée 80mm */
+            margin: 0 auto;
+            padding: 6px 8px;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        .line {
+            border-top: 1px dashed #000;
+            margin: 4px 0;
+        }
+
+        .small {
+            font-size: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        td {
+            padding: 2px 0;
+            vertical-align: top;
+        }
+
+        td.num {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .section-title {
+            font-weight: bold;
+            margin: 2px 0;
+        }
+
+        .totals-title {
+            margin-top: 2px;
+        }
+
+        .qr {
+            margin-top: 4px;
+        }
+
+        img.qr-img {
+            width: 90px;
+            height: 90px;
+        }
+
+        .total-ttc {
+            font-weight: bold;
+            font-size: 13px;
+            border-top: 1px solid #000;
+            padding-top: 3px;
+            margin-top: 2px;
+        }
+
+        .footer {
+            margin-top: 4px;
+        }
+    </style>
+</head>
+
+<body>
+<div class="ticket">
+
+    <!-- En-tête -->
+    <div class="center bold">
+        FAGNI – Ticket de commande
+    </div>
+    <div class="center">
+        {{ order.code }}
+    </div>
+    <div class="center small">
+        {{ order.created_at|date:"d/m/Y H:i" }}
+    </div>
+
+    <div class="line"></div>
+
+    <!-- Infos client -->
+    <div class="section-title">Client</div>
+    <div>
+        Nom : {{ order.customer.name|default:"—" }}<br>
+        Tél : {{ order.customer.phone|default:"—" }}<br>
+        Adresse : {{ order.customer.address|default:"—" }}<br>
+        {% if order.referral_code %}
+            Parrain : {{ order.referral_code }}<br>
+        {% endif %}
+    </div>
+
+    <div class="line"></div>
+
+    <!-- Lignes de commande -->
+    <div class="section-title">Détails de la commande</div>
+    <table>
+        {% for item in items %}
+            <tr>
+                <td>{{ item.quantity }} × {{ item.designation }}</td>
+                <td class="num">{{ item.total|floatformat:0 }} FCFA</td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="2">Aucune ligne.</td>
+            </tr>
+        {% endfor %}
+    </table>
+
+    <div class="line"></div>
+
+    <!-- Totaux -->
+    <div class="section-title">Récapitulatif</div>
+    <table>
+        <tr>
+            <td>Sous-total prestations</td>
+            <td class="num">{{ order.total|default:0|floatformat:0 }} FCFA</td>
+        </tr>
+        <tr>
+            <td>Service FAGNI</td>
+            <td class="num">{{ order.service_fee|default:0|floatformat:0 }} FCFA</td>
+        </tr>
+        <tr>
+            <td>Livraison</td>
+            <td class="num">{{ order.delivery_fee|default:0|floatformat:0 }} FCFA</td>
+        </tr>
+        <tr>
+            <td>TVA (18%)</td>
+            <td class="num">{{ tva_amount|default:0|floatformat:0 }} FCFA</td>
+        </tr>
+        <tr>
+            <td class="total-ttc">TOTAL TTC</td>
+            <td class="num total-ttc">{{ grand_total|default:0|floatformat:0 }} FCFA</td>
+        </tr>
+    </table>
+
+    <div class="line"></div>
+
+    <!-- QR compact -->
+    <div class="center small qr">
+        <img class="qr-img"
+             src="https://api.qrserver.com/v1/create-qr-code/?size=90x90&data={{ qr_data|urlencode }}"
+             alt="QR commande {{ order.code }}"><br>
+        Scanner pour les détails de la commande
+    </div>
+
+    <div class="line"></div>
+
+    <!-- Pied de ticket -->
+    <div class="center small footer">
+        Merci pour votre confiance.<br>
+        FAGNI – Pressing & Services
+    </div>
+
+</div>
+</body>
+</html>

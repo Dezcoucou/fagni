@@ -1,755 +1,623 @@
-{% extends "base.html" %}  
+{% extends "base.html" %}
 
-{% block content %}  
-
+{% block content %}
 <div class="driver-app-page">
 
-    <div class="page-header page-header--compact">
+    <!-- HEADER -->
+    <div class="page-header driver-app-header">
         <div class="page-header__left">
-            <h1 class="page-title">App livreur</h1>
+            <h1 class="page-title">Mes courses</h1>
             <p class="page-subtitle">
-                Mes courses assignées sur FAGNI.
+                Vue globale de tes courses FAGNI : actives, terminées, annulées.
             </p>
         </div>
     </div>
 
-    <div class="driver-app-shell">
-        <div class="container driver-app-container">  
-            <!-- URL pour les refresh AJAX -->  
-            <input type="hidden" id="driver-app-data-url" value="{% url 'orders:driver_app_data' %}">
+    <!-- FILTRES -->
+    <div class="card driver-app-filters-card">
+        <form method="get" class="driver-app-filters">
+            <!-- Ligne 1 : Driver + Statut -->
+            <div class="driver-app-filters-row">
+                <div class="driver-app-filter-block">
+                    <label class="driver-filter-label">Livreur</label>
+                    <select name="driver_id" class="driver-filter-select">
+                        <option value="">Tous les livreurs</option>
+                        {% for d in drivers %}
+                            <option value="{{ d.id }}" {% if selected_driver_id == d.id|stringformat:"s" %}selected{% endif %}>
+                                {{ d.name|default:d.email }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
 
-            <!-- Filtres -->
-            <div class="card mb-4 driver-filters-card">  
-                <form method="get" class="filters-grid">  
+                <div class="driver-app-filter-block">
+                    <label class="driver-filter-label">Statut</label>
+                    <select name="status" class="driver-filter-select">
+                        <option value="active" {% if status_filter == "active" %}selected{% endif %}>
+                            Actives (en attente + en cours)
+                        </option>
+                        <option value="done" {% if status_filter == "done" %}selected{% endif %}>
+                            Terminées
+                        </option>
+                        <option value="canceled" {% if status_filter == "canceled" %}selected{% endif %}>
+                            Annulées
+                        </option>
+                        <option value="all" {% if status_filter == "all" %}selected{% endif %}>
+                            Toutes
+                        </option>
+                    </select>
+                </div>
+            </div>
 
-                    {# === Sélecteur / info livreur === #}
-                    {% if connected_driver %}
-                        <!-- Mode LIVREUR : on cache le select, on fixe le driver_id -->
-                        <input type="hidden" name="driver_id" value="{{ connected_driver.id }}">
-                        <div class="filter-item">
-                            <label>Livreur</label>
-                            <div class="driver-connected-pill">
-                                <span class="driver-connected-label">Connecté en tant que</span>
-                                <span class="driver-connected-name">
-                                    {{ connected_driver.name }}{% if connected_driver.phone %} • {{ connected_driver.phone }}{% endif %}
-                                </span>
+            <!-- Ligne 2 : Période + Boutons -->
+            <div class="driver-app-filters-row driver-app-filters-row-bottom">
+                <div class="driver-app-filter-block">
+                    <label class="driver-filter-label">Période</label>
+                    <select name="period" class="driver-filter-select driver-filter-period">
+                        <option value="today" {% if period == "today" %}selected{% endif %}>Aujourd’hui</option>
+                        <option value="7d" {% if period == "7d" %}selected{% endif %}>7 derniers jours</option>
+                        <option value="30d" {% if period == "30d" %}selected{% endif %}>30 derniers jours</option>
+                        <option value="all" {% if period == "all" %}selected{% endif %}>Toute l’historique</option>
+                    </select>
+                </div>
+
+                <div class="driver-app-filter-actions">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        Filtrer
+                    </button>
+                    <a href="{% url 'orders:driver_app' %}" class="btn btn-light btn-sm">
+                        Réinitialiser
+                    </a>
+                    <a href="{% url 'orders:driver_app_export_xlsx' %}?{{ request.GET.urlencode }}"
+                       class="btn btn-light btn-sm driver-app-export-btn">
+                        📊 Export Excel FAGNI
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- KPIs -->
+    {% if stats %}
+    <div class="driver-app-kpi-wrapper">
+        <div class="kpi-grid">
+            <article class="kpi-card kpi-card--primary">
+                <div class="kpi-card__label">Total courses</div>
+                <div class="kpi-card__value">
+                    {{ stats.total_orders|default:0 }}
+                </div>
+                <div class="kpi-card__sub">
+                    Terminées : <strong>{{ stats.done_orders|default:0 }}</strong> •
+                    En cours : <strong>{{ stats.in_progress_orders|default:0 }}</strong>
+                </div>
+            </article>
+
+            <article class="kpi-card kpi-card--orange">
+                <div class="kpi-card__label">Actives</div>
+                <div class="kpi-card__value">
+                    {{ stats.pending_orders|default:0 }}
+                </div>
+                <div class="kpi-card__sub">
+                    En attente : {{ stats.pending_orders|default:0 }} /
+                    En cours : {{ stats.in_progress_orders|default:0 }}
+                </div>
+            </article>
+
+            <article class="kpi-card kpi-card--blue">
+                <div class="kpi-card__label">Distance A/R</div>
+                <div class="kpi-card__value">
+                    {{ stats.total_distance_km|default:0|floatformat:"1" }}
+                    <span class="kpi-card__unit">km</span>
+                </div>
+                <div class="kpi-card__sub">
+                    {% if stats.avg_distance_km %}
+                        Moyenne : {{ stats.avg_distance_km|floatformat:"1" }} km / course
+                    {% else %}
+                        Moyenne : n.d.
+                    {% endif %}
+                </div>
+            </article>
+
+            <article class="kpi-card kpi-card--green">
+                <div class="kpi-card__label">Revenus logistiques</div>
+                <div class="kpi-card__value">
+                    {{ stats.total_driver_income|default:0 }} <span class="kpi-card__unit">FCFA</span>
+                </div>
+                <div class="kpi-card__sub">
+                    Estimation sur la période sélectionnée
+                </div>
+            </article>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- LISTE DES COURSES -->
+    <div class="card driver-app-list-card">
+        <div class="driver-list-header">
+            <div>
+                <h2 class="driver-list-title">Liste des courses</h2>
+                <p class="driver-list-subtitle">
+                    {% if page_obj %}
+                        {{ page_obj.paginator.count }} course(s) trouvée(s)
+                    {% else %}
+                        Liste des courses filtrées
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+
+        {% if page_obj and page_obj.object_list %}
+            <div class="driver-orders-list">
+                {% for order in page_obj.object_list %}
+                    <article class="driver-order-card">
+                        <header class="driver-order-header">
+                            <div>
+                                <div class="driver-order-code">
+                                    {{ order.code|default:order.id }}
+                                </div>
+                                <div class="driver-order-date">
+                                    Créée le :
+                                    {% if order.created_at %}
+                                        {{ order.created_at|date:"d/m/Y H:i" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </div>
+                                {% if order.delivered_time %}
+                                    <div class="driver-order-date driver-order-date--secondary">
+                                        Dernier statut : {{ order.delivered_time|date:"d/m/Y H:i" }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <span class="badge-status badge-status--{{ order.status }}">
+                                {{ order.get_status_display }}
+                            </span>
+                        </header>
+
+                        <div class="driver-order-body">
+                            <div class="driver-order-section">
+                                <div class="driver-order-line">
+                                    <span class="order-label">Client :</span>
+                                    <span class="order-value">
+                                        {{ order.customer.name|default:"-" }}
+                                    </span>
+                                </div>
+                                <div class="driver-order-line">
+                                    <span class="order-label">Téléphone :</span>
+                                    <span class="order-value">
+                                        {{ order.customer.phone|default:"-" }}
+                                    </span>
+                                </div>
+                                <div class="driver-order-line">
+                                    <span class="order-label">Adresse :</span>
+                                    <span class="order-value">
+                                        {{ order.customer.address|default:"-" }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="driver-order-section driver-order-section-side">
+                                <div class="driver-order-line">
+                                    <span class="order-label">Distance A/R :</span>
+                                    <span class="order-value">
+                                        {% if order.distance_km %}
+                                            {{ order.distance_km|floatformat:"2" }} km
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <div class="driver-order-line">
+                                    <span class="order-label">Total client :</span>
+                                    <span class="order-value">
+                                        {{ order.total|default:0 }} FCFA
+                                    </span>
+                                </div>
+                                <div class="driver-order-line">
+                                    <span class="order-label">Revenu livreur :</span>
+                                    <span class="order-value">
+                                        {{ order.driver_logistic_cost|default:0 }} FCFA
+                                    </span>
+                                </div>
+                                {% if order.delivery_partner %}
+                                <div class="driver-order-line">
+                                    <span class="order-label">Livreur :</span>
+                                    <span class="order-value">
+                                        {{ order.delivery_partner.name|default:order.delivery_partner.email }}
+                                    </span>
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
-                    {% else %}
-                        <!-- Mode OPS : on laisse le choix du livreur -->
-                        <div class="filter-item">  
-                            <label for="driver_id">Livreur</label>  
-                            <select name="driver_id" id="driver_id">
-                                <option value="">Tous les livreurs</option>
-                                {% for d in drivers %}
-                                    <option value="{{ d.id }}"
-                                            {% if selected_driver_id|default:''|stringformat:"s" == d.id|stringformat:"s" %}selected{% endif %}>
-                                        {{ d.name }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </div>  
-                    {% endif %}
 
-                    <div class="filter-item">  
-                        <label for="status">Statut des commandes</label>  
-                        <select name="status" id="status">  
-                            <option value="active" {% if status_filter == "active" %}selected{% endif %}>  
-                                Actives (en attente + en cours)  
-                            </option>  
-                            <option value="done" {% if status_filter == "done" %}selected{% endif %}>  
-                                Terminées  
-                            </option>  
-                            <option value="canceled" {% if status_filter == "canceled" %}selected{% endif %}>  
-                                Annulées  
-                            </option>  
-                            <option value="all" {% if status_filter == "all" %}selected{% endif %}>  
-                                Toutes  
-                            </option>  
-                        </select>  
-                    </div>  
+                        <footer class="driver-order-footer">
+                            <div class="driver-order-buttons">
+                                <!-- Détail -->
+                                <a href="{% url 'orders:driver_order_detail_me' order.id %}"
+                                   class="btn btn-primary btn-sm">
+                                    Détail
+                                </a>
 
-                    <div class="filter-actions">
-                        <button type="submit" class="btn btn-primary">Filtrer</button>
-                        <a href="{% url 'orders:driver_app' %}" class="btn btn-secondary btn-reset">
-                            Réinitialiser
-                        </a>
-                        <a href="{% url 'orders:driver_app_export_xlsx' %}?{{ request.GET.urlencode }}" class="btn btn-light btn-sm">
-                            📊 Export Excel FAGNI
-                        </a>
-                    </div>
-                </form>  
-            </div>  
+                                <!-- Itinéraire client (si adresse) -->
+                                {% if order.customer.address %}
+                                    <a href="https://www.google.com/maps/search/?api=1&query={{ order.customer.address|urlencode }}"
+                                       target="_blank"
+                                       class="btn btn-light btn-sm">
+                                        🧭 Itinéraire
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </footer>
+                    </article>
+                {% endfor %}
+            </div>
 
-            <!-- KPIs Driver -->  
-            <div class="kpi-grid mb-4">  
-                <div class="kpi-card kpi-card--blue kpi-card--full">  
-                    <div class="kpi-label">Total commandes (selon filtres)</div>  
-                    <div class="kpi-value" id="kpi-filtered-count">{{ filtered_orders_count }}</div>  
-                    <div class="kpi-sub">  
-                        Sur ce livreur : <span id="kpi-total-orders">{{ total_orders }}</span> au total • Aujourd'hui : <span id="kpi-today-orders">{{ today_orders }}</span>  
-                    </div>  
-                </div>  
+            <!-- PAGINATION -->
+            <div class="driver-pagination">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode }}"
+                       class="driver-page-link">
+                        ← Précédent
+                    </a>
+                {% endif %}
 
-                <div class="kpi-card kpi-card--orange">  
-                    <div class="kpi-label">En attente</div>  
-                    <div class="kpi-value" id="kpi-pending">{{ pending }}</div>  
-                </div>  
+                <span class="driver-page-current">
+                    Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+                </span>
 
-                <div class="kpi-card kpi-card--blue">  
-                    <div class="kpi-label">En cours</div>  
-                    <div class="kpi-value" id="kpi-in-progress">{{ in_progress }}</div>  
-                </div>  
-
-                <div class="kpi-card kpi-card--green">  
-                    <div class="kpi-label">Terminées</div>  
-                    <div class="kpi-value" id="kpi-done">{{ done }}</div>  
-                </div>  
-
-                <div class="kpi-card kpi-card--red">  
-                    <div class="kpi-label">Annulées</div>  
-                    <div class="kpi-value" id="kpi-canceled">{{ canceled }}</div>  
-                </div>  
-
-                <div class="kpi-card kpi-card--blue">  
-                    <div class="kpi-label">Distance totale (A/R)</div>  
-                    <div class="kpi-value">  
-                        <span id="kpi-distance">{{ total_distance_km|floatformat:"2" }}</span> <span class="kpi-unit">km</span>  
-                    </div>  
-                </div>  
-            </div>  
-
-            <!-- Liste des commandes -->  
-            {% if orders %}  
-                <div class="orders-list">  
-                    {% for order in orders %}  
-                        <div class="order-card driver-order-card">  
-                            <div class="order-card__header">  
-                                <div>  
-                                    <div class="order-code">  
-                                        {{ order.code|default:order.id }}  
-                                    </div>  
-                                    <div class="order-date">  
-                                        Créée le :  
-                                        {% if order.created_at %}  
-                                            {{ order.created_at|date:"d/m/Y H:i" }}  
-                                        {% else %}  
-                                            -  
-                                        {% endif %}  
-                                    </div>  
-                                </div>  
-                                <div class="order-status order-status--{{ order.status }}">  
-                                    {{ order.get_status_display }}  
-                                </div>  
-                            </div>  
-
-                            <div class="order-card__body">  
-                                <div class="order-section">  
-                                    <div class="section-title">Client</div>  
-                                    <div class="section-line">  
-                                        <span class="label">Nom :</span>  
-                                        <span>{{ order.customer.name|default:"-" }}</span>  
-                                    </div>  
-                                    <div class="section-line">  
-                                        <span class="label">Téléphone :</span>  
-                                        <span>{{ order.customer.phone|default:"-" }}</span>  
-                                    </div>  
-                                    <div class="section-line">  
-                                        <span class="label">Adresse :</span>  
-                                        <span>{{ order.customer.address|default:"-" }}</span>  
-                                    </div>  
-                                </div>  
-
-                                <div class="order-section">  
-                                    <div class="section-title">Partenaires</div>  
-                                    <div class="section-line">  
-                                        <span class="label">Blanchisserie :</span>  
-                                        <span>  
-                                            {% if order.laundry_partner %}  
-                                                {{ order.laundry_partner.name }}  
-                                            {% else %}  
-                                                Non assignée  
-                                            {% endif %}  
-                                        </span>  
-                                    </div>  
-                                    <div class="section-line">  
-                                        <span class="label">Livreur :</span>  
-                                        <span>  
-                                            {% if order.delivery_partner %}  
-                                                {{ order.delivery_partner.name }}  
-                                            {% else %}  
-                                                Non assigné  
-                                            {% endif %}  
-                                        </span>  
-                                    </div>  
-                                    <div class="section-line">  
-                                        <span class="label">Distance A/R :</span>  
-                                        <span>  
-                                            {% if order.distance_km %}  
-                                                {{ order.distance_km|floatformat:"g" }} km  
-                                            {% else %}  
-                                                -  
-                                            {% endif %}  
-                                        </span>  
-                                    </div>  
-                                </div>  
-                            </div>  
-
-                            <div class="order-card__footer">  
-                                <div class="buttons-row buttons-row--app">  
-                                    <a href="{% url 'orders:driver_order_detail' order.id %}" class="btn btn-light btn-sm driver-btn-flex">  
-                                        Vue livreur  
-                                    </a>  
-
-                                    {% if order.client_maps_url %}  
-                                        <a href="{{ order.client_maps_url }}" target="_blank" class="btn btn-primary btn-sm driver-btn-flex">  
-                                            Itinéraire client  
-                                        </a>  
-                                    {% endif %}  
-
-                                    {% if order.laundry_maps_url %}  
-                                        <a href="{{ order.laundry_maps_url }}" target="_blank" class="btn btn-secondary btn-sm driver-btn-flex">  
-                                            Itinéraire blanchisserie  
-                                        </a>  
-                                    {% endif %}  
-
-                                    {# --- Actions rapides statut commande pour le livreur --- #}  
-                                    {% if order.status == "pending" %}  
-                                        <form method="post"  
-                                            action="{% url 'orders:change_status' order.id %}"  
-                                            class="inline-form driver-btn-flex">  
-                                            {% csrf_token %}  
-                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">  
-                                            <input type="hidden" name="status" value="in_progress">  
-                                            <button type="submit" class="btn btn-primary btn-sm driver-btn-full-width">  
-                                                Démarrer la course  
-                                            </button>  
-                                        </form>  
-
-                                        <form method="post"  
-                                            action="{% url 'orders:change_status' order.id %}"  
-                                            class="inline-form driver-btn-flex">  
-                                            {% csrf_token %}  
-                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">  
-                                            <input type="hidden" name="status" value="canceled">  
-                                            <button type="submit" class="btn btn-secondary btn-sm driver-btn-full-width">  
-                                                Annuler  
-                                            </button>  
-                                        </form>  
-
-                                    {% elif order.status == "in_progress" %}  
-                                        <form method="post"  
-                                            action="{% url 'orders:change_status' order.id %}"  
-                                            class="inline-form driver-btn-flex">  
-                                            {% csrf_token %}  
-                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">  
-                                            <input type="hidden" name="status" value="done">  
-                                            <button type="submit" class="btn btn-primary btn-sm driver-btn-full-width">  
-                                                Terminer  
-                                            </button>  
-                                        </form>  
-
-                                        <form method="post"  
-                                            action="{% url 'orders:change_status' order.id %}"  
-                                            class="inline-form driver-btn-flex">  
-                                            {% csrf_token %}  
-                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">  
-                                            <input type="hidden" name="status" value="canceled">  
-                                            <button type="submit" class="btn btn-secondary btn-sm driver-btn-full-width">  
-                                                Annuler  
-                                            </button>  
-                                        </form>  
-                                    {% endif %}  
-                                </div>  
-                            </div>  
-                        </div>  
-                    {% endfor %}  
-                </div>  
-            {% else %}  
-                <div class="card">  
-                    <p>Aucune commande pour ces filtres.</p>  
-                </div>  
-            {% endif %}  
-        </div>  
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode }}"
+                       class="driver-page-link">
+                        Suivant →
+                    </a>
+                {% endif %}
+            </div>
+        {% else %}
+            <p class="driver-empty-text">
+                Aucune course ne correspond à ces filtres.
+            </p>
+        {% endif %}
     </div>
 
-    <!-- Barre sticky en bas sur mobile -->
-    <div class="driver-app-sticky">
-        <a href="{% url 'orders:driver_hub' %}" class="driver-sticky-btn">
-            🏠 Hub
-        </a>
-        <a href="{% url 'orders:driver_app' %}" class="driver-sticky-btn driver-sticky-btn--primary">
-            🚚 Mes courses
-        </a>
-    </div>
+    <div class="driver-bottom-spacer"></div>
+</div>
 
-</div>  
+<!-- NAVBAR BASSE LIVREUR -->
+<nav class="driver-bottom-nav">
+    <a href="{% url 'orders:driver_hub' %}" class="driver-bottom-nav__item">
+        <div>🏠</div>
+        <div>Hub</div>
+    </a>
+    <a href="{% url 'orders:driver_app' %}" class="driver-bottom-nav__item driver-bottom-nav__item--active">
+        <div>📋</div>
+        <div>Courses</div>
+    </a>
+    <a href="{% url 'orders:driver_map' %}" class="driver-bottom-nav__item">
+        <div>🗺️</div>
+        <div>Carte</div>
+    </a>
+    <a href="{% url 'orders:driver_me_app' %}" class="driver-bottom-nav__item">
+        <div>👤</div>
+        <div>Moi</div>
+    </a>
+</nav>
 
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    var dataUrlInput = document.getElementById("driver-app-data-url");
-    if (!dataUrlInput) {
-        return;
-    }
-    var baseUrl = dataUrlInput.value || "";
+<style>
+.driver-app-page {
+    max-width: 1100px;
+    margin: 0 auto 80px;
+    padding: 8px 12px;
+}
 
-    function updateText(id, value) {
-        var el = document.getElementById(id);
-        if (el !== null && el !== undefined && value !== undefined && value !== null) {
-            el.textContent = value;
-        }
-    }
+/* Header */
+.driver-app-header {
+    margin-bottom: 8px;
+}
 
-    function refreshDriverAppData() {
-        var params = window.location.search || "";
-        var url = baseUrl + params;
+/* Filtres */
+.driver-app-filters-card {
+    margin-bottom: 12px;
+}
 
-        fetch(url, {
-            headers: {
-                "X-Requested-With": "XMLHttpRequest"
-            }
-        })
-        .then(function (resp) {
-            if (!resp.ok) {
-                return null;
-            }
-            return resp.json();
-        })
-        .then(function (data) {
-            if (!data) {
-                return;
-            }
-            updateText("kpi-filtered-count", data.filtered_orders_count);
-            updateText("kpi-total-orders", data.total_orders);
-            updateText("kpi-today-orders", data.today_orders);
-            updateText("kpi-pending", data.pending);
-            updateText("kpi-in-progress", data.in_progress);
-            updateText("kpi-done", data.done);
-            updateText("kpi-canceled", data.canceled);
-            updateText("kpi-distance", data.total_distance_km);
-        })
-        .catch(function (error) {
-            console.log("Erreur refresh driver_app data:", error);
-        });
-    }
+.driver-app-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
 
-    // Premier refresh immédiat
-    refreshDriverAppData();
-    // Puis auto-refresh toutes les 15 secondes
-    setInterval(refreshDriverAppData, 15000);
-});
-</script>
+.driver-app-filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
 
-<style>  
+.driver-app-filters-row-bottom {
+    align-items: flex-end;
+    justify-content: space-between;
+}
+
+.driver-app-filter-block {
+    min-width: 180px;
+    flex: 1;
+}
+
+.driver-filter-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--fagni-text-soft);
+    font-weight: 600;
+    margin-bottom: 3px;
+    display: block;
+}
+
+.driver-filter-select {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: var(--fagni-radius-md);
+    border: 1px solid var(--fagni-border);
+    background: #fff;
+    font-size: 13px;
+}
+
+.driver-app-filter-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.btn-sm {
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+.driver-app-export-btn {
+    white-space: nowrap;
+}
+
+/* KPIs wrapper */
+.driver-app-kpi-wrapper {
+    margin-bottom: 10px;
+}
+
+/* Liste */
+.driver-app-list-card {
+    margin-top: 2px;
+}
+
+.driver-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.driver-list-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--fagni-text);
+}
+
+.driver-list-subtitle {
+    font-size: 12px;
+    color: var(--fagni-muted);
+}
+
+/* Cards */
+.driver-orders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.driver-order-card {
+    border-radius: var(--fagni-radius-lg);
+    border: 1px solid var(--fagni-border);
+    padding: 10px 12px;
+    background: #fff;
+    box-shadow: var(--fagni-shadow-soft);
+}
+
+/* HEADER NAVY PREMIUM FAGNI */
+.driver-order-header,
+.order-card__header {
+    background: #173B63;
+    color: #ffffff;
+    padding: 12px 14px;
+    border-radius: 14px 14px 0 0;
+    margin: -10px -12px 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 3px 6px rgba(23, 59, 99, 0.26);
+}
+
+.driver-order-header .driver-order-code,
+.order-card__header .order-code {
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.driver-order-header .badge-status,
+.order-card__header .badge-status {
+    border-color: rgba(255, 255, 255, 0.4);
+    color: #ffffff;
+}
+
+.driver-order-code {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.driver-order-date {
+    font-size: 12px;
+    color: #e5e7eb;
+}
+
+.driver-order-date--secondary {
+    font-size: 11px;
+}
+
+/* Corps */
+.driver-order-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.driver-order-section {
+    background: #f8fafc;
+    border-radius: var(--fagni-radius-md);
+    padding: 6px 8px;
+}
+
+.driver-order-section-side {
+    background: #fefce8;
+}
+
+.driver-order-line {
+    font-size: 12px;
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+    color: var(--fagni-text);
+}
+
+.order-label {
+    font-weight: 500;
+    color: var(--fagni-text-soft);
+}
+
+.order-value {
+    color: var(--fagni-text);
+}
+
+/* Footer */
+.driver-order-footer {
+    border-top: 1px dashed var(--fagni-border);
+    padding-top: 6px;
+    margin-top: 4px;
+}
+
+.driver-order-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* Badges statut */
+.badge-status {
+    border-radius: 999px;
+    border: 1px solid transparent;
+    padding: 3px 9px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.badge-status--pending {
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
+}
+
+.badge-status--in_progress {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+}
+
+.badge-status--done {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #bbf7d0;
+}
+
+.badge-status--canceled {
+    background: #fee2e2;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+/* Pagination */
+.driver-pagination {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--fagni-muted);
+}
+
+.driver-page-link {
+    text-decoration: none;
+    color: var(--fagni-primary);
+}
+
+.driver-page-current {
+    font-weight: 600;
+}
+
+/* Empty */
+.driver-empty-text {
+    font-size: 12px;
+    color: var(--fagni-muted);
+    margin-top: 4px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
     .driver-app-page {
-        background: #0f172a;
-        min-height: calc(100vh - 60px);
-        padding-bottom: 70px; /* place pour la sticky bar */
+        padding: 6px;
     }
-
-    .driver-app-shell {
-        padding: 8px 0 16px;
-    }
-
-    .driver-app-container {  
-        max-width: 480px;  
-        margin: 0 auto;  
-    }  
-
-    .page-header--compact {
-        padding-bottom: 4px;
-        border-bottom: none;
-    }
-
-    .page-header--compact .page-title {
-        color: #f9fafb;
-    }
-
-    .page-header--compact .page-subtitle {
-        color: #cbd5f5;
-    }
-
-    .card {  
-        background: #ffffff;  
-        border-radius: 16px;  
-        padding: 14px 16px;  
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.35);  
-        border: 1px solid #1e293b;  
-    }  
-
-    .mb-4 {  
-        margin-bottom: 1.5rem;  
-    }  
-
-    .driver-filters-card {
-        position: sticky;
-        top: 52px;
-        z-index: 20;
-    }
-
-    .filters-grid {  
-        display: grid;  
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));  
-        gap: 12px;  
-        align-items: end;  
-    }  
-
-    .filter-item label {  
-        display: block;  
-        font-size: 13px;  
-        margin-bottom: 4px;  
-        color: #475569;  
-        font-weight: 500;  
-    }  
-
-    .filter-item select {  
-        width: 100%;  
-        padding: 8px 10px;  
-        border-radius: 999px;  
-        border: 1px solid #cbd5f5;  
-        font-size: 14px;  
-        background: #f8fafc;
-    }  
-
-    .filter-actions {  
-        display: flex;  
+    .driver-app-filters-row {
         flex-direction: column;
-        gap: 8px;  
-        align-items: stretch;  
-        margin-top: 4px;  
-    }  
-
-    .btn {  
-        display: inline-flex;  
-        align-items: center;  
-        justify-content: center;  
-        padding: 8px 14px;  
-        border-radius: 999px;  
-        font-size: 13px;  
-        text-decoration: none;  
-        border: none;  
-        cursor: pointer;  
-        white-space: nowrap;  
-    }  
-
-    .btn-sm {  
-        padding: 6px 10px;  
-        font-size: 12px;  
-    }  
-
-    .btn-primary {  
-        background: #ff7a00;  
-        color: #fff;  
-    }  
-
-    .btn-secondary {  
-        background: #e2e8f0;  
-        color: #1e293b;  
-    }  
-
-    .btn-light {  
-        background: #f1f5f9;  
-        color: #0f172a;  
-    }  
-
-    .btn-reset {  
-        font-size: 12px;  
-    }  
-
-    .driver-btn-full {
-        width: 100%;
     }
-
-    .driver-btn-flex {
-        flex: 1 1 45%;
+    .driver-app-filter-actions {
+        justify-content: flex-start;
     }
-
-    .driver-btn-full-width {
-        width: 100%;
+    .driver-order-body {
+        grid-template-columns: 1fr;
     }
+}
 
-    /* Pilule "connecté en tant que" */  
-    .driver-connected-pill {
-        padding: 6px 10px;
-        border-radius: 999px;
-        background: #eef2ff;
-        border: 1px solid #c7d2fe;
-        font-size: 12px;
-        display: inline-flex;
-        flex-wrap: wrap;
-        gap: 4px;
-        align-items: center;
-    }
-    .driver-connected-label {
-        color: #4f46e5;
-        font-weight: 500;
-    }
-    .driver-connected-name {
-        color: #111827;
-        font-weight: 600;
-    }
+/* NAVBAR BASSE */
+.driver-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 40;
+}
 
-    /* ===== KPI Driver ===== */  
-    .kpi-grid {  
-        display: grid;  
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));  
-        gap: 10px;  
-        margin-bottom: 1.5rem;
-    }  
+.driver-bottom-nav__item {
+    flex: 1;
+    text-align: center;
+    font-size: 11px;
+    color: #94a3b8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    text-decoration: none;
+}
 
-    .kpi-card {  
-        background: #ffffff;  
-        border-radius: 12px;  
-        padding: 10px 12px;  
-        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);  
-        border-left: 4px solid transparent;  
-    }  
+.driver-bottom-nav__item--active {
+    color: #0f172a;
+    font-weight: 600;
+}
 
-    .kpi-card--full {  
-        grid-column: 1 / -1;  
-    }  
-
-    .kpi-label {  
-        font-size: 11px;  
-        color: #64748b;  
-        text-transform: uppercase;  
-        letter-spacing: 0.04em;  
-    }  
-
-    .kpi-value {  
-        font-size: 20px;  
-        font-weight: 700;  
-        color: #0f172a;  
-        margin-top: 2px;  
-    }  
-
-    .kpi-sub {  
-        font-size: 11px;  
-        color: #94a3b8;  
-        margin-top: 2px;  
-    }  
-
-    .kpi-unit {  
-        font-size: 12px;  
-        font-weight: 500;  
-        margin-left: 2px;  
-    }  
-
-    .kpi-card--blue {  
-        border-left-color: #0056b3;  
-    }  
-
-    .kpi-card--orange {  
-        border-left-color: #ff7a00;  
-    }  
-
-    .kpi-card--green {  
-        border-left-color: #16a34a;  
-    }  
-
-    .kpi-card--red {  
-        border-left-color: #dc2626;  
-    }  
-
-    .orders-list {  
-        display: flex;  
-        flex-direction: column;  
-        gap: 12px;  
-    }  
-
-    .order-card {  
-        background: #ffffff;  
-        border-radius: 14px;  
-        padding: 12px 14px;  
-        box-shadow: 0 1px 5px rgba(15, 23, 42, 0.20);  
-        border: 1px solid #1f2937;  
-    }  
-
-    .driver-order-card {
-        background: #0b1220;
-        border-color: #1f2937;
-        color: #e5e7eb;
-    }
-
-    .driver-order-card .order-section {
-        background: #020617;
-    }
-
-    .order-card__header {  
-        display: flex;  
-        justify-content: space-between;  
-        align-items: flex-start;  
-        gap: 8px;  
-        margin-bottom: 8px;  
-    }  
-
-    .order-code {  
-        font-weight: 600;  
-        color: #e5e7eb;  
-        font-size: 15px;  
-    }  
-
-    .order-date {  
-        font-size: 12px;  
-        color: #9ca3af;  
-    }  
-
-    .order-status {  
-        font-size: 11px;  
-        padding: 3px 8px;  
-        border-radius: 999px;  
-        font-weight: 600;  
-        border: 1px solid transparent;  
-        white-space: nowrap;  
-    }  
-
-    .order-status--pending {  
-        background: #fef3c7;  
-        color: #92400e;  
-        border-color: #fde68a;  
-    }  
-
-    .order-status--in_progress {  
-        background: #dbeafe;  
-        color: #1d4ed8;  
-        border-color: #bfdbfe;  
-    }  
-
-    .order-status--done {  
-        background: #dcfce7;  
-        color: #166534;  
-        border-color: #bbf7d0;  
-    }  
-
-    .order-status--canceled {  
-        background: #fee2e2;  
-        color: #b91c1c;  
-        border-color: #fecaca;  
-    }  
-
-    .order-card__body {  
-        display: grid;  
-        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));  
-        gap: 8px;  
-        margin-bottom: 8px;  
-    }  
-
-    .order-section {  
-        padding: 6px 8px;  
-        border-radius: 8px;  
-        background: #f8fafc;  
-    }  
-
-    .section-title {  
-        font-size: 12px;  
-        font-weight: 600;  
-        color: #e5e7eb;  
-        margin-bottom: 4px;  
-    }  
-
-    .section-line {  
-        display: flex;  
-        gap: 6px;  
-        font-size: 12px;  
-        margin-top: 2px;  
-        color: #cbd5f5;  
-    }  
-
-    .section-line .label {  
-        font-weight: 500;  
-        color: #9ca3af;  
-    }  
-
-    .order-card__footer {  
-        margin-top: 4px;  
-        border-top: 1px dashed #1f2937;  
-        padding-top: 6px;  
-    }  
-
-    .buttons-row {  
-        display: flex;  
-        flex-wrap: wrap;  
-        gap: 6px;  
-        align-items: center;  
-    }  
-
-    .buttons-row--app {
-        gap: 8px;
-    }
-
-    .inline-form {  
-        display: inline-flex;  
-        margin: 0;  
-    }  
-
-    /* Barre sticky bas */
-    .driver-app-sticky {
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        padding: 6px 10px;
-        background: rgba(15, 23, 42, 0.98);
-        border-top: 1px solid #1f2937;
-        display: flex;
-        gap: 8px;
-        justify-content: center;
-        z-index: 50;
-    }
-
-    .driver-sticky-btn {
-        flex: 1 1 0;
-        max-width: 220px;
-        text-align: center;
-        padding: 8px 10px;
-        border-radius: 999px;
-        border: 1px solid #374151;
-        background: #020617;
-        color: #e5e7eb;
-        font-size: 13px;
-        text-decoration: none;
-    }
-
-    .driver-sticky-btn--primary {
-        background: #ff7a00;
-        border-color: #f97316;
-        color: #111827;
-        font-weight: 600;
-    }
-
-    @media (max-width: 640px) {  
-        .card {  
-            padding: 12px;  
-        }  
-
-        .order-card {  
-            padding: 10px;  
-        }  
-
-        .filters-grid {  
-            grid-template-columns: 1fr;  
-        }  
-
-        .filter-actions {  
-            justify-content: flex-start;  
-        }  
-
-        .kpi-grid {  
-            grid-template-columns: repeat(2, minmax(0, 1fr));  
-        }  
-
-        .buttons-row--app {
-            flex-direction: column;
-        }
-
-        .driver-btn-flex {
-            flex: 1 1 100%;
-        }
-
-        .driver-btn-full-width {
-            width: 100%;
-        }
-    }  
-</style>  
-
+.driver-bottom-spacer {
+    height: 56px;
+}
+</style>
 {% endblock %}

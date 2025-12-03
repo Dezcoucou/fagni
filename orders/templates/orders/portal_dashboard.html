@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="portal-page">
+
+    <!-- HEADER PORTAL -->
+    <div class="page-header">
+        <div class="page-header__left">
+            <h1 class="page-title">Portal FAGNI</h1>
+            <p class="page-subtitle">
+                Console centrale pour piloter les commandes, la logistique, les finances et les livreurs.
+            </p>
+        </div>
+        <div class="page-header__right">
+            <div class="portal-user-pill">
+                <div class="portal-user-pill-name">
+                    {{ request.user.username|default:"Utilisateur" }}
+                </div>
+                <div class="portal-user-pill-role">
+                    Accès back-office
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BANNIÈRE OVERVIEW -->
+    <section class="card portal-hero">
+        <div class="portal-hero-main">
+            <h2 class="portal-hero-title">Vue d’ensemble FAGNI</h2>
+            <p class="portal-hero-text">
+                Ce portail regroupe les points d’entrée clés : opérations, finances, app livreur, clients
+                et performance globale. Utilisez les raccourcis ci-dessous pour naviguer plus vite.
+            </p>
+        </div>
+        <div class="portal-hero-tags">
+            <span class="portal-tag">Ops</span>
+            <span class="portal-tag">Finance</span>
+            <span class="portal-tag">Livreurs</span>
+            <span class="portal-tag">Clients</span>
+        </div>
+    </section>
+
+    <!-- KPI GRID SIMPLIFIÉE -->
+    <section class="portal-kpi-grid">
+        <article class="kpi-card kpi-card--primary">
+            <div class="kpi-card__label">Commandes (global)</div>
+            <div class="kpi-card__value">
+                {{ portal_stats.total_orders|default:"—" }}
+            </div>
+            <div class="kpi-card__sub">
+                Toutes périodes confondues (placeholder – à alimenter plus tard).
+            </div>
+        </article>
+
+        <article class="kpi-card kpi-card--orange">
+            <div class="kpi-card__label">CA cumulé</div>
+            <div class="kpi-card__value">
+                {{ portal_stats.total_revenue|default:"—" }}
+                <span class="kpi-card__unit">FCFA</span>
+            </div>
+            <div class="kpi-card__sub">
+                Chiffre d’affaires global estimé.
+            </div>
+        </article>
+
+        <article class="kpi-card kpi-card--blue">
+            <div class="kpi-card__label">Livreurs actifs</div>
+            <div class="kpi-card__value">
+                {{ portal_stats.active_drivers|default:"—" }}
+            </div>
+            <div class="kpi-card__sub">
+                Comptes livreurs avec au moins une course.
+            </div>
+        </article>
+
+        <article class="kpi-card kpi-card--green">
+            <div class="kpi-card__label">Clients servis</div>
+            <div class="kpi-card__value">
+                {{ portal_stats.unique_customers|default:"—" }}
+            </div>
+            <div class="kpi-card__sub">
+                Nombre de clients distincts.
+            </div>
+        </article>
+    </section>
+
+    <!-- RACCOURCIS PORTAL EN CARTES -->
+    <section class="portal-sections-grid">
+
+        <!-- Colonne 1 : Commandes & OPS -->
+        <article class="card portal-section">
+            <header class="portal-section-header">
+                <h2 class="portal-section-title">Commandes & OPS</h2>
+                <p class="portal-section-subtitle">
+                    Pilotage du flux collecte → lavage → livraison.
+                </p>
+            </header>
+            <div class="portal-links-list">
+                <a href="{% url 'orders:list' %}" class="portal-link-row">
+                    <div class="portal-link-main">
+                        <span class="portal-link-title">📋 Liste des commandes</span>
+                        <span class="portal-link-desc">Vue détaillée de toutes les commandes FAGNI.</span>
+                    </div>
+                    <span class="portal-link-cta">Ouvrir &rarr;</span>
+                </a>
+                <a href="{% url 'orders:ops_dashboard' %}" class="portal-link-row">
+                    <div class="portal-link-main">
+                        <span class="portal-link-title">🚦 OPS dashboard</span>
+                        <span class="portal-link-desc">Suivi opérationnel collecte / lavage / livraison.</span>
+                    </div>
+                    <span class="portal-link-cta">Suivre &rarr;</span>
+                </a>
+                <a href="{% url 'orders:dashboard' %}" class="portal-link-row">
+                    <div class="portal-link-main">
+                        <span class="portal-link-title">📊 Dashboard commandes</span>
+                        <span class="portal-link-desc">Indicateurs globaux sur les volumes et statuts.</span>
+                    </div>
+                    <span class="portal-link-cta">Voir &rarr;</span>
+                </a>
+            </div>
+        </article>
+
+        <!-- Colonne 2 : Finance & Performance -->
+        <article class="card portal-section">
+            <header class="portal-section-header">
+                <h2 class="portal-section-title">Finance & performance</h2>
+                <p class="portal-section-subtitle">
+                    CA, marges FAGNI, top clients & export comptable.
+                </p>
+            </header>
+            <div class="portal-links-list">
+                <a href="{% url 'orders:finance_dashboard' %}" class="portal-link-row">
+                    <div class="portal-link-main">
+                        <span class="portal-link-title">💰 Dashboard financier</span>
+                        <span class="portal-link-desc">CA, frais, revenus livreurs, marges FAGNI.</span>
+                    </div>
+                    <span class="portal-link-cta">Analyser &rarr;</span>
+                </a>
+                <a href="{% url 'orders:export_finance_xlsx' %}" class="portal-link-row">
+                    <div class="portal-link-main">
+                        <span class="portal-link-title">📊 Export Excel Finance</span>
+                        <span class="portal-link-desc">Extraction pour analyse avancée & comptabilité.</span>
+                    </div>
+                    <span class="portal-link-cta">Exporter &rarr;</span>
+                </a>
+                <a href="{% url 'orders:export_top_clients_xlsx' %}" class="portal-link-row">
+                    <div class="portal-link-main">
+                        <span class="portal-link-title">🏆 Top clients</span>
+                        <span class="portal-link-desc">Liste des meilleurs clients (fichier XLSX).</span>
+                    </div>
+                    <span class="portal-link-cta">Voir &rarr;</span>
+                </a>
+            </div>
+        </article>
+
+        <!-- Colonne 3 : Livreurs & Clients -->
+        <article class="card portal-section">
+            <header class="portal-section-header">
+                <h2 class="portal-section-title">Livreurs & clients</h2>
+                <p class="portal-section-subtitle">
+                    Performance livreurs, hub opérationnel & mini-CRM clients.
+                </p>
+            </header>
+            <div class="portal-links-list">
+                <a href="{% url 'orders:driver_hub' %}" class="portal-link-row">
+                    <div class="portal-link-main">
+                        <span class="portal-link-title">🚚 Hub livreur</span>
+                        <span class="portal-link-desc">Vue KPI & synthèse pour le réseau de livreurs.</span>
+                    </div>
+                    <span class="portal-link-cta">Accéder &rarr;</span>
+                </a>
+                <a href="{% url 'orders:driver_dashboard' %}" class="portal-link-row">
+                    <div class="portal-link-main">
+                        <span class="portal-link-title">📈 Dashboard livreurs</span>
+                        <span class="portal-link-desc">Performance globale & comparatif des livreurs.</span>
+                    </div>
+                    <span class="portal-link-cta">Voir &rarr;</span>
+                </a>
+                <a href="{% url 'orders:customers_list' %}" class="portal-link-row">
+                    <div class="portal-link-main">
+                        <span class="portal-link-title">👥 Clients (mini-CRM)</span>
+                        <span class="portal-link-desc">Liste clients, historique de commandes & exports.</span>
+                    </div>
+                    <span class="portal-link-cta">Gérer &rarr;</span>
+                </a>
+            </div>
+        </article>
+    </section>
+
+</div>
+
+<style>
+.portal-page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 8px 12px 32px;
+}
+
+/* Pill user */
+.portal-user-pill {
+    background: #0f172a;
+    color: #e5e7eb;
+    border-radius: 999px;
+    padding: 8px 14px;
+    display: flex;
+    flex-direction: column;
+    min-width: 150px;
+}
+.portal-user-pill-name {
+    font-size: 13px;
+    font-weight: 600;
+}
+.portal-user-pill-role {
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+/* Hero */
+.portal-hero {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    background: linear-gradient(135deg, #f97316 0%, #0f172a 70%);
+    color: #f9fafb;
+}
+.portal-hero-main {
+    max-width: 70%;
+}
+.portal-hero-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 4px;
+}
+.portal-hero-text {
+    font-size: 13px;
+    margin: 0;
+    opacity: 0.94;
+}
+.portal-hero-tags {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-end;
+}
+.portal-tag {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(248,250,252,0.28);
+    background: rgba(15,23,42,0.35);
+}
+
+/* KPI GRID */
+.portal-kpi-grid {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
+    gap: 10px;
+}
+
+/* Sections grid */
+.portal-sections-grid {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
+}
+
+.portal-section-header {
+    margin-bottom: 8px;
+}
+.portal-section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+    margin: 0 0 2px;
+}
+.portal-section-subtitle {
+    font-size: 12px;
+    color: #6b7280;
+    margin: 0;
+}
+
+/* Links list */
+.portal-links-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.portal-link-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    text-decoration: none;
+    background: #f9fafb;
+    transition: 0.18s ease;
+}
+.portal-link-row:hover {
+    border-color: #cbd5e1;
+    background: #ffffff;
+    box-shadow: 0 2px 7px rgba(15,23,42,0.06);
+}
+.portal-link-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.portal-link-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+}
+.portal-link-desc {
+    font-size: 11px;
+    color: #6b7280;
+}
+.portal-link-cta {
+    font-size: 11px;
+    color: #0f172a;
+    opacity: 0.7;
+    white-space: nowrap;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .portal-hero {
+        flex-direction: column;
+    }
+    .portal-hero-main {
+        max-width: 100%;
+    }
+    .portal-hero-tags {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+    }
+}
+</style>
+{% endblock %}

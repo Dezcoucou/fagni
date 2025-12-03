@@ -58,7 +58,7 @@
         <article class="kpi-card kpi-card--orange">
             <div class="kpi-card__label">Actives</div>
             <div class="kpi-card__value">
-                {{ stats.pending_orders|default:0|add:stats.in_progress_orders|default:0 }}
+                {{ stats.pending_orders|default:0 }}
             </div>
             <div class="kpi-card__sub">
                 En attente : {{ stats.pending_orders|default:0 }} /
@@ -102,17 +102,37 @@
             Actions rapides
         </div>
         <div class="driver-hub__qa-grid">
+            <!-- Mes courses -->
             <a href="{% url 'orders:driver_app' %}" class="chip-button chip-button--primary">
-                📋 Mes courses
+                <span class="chip-label">📋 Mes courses</span>
             </a>
+
+            <!-- KPI / Performance -->
+            {% if connected_driver %}
+                <a href="{% url 'orders:driver_performance' connected_driver.id %}"
+                   class="chip-button chip-button--ghost">
+                    <span class="chip-label">📊 Mes KPI & performance</span>
+                </a>
+            {% else %}
+                <a href="{% url 'orders:driver_leaderboard' %}"
+                   class="chip-button chip-button--ghost">
+                    <span class="chip-label">📊 KPI livreurs</span>
+                </a>
+            {% endif %}
+
+            <!-- Carte -->
             <a href="{% url 'orders:driver_map' %}" class="chip-button">
-                🗺️ Carte
+                <span class="chip-label">🗺️ Carte</span>
             </a>
+
+            <!-- Historique perso -->
             <a href="{% url 'orders:driver_history_me' %}" class="chip-button">
-                📜 Historique
+                <span class="chip-label">📜 Historique</span>
             </a>
+
+            <!-- Classement global -->
             <a href="{% url 'orders:driver_leaderboard' %}" class="chip-button chip-button--ghost">
-                🏆 Classement
+                <span class="chip-label">🏆 Classement</span>
             </a>
         </div>
     </section>
@@ -153,13 +173,22 @@
                             </span>
                         </div>
                         <div class="mini-order__bottom">
-                            <span class="mini-order__amount">
+                            <div class="mini-order__amount">
                                 {{ order.total|default:0 }} FCFA
-                            </span>
-                            <a href="{% url 'orders:driver_order_detail_me' order.id %}"
-                               class="mini-order__link">
-                                Détail →
-                            </a>
+                            </div>
+                            <div class="mini-order__actions">
+                                <a href="{% url 'orders:driver_order_detail_me' order.id %}"
+                                   class="btn btn-light btn-sm mini-order__btn">
+                                    Détail
+                                </a>
+                                {% if order.customer.address %}
+                                    <a href="https://www.google.com/maps/search/?api=1&query={{ order.customer.address|urlencode }}"
+                                       target="_blank"
+                                       class="btn btn-light btn-sm mini-order__btn">
+                                        🧭 Itinéraire
+                                    </a>
+                                {% endif %}
+                            </div>
                         </div>
                     </article>
                 {% endfor %}
@@ -355,13 +384,13 @@
     }
 
     .driver-hub__qa-grid {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 8px;
     }
 
     .chip-button {
-        font-size: 12px;
+        font-size: 11px;
         padding: 6px 10px;
         border-radius: 999px;
         background: #f1f5f9;
@@ -369,7 +398,17 @@
         border: 1px solid #e2e8f0;
         display: inline-flex;
         align-items: center;
+        justify-content: center;
+        text-align: center;
         gap: 4px;
+        white-space: normal;
+        line-height: 1.2;
+        min-height: 34px;
+    }
+
+    .chip-label {
+        display: inline-block;
+        max-width: 100%;
     }
 
     .chip-button--primary {
@@ -428,17 +467,21 @@
     }
 
     .mini-order__main {
+        background: #173B63; /* NAVY premium FAGNI */
+        color: #ffffff;
+        padding: 8px 12px;
+        border-radius: 10px 10px 0 0;
+        margin: -8px -10px 4px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 6px;
-        margin-bottom: 2px;
+        box-shadow: 0 3px 6px rgba(23, 59, 99, 0.25);
     }
 
     .mini-order__code {
         font-size: 13px;
-        font-weight: 600;
-        color: #0f172a;
+        font-weight: 700;
+        color: #ffffff;
     }
 
     .mini-order__badge {
@@ -448,6 +491,13 @@
         border: 1px solid transparent;
         white-space: nowrap;
         font-weight: 600;
+        background: rgba(15, 23, 42, 0.08);
+    }
+
+    .mini-order__main .mini-order__badge {
+        border-color: rgba(255, 255, 255, 0.4);
+        color: #ffffff;
+        background: rgba(15, 23, 42, 0.15);
     }
 
     .mini-order__badge--pending {
@@ -486,20 +536,28 @@
     .mini-order__bottom {
         display: flex;
         justify-content: space-between;
-        font-size: 12px;
         align-items: center;
-        margin-top: 2px;
+        gap: 8px;
+        margin-top: 4px;
     }
 
     .mini-order__amount {
         font-weight: 600;
         color: #0f172a;
+        font-size: 12px;
     }
 
-    .mini-order__link {
+    .mini-order__actions {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .mini-order__btn {
         font-size: 11px;
-        color: #0f172a;
-        opacity: 0.8;
+        padding: 4px 8px;
+        border-radius: 999px;
     }
 
     /* HIGHLIGHTS */

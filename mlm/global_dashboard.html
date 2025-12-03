@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header__left">
+        <h1 class="page-title">Dashboard Global MLM – FAGNI</h1>
+        <p class="page-subtitle">
+            Vue d’ensemble des profils affiliés, commissions générées et soldes de wallets.
+        </p>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- Statistiques globales -->
+    <div class="cards-grid">
+        <div class="card">
+            <h2 class="card-title">Profils affiliés</h2>
+            <p class="metric">{{ total_profiles }}</p>
+            <p class="metric-label">Clients / partenaires avec un code MLM actif</p>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">Total commissions générées</h2>
+            <p class="metric">{{ total_commissions }} FCFA</p>
+            <p class="metric-label">Somme des ReferralCommission (tous niveaux)</p>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">Solde total des wallets</h2>
+            <p class="metric">{{ total_wallet_balance }} FCFA</p>
+            <p class="metric-label">Somme des Wallets (owner_type = "customer")</p>
+        </div>
+    </div>
+
+    <!-- Top parrains -->
+    <div class="card mt-4">
+        <h2 class="card-title">Top parrains par commissions cumulées</h2>
+
+        {% if top_sponsors %}
+            <div class="table-wrapper">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Parrain</th>
+                            <th>Code</th>
+                            <th>Commandes rémunérées</th>
+                            <th>Total commissions (FCFA)</th>
+                            <th>Wallet</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in top_sponsors %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td>{{ s.beneficiary_profile__customer__name|default:"—" }}</td>
+                                <td><code>{{ s.beneficiary_profile__referral_code }}</code></td>
+                                <td>{{ s.orders_count }}</td>
+                                <td>{{ s.total_commissions }}</td>
+                                <td>
+                                    {% if s.beneficiary_profile__customer__id %}
+                                        <a href="{% url 'wallets:customer_wallet_detail' s.beneficiary_profile__customer__id %}"
+                                           class="btn btn-light btn-sm">
+                                            Voir wallet
+                                        </a>
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p>Aucune commission MLM n’a encore été générée.</p>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

@@ -41,6 +41,8 @@ urlpatterns = [
         RedirectView.as_view(pattern_name="orders:create", permanent=False),
         name="portal_commande_legacy",
     ),
+
+    path("wallets/", include("wallets.urls")),
 ]
 
 # Fichiers médias en dev

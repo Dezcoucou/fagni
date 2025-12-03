@@ -3,452 +3,317 @@
 {% block content %}
 <div class="page-header">
     <div class="page-header__left">
-        <h1 class="page-title">
-            Performance livreur – {{ driver.name }}
-        </h1>
+        <h1 class="page-title">Performance du livreur</h1>
         <p class="page-subtitle">
-            Synthèse des courses, distances et revenus pour ce livreur.
+            Suivi global • KPI • Historique • Analyse des revenus
         </p>
     </div>
-    <div class="page-header__right">
-        <a href="{% url 'orders:driver_app' %}?driver_id={{ driver.id }}" class="btn btn-secondary">
-            ← Retour app livreur
-        </a>
-    </div>
 </div>
 
-<div class="container">
+<div class="driver-performance container">
 
-    <!-- Carte identité livreur -->
-    <div class="card mb-4 driver-header-card">
-        <div class="driver-header-main">
-            <div>
-                <div class="driver-name">{{ driver.name }}</div>
-                <div class="driver-meta">
-                    {% if driver.email %}
-                        <span>{{ driver.email }}</span>
-                    {% endif %}
-                    {% if driver.phone %}
-                        · <span>{{ driver.phone }}</span>
-                    {% endif %}
-                </div>
+    <!-- 🔙 NAVIGATION -->
+    <div class="card perf-nav">
+        <a href="{% url 'orders:driver_hub' %}" class="btn btn-secondary btn-pill">
+            ← Retour Hub Livreur
+        </a>
+
+        <div class="perf-nav-right">
+            <a href="{% url 'orders:driver_hub' %}" class="btn btn-primary btn-pill">
+                📊 KPI
+            </a>
+
+            <a href="{% url 'orders:driver_app' %}" class="btn btn-light btn-pill">
+                📱 Vue globale
+            </a>
+
+            <a href="{% url 'orders:driver_map' %}" class="btn btn-light btn-pill">
+                🗺 Carte
+            </a>
+        </div>
+    </div>
+
+    <!-- 🧑‍✈️ INFORMATIONS LIVREUR -->
+    <div class="card driver-header">
+        <div class="driver-main-info">
+            <h2 class="driver-name">{{ driver.name }}</h2>
+            <p class="driver-email">{{ driver.email }}</p>
+            <p class="driver-phone">{{ driver.phone }}</p>
+        </div>
+
+        <div class="driver-badges">
+            <div class="badge badge-blue">
+                Total courses : {{ stats.total_orders }}
             </div>
-            <div class="driver-tag">
-                Livreurs FAGNI
+            <div class="badge badge-orange">
+                En cours : {{ stats.in_progress }}
+            </div>
+            <div class="badge badge-green">
+                Terminées : {{ stats.done }}
+            </div>
+            <div class="badge badge-red">
+                Annulées : {{ stats.canceled }}
             </div>
         </div>
     </div>
 
-    <!-- KPIs principaux -->
+    <!-- 📈 KPI PRINCIPAUX -->
     <div class="kpi-grid mb-4">
-        <div class="kpi-card kpi-card--blue kpi-card--full">
-            <div class="kpi-label">Total commandes</div>
-            <div class="kpi-value">{{ total_orders }}</div>
-            <div class="kpi-sub">
-                Terminées : {{ done_count }} • Annulées : {{ canceled_count }}
+
+        <div class="kpi-card kpi-blue">
+            <div class="kpi-label">Total courses</div>
+            <div class="kpi-value">{{ stats.total_orders }}</div>
+        </div>
+
+        <div class="kpi-card kpi-orange">
+            <div class="kpi-label">En cours</div>
+            <div class="kpi-value">{{ stats.in_progress }}</div>
+        </div>
+
+        <div class="kpi-card kpi-green">
+            <div class="kpi-label">Terminées</div>
+            <div class="kpi-value">{{ stats.done }}</div>
+        </div>
+
+        <div class="kpi-card kpi-red">
+            <div class="kpi-label">Annulées</div>
+            <div class="kpi-value">{{ stats.canceled }}</div>
+        </div>
+
+        <div class="kpi-card kpi-blue">
+            <div class="kpi-label">Distance totale</div>
+            <div class="kpi-value">
+                {{ stats.total_distance|floatformat:"2" }} <span class="kpi-unit">km</span>
             </div>
         </div>
 
-        <div class="kpi-card kpi-card--orange">
-            <div class="kpi-label">Distance totale A/R</div>
+        <div class="kpi-card kpi-orange">
+            <div class="kpi-label">Revenu total</div>
             <div class="kpi-value">
-                {{ total_distance_km|default:0|floatformat:2 }}
-                <span class="kpi-unit">km</span>
-            </div>
-            <div class="kpi-sub">
-                Moyenne / course :
-                {{ distance_per_order|default:0|floatformat:2 }} km
-            </div>
-        </div>
-
-        <div class="kpi-card kpi-card--green">
-            <div class="kpi-label">Revenu livreur</div>
-            <div class="kpi-value">
-                {{ total_driver_income|default:0|floatformat:0 }}
-                <span class="kpi-unit">FCFA</span>
-            </div>
-            <div class="kpi-sub">
-                Moyenne / course :
-                {{ income_per_order|default:0|floatformat:0 }} FCFA
-            </div>
-        </div>
-
-        <div class="kpi-card kpi-card--blue">
-            <div class="kpi-label">Montant total client (TTC estimé)</div>
-            <div class="kpi-value">
-                {{ grand_total_client|default:0|floatformat:0 }}
-                <span class="kpi-unit">FCFA</span>
-            </div>
-        </div>
-
-        <div class="kpi-card kpi-card--green">
-            <div class="kpi-label">Taux de commandes terminées</div>
-            <div class="kpi-value">
-                {{ done_ratio|default:0|floatformat:1 }}
-                <span class="kpi-unit">%</span>
-            </div>
-            <div class="kpi-sub">
-                Sur {{ total_orders }} commandes
-            </div>
-        </div>
-
-        <div class="kpi-card kpi-card--orange">
-            <div class="kpi-label">Durée moyenne d’une course</div>
-            <div class="kpi-value">
-                {% if avg_duration_minutes %}
-                    ~ {{ avg_duration_minutes }} <span class="kpi-unit">min</span>
-                {% else %}
-                    —
-                {% endif %}
-            </div>
-            <div class="kpi-sub">
-                Calculée entre le démarrage et la livraison.
+                {{ stats.total_income|default:0 }} <span class="kpi-unit">FCFA</span>
             </div>
         </div>
     </div>
 
-    <!-- Répartition des statuts -->
-    <div class="card mb-4">
-        <h2 class="section-title">Répartition des statuts</h2>
-        <div class="status-grid">
-            <div class="status-pill status-pill--pending">
-                En attente : <strong>{{ pending_count }}</strong>
-            </div>
-            <div class="status-pill status-pill--in-progress">
-                En cours : <strong>{{ in_progress_count }}</strong>
-            </div>
-            <div class="status-pill status-pill--done">
-                Terminées : <strong>{{ done_count }}</strong>
-            </div>
-            <div class="status-pill status-pill--canceled">
-                Annulées : <strong>{{ canceled_count }}</strong>
-            </div>
-        </div>
-    </div>
-
-    <!-- Liste des dernières courses -->
+    <!-- 📊 GRAPHIQUES -->
     <div class="card">
-        <h2 class="section-title">Dernières courses</h2>
+        <h2 class="section-title">Graphique des revenus par période</h2>
+        <canvas id="revenuesChart" height="120"></canvas>
+    </div>
+
+    <div class="card">
+        <h2 class="section-title">Courses terminées par période</h2>
+        <canvas id="ordersChart" height="120"></canvas>
+    </div>
+
+    <!-- 📜 LISTE DES COURSES -->
+    <div class="card">
+        <h2 class="section-title">Historique des courses</h2>
+
         {% if orders %}
-            <div class="orders-list">
-                {% for order in orders %}
-                    <div class="order-row">
-                        <div class="order-row-main">
-                            <div class="order-code">
-                                {{ order.code|default:order.id }}
-                            </div>
-                            <div class="order-date">
-                                {% if order.created_at %}
-                                    {{ order.created_at|date:"d/m/Y H:i" }}
-                                {% endif %}
-                            </div>
-                            <div class="order-client">
-                                {{ order.customer.name|default:"Client inconnu" }}
-                            </div>
-                        </div>
-                        <div class="order-row-right">
-                            <div class="order-distance">
-                                {% if order.distance_km %}
-                                    {{ order.distance_km|floatformat:2 }} km
-                                {% else %}
-                                    —
-                                {% endif %}
-                            </div>
-                            <div class="order-amount">
-                                {% with total_line=order.total|default:0 service=order.service_fee|default:0 delivery=order.delivery_fee|default:0 %}
-                                    {{ total_line|add:service|add:delivery|floatformat:0 }} FCFA
-                                {% endwith %}
-                            </div>
-                            <div class="order-status-mini order-status-mini--{{ order.status }}">
-                                {{ order.get_status_display }}
-                            </div>
-                            <a href="{% url 'orders:driver_order_detail' order.id %}"
-                               class="btn btn-light btn-sm">
-                                Détail
+            <table class="perf-table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Date</th>
+                        <th>Client</th>
+                        <th>Distance</th>
+                        <th>Revenu</th>
+                        <th>Statut</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td>{{ order.code|default:order.id }}</td>
+                        <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
+                        <td>{{ order.customer.name }}</td>
+                        <td>{{ order.distance_km|default:0 }} km</td>
+                        <td>{{ order.driver_logistic_cost|default:0 }} FCFA</td>
+                        <td>{{ order.get_status_display }}</td>
+                        <td>
+                            <a href="{% url 'orders:driver_order_detail' order.id %}" class="btn btn-sm btn-primary">
+                                Détails
                             </a>
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         {% else %}
-            <p>Aucune course pour ce livreur.</p>
+            <p class="muted">Aucune course à afficher.</p>
         {% endif %}
     </div>
+
 </div>
 
+<!-- 📈 SCRIPTS CHARTJS -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const revenuesCtx = document.getElementById('revenuesChart');
+const ordersCtx = document.getElementById('ordersChart');
+
+// Revenus
+new Chart(revenuesCtx, {
+    type: 'line',
+    data: {
+        labels: {{ charts.labels|safe }},
+        datasets: [{
+            label: "Revenu (FCFA)",
+            data: {{ charts.revenues|safe }},
+            borderColor: "#F07C22",
+            backgroundColor: "rgba(240, 124, 34, 0.2)",
+            borderWidth: 2,
+            tension: 0.4
+        }]
+    }
+});
+
+// Nombre de courses
+new Chart(ordersCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ charts.labels|safe }},
+        datasets: [{
+            label: "Courses terminées",
+            data: {{ charts.orders|safe }},
+            backgroundColor: "#173B63"
+        }]
+    }
+});
+</script>
+
 <style>
-    .container {
-        max-width: 1100px;
-        margin: 0 auto;
-    }
 
-    .card {
-        background: #ffffff;
-        border-radius: 12px;
-        padding: 16px 18px;
-        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
-        margin-bottom: 1.5rem;
-    }
+.driver-performance {
+    max-width: 1100px;
+    margin: 0 auto 24px;
+}
 
-    .driver-header-card {
-        border-left: 4px solid #0056b3;
-    }
+/* ─────────────────────────────── */
+/* NAVIGATION */
+/* ─────────────────────────────── */
+.perf-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
 
-    .driver-header-main {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-    }
+.perf-nav-right {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
 
-    .driver-name {
-        font-size: 18px;
-        font-weight: 700;
-        color: #0f172a;
-    }
+/* ─────────────────────────────── */
+/* LIVREUR HEADER */
+/* ─────────────────────────────── */
+.driver-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+}
 
-    .driver-meta {
-        font-size: 13px;
-        color: #64748b;
-        margin-top: 2px;
-    }
+.driver-name {
+    font-size: 22px;
+    font-weight: 700;
+    color: #173B63;
+}
 
-    .driver-tag {
-        font-size: 11px;
-        padding: 4px 10px;
-        border-radius: 999px;
-        background: #eff6ff;
-        color: #1d4ed8;
-        font-weight: 600;
-    }
+.driver-email,
+.driver-phone {
+    font-size: 13px;
+    color: #64748b;
+}
 
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 6px 12px;
-        border-radius: 999px;
-        font-size: 13px;
-        text-decoration: none;
-        border: none;
-        cursor: pointer;
-        white-space: nowrap;
-    }
+.badges {
+    display: flex;
+}
 
-    .btn-secondary {
-        background: #e2e8f0;
-        color: #1e293b;
-    }
+.badge {
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+}
 
-    .btn-light {
-        background: #f1f5f9;
-        color: #0f172a;
-    }
+.badge-blue { background: #173B63; }
+.badge-orange { background: #F07C22; }
+.badge-green { background: #16a34a; }
+.badge-red { background: #dc2626; }
 
-    .btn-sm {
-        padding: 4px 10px;
-        font-size: 12px;
-    }
+/* ─────────────────────────────── */
+/* KPI GRID */
+/* ─────────────────────────────── */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+}
 
-    .kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-        gap: 10px;
-    }
+.kpi-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 12px;
+    border-left: 4px solid;
+    box-shadow: 0 1px 4px rgba(15,23,42,0.08);
+}
 
-    .kpi-card {
-        background: #ffffff;
-        border-radius: 12px;
-        padding: 10px 12px;
-        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
-        border-left: 4px solid transparent;
-    }
+.kpi-label {
+    color: #64748b;
+    font-size: 11px;
+    text-transform: uppercase;
+}
 
-    .kpi-card--full {
-        grid-column: 1 / -1;
-    }
+.kpi-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-top: 4px;
+}
 
-    .kpi-label {
-        font-size: 11px;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-    }
+.kpi-unit {
+    font-size: 12px;
+    margin-left: 2px;
+    color: #475569;
+}
 
-    .kpi-value {
-        font-size: 20px;
-        font-weight: 700;
-        color: #0f172a;
-        margin-top: 2px;
-    }
+.kpi-blue { border-left-color:#173B63; }
+.kpi-orange { border-left-color:#F07C22; }
+.kpi-green { border-left-color:#16a34a; }
+.kpi-red { border-left-color:#dc2626; }
 
-    .kpi-sub {
-        font-size: 11px;
-        color: #94a3b8;
-        margin-top: 2px;
-    }
+/* ─────────────────────────────── */
+/* HISTORIQUE TABLE */
+/* ─────────────────────────────── */
+.perf-table {
+    width: 100%;
+    font-size: 12px;
+    border-collapse: collapse;
+}
 
-    .kpi-unit {
-        font-size: 12px;
-        font-weight: 500;
-        margin-left: 2px;
-    }
+.perf-table th {
+    background: #f1f5f9;
+    padding: 6px;
+    color: #475569;
+    font-weight: 600;
+}
 
-    .kpi-card--blue {
-        border-left-color: #0056b3;
-    }
+.perf-table td {
+    padding: 6px;
+    border-bottom: 1px solid #e5e7eb;
+}
 
-    .kpi-card--orange {
-        border-left-color: #ff7a00;
-    }
+.muted {
+    font-size: 12px;
+    color: #94a3b8;
+}
 
-    .kpi-card--green {
-        border-left-color: #16a34a;
-    }
-
-    .section-title {
-        font-size: 15px;
-        font-weight: 600;
-        color: #0f172a;
-        margin: 0 0 8px 0;
-    }
-
-    .status-grid {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-
-    .status-pill {
-        font-size: 12px;
-        padding: 4px 10px;
-        border-radius: 999px;
-        border: 1px solid transparent;
-        background: #f8fafc;
-        color: #0f172a;
-    }
-
-    .status-pill--pending {
-        background: #fef3c7;
-        color: #92400e;
-        border-color: #fde68a;
-    }
-
-    .status-pill--in-progress {
-        background: #dbeafe;
-        color: #1d4ed8;
-        border-color: #bfdbfe;
-    }
-
-    .status-pill--done {
-        background: #dcfce7;
-        color: #166534;
-        border-color: #bbf7d0;
-    }
-
-    .status-pill--canceled {
-        background: #fee2e2;
-        color: #b91c1c;
-        border-color: #fecaca;
-    }
-
-    .orders-list {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .order-row {
-        display: flex;
-        justify-content: space-between;
-        gap: 8px;
-        padding: 8px 10px;
-        border-radius: 10px;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        flex-wrap: wrap;
-    }
-
-    .order-row-main {
-        min-width: 180px;
-    }
-
-    .order-code {
-        font-weight: 600;
-        font-size: 14px;
-        color: #0f172a;
-    }
-
-    .order-date {
-        font-size: 11px;
-        color: #64748b;
-        margin-top: 2px;
-    }
-
-    .order-client {
-        font-size: 12px;
-        color: #0f172a;
-        margin-top: 2px;
-    }
-
-    .order-row-right {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 2px;
-        min-width: 150px;
-    }
-
-    .order-distance,
-    .order-amount {
-        font-size: 12px;
-        color: #0f172a;
-    }
-
-    .order-status-mini {
-        font-size: 11px;
-        padding: 2px 8px;
-        border-radius: 999px;
-        border: 1px solid transparent;
-        margin-top: 2px;
-    }
-
-    .order-status-mini--pending {
-        background: #fef3c7;
-        color: #92400e;
-        border-color: #fde68a;
-    }
-
-    .order-status-mini--in_progress {
-        background: #dbeafe;
-        color: #1d4ed8;
-        border-color: #bfdbfe;
-    }
-
-    .order-status-mini--done {
-        background: #dcfce7;
-        color: #166534;
-        border-color: #bbf7d0;
-    }
-
-    .order-status-mini--canceled {
-        background: #fee2e2;
-        color: #b91c1c;
-        border-color: #fecaca;
-    }
-
-    @media (max-width: 640px) {
-        .card {
-            padding: 12px;
-        }
-
-        .order-row {
-            align-items: flex-start;
-        }
-
-        .order-row-right {
-            align-items: flex-start;
-        }
-    }
 </style>
+
 {% endblock %}

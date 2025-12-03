@@ -1,26 +1,29 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block content %}
+{% block extra_head %}
 <style>
     body{
         background:#f5f5f7;
     }
-    header{
-        background:linear-gradient(90deg,#ff7a00,#0056b3);
+
+    /* HERO HEADER DASHBOARD */
+    .dashboard-hero {
+        background:linear-gradient(90deg,#F07C22,#173B63);
         color:#fff;
         padding:16px 24px;
         margin:0 -12px 0 -12px;
     }
-    header h1{
+    .dashboard-hero h1{
         margin:0;
         font-size:20px;
     }
-    header p{
+    .dashboard-hero p{
         margin:4px 0 0;
         font-size:13px;
         opacity:.9;
     }
+
     .page{
         max-width:1200px;
         margin:20px auto 30px;
@@ -29,9 +32,10 @@
     .card{
         background:#fff;
         border-radius:10px;
-        box-shadow:0 4px 10px rgba(0,0,0,0.05);
+        box-shadow:0 4px 10px rgba(15,23,42,0.06);
         padding:14px 18px 18px;
         margin-bottom:14px;
+        border:1px solid #e5e7eb;
     }
     .top-bar{
         display:flex;
@@ -49,24 +53,24 @@
         font-size:13px;
     }
     .btn-primary{
-        background:#0056b3;
+        background:#173B63;
         color:#fff;
         border:none;
     }
     .btn-primary:hover{
-        background:#00408a;
+        background:#102640;
     }
     .btn-secondary{
         background:#fff;
-        border:1px solid #ccc;
-        color:#333;
+        border:1px solid #cbd5e1;
+        color:#0f172a;
     }
     .btn-secondary:hover{
-        background:#f3f3f3;
+        background:#f8fafc;
     }
     .mini{
         font-size:11px;
-        color:#666;
+        color:#64748b;
     }
 
     /* Cartes KPI */
@@ -87,22 +91,27 @@
         }
     }
     .stat-card{
-        background:#f8f9fb;
+        background:#f8fafc;
         border-radius:10px;
         padding:10px 12px;
+        border:1px solid #e5e7eb;
     }
     .stat-label{
         font-size:11px;
-        color:#666;
+        color:#64748b;
         margin-bottom:2px;
+        text-transform:uppercase;
+        letter-spacing:0.06em;
+        font-weight:600;
     }
     .stat-value{
         font-size:18px;
         font-weight:600;
+        color:#0f172a;
     }
     .stat-sub{
         font-size:11px;
-        color:#777;
+        color:#6b7280;
         margin-top:2px;
     }
 
@@ -118,16 +127,16 @@
     .chip{
         border-radius:999px;
         padding:4px 10px;
-        border:1px solid #ddd;
+        border:1px solid #e2e8f0;
         font-size:11px;
         text-decoration:none;
-        color:#333;
-        background:#fff;
+        color:#0f172a;
+        background:#ffffff;
     }
     .chip.active{
-        background:#0056b3;
-        border-color:#0056b3;
-        color:#fff;
+        background:#173B63;
+        border-color:#173B63;
+        color:#ffffff;
     }
 
     /* Zone graphique */
@@ -143,18 +152,20 @@
         }
     }
     .chart-box{
-        background:#f8f9fb;
+        background:#f8fafc;
         border-radius:10px;
         padding:10px 12px;
+        border:1px solid #e5e7eb;
     }
     .chart-title{
         font-size:13px;
         font-weight:600;
         margin-bottom:4px;
+        color:#0f172a;
     }
     .chart-sub{
         font-size:11px;
-        color:#777;
+        color:#6b7280;
         margin-bottom:6px;
     }
 
@@ -163,7 +174,7 @@
         position:relative;
         width:100%;
         max-width:100%;
-        height:220px; /* hauteur visible du graph */
+        height:220px;
     }
     @media(max-width:768px){
         .chart-container{
@@ -171,7 +182,7 @@
         }
     }
 
-    /* Top tables */
+    /* Tables */
     table{
         width:100%;
         border-collapse:collapse;
@@ -180,46 +191,35 @@
     }
     th,td{
         padding:6px 4px;
-        border-bottom:1px solid #eee;
+        border-bottom:1px solid #e5e7eb;
         vertical-align:top;
     }
     th{
-        background:#fafafa;
+        background:#f9fafb;
         font-weight:600;
         white-space:nowrap;
+        font-size:11px;
+        text-transform:uppercase;
+        letter-spacing:.04em;
+        color:#6b7280;
     }
     tr:hover{
-        background:#fafafa;
+        background:#f9fafb;
     }
     .t-right{ text-align:right; }
     .t-nowrap{ white-space:nowrap; }
 
-    .tag-client{
-        display:inline-block;
-        padding:2px 6px;
-        border-radius:999px;
-        background:#edf4ff;
-        color:#234f9c;
-        font-size:11px;
-        margin-top:2px;
-    }
-    .tag-item{
-        display:inline-block;
-        padding:2px 6px;
-        border-radius:999px;
-        background:#fff3cd;
-        color:#856404;
-        font-size:11px;
-        margin-top:2px;
-    }
     .legend{
         margin-top:8px;
         font-size:11px;
-        color:#666;
+        color:#64748b;
     }
 </style>
+{% endblock %}
 
-<header>
+{% block content %}
+
+<header class="dashboard-hero">
     <h1>Dashboard commandes – FAGNI</h1>
     <p>Vision synthétique des commandes, du CA et des comportements clients.</p>
 </header>
@@ -230,7 +230,7 @@
     <div class="card">
         <div class="top-bar">
             <div>
-                <div style="font-size:14px;font-weight:600;">
+                <div style="font-size:14px;font-weight:600;color:#0f172a;">
                     Synthèse opérationnelle & business
                 </div>
                 <div class="mini">
@@ -344,12 +344,12 @@
         </div>
     </div>
 
-    <!-- Graphiques + Top clients / articles -->
+    <!-- Graphiques + bloc résumé Top -->
     <div class="card">
 
         <div class="top-bar" style="margin-bottom:6px;">
             <div>
-                <div style="font-size:14px;font-weight:600;">
+                <div style="font-size:14px;font-weight:600;color:#0f172a;">
                     Tendances des commandes & du CA
                 </div>
                 <div class="mini">
@@ -378,22 +378,23 @@
             <div class="chart-box">
                 <div class="chart-title">Évolution quotidienne des commandes & du CA</div>
                 <div class="chart-sub">
-                    Ligne bleu = nombre de commandes · Barres orange = total prestations livrées (FCFA).
+                    Courbe = nombre de commandes · Barres = total prestations livrées (FCFA).
                 </div>
                 <div class="chart-container">
                     <canvas id="ordersChart"></canvas>
                 </div>
             </div>
 
-            <!-- Top clients / articles (bloc texte) -->
+            <!-- Bloc explicatif Top -->
             <div class="chart-box">
-                <div class="chart-title">Vue rapide Top</div>
+                <div class="chart-title">Vue rapide "Top"</div>
                 <div class="chart-sub">
                     Clients les plus générateurs & prestations les plus demandées.
                 </div>
                 <div class="mini">
                     • <strong>Top clients</strong> : par montant cumulé sur les commandes livrées.<br>
-                    • <strong>Top prestations</strong> : par volume (quantité totale).
+                    • <strong>Top prestations</strong> : par volume (quantité totale).<br>
+                    • Utilisable pour cibler VIP, promos, abonnements, etc.
                 </div>
             </div>
         </div>
@@ -403,7 +404,7 @@
     <div class="card">
         <div class="top-bar" style="margin-bottom:6px;">
             <div>
-                <div style="font-size:14px;font-weight:600;">
+                <div style="font-size:14px;font-weight:600;color:#0f172a;">
                     Top clients & Top prestations
                 </div>
                 <div class="mini">
@@ -415,7 +416,7 @@
         <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:12px;">
             <!-- Top clients -->
             <div>
-                <h3 style="font-size:13px;margin:0 0 4px;border-left:3px solid #0056b3;padding-left:6px;">
+                <h3 style="font-size:13px;margin:0 0 4px;border-left:3px solid #173B63;padding-left:6px;color:#0f172a;">
                     Top 5 clients par CA cumulé
                 </h3>
                 {% if top_clients %}
@@ -453,7 +454,7 @@
 
             <!-- Top prestations -->
             <div>
-                <h3 style="font-size:13px;margin:0 0 4px;border-left:3px solid #ff7a00;padding-left:6px;">
+                <h3 style="font-size:13px;margin:0 0 4px;border-left:3px solid #F07C22;padding-left:6px;color:#0f172a;">
                     Top 5 prestations
                 </h3>
                 {% if top_items %}

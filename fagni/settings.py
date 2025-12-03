@@ -217,8 +217,8 @@ FAGNI_LOGISTICS = {
 # ========================
 #  GOOGLE MAPS / DISTANCE
 # ========================
-GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "AIzaSyANSUv_OvcDO9aH5ScY2QwR5BsubHbjghU")
-GOOGLE_DISTANCE_MATRIX_API_KEY = os.getenv("GOOGLE_DISTANCE_MATRIX_API_KEY", "AIzaSyANSUv_OvcDO9aH5ScY2QwR5BsubHbjghU")
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
+GOOGLE_DISTANCE_MATRIX_API_KEY = os.getenv("GOOGLE_DISTANCE_MATRIX_API_KEY", "")
 
 # ==========================
 # Auth / redirections FAGNI

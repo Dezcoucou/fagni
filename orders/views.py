@@ -3646,113 +3646,59 @@ def compute_driver_week_stats(driver):
     }
 
 
-@login_required
 def driver_me_app(request):
-    """
-    Vue 'Mes courses du jour' pour le livreur connecté.
+    # 1. Récupérer le livreur connecté
+    delivery_partner = None
+    if request.user.is_authenticated:
+        from orders.models import DeliveryPartner  # si pas déjà importé en haut
+        delivery_partner = DeliveryPartner.objects.filter(
+            email=request.user.email
+        ).first()
 
-    - Récupère le DeliveryPartner via son email.
-    - Liste TOUTES ses commandes (les plus récentes en premier).
-    - Les KPI "du jour" ne filtrent que sur la date du jour,
-      mais la liste affiche les commandes actives du jour
-      OU, si aucune, les dernières commandes tout court.
-    """
-    user = request.user
+    # Si on n’a pas de livreur, tu peux gérer un fallback propre
+    qs = Order.objects.all()
+    if delivery_partner:
+        qs = qs.filter(delivery_partner=delivery_partner)
 
-    # 1) Récupérer le profil livreur
-    delivery_partner = get_object_or_404(DeliveryPartner, email=user.email)
-
-    # 2) Date du jour
+    # 2. Périodes
     today = timezone.localdate()
+    month_start = today.replace(day=1)
 
-    # 3) Queryset de base : toutes les commandes du livreur
-    base_qs = Order.objects.filter(delivery_partner=delivery_partner).order_by("-created_at")
+    # 3. Stats de base
+    total_orders = qs.count()
+    month_orders = qs.filter(created_at__date__gte=month_start).count()
 
-    # 4) Commandes "du jour" (actives)
-    today_qs = base_qs.filter(created_at__date=today)
+    total_distance_km = qs.aggregate(
+        total=Coalesce(Sum("distance_km"), Decimal("0"))
+    )["total"]
 
-    # Si on a des commandes aujourd'hui, on affiche celles-là,
-    # sinon on affiche les dernières commandes tout court.
-    if today_qs.exists():
-        orders = today_qs
-    else:
-        orders = base_qs[:20]  # éviter une liste trop longue
+    total_income = qs.aggregate(
+        total=Coalesce(Sum("driver_logistic_cost"), Decimal("0"))
+    )["total"]
 
-    # 5) KPI du jour (toujours sur "today_qs")
-    total_today = today_qs.count()
-    pending = today_qs.filter(status="pending").count()
-    in_progress = today_qs.filter(status="in_progress").count()
-    done = today_qs.filter(status="done").count()
-    canceled = today_qs.filter(status="canceled").count()
+    # 4. 👉 Stats d’activité (celles qui manquent au template)
+    pending_orders = qs.filter(status="pending").count()
+    in_progress_orders = qs.filter(status="in_progress").count()
 
-    # KPI distance & revenus estimés (jour)
-    agg = today_qs.aggregate(
-        total_distance_km=models.Sum("distance_km"),
-        total_driver_cost=models.Sum("driver_logistic_cost"),
-    )
-    total_distance_km = agg["total_distance_km"] or 0
-    driver_earnings = agg["total_driver_cost"] or 0
+    # 5. Dictionnaire stats COMPLET
+    stats = {
+        "total_orders": total_orders,
+        "month_orders": month_orders,
+        "total_distance_km": total_distance_km,
+        "total_income": total_income,
+        "pending_orders": pending_orders,
+        "in_progress_orders": in_progress_orders,
+    }
 
-    # KPI semaine (simple pour l’instant : semaine courant)
-    start_week = today - timezone.timedelta(days=today.weekday())
-    end_week = start_week + timezone.timedelta(days=7)
-
-    week_qs = base_qs.filter(
-        created_at__date__gte=start_week,
-        created_at__date__lt=end_week,
-    )
-
-    weekly_orders = week_qs.count()
-    weekly_agg = week_qs.aggregate(
-        total_driver_cost=models.Sum("driver_logistic_cost"),
-    )
-    weekly_earnings = weekly_agg["total_driver_cost"] or 0
-
-    # Petits objectifs arbitraires
-    weekly_target_orders = 40
-    weekly_target_earnings = 80000
-
-    weekly_orders_progress = int(min(100, (weekly_orders / weekly_target_orders) * 100)) if weekly_target_orders else 0
-    weekly_earnings_progress = int(min(100, (weekly_earnings / weekly_target_earnings) * 100)) if weekly_target_earnings else 0
-
-    # Prime semaine : pour l’instant on réutilise la logique existante côté leaderboard,
-    # mais on peut la raffiner plus tard.
-    weekly_bonus_amount = 0
-    weekly_success_rate = 0
-    weekly_peak_rides = 0
-
-    if week_qs.exists():
-        done_week = week_qs.filter(status="done").count()
-        weekly_success_rate = int((done_week / week_qs.count()) * 100) if week_qs.count() > 0 else 0
-        weekly_peak_rides = week_qs.filter(status="done").count()
-        weekly_bonus_amount = done_week * 500  # même logique : 500 FCFA / course terminée
+    # 6. Dernières commandes du chauffeur
+    orders = qs.order_by("-created_at")[:10]
 
     context = {
         "delivery_partner": delivery_partner,
+        "connected_driver": delivery_partner,
         "orders": orders,
-
-        "total_today": total_today,
-        "pending": pending,
-        "in_progress": in_progress,
-        "done": done,
-        "canceled": canceled,
-        "total_distance_km": total_distance_km,
-        "driver_earnings": driver_earnings,
-
-        "weekly_orders": weekly_orders,
-        "weekly_earnings": weekly_earnings,
-        "weekly_target_orders": weekly_target_orders,
-        "weekly_target_earnings": weekly_target_earnings,
-        "weekly_orders_progress": weekly_orders_progress,
-        "weekly_earnings_progress": weekly_earnings_progress,
-        "weekly_bonus_amount": weekly_bonus_amount,
-        "weekly_success_rate": weekly_success_rate,
-        "weekly_peak_rides": weekly_peak_rides,
+        "stats": stats,
     }
-
-    # Petit debug
-    print("DEBUG driver_me_app – commandes affichées :", orders.count())
-
     return render(request, "orders/driver_me.html", context)
 
 

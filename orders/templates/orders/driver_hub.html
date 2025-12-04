@@ -1,307 +1,243 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block content %}
-<div class="driver-hub-page">
-    <!-- HEADER PREMIUM FAGNI -->
-    <header class="driver-hub-header">
-        <div class="driver-hub-header__left">
-            <p class="driver-hub-header__hello">
+<div class="driver-hub">
+
+    <!-- BRAND FAGNI -->
+    <div class="driver-brand">
+        <div class="driver-brand__logo">
+            <img src="{% static 'img/fagni/logo_fagni_light.png' %}"
+                 alt="Logo FAGNI"
+                 onerror="this.style.display='none';this.parentElement.innerHTML='<span class=&quot;driver-brand__logo-fallback&quot;>FG</span>';">
+        </div>
+        <div class="driver-brand__text">
+            <div class="driver-brand__name">FAGNI</div>
+            <div class="driver-brand__tagline">App livreur – Hub & performance</div>
+        </div>
+        <div class="driver-brand__pill">
+            <span class="driver-brand__pill-dot"></span>
+            <span>Vue synthèse</span>
+        </div>
+    </div>
+
+    <!-- ==========================
+         HEADER STYLE APP
+    =========================== -->
+    <header class="driver-hub__header">
+        <div class="driver-hub__title-block">
+            <div class="driver-hub__hello">
                 {% if connected_driver %}
                     Bonjour,
-                    <span class="driver-hub-header__hello-name">
+                    <span class="driver-hub__hello-name">
                         {{ connected_driver.name|default:"Livreur FAGNI" }}
                     </span>
                 {% else %}
-                    Bienvenue sur
-                    <span class="driver-hub-header__hello-name">
-                        FAGNI – Livreurs
-                    </span>
+                    Hub livreur FAGNI
                 {% endif %}
-            </p>
-            <p class="driver-hub-header__subtitle">
-                Ton espace de pilotage : performances, courses et actions rapides.
-            </p>
-            <div class="driver-hub-header__chip">
-                🛵 <span>App livreur FAGNI</span>
+            </div>
+            <div class="driver-hub__subtitle">
+                Vue synthèse de tes performances & courses.
             </div>
         </div>
 
-        <div class="driver-hub-header__right">
-            <div class="driver-hub-header__period-pill">
-                <span class="period-label">Période</span>
-                <span class="period-value">
-                    {% if period_display %}
-                        {{ period_display }}
-                    {% else %}
-                        Aujourd'hui ({{ today|date:"d/m" }})
-                    {% endif %}
-                </span>
-            </div>
-            <div class="driver-hub-header__status">
-                <span class="status-dot"></span>
-                <span class="status-text">Connecté</span>
-            </div>
+        <div class="driver-hub__pill">
+            <span class="driver-hub__pill-label">Période</span>
+            <span class="driver-hub__pill-value">
+                {% if period_display %}
+                    {{ period_display }}
+                {% else %}
+                    Aujourd'hui
+                {% endif %}
+            </span>
         </div>
     </header>
 
-    <!-- CONTENU PRINCIPAL -->
-    <main class="driver-hub-main">
+    <!-- ==========================
+         KPIs PRINCIPAUX
+    =========================== -->
+    <section class="driver-hub__kpi-grid">
 
-        <!-- KPIs -->
-        <section class="driver-hub-section">
-            <div class="driver-hub-section__title-row">
-                <h2 class="driver-hub-section__title">Mes indicateurs clés</h2>
-                <p class="driver-hub-section__subtitle">
-                    Vue rapide de ton activité sur la période sélectionnée.
-                </p>
+        <!-- Total courses -->
+        <article class="kpi-card kpi-card--primary">
+            <div class="kpi-card__label">Total courses</div>
+            <div class="kpi-card__value">
+                {{ stats.total_orders|default_if_none:0 }}
             </div>
-
-            <div class="driver-hub-kpi-grid">
-                <!-- Total courses -->
-                <article class="kpi-card kpi-card--primary">
-                    <div class="kpi-card__label">Total courses</div>
-                    <div class="kpi-card__value">
-                        {{ stats.total_orders|default_if_none:0 }}
-                    </div>
-                    <div class="kpi-card__sub">
-                        Terminées :
-                        <strong>{{ stats.done_orders|default_if_none:0 }}</strong> •
-                        En cours :
-                        <strong>{{ stats.in_progress_orders|default_if_none:0 }}</strong>
-                    </div>
-                </article>
-
-                <!-- Actives -->
-                <article class="kpi-card kpi-card--orange">
-                    <div class="kpi-card__label">Courses actives</div>
-                    <div class="kpi-card__value">
-                        {% with p=stats.pending_orders|default_if_none:0 ip=stats.in_progress_orders|default_if_none:0 %}
-                            {{ p|add:ip }}
-                        {% endwith %}
-                    </div>
-                    <div class="kpi-card__sub">
-                        En attente :
-                        <strong>{{ stats.pending_orders|default_if_none:0 }}</strong> /
-                        En cours :
-                        <strong>{{ stats.in_progress_orders|default_if_none:0 }}</strong>
-                    </div>
-                </article>
-
-                <!-- Distance -->
-                <article class="kpi-card kpi-card--blue">
-                    <div class="kpi-card__label">Distance A/R cumulée</div>
-                    <div class="kpi-card__value">
-                        {{ stats.total_distance_km|default_if_none:0|floatformat:"1" }}
-                        <span class="kpi-card__unit">km</span>
-                    </div>
-                    <div class="kpi-card__sub">
-                        {% if stats.avg_distance_km %}
-                            Moyenne :
-                            <strong>{{ stats.avg_distance_km|floatformat:"1" }} km / course</strong>
-                        {% else %}
-                            Moyenne : n.d.
-                        {% endif %}
-                    </div>
-                </article>
-
-                <!-- Revenus -->
-                <article class="kpi-card kpi-card--green">
-                    <div class="kpi-card__label">Revenus logistiques</div>
-                    <div class="kpi-card__value">
-                        {{ stats.total_driver_income|default_if_none:0 }}
-                        <span class="kpi-card__unit">FCFA</span>
-                    </div>
-                    <div class="kpi-card__sub">
-                        Estimation sur la période sélectionnée.
-                    </div>
-                </article>
+            <div class="kpi-card__sub">
+                Terminées :
+                <strong>{{ stats.done_orders|default_if_none:0 }}</strong> •
+                En cours :
+                <strong>{{ stats.in_progress_orders|default_if_none:0 }}</strong>
             </div>
-        </section>
+        </article>
 
-        <!-- ACTIONS RAPIDES -->
-        <section class="driver-hub-section">
-            <div class="driver-hub-section__title-row">
-                <h2 class="driver-hub-section__title">Actions rapides</h2>
-                <p class="driver-hub-section__subtitle">
-                    Accède en un geste à ce dont tu as besoin le plus souvent.
-                </p>
+        <!-- En attente / En cours -->
+        <article class="kpi-card kpi-card--orange">
+            <div class="kpi-card__label">Actives</div>
+            <div class="kpi-card__value">
+                {{ stats.pending_orders|default_if_none:0|add:stats.in_progress_orders|default_if_none:0 }}
             </div>
+            <div class="kpi-card__sub">
+                En attente : {{ stats.pending_orders|default_if_none:0 }} /
+                En cours : {{ stats.in_progress_orders|default_if_none:0 }}
+            </div>
+        </article>
 
-            <div class="driver-hub-actions-grid">
-                <a href="{% url 'orders:driver_app' %}"
-                   class="driver-action-card driver-action-card--primary">
-                    <div class="driver-action-card__icon">📋</div>
-                    <div class="driver-action-card__content">
-                        <div class="driver-action-card__title">Mes courses</div>
-                        <div class="driver-action-card__text">
-                            Voir toutes tes courses (actives, terminées, annulées).
-                        </div>
-                    </div>
-                    <div class="driver-action-card__chevron">›</div>
-                </a>
-
-                {% if connected_driver %}
-                    <a href="{% url 'orders:driver_performance' connected_driver.id %}"
-                       class="driver-action-card">
-                        <div class="driver-action-card__icon">📊</div>
-                        <div class="driver-action-card__content">
-                            <div class="driver-action-card__title">Mes KPI & performance</div>
-                            <div class="driver-action-card__text">
-                                Suivi détaillé de ton activité, performance & classement.
-                            </div>
-                        </div>
-                        <div class="driver-action-card__chevron">›</div>
-                    </a>
+        <!-- Distance -->
+        <article class="kpi-card kpi-card--blue">
+            <div class="kpi-card__label">Distance A/R</div>
+            <div class="kpi-card__value">
+                {{ stats.total_distance_km|default_if_none:0|floatformat:"2" }}
+                <span class="kpi-card__unit">km</span>
+            </div>
+            <div class="kpi-card__sub">
+                {% if stats.avg_distance_km %}
+                    Moyenne : {{ stats.avg_distance_km|floatformat:"1" }} km / course
                 {% else %}
-                    <a href="{% url 'orders:driver_leaderboard' %}"
-                       class="driver-action-card">
-                        <div class="driver-action-card__icon">🏆</div>
-                        <div class="driver-action-card__content">
-                            <div class="driver-action-card__title">Classement livreurs</div>
-                            <div class="driver-action-card__text">
-                                Voir le top des livreurs FAGNI.
-                            </div>
-                        </div>
-                        <div class="driver-action-card__chevron">›</div>
-                    </a>
+                    Moyenne : n.d.
                 {% endif %}
-
-                <a href="{% url 'orders:driver_map' %}"
-                   class="driver-action-card">
-                    <div class="driver-action-card__icon">🗺️</div>
-                    <div class="driver-action-card__content">
-                        <div class="driver-action-card__title">Carte & itinéraires</div>
-                        <div class="driver-action-card__text">
-                            Visualise tes adresses clients et ouvre ton GPS.
-                        </div>
-                    </div>
-                    <div class="driver-action-card__chevron">›</div>
-                </a>
-
-                <a href="{% url 'orders:driver_history_me' %}"
-                   class="driver-action-card">
-                    <div class="driver-action-card__icon">📜</div>
-                    <div class="driver-action-card__content">
-                        <div class="driver-action-card__title">Historique perso</div>
-                        <div class="driver-action-card__text">
-                            Consulte ton historique de courses détaillé.
-                        </div>
-                    </div>
-                    <div class="driver-action-card__chevron">›</div>
-                </a>
-
-                <a href="{% url 'orders:driver_leaderboard' %}"
-                   class="driver-action-card">
-                    <div class="driver-action-card__icon">🏆</div>
-                    <div class="driver-action-card__content">
-                        <div class="driver-action-card__title">Classement général</div>
-                        <div class="driver-action-card__text">
-                            Compare ta performance aux autres livreurs.
-                        </div>
-                    </div>
-                    <div class="driver-action-card__chevron">›</div>
-                </a>
             </div>
-        </section>
+        </article>
 
-        <!-- DERNIÈRES COURSES -->
-        <section class="driver-hub-section">
-            <div class="driver-hub-section__title-row">
-                <h2 class="driver-hub-section__title">Dernières courses</h2>
-                <a href="{% url 'orders:driver_app' %}" class="driver-hub-section__link">
-                    Voir toutes mes courses →
-                </a>
+        <!-- Gains logistic -->
+        <article class="kpi-card kpi-card--green">
+            <div class="kpi-card__label">Revenus logistiques</div>
+            <div class="kpi-card__value">
+                {{ stats.total_driver_income|default_if_none:0 }} <span class="kpi-card__unit">FCFA</span>
             </div>
+            <div class="kpi-card__sub">
+                Estimation sur la période sélectionnée
+            </div>
+        </article>
+    </section>
 
-            {% if last_orders %}
-                <div class="driver-hub-orders-list">
-                    {% for order in last_orders %}
-                        <article class="driver-mini-order">
-                            <div class="driver-mini-order__header">
-                                <div class="driver-mini-order__code">
-                                    {{ order.code|default:order.id }}
-                                </div>
-                                <span class="driver-mini-order__badge driver-mini-order__badge--{{ order.status }}">
-                                    {{ order.get_status_display }}
-                                </span>
-                            </div>
+    <!-- ==========================
+         BOUTONS RAPIDES
+    =========================== -->
+    <section class="driver-hub__quick-actions card">
+        <div class="driver-hub__qa-title">
+            Actions rapides
+        </div>
+        <div class="driver-hub__qa-grid">
+            <!-- Mes courses -->
+            <a href="{% url 'orders:driver_app' %}" class="chip-button chip-button--primary">
+                <span class="chip-label">📋 Mes courses</span>
+            </a>
 
-                            <div class="driver-mini-order__body">
-                                <div class="driver-mini-order__line">
-                                    <span class="label">Client</span>
-                                    <span class="value">
-                                        {{ order.customer.name|default:"Client inconnu" }}
-                                    </span>
-                                </div>
-                                <div class="driver-mini-order__line">
-                                    <span class="label">Date</span>
-                                    <span class="value">
-                                        {% if order.created_at %}
-                                            {{ order.created_at|date:"d/m H:i" }}
-                                        {% else %}
-                                            –
-                                        {% endif %}
-                                    </span>
-                                </div>
-                                <div class="driver-mini-order__line">
-                                    <span class="label">Montant</span>
-                                    <span class="value">
-                                        {{ order.total|default:0 }} FCFA
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div class="driver-mini-order__footer">
-                                <div class="driver-mini-order__footer-left">
-                                    {% if order.distance_km %}
-                                        <span class="driver-mini-order__meta">
-                                            {{ order.distance_km|floatformat:"1" }} km A/R
-                                        </span>
-                                    {% endif %}
-                                </div>
-                                <div class="driver-mini-order__footer-actions">
-                                    <a href="{% url 'orders:driver_order_detail_me' order.id %}"
-                                       class="btn-mini btn-mini--dark">
-                                        Détail
-                                    </a>
-                                    {% if order.customer.address %}
-                                        <a href="https://www.google.com/maps/search/?api=1&query={{ order.customer.address|urlencode }}"
-                                           target="_blank"
-                                           class="btn-mini btn-mini--light">
-                                            🧭 Itinéraire
-                                        </a>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </article>
-                    {% endfor %}
-                </div>
+            <!-- KPI / Performance -->
+            {% if connected_driver %}
+                <a href="{% url 'orders:driver_performance' connected_driver.id %}"
+                   class="chip-button chip-button--ghost">
+                    <span class="chip-label">📊 Mes KPI & performance</span>
+                </a>
             {% else %}
-                <p class="driver-hub-empty">
-                    Aucune course récente trouvée pour cette période.
-                </p>
+                <a href="{% url 'orders:driver_leaderboard' %}"
+                   class="chip-button chip-button--ghost">
+                    <span class="chip-label">📊 KPI livreurs</span>
+                </a>
             {% endif %}
-        </section>
 
-        <!-- HIGHLIGHTS (optionnel) -->
-        {% if highlights %}
-            <section class="driver-hub-section">
-                <div class="driver-hub-section__title-row">
-                    <h2 class="driver-hub-section__title">Highlights</h2>
-                </div>
-                <ul class="driver-hub-highlights">
-                    {% for h in highlights %}
-                        <li>{{ h }}</li>
-                    {% endfor %}
-                </ul>
-            </section>
+            <!-- Carte -->
+            <a href="{% url 'orders:driver_map' %}" class="chip-button">
+                <span class="chip-label">🗺️ Carte</span>
+            </a>
+
+            <!-- Historique perso -->
+            <a href="{% url 'orders:driver_history_me' %}" class="chip-button">
+                <span class="chip-label">📜 Historique</span>
+            </a>
+
+            <!-- Classement global -->
+            <a href="{% url 'orders:driver_leaderboard' %}" class="chip-button chip-button--ghost">
+                <span class="chip-label">🏆 Classement</span>
+            </a>
+        </div>
+    </section>
+
+    <!-- ==========================
+         DERNIÈRES COURSES
+    =========================== -->
+    <section class="driver-hub__section card">
+        <div class="driver-hub__section-header">
+            <h2 class="driver-hub__section-title">Dernières courses</h2>
+            <a href="{% url 'orders:driver_app' %}" class="driver-hub__section-link">
+                Voir toutes → 
+            </a>
+        </div>
+
+        {% if last_orders %}
+            <div class="driver-hub__orders-list">
+                {% for order in last_orders %}
+                    <article class="mini-order">
+                        <div class="mini-order__main">
+                            <div class="mini-order__code">
+                                {{ order.code|default:order.id }}
+                            </div>
+                            <span class="mini-order__badge mini-order__badge--{{ order.status }}">
+                                {{ order.get_status_display }}
+                            </span>
+                        </div>
+                        <div class="mini-order__meta">
+                            <span class="mini-order__client">
+                                👤 {{ order.customer.name|default:"Client inconnu" }}
+                            </span>
+                            <span class="mini-order__date">
+                                {% if order.created_at %}
+                                    {{ order.created_at|date:"d/m H:i" }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="mini-order__bottom">
+                            <div class="mini-order__amount">
+                                {{ order.total|default:0 }} FCFA
+                            </div>
+                            <div class="mini-order__actions">
+                                <a href="{% url 'orders:driver_order_detail_me' order.id %}"
+                                   class="btn btn-light btn-sm mini-order__btn">
+                                    Détail
+                                </a>
+                                {% if order.customer.address %}
+                                    <a href="https://www.google.com/maps/search/?api=1&query={{ order.customer.address|urlencode }}"
+                                       target="_blank"
+                                       class="btn btn-light btn-sm mini-order__btn">
+                                        🧭 Itinéraire
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="driver-hub__empty">
+                Aucune course récente trouvée pour cette période.
+            </p>
         {% endif %}
+    </section>
 
-        <div class="driver-hub-bottom-spacer"></div>
-    </main>
+    <!-- ==========================
+         JOURNAL / HIGHLIGHTS (optionnel)
+    =========================== -->
+    {% if highlights %}
+    <section class="driver-hub__section card">
+        <div class="driver-hub__section-header">
+            <h2 class="driver-hub__section-title">Highlights</h2>
+        </div>
+        <ul class="driver-hub__highlights">
+            {% for h in highlights %}
+                <li>{{ h }}</li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+    <div class="driver-hub__bottom-spacer"></div>
 </div>
 
-<!-- NAVBAR BASSE SUPER-APP -->
+<!-- NAVBAR FIXE BAS D'ÉCRAN -->
 <nav class="driver-bottom-nav">
     <a href="{% url 'orders:driver_hub' %}" class="driver-bottom-nav__item driver-bottom-nav__item--active">
         <span class="driver-bottom-nav__icon">🏠</span>
@@ -322,495 +258,84 @@
 </nav>
 
 <style>
-    :root {
-        --fagni-navy: #0F172A;
-        --fagni-navy-soft: #111827;
-        --fagni-blue: #1D4ED8;
-        --fagni-orange: #FF7A00;
-        --fagni-bg: #F3F4F6;
-        --fagni-card-bg: #FFFFFF;
-        --fagni-border: #E5E7EB;
-        --fagni-muted: #9CA3AF;
-    }
-
-    .driver-hub-page {
-        max-width: 960px;
+    .driver-hub {
+        max-width: 800px;
         margin: 0 auto;
-        background: var(--fagni-bg);
-        padding: 0 10px 80px;
+        padding: 10px 12px 80px;
     }
 
-    /* HEADER */
-    .driver-hub-header {
-        margin: -8px -10px 12px;
-        padding: 14px 16px 18px;
-        background: radial-gradient(circle at top left, var(--fagni-orange), var(--fagni-navy));
-        color: #FFFFFF;
+    .card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 12px 14px;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+        border: 1px solid #e5e7eb;
+        margin-bottom: 10px;
+    }
+
+    /* BRAND COMMON */
+    .driver-brand {
         display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        flex-wrap: wrap;
-        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.45);
-        border-radius: 0 0 18px 18px;
-    }
-
-    .driver-hub-header__hello {
-        margin: 0;
-        font-size: 13px;
-        opacity: 0.95;
-    }
-
-    .driver-hub-header__hello-name {
-        font-weight: 700;
-    }
-
-    .driver-hub-header__subtitle {
-        margin: 4px 0 6px;
-        font-size: 12px;
-        opacity: 0.9;
-    }
-
-    .driver-hub-header__chip {
-        display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 4px 10px;
-        border-radius: 999px;
-        background: rgba(15, 23, 42, 0.15);
-        border: 1px solid rgba(255, 255, 255, 0.28);
-        font-size: 11px;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 16px;
+        background: #0F172A;
+        color: #E5E7EB;
+        margin-bottom: 10px;
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.35);
     }
-
-    .driver-hub-header__right {
+    .driver-brand__logo {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        background: radial-gradient(circle at 30% 20%, #FDBA74, #F97316);
         display: flex;
-        flex-direction: column;
-        gap: 6px;
-        align-items: flex-end;
-        justify-content: space-between;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
     }
-
-    .driver-hub-header__period-pill {
-        padding: 6px 10px;
-        border-radius: 999px;
-        background: rgba(15, 23, 42, 0.25);
-        border: 1px solid rgba(255, 255, 255, 0.45);
-        font-size: 11px;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        min-width: 130px;
-    }
-
-    .period-label {
-        text-transform: uppercase;
+    .driver-brand__logo-fallback {
+        font-weight: 800;
+        font-size: 14px;
         letter-spacing: 0.08em;
-        font-weight: 600;
-        opacity: 0.9;
-        font-size: 10px;
+        color: #111827;
     }
-
-    .period-value {
-        font-weight: 600;
-        font-size: 12px;
+    .driver-brand__text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
     }
-
-    .driver-hub-header__status {
+    .driver-brand__name {
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #F9FAFB;
+    }
+    .driver-brand__tagline {
+        font-size: 11px;
+        color: #CBD5F5;
+    }
+    .driver-brand__pill {
+        margin-left: auto;
+        font-size: 11px;
+        padding: 4px 9px;
+        border-radius: 999px;
+        border: 1px solid rgba(248, 250, 252, 0.25);
+        background: rgba(15, 23, 42, 0.6);
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 3px 8px;
-        border-radius: 999px;
-        background: rgba(22, 163, 74, 0.1);
-        border: 1px solid rgba(74, 222, 128, 0.8);
-        font-size: 11px;
+        gap: 4px;
+        white-space: nowrap;
     }
-
-    .status-dot {
+    .driver-brand__pill-dot {
         width: 7px;
         height: 7px;
         border-radius: 999px;
         background: #22C55E;
-        box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.4);
     }
 
-    .status-text {
-        font-weight: 500;
-    }
-
-    /* MAIN */
-    .driver-hub-main {
-        margin-top: 10px;
-    }
-
-    .driver-hub-section {
-        background: var(--fagni-card-bg);
-        border-radius: 16px;
-        padding: 12px 14px;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
-        border: 1px solid var(--fagni-border);
-        margin-bottom: 12px;
-    }
-
-    .driver-hub-section__title-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 8px;
-        margin-bottom: 8px;
-        flex-wrap: wrap;
-    }
-
-    .driver-hub-section__title {
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--fagni-navy-soft);
-        margin: 0;
-    }
-
-    .driver-hub-section__subtitle {
-        font-size: 11px;
-        color: var(--fagni-muted);
-        margin: 0;
-        max-width: 260px;
-    }
-
-    .driver-hub-section__link {
-        margin-left: auto;
-        font-size: 11px;
-        color: var(--fagni-blue);
-    }
-
-    /* KPI GRID */
-    .driver-hub-kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-        gap: 10px;
-    }
-
-    .kpi-card {
-        background: #F9FAFB;
-        border-radius: 12px;
-        padding: 9px 10px;
-        border: 1px solid var(--fagni-border);
-        position: relative;
-        overflow: hidden;
-    }
-
-    .kpi-card::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        opacity: 0.5;
-        pointer-events: none;
-    }
-
-    .kpi-card__label {
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: #6B7280;
-        margin-bottom: 3px;
-        font-weight: 600;
-    }
-
-    .kpi-card__value {
-        font-size: 20px;
-        font-weight: 700;
-        color: var(--fagni-navy-soft);
-        display: flex;
-        align-items: baseline;
-        gap: 4px;
-    }
-
-    .kpi-card__unit {
-        font-size: 11px;
-        color: var(--fagni-muted);
-    }
-
-    .kpi-card__sub {
-        font-size: 11px;
-        color: var(--fagni-muted);
-        margin-top: 2px;
-    }
-
-    .kpi-card--primary::before {
-        border-top: 2px solid var(--fagni-navy);
-    }
-
-    .kpi-card--orange::before {
-        border-top: 2px solid var(--fagni-orange);
-    }
-
-    .kpi-card--blue::before {
-        border-top: 2px solid var(--fagni-blue);
-    }
-
-    .kpi-card--green::before {
-        border-top: 2px solid #16A34A;
-    }
-
-    /* ACTIONS RAPIDES */
-    .driver-hub-actions-grid {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 8px;
-    }
-
-    @media (min-width: 720px) {
-        .driver-hub-actions-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-    }
-
-    .driver-action-card {
-        border-radius: 14px;
-        border: 1px solid var(--fagni-border);
-        background: #F9FAFB;
-        padding: 9px 10px;
-        display: grid;
-        grid-template-columns: auto 1fr auto;
-        gap: 8px;
-        align-items: center;
-        text-decoration: none;
-        color: var(--fagni-navy-soft);
-    }
-
-    .driver-action-card--primary {
-        background: linear-gradient(135deg, var(--fagni-navy), #173B63);
-        color: #FFFFFF;
-        border-color: rgba(15, 23, 42, 0.2);
-    }
-
-    .driver-action-card__icon {
-        width: 32px;
-        height: 32px;
-        border-radius: 999px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 18px;
-        background: rgba(15, 23, 42, 0.04);
-    }
-
-    .driver-action-card--primary .driver-action-card__icon {
-        background: rgba(255, 255, 255, 0.12);
-    }
-
-    .driver-action-card__content {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-    }
-
-    .driver-action-card__title {
-        font-size: 13px;
-        font-weight: 600;
-    }
-
-    .driver-action-card__text {
-        font-size: 11px;
-        color: var(--fagni-muted);
-    }
-
-    .driver-action-card--primary .driver-action-card__text {
-        color: rgba(248, 250, 252, 0.9);
-    }
-
-    .driver-action-card__chevron {
-        font-size: 18px;
-        opacity: 0.5;
-    }
-
-    /* LISTE DERNIÈRES COURSES */
-    .driver-hub-orders-list {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .driver-mini-order {
-        border-radius: 14px;
-        border: 1px solid var(--fagni-border);
-        background: #F9FAFB;
-        overflow: hidden;
-    }
-
-    .driver-mini-order__header {
-        background: linear-gradient(135deg, var(--fagni-navy), #173B63);
-        color: #FFFFFF;
-        padding: 8px 12px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 6px;
-    }
-
-    .driver-mini-order__code {
-        font-size: 13px;
-        font-weight: 700;
-    }
-
-    .driver-mini-order__badge {
-        font-size: 10px;
-        padding: 3px 8px;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.4);
-        white-space: nowrap;
-        font-weight: 500;
-    }
-
-    .driver-mini-order__badge--pending {
-        background: rgba(251, 191, 36, 0.18);
-    }
-
-    .driver-mini-order__badge--in_progress {
-        background: rgba(59, 130, 246, 0.22);
-    }
-
-    .driver-mini-order__badge--done {
-        background: rgba(34, 197, 94, 0.22);
-    }
-
-    .driver-mini-order__badge--canceled {
-        background: rgba(239, 68, 68, 0.22);
-    }
-
-    .driver-mini-order__body {
-        padding: 8px 10px 2px;
-    }
-
-    .driver-mini-order__line {
-        display: flex;
-        justify-content: space-between;
-        font-size: 12px;
-        margin-bottom: 2px;
-        gap: 8px;
-    }
-
-    .driver-mini-order__line .label {
-        color: var(--fagni-muted);
-    }
-
-    .driver-mini-order__line .value {
-        font-weight: 500;
-        color: var(--fagni-navy-soft);
-        text-align: right;
-    }
-
-    .driver-mini-order__footer {
-        border-top: 1px dashed var(--fagni-border);
-        padding: 6px 10px 8px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
-    }
-
-    .driver-mini-order__meta {
-        font-size: 11px;
-        color: var(--fagni-muted);
-    }
-
-    .driver-mini-order__footer-actions {
-        display: flex;
-        gap: 6px;
-        flex-wrap: wrap;
-        justify-content: flex-end;
-    }
-
-    .btn-mini {
-        font-size: 11px;
-        padding: 4px 9px;
-        border-radius: 999px;
-        border: 1px solid var(--fagni-border);
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-    }
-
-    .btn-mini--dark {
-        background: var(--fagni-navy);
-        color: #FFFFFF;
-        border-color: var(--fagni-navy);
-    }
-
-    .btn-mini--light {
-        background: #FFFFFF;
-        color: var(--fagni-navy-soft);
-    }
-
-    .driver-hub-empty {
-        font-size: 12px;
-        color: var(--fagni-muted);
-        margin: 4px 0 0;
-    }
-
-    /* HIGHLIGHTS */
-    .driver-hub-highlights {
-        list-style: none;
-        padding-left: 0;
-        margin: 0;
-        font-size: 12px;
-        color: #475569;
-    }
-
-    .driver-hub-highlights li {
-        padding: 3px 0;
-    }
-
-    .driver-hub-bottom-spacer {
-        height: 56px;
-    }
-
-    /* NAVBAR BASSE */
-    .driver-bottom-nav {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 56px;
-        background: #FFFFFF;
-        border-top: 1px solid var(--fagni-border);
-        display: flex;
-        justify-content: space-around;
-        align-items: center;
-        z-index: 40;
-    }
-
-    .driver-bottom-nav__item {
-        flex: 1;
-        text-align: center;
-        font-size: 11px;
-        color: #9CA3AF;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 2px;
-        text-decoration: none;
-    }
-
-    .driver-bottom-nav__icon {
-        font-size: 16px;
-        line-height: 1;
-    }
-
-    .driver-bottom-nav__item--active {
-        color: var(--fagni-navy);
-        font-weight: 600;
-    }
-
-    .driver-bottom-nav__item--active .driver-bottom-nav__icon {
-        transform: translateY(-1px);
-    }
-
-    @media (max-width: 640px) {
-        .driver-hub-header {
-            border-radius: 0 0 14px 14px;
-        }
-    }
+    /* ... (le reste de ton CSS existant driver-hub : header, KPI, mini-order, nav bas) ... */
 </style>
 {% endblock %}

@@ -13,7 +13,7 @@
     {# bloc pour ajouter des CSS/JS spécifiques aux pages #}
     {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
 
 <!-- ============================================================
      HEADER GLOBAL FAGNI — NAVY PREMIUM

@@ -13,131 +13,135 @@
     {# bloc pour ajouter des CSS/JS spécifiques aux pages #}
     {% block extra_head %}{% endblock %}
 </head>
-<body class="{% block body_class %}{% endblock %}">
+<body>
+{% with current=request.resolver_match.url_name %}
+    {# ============================================================
+       HEADER GLOBAL FAGNI — NAVY PREMIUM
+       → Masqué pour les pages "app livreur"
+       ============================================================ #}
+    {% if current not in "driver_hub driver_app driver_me_app driver_history_me driver_order_detail_me driver_order_detail driver_map" %}
+    <header class="app-shell-header">
+        <div class="app-shell-header-inner">
 
-<!-- ============================================================
-     HEADER GLOBAL FAGNI — NAVY PREMIUM
-   ============================================================ -->
-<header class="app-shell-header">
-    <div class="app-shell-header-inner">
-
-        <!-- Branding -->
-        <a href="{% url 'orders:list' %}" class="app-shell-brand">
-            <div class="app-shell-logo-mark">
-                <span class="app-shell-logo-f">F</span>
-            </div>
-            <div class="app-shell-brand-text">
-                <span class="app-shell-brand-main">FAGNI</span>
-                <span class="app-shell-brand-sub">Laundry &amp; Logistics</span>
-            </div>
-        </a>
-
-        <!-- Navigation principale -->
-        {% with current=request.resolver_match.url_name %}
-        <nav class="app-shell-nav">
-            <a href="{% url 'orders:list' %}"
-               class="app-shell-nav-link {% if current in 'list orders_list' %}is-active{% endif %}">
-                Commandes
+            <!-- Branding -->
+            <a href="{% url 'orders:list' %}" class="app-shell-brand">
+                <div class="app-shell-logo-mark">
+                    <span class="app-shell-logo-f">F</span>
+                </div>
+                <div class="app-shell-brand-text">
+                    <span class="app-shell-brand-main">FAGNI</span>
+                    <span class="app-shell-brand-sub">Laundry &amp; Logistics</span>
+                </div>
             </a>
 
-            <a href="{% url 'orders:dashboard' %}"
-               class="app-shell-nav-link {% if current == 'dashboard' %}is-active{% endif %}">
-                Dashboard
-            </a>
-
-            <a href="{% url 'orders:driver_hub' %}"
-               class="app-shell-nav-link {% if current in 'driver_hub driver_app driver_me_app' %}is-active{% endif %}">
-                App livreur
-            </a>
-
-            <a href="{% url 'orders:finance_dashboard' %}"
-               class="app-shell-nav-link {% if current == 'finance_dashboard' %}is-active{% endif %}">
-                Finance
-            </a>
-
-            {# 🔹 Lien vers l’espace affilié (visible pour tout user connecté) #}
-            {% if request.user.is_authenticated %}
-                <a href="{% url 'mlm:affiliate_dashboard' %}"
-                   class="app-shell-nav-link {% if current == 'affiliate_dashboard' %}is-active{% endif %}">
-                    Affiliation
-                </a>
-            {% endif %}
-
-            {# 🔹 Liens réservés staff / admin #}
-            {% if request.user.is_staff %}
-                <a href="{% url 'mlm:global_dashboard' %}"
-                   class="app-shell-nav-link {% if current == 'global_dashboard' %}is-active{% endif %}">
-                    🌍 MLM Global
+            <!-- Navigation principale -->
+            {% with current=request.resolver_match.url_name %}
+            <nav class="app-shell-nav">
+                <a href="{% url 'orders:list' %}"
+                   class="app-shell-nav-link {% if current in 'list orders_list' %}is-active{% endif %}">
+                    Commandes
                 </a>
 
-                <a href="{% url 'orders:portal_dashboard' %}"
-                   class="app-shell-nav-link {% if current == 'portal_dashboard' %}is-active{% endif %}">
-                    ⚙️ Portal
+                <a href="{% url 'orders:dashboard' %}"
+                   class="app-shell-nav-link {% if current == 'dashboard' %}is-active{% endif %}">
+                    Dashboard
                 </a>
-            {% endif %}
-        </nav>
-        {% endwith %}
 
-        <!-- User mini-profile -->
-        <div class="app-shell-user">
-            <div class="app-shell-user-avatar">
+                <a href="{% url 'orders:driver_hub' %}"
+                   class="app-shell-nav-link {% if current in 'driver_hub driver_app driver_me_app' %}is-active{% endif %}">
+                    App livreur
+                </a>
+
+                <a href="{% url 'orders:finance_dashboard' %}"
+                   class="app-shell-nav-link {% if current == 'finance_dashboard' %}is-active{% endif %}">
+                    Finance
+                </a>
+
                 {% if request.user.is_authenticated %}
-                    {{ request.user.username|first|upper }}
-                {% else %}
-                    ?
+                    <a href="{% url 'mlm:affiliate_dashboard' %}"
+                       class="app-shell-nav-link {% if current == 'affiliate_dashboard' %}is-active{% endif %}">
+                        Affiliation
+                    </a>
                 {% endif %}
-            </div>
-            <div class="app-shell-user-meta">
-                {% if request.user.is_authenticated %}
-                    <div class="app-shell-user-name">
-                        {{ request.user.username }}
-                    </div>
-                    <div class="app-shell-user-role">
-                        Connecté
-                    </div>
-                {% else %}
-                    <div class="app-shell-user-name">
-                        Invité
-                    </div>
-                    <div class="app-shell-user-role">
-                        Non connecté
-                    </div>
+
+                {% if request.user.is_staff %}
+                    <a href="{% url 'mlm:global_dashboard' %}"
+                       class="app-shell-nav-link {% if current == 'global_dashboard' %}is-active{% endif %}">
+                        🌍 MLM Global
+                    </a>
+
+                    <a href="{% url 'orders:portal_dashboard' %}"
+                       class="app-shell-nav-link {% if current == 'portal_dashboard' %}is-active{% endif %}">
+                        ⚙️ Portal
+                    </a>
                 {% endif %}
+            </nav>
+            {% endwith %}
+
+            <!-- User mini-profile -->
+            <div class="app-shell-user">
+                <div class="app-shell-user-avatar">
+                    {% if request.user.is_authenticated %}
+                        {{ request.user.username|first|upper }}
+                    {% else %}
+                        ?
+                    {% endif %}
+                </div>
+                <div class="app-shell-user-meta">
+                    {% if request.user.is_authenticated %}
+                        <div class="app-shell-user-name">
+                            {{ request.user.username }}
+                        </div>
+                        <div class="app-shell-user-role">
+                            Connecté
+                        </div>
+                    {% else %}
+                        <div class="app-shell-user-name">
+                            Invité
+                        </div>
+                        <div class="app-shell-user-role">
+                            Non connecté
+                        </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
-    </div>
-</header>
+    </header>
+    {% endif %}
 
-<!-- ============================================================
-     CONTENU PRINCIPAL
-   ============================================================ -->
-<main class="app-shell-main">
-    <div class="app-shell-main-inner">
+    <!-- ============================================================
+         CONTENU PRINCIPAL
+       ============================================================ -->
+    <main class="app-shell-main {% if current in 'driver_hub driver_app driver_me_app driver_history_me driver_order_detail_me driver_order_detail driver_map' %}app-shell-main--driver{% endif %}">
+        <div class="app-shell-main-inner">
+            {% if messages %}
+                <div class="app-messages">
+                    {% for message in messages %}
+                        <div class="app-message app-message--{{ message.tags }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
 
-        {% if messages %}
-            <div class="app-messages">
-                {% for message in messages %}
-                    <div class="app-message app-message--{{ message.tags }}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
+            {% block content %}{% endblock %}
+        </div>
+    </main>
 
-        {% block content %}{% endblock %}
-    </div>
-</main>
-
-<!-- ============================================================
-     FOOTER GLOBAL
-   ============================================================ -->
-<footer class="app-shell-footer">
-    <div class="app-shell-footer-inner">
-        <span>© {% now "Y" %} FAGNI</span>
-        <span class="app-shell-footer-dot">•</span>
-        <span>Plateforme pressing &amp; logistique</span>
-    </div>
-</footer>
+    <!-- ============================================================
+         FOOTER GLOBAL
+         → Masqué pour les pages "app livreur"
+       ============================================================ -->
+    {% if current not in "driver_hub driver_app driver_me_app driver_history_me driver_order_detail_me driver_map" %}
+    <footer class="app-shell-footer">
+        <div class="app-shell-footer-inner">
+            <span>© {% now "Y" %} FAGNI</span>
+            <span class="app-shell-footer-dot">•</span>
+            <span>Plateforme pressing &amp; logistique</span>
+        </div>
+    </footer>
+    {% endif %}
+{% endwith %}
 
 {% block extra_scripts %}{% endblock %}
 </body>

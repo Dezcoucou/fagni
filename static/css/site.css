@@ -1,0 +1,1169 @@
+/* ============================================================
+   FAGNI DESIGN SYSTEM — ULTRA PRO / PREMIUM
+   ============================================================ */
+
+/* ---------- Palette & Tokens ---------- */
+
+:root {
+    --fagni-primary: #F07C22;          /* Orange FAGNI */
+    --fagni-primary-soft: #FDE7CF;
+    --fagni-primary-hover: #d96815;
+
+    --fagni-navy: #111827;             /* Bleu très sombre pour header */
+    --fagni-navy-soft: #1f2933;
+    --fagni-navy-light: #374151;
+
+    --fagni-bg: #f4f7fb;               /* Background global */
+    --fagni-surface: #ffffff;          /* Cartes, surfaces */
+    --fagni-surface-soft: #f9fafb;
+    --fagni-border: #e2e8f0;           /* Gris neutre */
+    --fagni-border-strong: #cbd5e1;
+
+    --fagni-text: #0f172a;             /* Texte principal */
+    --fagni-text-soft: #64748b;        /* Texte secondaire */
+    --fagni-muted: #94a3b8;            /* Texte discret */
+
+    --fagni-success: #16a34a;
+    --fagni-warning: #fbbf24;
+    --fagni-danger:  #dc2626;
+
+    --fagni-radius-xs: 4px;
+    --fagni-radius-sm: 8px;
+    --fagni-radius-md: 12px;
+    --fagni-radius-lg: 18px;
+    --fagni-radius-pill: 999px;
+
+    --fagni-shadow-soft: 0 2px 6px rgba(15, 23, 42, 0.08);
+    --fagni-shadow-card: 0 4px 12px rgba(15, 23, 42, 0.12);
+
+    --fagni-font-sans: system-ui, -apple-system, BlinkMacSystemFont,
+        "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+}
+
+/* ============================================================
+   RESET GLOBAL
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--fagni-font-sans);
+    background: var(--fagni-bg);
+    color: var(--fagni-text);
+    -webkit-font-smoothing: antialiased;
+    font-size: 14px;
+}
+
+/* Liens */
+a {
+    color: var(--fagni-navy);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* ============================================================
+   APP SHELL — HEADER / MAIN / FOOTER
+   ============================================================ */
+
+.app-shell-header {
+    background: linear-gradient(90deg, var(--fagni-navy), #000000);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.35);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+}
+
+.app-shell-header-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+/* Branding */
+.app-shell-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #fff;
+    text-decoration: none;
+}
+
+.app-shell-logo-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    background: var(--fagni-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 18px;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12);
+}
+
+.app-shell-brand-main {
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 0.05em;
+}
+
+.app-shell-brand-sub {
+    font-size: 11px;
+    opacity: 0.7;
+}
+
+/* Navigation principale */
+.app-shell-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.app-shell-nav-link {
+    padding: 6px 12px;
+    border-radius: var(--fagni-radius-pill);
+    font-size: 13px;
+    color: #e5e7eb;
+    text-decoration: none;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease;
+}
+
+.app-shell-nav-link:hover {
+    background: rgba(148, 163, 184, 0.25);
+    transform: translateY(-1px);
+}
+
+.app-shell-nav-link.active {
+    background: var(--fagni-primary);
+    color: #fff;
+}
+
+/* User */
+.app-shell-user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.app-shell-user-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    background: #1f2937;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.6);
+}
+
+.app-shell-user-meta {
+    display: flex;
+    flex-direction: column;
+}
+
+.app-shell-user-name {
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.app-shell-user-role {
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+/* Main + footer */
+
+.app-shell-main {
+    padding: 10px 0 32px;
+}
+
+.app-shell-main-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+
+.app-shell-footer {
+    border-top: 1px solid var(--fagni-border);
+    background: #0b1120;
+    color: #9ca3af;
+}
+
+.app-shell-footer-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 8px 16px 10px;
+    font-size: 11px;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.app-shell-footer-dot {
+    opacity: 0.6;
+}
+
+/* ============================================================
+   MESSAGES DJANGO
+   ============================================================ */
+
+.app-messages {
+    margin-bottom: 10px;
+}
+
+.app-message {
+    padding: 8px 10px;
+    border-radius: var(--fagni-radius-md);
+    font-size: 13px;
+    margin-bottom: 6px;
+}
+
+.app-message--success {
+    background: #dcfce7;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+}
+
+.app-message--error {
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+}
+
+.app-message--warning {
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    color: #92400e;
+}
+
+.app-message--info {
+    background: #dbeafe;
+    border: 1px solid #bfdbfe;
+    color: #1d4ed8;
+}
+
+/* ============================================================
+   TITRES + TEXTES + PAGE HEADER
+   ============================================================ */
+
+h1, h2, h3, h4 {
+    color: var(--fagni-navy);
+    margin: 0 0 4px;
+}
+
+.page-title {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.page-subtitle {
+    font-size: 13px;
+    color: var(--fagni-text-soft);
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.page-header__left {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.page-header__right {
+    align-self: center;
+}
+
+/* ============================================================
+   CARTES / COMPOSANTS GÉNÉRAUX
+   ============================================================ */
+
+.card {
+    background: var(--fagni-surface);
+    border-radius: var(--fagni-radius-lg);
+    padding: 12px 14px;
+    border: 1px solid var(--fagni-border);
+    box-shadow: var(--fagni-shadow-soft);
+    margin-bottom: 12px;
+}
+
+/* Boutons */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 14px;
+    border-radius: var(--fagni-radius-md);
+    border: none;
+    font-size: 13px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: 0.2s ease;
+    gap: 4px;
+}
+
+.btn-sm {
+    font-size: 12px;
+    padding: 6px 10px;
+}
+
+.btn-primary {
+    background: var(--fagni-primary);
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background: var(--fagni-primary-hover);
+    text-decoration: none;
+}
+
+.btn-secondary {
+    background: var(--fagni-navy-light);
+    color: #fff;
+}
+
+.btn-secondary:hover {
+    background: #020617;
+    text-decoration: none;
+}
+
+.btn-light {
+    background: var(--fagni-bg);
+    border: 1px solid var(--fagni-border);
+    color: var(--fagni-text);
+}
+
+.btn-light:hover {
+    background: var(--fagni-surface-soft);
+    text-decoration: none;
+}
+
+.btn-pill {
+    border-radius: var(--fagni-radius-pill);
+}
+
+/* Badges de statut */
+
+.badge-status {
+    font-size: 11px;
+    padding: 3px 8px;
+    font-weight: 600;
+    border-radius: var(--fagni-radius-pill);
+    border: 1px solid transparent;
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.badge-status--pending {
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
+}
+
+.badge-status--in_progress {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+}
+
+.badge-status--done {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #bbf7d0;
+}
+
+.badge-status--canceled {
+    background: #fee2e2;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+/* Chip buttons */
+
+.chip-button {
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: var(--fagni-radius-pill);
+    background: #f1f5f9;
+    border: 1px solid var(--fagni-border);
+    color: var(--fagni-text);
+    text-decoration: none;
+    transition: 0.18s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    line-height: 1.2;
+    min-height: 32px;
+    white-space: normal;
+}
+
+.chip-button:hover {
+    background: #e5e7eb;
+    text-decoration: none;
+}
+
+.chip-button--primary {
+    background: var(--fagni-navy);
+    border-color: var(--fagni-navy);
+    color: #fff;
+}
+
+.chip-button--ghost {
+    background: #ffffff;
+}
+
+/* KPI cards génériques */
+
+.kpi-grid,
+.driver-hub__kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.kpi-card {
+    background: #ffffff;
+    border-radius: var(--fagni-radius-md);
+    padding: 10px 12px;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+    border-left: 4px solid transparent;
+    border: 1px solid var(--fagni-border);
+}
+
+.kpi-card__label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--fagni-muted);
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.kpi-card__value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--fagni-text);
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.kpi-card__unit {
+    font-size: 11px;
+    color: var(--fagni-muted);
+}
+
+.kpi-card__sub {
+    font-size: 11px;
+    color: var(--fagni-text-soft);
+    margin-top: 2px;
+}
+
+.kpi-card--primary { border-left-color: var(--fagni-navy); }
+.kpi-card--orange  { border-left-color: var(--fagni-primary); }
+.kpi-card--blue    { border-left-color: #0ea5e9; }
+.kpi-card--green   { border-left-color: var(--fagni-success); }
+
+/* Formulaires */
+
+input,
+select,
+textarea {
+    font-family: inherit;
+    font-size: 13px;
+    border-radius: var(--fagni-radius-md);
+    border: 1px solid var(--fagni-border);
+    padding: 8px 9px;
+    width: 100%;
+    background: #ffffff;
+    color: var(--fagni-text);
+}
+
+label {
+    font-size: 12px;
+    color: var(--fagni-text-soft);
+    display: block;
+    margin-bottom: 3px;
+}
+
+/* Utilities */
+
+.shadow-soft { box-shadow: var(--fagni-shadow-soft); }
+.shadow-card { box-shadow: var(--fagni-shadow-card); }
+.radius      { border-radius: var(--fagni-radius-md); }
+.radius-lg   { border-radius: var(--fagni-radius-lg); }
+.radius-pill { border-radius: var(--fagni-radius-pill); }
+
+/* ============================================================
+   NAVBAR BASSE — APP LIVREUR MOBILE
+   ============================================================ */
+
+.driver-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: #ffffff;
+    border-top: 1px solid var(--fagni-border);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 40;
+}
+
+.driver-bottom-nav__item {
+    flex: 1;
+    text-align: center;
+    font-size: 11px;
+    color: var(--fagni-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+}
+
+.driver-bottom-nav__icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+.driver-bottom-nav__item--active {
+    color: var(--fagni-navy);
+    font-weight: 600;
+}
+
+/* ============================================================
+   HUB LIVREUR (driver_hub)
+   ============================================================ */
+
+.driver-hub {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 10px 12px 80px;
+}
+
+.driver-hub__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.driver-hub__hello {
+    font-size: 14px;
+    color: var(--fagni-text-soft);
+}
+
+.driver-hub__hello-name {
+    font-weight: 700;
+    color: var(--fagni-text);
+}
+
+.driver-hub__subtitle {
+    font-size: 12px;
+    color: var(--fagni-muted);
+    margin-top: 2px;
+}
+
+.driver-hub__pill,
+.finance-period-pill {
+    align-self: center;
+    padding: 6px 12px;
+    border-radius: var(--fagni-radius-pill);
+    background: #e5f0ff;
+    border: 1px solid #c4dcff;
+    font-size: 11px;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 130px;
+}
+
+.finance-period-label,
+.driver-hub__pill-label {
+    color: #2563eb;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+}
+
+.finance-period-value,
+.driver-hub__pill-value {
+    color: #020617;
+    font-weight: 600;
+}
+
+/* Quick actions hub */
+
+.driver-hub__quick-actions {
+    margin-bottom: 10px;
+}
+
+.driver-hub__qa-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 6px;
+}
+
+.driver-hub__qa-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+}
+
+.driver-hub__section {
+    margin-bottom: 10px;
+}
+
+.driver-hub__section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.driver-hub__section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fagni-text);
+}
+
+.driver-hub__section-link {
+    font-size: 11px;
+    color: var(--fagni-text-soft);
+}
+
+/* Mini orders (hub) */
+
+.driver-hub__orders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.mini-order {
+    border-radius: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--fagni-border);
+    background: var(--fagni-surface-soft);
+}
+
+.mini-order__main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 2px;
+}
+
+.mini-order__code {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.mini-order__badge {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: var(--fagni-radius-pill);
+    border: 1px solid transparent;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.mini-order__badge--pending  { background:#fef3c7; color:#92400e; border-color:#fde68a; }
+.mini-order__badge--in_progress { background:#dbeafe; color:#1d4ed8; border-color:#bfdbfe; }
+.mini-order__badge--done     { background:#dcfce7; color:#166534; border-color:#bbf7d0; }
+.mini-order__badge--canceled { background:#fee2e2; color:#b91c1c; border-color:#fecaca; }
+
+.mini-order__meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--fagni-text-soft);
+    margin-bottom: 2px;
+    gap: 6px;
+}
+
+.mini-order__bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+}
+
+.mini-order__amount {
+    font-weight: 600;
+}
+
+.mini-order__link {
+    font-size: 11px;
+    color: var(--fagni-navy);
+}
+
+/* Texte vide générique */
+
+.driver-empty-text {
+    font-size: 12px;
+    color: var(--fagni-muted);
+    margin-top: 4px;
+}
+
+/* ============================================================
+   PAGE "MOI" LIVREUR (driver_me)
+   ============================================================ */
+
+.driver-me-page {
+    max-width: 900px;
+    margin: 0 auto 80px;
+    padding: 8px 12px;
+}
+
+.driver-me-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.driver-me-hero-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.driver-me-avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: var(--fagni-radius-pill);
+    background: #dbeafe;
+    color: #1d4ed8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 20px;
+}
+
+.driver-me-name {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.driver-me-meta {
+    font-size: 12px;
+    color: var(--fagni-text-soft);
+}
+
+.driver-me-email {
+    margin-left: 4px;
+}
+
+.driver-me-today {
+    font-size: 11px;
+    color: var(--fagni-muted);
+    margin-top: 2px;
+}
+
+.driver-me-quick {
+    margin-top: 10px;
+}
+
+.driver-me-quick-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.driver-chip-large {
+    align-items: flex-start;
+    flex-direction: column;
+    text-align: left;
+}
+
+.chip-icon {
+    font-size: 16px;
+}
+
+.chip-main {
+    font-weight: 600;
+}
+
+.chip-sub {
+    font-size: 11px;
+    color: var(--fagni-text-soft);
+}
+
+.driver-orders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.driver-order-card {
+    border-radius: var(--fagni-radius-lg);
+    border: 1px solid var(--fagni-border);
+    padding: 10px 12px;
+    background: #fff;
+    box-shadow: var(--fagni-shadow-soft);
+}
+
+.driver-order-card--compact {
+    padding: 8px 10px;
+}
+
+.driver-order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.driver-order-code {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.driver-order-date {
+    font-size: 12px;
+    color: var(--fagni-muted);
+}
+
+.driver-order-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.driver-order-body--history {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+}
+
+.driver-order-section {
+    background: #f8fafc;
+    border-radius: var(--fagni-radius-md);
+    padding: 6px 8px;
+}
+
+.driver-order-section-side {
+    background: #fefce8;
+}
+
+.driver-order-line {
+    font-size: 12px;
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.order-label {
+    font-weight: 500;
+    color: var(--fagni-text-soft);
+}
+
+.order-value {
+    color: var(--fagni-text);
+}
+
+.driver-order-footer {
+    border-top: 1px dashed var(--fagni-border);
+    padding-top: 6px;
+    margin-top: 4px;
+}
+
+.buttons-row,
+.driver-order-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* ============================================================
+   DASHBOARD FINANCE
+   ============================================================ */
+
+.finance-page {
+    max-width: 1100px;
+    margin: 0 auto 40px;
+    padding: 8px 12px 60px;
+}
+
+/* Filtres */
+
+.finance-filters-card {
+    margin-bottom: 14px;
+}
+
+.finance-filters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.finance-filter-block {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.finance-filter-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.finance-btn-filter {
+    min-width: 80px;
+}
+
+.finance-btn-reset,
+.finance-btn-export {
+    white-space: nowrap;
+}
+
+/* KPIs finance */
+
+.finance-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+/* Breakdown */
+
+.finance-breakdown-card {
+    margin-bottom: 14px;
+}
+
+.finance-breakdown-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.finance-breakdown-item {
+    background: var(--fagni-surface-soft);
+    border-radius: var(--fagni-radius-md);
+    padding: 8px 10px;
+    border: 1px dashed var(--fagni-border);
+}
+
+.finance-breakdown-label {
+    font-size: 11px;
+    color: var(--fagni-text-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 2px;
+}
+
+.finance-breakdown-value {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+/* Tableau */
+
+.finance-table-card {
+    margin-bottom: 14px;
+}
+
+.finance-table-header {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 6px;
+}
+
+.finance-table-title {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.finance-table-subtitle {
+    font-size: 11px;
+    color: var(--fagni-muted);
+}
+
+.finance-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.finance-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.finance-table thead {
+    background: #f1f5f9;
+}
+
+.finance-table th,
+.finance-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--fagni-border);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.finance-table th {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--fagni-text-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.finance-table tbody tr:nth-child(even) {
+    background: #f9fafb;
+}
+
+.finance-table tbody tr:hover {
+    background: #eef2ff;
+}
+
+.finance-order-link {
+    color: var(--fagni-navy);
+    font-weight: 600;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 768px) {
+    .app-shell-header-inner {
+        padding-inline: 10px;
+        gap: 8px;
+    }
+
+    .app-shell-nav {
+        display: none; /* on simplifie sur mobile */
+    }
+
+    .app-shell-main-inner {
+        padding-inline: 10px;
+    }
+
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .driver-order-body {
+        grid-template-columns: 1fr;
+    }
+
+    .finance-filters-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .finance-table th,
+    .finance-table td {
+        white-space: nowrap;
+    }
+}
+
+/* ============================================================
+   CARTES GOOGLE MAPS / LOCALISATION
+   ============================================================ */
+
+/* Carte client / create order */
+.map-container,
+.map-block,
+#map,
+#customer_map,
+#customer-map,
+#order-map {
+    width: 100%;
+    min-height: 260px;
+    max-height: 360px;
+    border-radius: var(--fagni-radius-lg);
+    border: 1px solid var(--fagni-border);
+    background: linear-gradient(135deg, #e5f0ff, #f9fafb);
+    box-shadow: var(--fagni-shadow-soft);
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+/* Petit texte d’aide sous la carte */
+.map-help-text {
+    font-size: 11px;
+    color: var(--fagni-muted);
+    margin-top: 4px;
+}
+
+/* Sur mobile on réduit un peu la hauteur */
+@media (max-width: 768px) {
+    .map-container,
+    .map-block,
+    #map,
+    #customer_map,
+    #customer-map,
+    #order-map {
+        min-height: 220px;
+        max-height: 280px;
+    }
+}
+
+/* =========================
+   MODE APP LIVREUR (MOBILE)
+   ========================= */
+
+.body-driver .app-shell-header,
+.body-driver .app-shell-footer {
+    display: none;
+}
+
+.body-driver .app-shell-main {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+/* on évite le fond gris de l'admin pour faire plus "app" */
+.body-driver {
+    background: #f3f4f6;
+}

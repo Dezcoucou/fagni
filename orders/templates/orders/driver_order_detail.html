@@ -464,6 +464,7 @@
         overflow:hidden;
         border:1px solid #e5e7eb;
         background:#f8fafc;
+        position:relative;
     }
     #fagniMap{
         width:100%;
@@ -484,6 +485,23 @@
         color:#6b7280;
         font-size:12px;
     }
+
+    /* ✅ overlay loading */
+    .map-loading{
+        position:absolute;
+        inset:0;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:12px;
+        color:#475569;
+        background:rgba(248,250,252,0.88);
+        backdrop-filter: blur(2px);
+        z-index:500;
+        text-align:center;
+        padding:10px;
+    }
+    .map-loading.hidden{ display:none; }
 
     @media (max-width: 900px){
         table{ min-width:0; }
@@ -755,6 +773,7 @@
                 <h2 class="card-title"><span class="emoji">🗺️</span> Carte (collecte → prestataire → livraison)</h2>
 
                 <div class="map-shell">
+                    <div id="mapLoading" class="map-loading">⏳ Chargement de la carte…</div>
                     <div id="fagniMap"></div>
                 </div>
 
@@ -1079,7 +1098,7 @@
   (function () {
     if (!window.L) return;
 
-    // 1) force le chemin d'images (évite le double /static/vendor/leaflet/static/vendor/leaflet/...)
+    // 1) force le chemin d'images
     L.Icon.Default.imagePath = "{% static 'vendor/leaflet/images/' %}";
 
     // 2) force les URLs complètes des assets
@@ -1178,6 +1197,17 @@
   var infoEl = document.getElementById("geoInfo");
   var statusEl = document.getElementById("geoStatus");
 
+  var loadingEl = document.getElementById("mapLoading");
+  function showLoading(msg){
+    if (!loadingEl) return;
+    loadingEl.classList.remove("hidden");
+    loadingEl.textContent = msg || "⏳ Chargement de la carte…";
+  }
+  function hideLoading(){
+    if (!loadingEl) return;
+    loadingEl.classList.add("hidden");
+  }
+
   function setInfo(html) {
     if (!infoEl) return;
     infoEl.style.display = html ? "block" : "none";
@@ -1219,6 +1249,7 @@
   if (points.length === 0) {
     mapEl.style.display = "none";
     if (emptyEl) emptyEl.style.display = "block";
+    hideLoading();
     return;
   } else {
     if (emptyEl) emptyEl.style.display = "none";
@@ -1228,15 +1259,31 @@
   // ==========================================
   // Map init
   // ==========================================
+  if (!window.L) {
+    showLoading("⚠️ Leaflet non chargé.");
+    return;
+  }
+
+  showLoading("⏳ Chargement de la carte…");
+
   var center = [points[0].lat, points[0].lng];
   var map = L.map("fagniMap", { zoomControl: true }).setView(center, 13);
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  var tiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: "&copy; OpenStreetMap"
   }).addTo(map);
 
-  // ✅ Icône FAGNI personnalisée
+  // ✅ Dès qu’une tuile arrive → on enlève l’overlay
+  tiles.once("tileload", function(){ hideLoading(); });
+  tiles.once("load", function(){ hideLoading(); });
+
+  // ❌ Si problème réseau/quota/blocage → message clair
+  tiles.on("tileerror", function(){
+    showLoading("⚠️ Carte indisponible (réseau/tiles). Utilise les boutons Google Maps.");
+  });
+
+  // ✅ Icône FAGNI
   var fagniIcon = L.icon({
     iconRetinaUrl: "{% static 'vendor/leaflet/images/marker-icon-2x.png' %}",
     iconUrl: "{% static 'vendor/leaflet/images/marker-icon.png' %}",
@@ -1270,7 +1317,12 @@
     map.setView(center, 15);
   }
 
-  setTimeout(function () { map.invalidateSize(); }, 250);
+  // ✅ mobile : délai plus long + invalidateSize(true)
+  setTimeout(function () { map.invalidateSize(true); }, 650);
+
+  // ✅ orientationchange / resize : évite la carte “bloquée”
+  window.addEventListener("resize", function(){ setTimeout(function(){ map.invalidateSize(true); }, 250); });
+  window.addEventListener("orientationchange", function(){ setTimeout(function(){ map.invalidateSize(true); }, 450); });
 
   // ==========================================
   // GEO + Server sync (Lot 4.5)
@@ -1279,7 +1331,7 @@
   var lastDriverPos = null;
 
   var UPDATE_URL = "{% url 'orders:driver_update_location' %}";
-  var SEND_INTERVAL_MS = 8000;   // throttle envoi serveur
+  var SEND_INTERVAL_MS = 8000;
   var lastSentAt = 0;
 
   function safeSendToServer(lat, lng) {
@@ -1288,9 +1340,7 @@
     lastSentAt = now;
 
     return postForm(UPDATE_URL, { lat: lat, lng: lng })
-      .then(function () {
-        return { ok: true };
-      })
+      .then(function () { return { ok: true }; })
       .catch(function (e) {
         console.warn("GPS sync error:", e && e.message ? e.message : e);
         return { ok: false, error: (e && e.message) ? e.message : "Erreur envoi GPS" };
@@ -1299,9 +1349,7 @@
 
   function updateDistances(driverLat, driverLng) {
     var rows = points
-      .map(function (p) {
-        return { label: p.label, km: haversineKm(driverLat, driverLng, p.lat, p.lng) };
-      })
+      .map(function (p) { return { label: p.label, km: haversineKm(driverLat, driverLng, p.lat, p.lng) }; })
       .sort(function (a, b) { return a.km - b.km; });
 
     var next = rows[0];
@@ -1325,9 +1373,7 @@
     }
 
     var rows = points
-      .map(function (p) {
-        return { label: p.label, km: haversineKm(lastDriverPos.lat, lastDriverPos.lng, p.lat, p.lng) };
-      })
+      .map(function (p) { return { label: p.label, km: haversineKm(lastDriverPos.lat, lastDriverPos.lng, p.lat, p.lng) }; })
       .sort(function (a, b) { return a.km - b.km; });
 
     var next = rows[0];
@@ -1337,11 +1383,9 @@
 
   function placeOrMoveDriver(lat, lng, accuracy) {
     lastDriverPos = { lat: lat, lng: lng };
-
     setStatus("GPS : OK" + (accuracy ? (" (±" + Math.round(accuracy) + "m)") : ""));
     updateDistances(lat, lng);
     updateNextStepUI();
-
     safeSendToServer(lat, lng);
   }
 
@@ -1353,7 +1397,6 @@
     setStatus(msg);
 
     setInfo("⚠️ La géolocalisation nécessite souvent <strong>HTTPS</strong> (ou localhost).<br>Active le GPS et autorise le navigateur.");
-
     updateNextStepUI();
   }
 
@@ -1372,7 +1415,7 @@
 
       placeOrMoveDriver(lat, lng, acc);
       map.setView([lat, lng], 15);
-      setTimeout(function () { map.invalidateSize(); }, 200);
+      setTimeout(function () { map.invalidateSize(true); }, 350);
     }, geoError, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
   }
 

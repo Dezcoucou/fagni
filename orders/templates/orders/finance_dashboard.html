@@ -1,309 +1,198 @@
 {% extends "base.html" %}
+{% load money_filters %}
+
+{% block title %}Dashboard financier FAGNI{% endblock %}
 
 {% block content %}
-<div class="finance-page">
+<div class="page-header">
+    <div class="page-header__left">
+        <h1 class="page-title">Dashboard financier FAGNI</h1>
+        <p class="page-subtitle">
+            Vue synthèse : CA client, reversements partenaires et revenu FAGNI.
+        </p>
+    </div>
+    <div class="page-header__right">
+        <a href="{% url 'orders:list' %}" class="btn btn-light">
+            ← Retour liste des commandes
+        </a>
+    </div>
+</div>
 
-    <!-- HEADER PAGE -->
-    <div class="page-header">
-        <div class="page-header__left">
-            <h1 class="page-title">Dashboard Finance</h1>
-            <p class="page-subtitle">
-                Vue consolidée du chiffre d’affaires, des frais et des marges FAGNI.
-            </p>
-        </div>
-        <div class="page-header__right finance-period-pill">
-            <span class="finance-period-label">Période</span>
-            <span class="finance-period-value">
-                {{ period_label|default:"Aujourd’hui" }}
-            </span>
+<div class="container">
+
+    <!-- Filtres -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <strong>Filtre paiement :</strong>
+            <a href="{% url 'orders:finance_dashboard' %}?payment=all"
+               class="btn btn-sm {% if payment_filter == 'all' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                Tous
+            </a>
+            <a href="{% url 'orders:finance_dashboard' %}?payment=paid"
+               class="btn btn-sm {% if payment_filter == 'paid' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                Payées
+            </a>
+            <a href="{% url 'orders:finance_dashboard' %}?payment=unpaid"
+               class="btn btn-sm {% if payment_filter == 'unpaid' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                Non payées
+            </a>
         </div>
     </div>
 
-    <!-- FILTRES FINANCE -->
-    <section class="card finance-filters-card">
-        <form method="get" class="finance-filters-grid">
-            <div class="finance-filter-block">
-                <label for="date_from">Du</label>
-                <input type="date" id="date_from" name="date_from"
-                       value="{{ date_from }}">
-            </div>
-
-            <div class="finance-filter-block">
-                <label for="date_to">Au</label>
-                <input type="date" id="date_to" name="date_to"
-                       value="{{ date_to }}">
-            </div>
-
-            <div class="finance-filter-block">
-                <label for="status">Statut</label>
-                <select id="status" name="status">
-                    <option value="all" {% if status_filter == "all" %}selected{% endif %}>Tous</option>
-                    <option value="active" {% if status_filter == "active" %}selected{% endif %}>Actives (en cours / attente)</option>
-                    <option value="done" {% if status_filter == "done" %}selected{% endif %}>Terminées</option>
-                    <option value="pending" {% if status_filter == "pending" %}selected{% endif %}>En attente</option>
-                    <option value="in_progress" {% if status_filter == "in_progress" %}selected{% endif %}>En cours</option>
-                    <option value="canceled" {% if status_filter == "canceled" %}selected{% endif %}>Annulées</option>
-                </select>
-            </div>
-
-            <div class="finance-filter-block">
-                <label for="driver_id">Livreur</label>
-                <select id="driver_id" name="driver_id">
-                    <option value="">Tous</option>
-                    {% for d in drivers %}
-                        <option value="{{ d.id }}" {% if driver_id|default:"" == d.id|stringformat:"s" %}selected{% endif %}>
-                            {{ d.name|default:d.email }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="finance-filter-block">
-                <label for="laundry_id">Blanchisserie</label>
-                <select id="laundry_id" name="laundry_id">
-                    <option value="">Toutes</option>
-                    {% for l in laundries %}
-                        <option value="{{ l.id }}" {% if laundry_id|default:"" == l.id|stringformat:"s" %}selected{% endif %}>
-                            {{ l.name|default:l.email }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="finance-filter-actions">
-                <button type="submit" class="btn btn-primary btn-sm finance-btn-filter">
-                    Filtrer
-                </button>
-                <a href="{% url 'orders:finance_dashboard' %}" class="btn btn-light btn-sm finance-btn-reset">
-                    Réinitialiser
-                </a>
-                <a href="{% url 'orders:export_finance_xlsx' %}?{{ request.GET.urlencode }}"
-                   class="btn btn-secondary btn-sm finance-btn-export">
-                    📊 Export Excel
-                </a>
-            </div>
-        </form>
-    </section>
-
-    <!-- KPI FINANCE -->
-    <section class="card finance-kpi-card">
-        <div class="finance-kpi-grid">
-            <article class="kpi-card kpi-card--primary">
-                <div class="kpi-card__label">Chiffre d’affaires total</div>
-                <div class="kpi-card__value">
-                    {{ stats.total_revenue|default:0 }} <span class="kpi-card__unit">FCFA</span>
-                </div>
-                <div class="kpi-card__sub">
-                    Toutes les commandes de la période
-                </div>
-            </article>
-
-            <article class="kpi-card kpi-card--orange">
-                <div class="kpi-card__label">Nombre de commandes</div>
-                <div class="kpi-card__value">
-                    {{ stats.total_orders|default:0 }}
-                </div>
-                <div class="kpi-card__sub">
-                    Terminées : {{ stats.done_orders|default:0 }} • Annulées : {{ stats.canceled_orders|default:0 }}
-                </div>
-            </article>
-
-            <article class="kpi-card kpi-card--blue">
-                <div class="kpi-card__label">Panier moyen</div>
-                <div class="kpi-card__value">
-                    {{ stats.avg_basket|default:0 }} <span class="kpi-card__unit">FCFA</span>
-                </div>
-                <div class="kpi-card__sub">
-                    Chiffre d’affaires / commande
-                </div>
-            </article>
-
-            <article class="kpi-card kpi-card--green">
-                <div class="kpi-card__label">Marge FAGNI</div>
-                <div class="kpi-card__value">
-                    {{ stats.fagni_margin|default:0 }} <span class="kpi-card__unit">FCFA</span>
-                </div>
-                <div class="kpi-card__sub">
-                    (Service + Livraison) – Revenu livreur
-                </div>
-            </article>
-        </div>
-    </section>
-
-    <!-- DÉTAILS FINANCE (frais) -->
-    <section class="card finance-breakdown-card">
-        <div class="finance-breakdown-grid">
-            <div class="finance-breakdown-item">
-                <div class="finance-breakdown-label">Frais de service</div>
-                <div class="finance-breakdown-value">
-                    {{ stats.total_service_fee|default:0 }} FCFA
-                </div>
-            </div>
-            <div class="finance-breakdown-item">
-                <div class="finance-breakdown-label">Frais de livraison facturés</div>
-                <div class="finance-breakdown-value">
-                    {{ stats.total_delivery_fee|default:0 }} FCFA
-                </div>
-            </div>
-            <div class="finance-breakdown-item">
-                <div class="finance-breakdown-label">Revenus livreurs (logistique)</div>
-                <div class="finance-breakdown-value">
-                    {{ stats.total_driver_income|default:0 }} FCFA
-                </div>
-            </div>
-            <div class="finance-breakdown-item">
-                <div class="finance-breakdown-label">Distance totale A/R</div>
-                <div class="finance-breakdown-value">
-                    {{ stats.total_distance_km|default:0|floatformat:"1" }} km
+    <!-- Cartes KPI -->
+    <div class="row g-3 mb-4">
+        <!-- CA client -->
+        <div class="col-12 col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="h6 text-muted">CA total facturé au client</h2>
+                    <p class="h4 mb-1">
+                        {{ ca_client_total|money }} FCFA
+                    </p>
+                    <p class="mb-0 text-muted small">
+                        Sur {{ order_count }} commande{{ order_count|pluralize:"s" }}.<br>
+                        Ticket moyen : <strong>{{ avg_ticket|money }} FCFA</strong>
+                    </p>
                 </div>
             </div>
         </div>
-    </section>
 
-    <!-- TABLEAU DES COMMANDES -->
-    <section class="card finance-table-card">
-        <div class="finance-table-header">
-            <h2 class="finance-table-title">Détail des commandes</h2>
-            <p class="finance-table-subtitle">
-                Résultats paginés – utilisez les filtres pour affiner la vue.
-            </p>
+        <!-- Partenaires -->
+        <div class="col-12 col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="h6 text-muted">Montants à verser partenaires</h2>
+                    <p class="h4 mb-1">
+                        {{ partners_total|money }} FCFA
+                    </p>
+                    <p class="mb-0 text-muted small">
+                        Blanchisseries :
+                        <strong>{{ partners_laundry_total|money }} FCFA</strong><br>
+                        Livreurs :
+                        <strong>{{ partners_driver_total|money }} FCFA</strong>
+                    </p>
+                </div>
+            </div>
         </div>
 
-        {% if orders %}
-            <div class="finance-table-wrapper">
-                <table class="finance-table">
-                    <thead>
+        <!-- FAGNI -->
+        <div class="col-12 col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="h6 text-muted">Revenu FAGNI (TTC)</h2>
+                    <p class="h4 mb-1">
+                        {{ fagni_revenue_total|money }} FCFA
+                    </p>
+                    <p class="mb-0 text-muted small">
+                        Marge logistique :
+                        <strong>{{ logistic_margin_total|money }} FCFA</strong><br>
+                        Service fee total :
+                        <strong>{{ service_fee_total|money }} FCFA</strong><br>
+                        <span class="text-muted">
+                            Vérif indicative : CA client ≈ Partenaires + Revenu FAGNI
+                        </span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tableau des commandes -->
+    <div class="card">
+        <div class="card-body">
+            <h2 class="h5 mb-3">Dernières commandes prises en compte</h2>
+
+            {% if orders %}
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
                         <tr>
-                            <th>Code</th>
                             <th>Date</th>
+                            <th>Code</th>
                             <th>Client</th>
-                            <th>Statut</th>
-                            <th class="finance-col-number">Total client</th>
-                            <th class="finance-col-number">Service</th>
-                            <th class="finance-col-number">Livraison</th>
-                            <th class="finance-col-number">Revenu livreur</th>
-                            <th>Livreur</th>
                             <th>Blanchisserie</th>
+                            <th class="text-end">Total client</th>
+                            <th class="text-end">Blanchisserie</th>
+                            <th class="text-end">Livreur</th>
+                            <th class="text-end">Partenaires</th>
+                            <th class="text-end">Service fee</th>
+                            <th class="text-end">FAGNI TTC</th>
+                            <th class="text-end">Marge logistique</th>
+                            <th>Paiement</th>
                         </tr>
-                    </thead>
-                    <tbody>
+                        </thead>
+                        <tbody>
                         {% for o in orders %}
                             <tr>
-                                <td>
-                                    <a href="{% url 'orders:detail' o.id %}" class="finance-order-link">
-                                        {{ o.code|default:o.id }}
-                                    </a>
-                                </td>
                                 <td>
                                     {% if o.created_at %}
                                         {{ o.created_at|date:"d/m/Y H:i" }}
                                     {% else %}
-                                        -
+                                        —
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {{ o.customer.name|default:"-" }}
-                                </td>
-                                <td class="finance-col-status">
-                                    <span class="badge-status badge-status--{{ o.status }}">
-                                        {{ o.get_status_display }}
-                                    </span>
-                                </td>
-                                <td class="finance-col-number">
-                                    {{ o.total|default:0 }} FCFA
-                                </td>
-                                <td class="finance-col-number">
-                                    {{ o.service_fee|default:0 }} FCFA
-                                </td>
-                                <td class="finance-col-number">
-                                    {{ o.delivery_fee|default:0 }} FCFA
-                                </td>
-                                <td class="finance-col-number">
-                                    {{ o.driver_logistic_cost|default:0 }} FCFA
+                                    <a href="{% url 'orders:detail' o.id %}">
+                                        {{ o.code|default:o.id }}
+                                    </a>
                                 </td>
                                 <td>
-                                    {% if o.delivery_partner %}
-                                        {{ o.delivery_partner.name|default:o.delivery_partner.email }}
+                                    {% if o.customer %}
+                                        {{ o.customer.name|default:"Client FAGNI" }}
                                     {% else %}
-                                        -
+                                        —
                                     {% endif %}
                                 </td>
                                 <td>
                                     {% if o.laundry_partner %}
-                                        {{ o.laundry_partner.name|default:o.laundry_partner.email }}
+                                        {{ o.laundry_partner.name }}
                                     {% else %}
-                                        -
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    {{ o.total_client_expr|money }} FCFA
+                                </td>
+                                <td class="text-end">
+                                    {{ o.amount_laundry_safe|money }} FCFA
+                                </td>
+                                <td class="text-end">
+                                    {{ o.amount_driver_safe|money }} FCFA
+                                </td>
+                                <td class="text-end">
+                                    {{ o.partners_expr|money }} FCFA
+                                </td>
+                                <td class="text-end">
+                                    {{ o.service_fee_safe|money }} FCFA
+                                </td>
+                                <td class="text-end">
+                                    {{ o.fagni_revenue_ttc_safe|money }} FCFA
+                                </td>
+                                <td class="text-end">
+                                    {{ o.logistic_margin_safe|money }} FCFA
+                                </td>
+                                <td>
+                                    {% if o.payment_status == "paid" %}
+                                        <span class="badge bg-success">Payée</span>
+                                    {% elif o.payment_status == "unpaid" %}
+                                        <span class="badge bg-warning text-dark">Non payée</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">
+                                            {{ o.get_payment_status_display|default:o.payment_status }}
+                                        </span>
                                     {% endif %}
                                 </td>
                             </tr>
                         {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-            {% if page_obj %}
-            <div class="finance-pagination">
-                {% if page_obj.has_previous %}
-                    <a class="btn btn-light"
-                       href="?page={{ page_obj.previous_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}&status={{ status_filter }}&driver_id={{ driver_id }}&laundry_id={{ laundry_id }}">
-                        ← Page précédente
-                    </a>
-                {% else %}
-                    <span class="btn btn-light disabled">← Page précédente</span>
-                {% endif %}
-
-                <span class="finance-pagination-info">
-                    Page {{ page_obj.number }} / {{ paginator.num_pages }}
-                    • {{ stats.total_orders }} commande{% if stats.total_orders > 1 %}s{% endif %} au total
-                </span>
-
-                {% if page_obj.has_next %}
-                    <a class="btn btn-light"
-                       href="?page={{ page_obj.next_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}&status={{ status_filter }}&driver_id={{ driver_id }}&laundry_id={{ laundry_id }}">
-                        Page suivante →
-                    </a>
-                {% else %}
-                    <span class="btn btn-light disabled">Page suivante →</span>
-                {% endif %}
-            </div>
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">
+                    Aucune commande trouvée pour ce filtre.
+                </p>
             {% endif %}
-
-        {% else %}
-            <p class="driver-empty-text">
-                Aucune commande trouvée pour ces filtres.
-            </p>
-        {% endif %}
-    </section>
+        </div>
+    </div>
 </div>
-
-<div class="page-actions" style="margin-top: 24px; display:flex; gap:10px; flex-wrap:wrap;">
-    <a href="{% url 'orders:list' %}" class="btn btn-light">
-        📋 Liste des commandes
-    </a>
-
-    <a href="{% url 'orders:dashboard' %}" class="btn btn-light">
-        📊 Dashboard opérations
-    </a>
-
-    <a href="{% url 'orders:driver_hub' %}" class="btn btn-light">
-        🚚 App livreur
-    </a>
-
-    <a href="{% url 'orders:driver_leaderboard' %}" class="btn btn-light">
-        🏆 Leaderboard livreurs
-    </a>
-
-    <a href="{% url 'mlm:affiliate_dashboard' %}" class="btn btn-light">
-        👤 Mon espace affilié
-    </a>
-
-    <a href="{% url 'mlm:global_dashboard' %}" class="btn btn-light">
-        🌍 Dashboard MLM
-    </a>
-
-    <a href="{% url 'mlm:admin_withdrawals' %}" class="btn btn-light">
-        💸 Demandes de retrait MLM
-    </a>
-</div>
-
 {% endblock %}

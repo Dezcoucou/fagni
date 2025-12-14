@@ -1,146 +1,292 @@
-from decimal import Decimal
-from typing import Optional
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Optional, Dict, Any
 
-from django.utils import timezone
+from django.db import transaction
 
-from orders.models import Order
-from .models import Wallet, WalletTransaction, CommissionEvent
+from orders.models import Order, Customer
+from partners.models import LaundryPartner, DeliveryPartner, RelayPointPartner
+from .models import Wallet, WalletTransaction
 
 
-def get_or_create_wallet_for_customer(customer) -> Wallet:
+# ==========================
+#  OUTILS DE NORMALISATION
+# ==========================
+def _to_decimal(amount) -> Decimal:
     """
-    Retourne (ou crée) le wallet associé à un client.
+    Convertit un montant en Decimal avec 2 décimales.
+    """
+    if isinstance(amount, Decimal):
+        value = amount
+    else:
+        value = Decimal(str(amount))
+    return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+# ==========================
+#  HELPERS GET / CREATE
+# ==========================
+def get_or_create_wallet_for_customer(customer: Customer) -> Wallet:
+    """
+    Wallet client FAGNI.
     """
     wallet, _ = Wallet.objects.get_or_create(
-        owner_type=Wallet.OWNER_TYPE_CUSTOMER,
+        owner_type="customer",
         customer=customer,
-        defaults={"balance": Decimal("0.00")},
+        defaults={
+            "currency": "XOF",
+        },
     )
     return wallet
 
 
-def get_or_create_wallet_for_delivery_partner(delivery_partner) -> Wallet:
+def get_or_create_wallet_for_delivery_partner(delivery_partner: DeliveryPartner) -> Wallet:
     """
-    Retourne (ou crée) le wallet associé à un livreur.
+    Wallet livreur partenaire.
     """
     wallet, _ = Wallet.objects.get_or_create(
-        owner_type=Wallet.OWNER_TYPE_DELIVERY,
+        owner_type="driver",
         delivery_partner=delivery_partner,
-        defaults={"balance": Decimal("0.00")},
+        defaults={
+            "currency": "XOF",
+        },
     )
     return wallet
 
 
-def get_or_create_wallet_for_laundry_partner(laundry_partner) -> Wallet:
+def get_or_create_wallet_for_laundry_partner(laundry_partner: LaundryPartner) -> Wallet:
     """
-    Retourne (ou crée) le wallet associé à une blanchisserie.
+    Wallet blanchisserie partenaire.
     """
     wallet, _ = Wallet.objects.get_or_create(
-        owner_type=Wallet.OWNER_TYPE_LAUNDRY,
+        owner_type="laundry",
         laundry_partner=laundry_partner,
-        defaults={"balance": Decimal("0.00")},
+        defaults={
+            "currency": "XOF",
+        },
     )
     return wallet
 
 
-def credit_wallet(wallet: Wallet, amount: Decimal, label: str, order: Optional[Order] = None, meta: Optional[dict] = None) -> WalletTransaction:
+def get_or_create_wallet_for_relay_partner(relay_partner: RelayPointPartner) -> Wallet:
     """
-    Crée un crédit sur un wallet (augmentation du solde).
+    Wallet point relais partenaire.
+    """
+    wallet, _ = Wallet.objects.get_or_create(
+        owner_type="laundry",  # ou un type dédié si besoin plus tard
+        relay_partner=relay_partner,
+        defaults={
+            "currency": "XOF",
+        },
+    )
+    return wallet
 
-    À utiliser pour :
-    - commissions livreur
-    - commissions blanchisseur
-    - cashback client
-    - bonus MLM, etc.
+
+def get_or_create_internal_wallet() -> Wallet:
     """
+    Wallet interne FAGNI (compte de la plateforme).
+    Utilisé pour encaisser les revenus FAGNI (commissions, service fee, marge, TVA…).
+    """
+    wallet, _ = Wallet.objects.get_or_create(
+        owner_type="internal",
+        customer=None,
+        laundry_partner=None,
+        delivery_partner=None,
+        relay_partner=None,
+        user=None,
+        defaults={
+            "currency": "XOF",
+        },
+    )
+    return wallet
+
+
+# ==========================
+#  FONCTIONS GÉNÉRIQUES DE MOUVEMENT
+# ==========================
+def credit_wallet(
+    wallet: Wallet,
+    amount,
+    label: str = "",
+    order: Optional[Order] = None,
+    tx_type: str = "credit",
+) -> Optional[WalletTransaction]:
+    """
+    Crédite un wallet (entrée d'argent).
+    - direction = "in"
+    - type = tx_type (par ex: "credit", "topup", "payout", "mlm_commission")
+    """
+    amount = _to_decimal(amount)
     if amount <= 0:
-        raise ValueError("Le montant d'un crédit doit être > 0")
+        return None
 
-    before = wallet.balance
-    after = (before + amount).quantize(Decimal("0.01"))
-
-    wallet.balance = after
+    wallet.balance = (wallet.balance + amount).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
     wallet.save(update_fields=["balance", "updated_at"])
 
     tx = WalletTransaction.objects.create(
         wallet=wallet,
-        transaction_type=WalletTransaction.TYPE_CREDIT,
-        amount=amount.quantize(Decimal("0.01")),
-        balance_before=before,
-        balance_after=after,
-        label=label,
         order=order,
-        meta=meta or {},
+        type=tx_type,
+        direction="in",
+        amount=amount,
+        description=label or "",
     )
     return tx
 
 
-def debit_wallet(wallet: Wallet, amount: Decimal, label: str, order: Optional[Order] = None, meta: Optional[dict] = None) -> WalletTransaction:
+def debit_wallet(
+    wallet: Wallet,
+    amount,
+    label: str = "",
+    order: Optional[Order] = None,
+    tx_type: str = "debit",
+) -> Optional[WalletTransaction]:
     """
-    Crée un débit sur un wallet (diminution du solde),
-    par exemple lors d'un retrait ou d'une compensation.
+    Débite un wallet (sortie d'argent).
+    - direction = "out"
+    - type = tx_type (par ex: "debit", "payout", "adjustment")
     """
+    amount = _to_decimal(amount)
     if amount <= 0:
-        raise ValueError("Le montant d'un débit doit être > 0")
+        return None
 
-    before = wallet.balance
-    after = (before - amount).quantize(Decimal("0.01"))
-
-    # À affiner : bloquer si solde négatif, ou autoriser overdraft ?
-    if after < 0:
-        # Ici on choisit de bloquer par défaut
-        raise ValueError("Solde insuffisant sur le wallet")
-
-    wallet.balance = after
+    wallet.balance = (wallet.balance - amount).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
     wallet.save(update_fields=["balance", "updated_at"])
 
     tx = WalletTransaction.objects.create(
         wallet=wallet,
-        transaction_type=WalletTransaction.TYPE_DEBIT,
-        amount=amount.quantize(Decimal("0.01")),
-        balance_before=before,
-        balance_after=after,
-        label=label,
         order=order,
-        meta=meta or {},
+        type=tx_type,
+        direction="out",
+        amount=amount,
+        description=label or "",
     )
     return tx
 
 
-def create_commission_event_for_order(order: Order) -> CommissionEvent:
+# ==========================
+#  DISTRIBUTION DES REVENUS D'UNE COMMANDE
+# ==========================
+@transaction.atomic
+def distribute_order_revenues(
+    order: Order,
+    *,
+    recompute: bool = True,
+    force: bool = False,
+) -> Dict[str, Any]:
     """
-    Crée un événement de commission à partir d'une commande.
+    Distribue les montants d'une commande FAGNI dans les wallets :
 
-    Cette fonction sera appelée quand une commande passe à 'done'
-    ou quand tu confirmes le paiement complet.
+    - Vérifie que la commande est PAYÉE (payment_status = "paid")
+    - Optionnellement : recalcule les montants via order.update_financials()
+    - Crédite :
+        • Wallet blanchisseur (amount_laundry_partner)
+        • Wallet livreur (amount_driver_partner)
+        • Wallet interne FAGNI (fagni_revenue_ttc)
+    - Marque order.wallets_distributed = True pour éviter les doublons.
 
-    Pour l'instant on se contente de stocker un snapshot des montants
-    clés dans 'payload'. La logique MLM sera ajoutée dans un second temps.
+    Paramètres :
+    - recompute : si True, appelle order.update_financials(save=True)
+    - force : si True, redistribue même si wallets_distributed == True
+
+    Retourne un dict avec quelques infos et les ids de transactions créées.
     """
-    payload = {
+    # 0) Vérifier que la commande est payée
+    payment_status = getattr(order, "payment_status", "unpaid")
+    if payment_status != "paid":
+        raise ValueError(
+            f"Impossible de distribuer les wallets : commande {order.id} non payée "
+            f"(payment_status = {payment_status})."
+        )
+
+    # 1) Éviter la double distribution
+    if getattr(order, "wallets_distributed", False) and not force:
+        return {
+            "status": "already_distributed",
+            "order_id": order.id,
+        }
+
+    # 2) Recalcul éventuel des montants financiers
+    financial_data = None
+    if recompute:
+        # Utilise le moteur FAGNI (compute_order_financials) via update_financials()
+        financial_data = order.update_financials(save=True)
+
+    # 3) Récupérer les montants
+    prestation_total = _to_decimal(getattr(order, "prestation_total", Decimal("0")))
+    service_fee = _to_decimal(getattr(order, "service_fee", Decimal("0")))
+    delivery_fee = _to_decimal(getattr(order, "delivery_fee", Decimal("0")))
+    amount_laundry = _to_decimal(getattr(order, "amount_laundry_partner", Decimal("0")))
+    amount_driver = _to_decimal(getattr(order, "amount_driver_partner", Decimal("0")))
+    fagni_ht = _to_decimal(getattr(order, "fagni_revenue_ht", Decimal("0")))
+    fagni_ttc = _to_decimal(getattr(order, "fagni_revenue_ttc", Decimal("0")))
+
+    # 4) Créer / récupérer les wallets nécessaires
+    txs: Dict[str, Optional[WalletTransaction]] = {}
+
+    # 4.a Wallet blanchisseur
+    if order.laundry_partner and amount_laundry > 0:
+        wl = get_or_create_wallet_for_laundry_partner(order.laundry_partner)
+        txs["laundry"] = credit_wallet(
+            wl,
+            amount_laundry,
+            label=f"Commande {order.code} – part blanchisserie",
+            order=order,
+            tx_type="payout",
+        )
+    else:
+        txs["laundry"] = None
+
+    # 4.b Wallet livreur
+    if order.delivery_partner and amount_driver > 0:
+        wd = get_or_create_wallet_for_delivery_partner(order.delivery_partner)
+        txs["driver"] = credit_wallet(
+            wd,
+            amount_driver,
+            label=f"Commande {order.code} – part livreur",
+            order=order,
+            tx_type="payout",
+        )
+    else:
+        txs["driver"] = None
+
+    # 4.c Wallet interne FAGNI (revenu plateforme)
+    internal_wallet = get_or_create_internal_wallet()
+    if fagni_ttc > 0:
+        txs["internal"] = credit_wallet(
+            internal_wallet,
+            fagni_ttc,
+            label=f"Commande {order.code} – revenu FAGNI TTC",
+            order=order,
+            tx_type="credit",
+        )
+    else:
+        txs["internal"] = None
+
+    # 5) Marquer la commande comme distribuée
+    order.wallets_distributed = True
+    order.save(update_fields=["wallets_distributed"])
+
+    # 6) Retour d'info
+    return {
+        "status": "ok",
         "order_id": order.id,
-        "code": order.code,
-        "total": str(order.total or 0),
-        "service_fee": str(order.service_fee or 0),
-        "delivery_fee": str(order.delivery_fee or 0),
-        "logistic_margin": str(order.logistic_margin or 0),
-        "created_at": order.created_at.isoformat() if order.created_at else None,
-        "status": order.status,
+        "payment_status": payment_status,
+        "amounts": {
+            "prestation_total": prestation_total,
+            "service_fee": service_fee,
+            "delivery_fee": delivery_fee,
+            "amount_laundry": amount_laundry,
+            "amount_driver": amount_driver,
+            "fagni_revenue_ht": fagni_ht,
+            "fagni_revenue_ttc": fagni_ttc,
+        },
+        "transactions": {
+            key: tx.id if tx else None
+            for key, tx in txs.items()
+        },
+        "financial_data": financial_data,
     }
-
-    event = CommissionEvent.objects.create(
-        event_type=CommissionEvent.TYPE_ORDER_COMPLETED,
-        order=order,
-        payload=payload,
-        processed=False,
-    )
-    return event
-
-
-def mark_commission_event_processed(event: CommissionEvent) -> None:
-    """
-    Marque un événement comme traité après génération des transactions MLM.
-    """
-    event.processed = True
-    event.processed_at = timezone.now()
-    event.save(update_fields=["processed", "processed_at"])

@@ -1,111 +1,469 @@
 {% extends "base.html" %}
 {% load static %}
+{% load money_filters %}
 
-{# On utilise bien le bon bloc défini dans base.html : extra_head #}
+{% block title %}Dashboard global MLM – FAGNI{% endblock %}
+
 {% block extra_head %}
-    {{ block.super }}
-    <link rel="stylesheet" href="{{ STATIC_PREFIX }}mlm/mlm.css">
+<style>
+    .page {
+        max-width: 1150px;
+        margin: 0 auto 32px;
+        padding: 12px 10px 24px;
+    }
+
+    .page-header {
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:12px;
+        margin-bottom:18px;
+    }
+
+    .page-title {
+        font-size:20px;
+        font-weight:700;
+        color:#0f172a;
+        margin:0;
+    }
+
+    .page-subtitle {
+        font-size:13px;
+        color:#64748b;
+        margin:4px 0 0;
+    }
+
+    .card {
+        background:#ffffff;
+        border-radius:16px;
+        padding:16px 16px;
+        margin-bottom:14px;
+        border:1px solid #e5e7eb;
+        box-shadow:0 2px 6px rgba(15,23,42,0.08);
+    }
+
+    .card-title {
+        font-size:15px;
+        font-weight:600;
+        margin:0 0 10px;
+        color:#0f172a;
+        display:flex;
+        align-items:center;
+        gap:6px;
+    }
+
+    .card-title .emoji {
+        font-size:18px;
+    }
+
+    .grid-2 {
+        display:grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap:14px;
+    }
+
+    .stats-grid {
+        display:grid;
+        grid-template-columns: repeat(4, minmax(0,1fr));
+        gap:10px;
+    }
+
+    .stat-pill {
+        background:#f9fafb;
+        border-radius:12px;
+        padding:10px 10px;
+        border:1px solid #e5e7eb;
+    }
+
+    .stat-label {
+        font-size:11px;
+        color:#9ca3af;
+        text-transform:uppercase;
+        letter-spacing:.04em;
+    }
+
+    .stat-value {
+        font-size:16px;
+        font-weight:600;
+        color:#111827;
+        margin-top:2px;
+    }
+
+    .stat-helper {
+        font-size:11px;
+        color:#6b7280;
+        margin-top:2px;
+    }
+
+    table.table {
+        width:100%;
+        border-collapse:collapse;
+        font-size:13px;
+        margin-top:6px;
+    }
+
+    table.table th,
+    table.table td {
+        padding:7px 6px;
+        border-bottom:1px solid #e5e7eb;
+        vertical-align:top;
+    }
+
+    table.table thead th {
+        background:#f9fafb;
+        font-weight:600;
+        color:#6b7280;
+        font-size:12px;
+    }
+
+    td.num {
+        text-align:right;
+        white-space:nowrap;
+    }
+
+    .badge-soft {
+        padding:3px 8px;
+        border-radius:999px;
+        font-size:11px;
+        background:#f3f4f6;
+        color:#4b5563;
+        display:inline-flex;
+        align-items:center;
+        gap:4px;
+    }
+
+    .badge-soft--success {
+        background:#ecfdf3;
+        color:#166534;
+    }
+
+    .badge-soft--warning {
+        background:#fffbeb;
+        color:#92400e;
+    }
+
+    .filters-grid {
+        display:grid;
+        grid-template-columns: repeat(4, minmax(0,1fr));
+        gap:8px;
+        margin-bottom:10px;
+    }
+
+    .filter-item label {
+        font-size:12px;
+        color:#6b7280;
+        display:block;
+        margin-bottom:2px;
+    }
+
+    .filter-item input,
+    .filter-item select {
+        width:100%;
+        padding:6px 8px;
+        border-radius:10px;
+        border:1px solid #d1d5db;
+        font-size:13px;
+    }
+
+    .btn {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        padding:7px 12px;
+        border-radius:999px;
+        font-size:13px;
+        border:1px solid transparent;
+        cursor:pointer;
+        text-decoration:none;
+        white-space:nowrap;
+    }
+
+    .btn-light {
+        background:#fff;
+        border-color:#e5e7eb;
+        color:#374151;
+    }
+
+    .btn-light:hover {
+        background:#f9fafb;
+    }
+
+    .btn-primary {
+        background:linear-gradient(90deg,#ff7a00,#0056b3);
+        color:#fff;
+        border:none;
+    }
+
+    .field-value-muted {
+        font-size:12px;
+        color:#6b7280;
+    }
+
+    @media (max-width: 1050px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, minmax(0,1fr));
+        }
+        .filters-grid {
+            grid-template-columns: repeat(2, minmax(0,1fr));
+        }
+        .grid-2 {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .stats-grid,
+        .filters-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="mlm-page">
+<div class="page">
 
+    <!-- HEADER -->
     <div class="page-header">
-        <div class="page-header__left">
-            <h1 class="page-title">Dashboard MLM – Vue globale</h1>
+        <div>
+            <h1 class="page-title">Dashboard global MLM</h1>
             <p class="page-subtitle">
-                Synthèse des commissions, soldes wallets et performances des affiliés FAGNI.
+                Vue d’ensemble du programme de parrainage FAGNI : affiliés, commissions, performances.
             </p>
         </div>
-    </div>
-
-    <!-- STAT CARDS -->
-    <div class="mlm-stats-grid">
-        <div class="mlm-card">
-            <div class="mlm-stat-label">Total commissions versées (MLM)</div>
-            <div class="mlm-stat-value">{{ total_commissions|default:0 }} FCFA</div>
-            <div class="mlm-stat-sub">Toutes commissions payées aux affiliés</div>
-        </div>
-
-        <div class="mlm-card">
-            <div class="mlm-stat-label">Solde cumulé des wallets affiliés</div>
-            <div class="mlm-stat-value">{{ total_wallet_balance|default:0 }} FCFA</div>
-            <div class="mlm-stat-sub">Total actuel dans tous les wallets</div>
-        </div>
-
-        <div class="mlm-card">
-            <div class="mlm-stat-label">Montant total des retraits demandés</div>
-            <div class="mlm-stat-value">{{ total_withdraw_requested|default:0 }} FCFA</div>
-            <div class="mlm-stat-sub">Retraits en attente + traités</div>
+        <div>
+            <a href="{% url 'mlm:admin_withdrawals' %}" class="btn btn-light">💼 Gestion des retraits</a>
         </div>
     </div>
 
-    <!-- AFFILIÉS -->
-    <div class="mlm-section">
-        <div class="mlm-section-header">
-            <h2>Affiliés & performances</h2>
-        </div>
-        <p class="mlm-section-subtitle">
-            Liste des profils MLM avec leurs filleuls, commissions et solde wallet estimé.
-        </p>
+    <!-- STATS GLOBALES -->
+    <section class="card">
+        <h2 class="card-title">
+            <span class="emoji">📊</span> KPIs globaux
+        </h2>
 
-        {% if affiliates %}
-            <div class="table-responsive">
-                <table class="mlm-table">
+        <div class="stats-grid">
+            <div class="stat-pill">
+                <div class="stat-label">Affiliés actifs</div>
+                <div class="stat-value">
+                    {{ total_affiliates|default:0 }}
+                </div>
+                <div class="stat-helper">
+                    Total des comptes affiliés avec au moins une activité.
+                </div>
+            </div>
+
+            <div class="stat-pill">
+                <div class="stat-label">Filleuls enregistrés</div>
+                <div class="stat-value">
+                    {{ total_referrals|default:0 }}
+                </div>
+                <div class="stat-helper">
+                    Ensemble des filleuls (directs & indirects).
+                </div>
+            </div>
+
+            <div class="stat-pill">
+                <div class="stat-label">Commissions versées (cumul)</div>
+                <div class="stat-value">
+                    {{ total_commissions_paid|default:0|money }} FCFA
+                </div>
+                <div class="stat-helper">
+                    Commissions effectivement payées aux affiliés.
+                </div>
+            </div>
+
+            <div class="stat-pill">
+                <div class="stat-label">Commissions en attente</div>
+                <div class="stat-value">
+                    {{ total_commissions_pending|default:0|money }} FCFA
+                </div>
+                <div class="stat-helper">
+                    Solde global encore non versé.
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="grid-2">
+
+        <!-- COLONNE GAUCHE : CLASSEMENT AFFILIÉS -->
+        <div>
+            <section class="card">
+                <h2 class="card-title">
+                    <span class="emoji">🏅</span> Top affiliés
+                </h2>
+
+                <form method="get" class="filters-grid" style="margin-bottom:10px;">
+                    <div class="filter-item">
+                        <label for="period">Période</label>
+                        <select id="period" name="period">
+                            <option value="30d" {% if period|default:"30d" == "30d" %}selected{% endif %}>30 derniers jours</option>
+                            <option value="7d" {% if period == "7d" %}selected{% endif %}>7 derniers jours</option>
+                            <option value="today" {% if period == "today" %}selected{% endif %}>Aujourd’hui</option>
+                            <option value="all" {% if period == "all" %}selected{% endif %}>Toutes périodes</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label for="q_aff">Recherche affilié</label>
+                        <input type="text" id="q_aff" name="q" value="{{ q|default:'' }}" placeholder="Nom, email, code">
+                    </div>
+                    <div class="filter-item">
+                        <label>&nbsp;</label>
+                        <button type="submit" class="btn btn-light">Filtrer</button>
+                    </div>
+                    <div class="filter-item">
+                        <label>&nbsp;</label>
+                        <a href="?period={{ period|default:'30d' }}&q={{ q|default:'' }}&export=csv" class="btn btn-light">
+                            ⬇️ Export CSV
+                        </a>
+                    </div>
+                </form>
+
+                <table class="table">
                     <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Client</th>
-                            <th>Code parrain</th>
-                            <th>N1</th>
-                            <th>Total commissions</th>
-                            <th>Wallet</th>
-                            <th>Actions</th>
-                        </tr>
+                    <tr>
+                        <th>#</th>
+                        <th>Affilié</th>
+                        <th>Code</th>
+                        <th class="num">Filleuls</th>
+                        <th class="num">Commandes</th>
+                        <th class="num">Commissions</th>
+                    </tr>
                     </thead>
                     <tbody>
-                        {% for a in affiliates %}
-                        <tr>
+                    {% for row in leaderboard %}
+                        <tr{% if forloop.counter <= 3 %} style="background:#fffbeb;"{% endif %}>
                             <td>{{ forloop.counter }}</td>
                             <td>
-                                {% if a.customer %}
-                                    <strong>{{ a.customer.name }}</strong><br>
-                                    <span class="text-muted">{{ a.customer.phone }}</span>
+                                {% if row.user %}
+                                    {{ row.user.get_full_name|default:row.user.username }}
                                 {% else %}
-                                    —
+                                    {{ row.name|default:"Affilié" }}
                                 {% endif %}
                             </td>
-                            <td><code>{{ a.referral_code }}</code></td>
-                            <td>{{ a.nb_filleuls|default:0 }}</td>
-                            <td>{{ a.total_commissions|default:0 }} FCFA</td>
-                            <td>{{ a.wallet_balance|default:0 }} FCFA</td>
                             <td>
-                                <a href="{% url 'mlm:affiliate_detail' a.referral_code %}"
-                                   class="btn btn-sm btn-primary">
-                                    Voir détail
-                                </a>
+                                <span class="badge-soft">{{ row.referral_code|default:"—" }}</span>
+                            </td>
+                            <td class="num">
+                                {{ row.referrals_count|default:0 }}
+                            </td>
+                            <td class="num">
+                                {{ row.orders_count|default:0 }}
+                            </td>
+                            <td class="num">
+                                {{ row.commissions_amount|default:0|money }} FCFA
                             </td>
                         </tr>
-                        {% endfor %}
+                    {% empty %}
+                        <tr>
+                            <td colspan="6" class="field-value-muted">
+                                Aucun affilié trouvé pour ces filtres.
+                            </td>
+                        </tr>
+                    {% endfor %}
                     </tbody>
                 </table>
-            </div>
-        {% else %}
-            <p class="mlm-empty">Aucun affilié trouvé pour le moment.</p>
-        {% endif %}
-        <div class="mlm-actions">
-            <a href="{% url 'mlm:affiliate_dashboard' %}" class="btn btn-primary">
-                🌱 Mon espace affilié
-            </a>
-            <a href="{% url 'mlm:admin_dashboard' %}" class="btn btn-light">
-                📊 Dashboard Admin MLM
-            </a>
-            <a href="{% url 'mlm:admin_withdrawals' %}" class="btn btn-light">
-                💸 Demandes de retrait
-            </a>
-            <a href="{% url 'mlm:finance_dashboard' %}" class="btn btn-light">
-                🧮 Vue finance MLM
-            </a>
+            </section>
+        </div>
+
+        <!-- COLONNE DROITE : DERNIÈRES ACTIVITÉS & RETRAITS -->
+        <div>
+            <section class="card">
+                <h2 class="card-title">
+                    <span class="emoji">📌</span> Dernières activités MLM
+                </h2>
+
+                {% if last_events %}
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Détails</th>
+                            <th class="num">Montant</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for ev in last_events %}
+                            <tr>
+                                <td>{{ ev.created_at|date:"d/m/Y H:i" }}</td>
+                                <td>
+                                    <span class="badge-soft">
+                                        {{ ev.type_label|default:"Événement" }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {{ ev.description|default:"—" }}
+                                </td>
+                                <td class="num">
+                                    {% if ev.amount %}
+                                        {{ ev.amount|money }} FCFA
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="field-value-muted" style="margin:0;">
+                        Aucune activité récente.
+                    </p>
+                {% endif %}
+            </section>
+
+            <section class="card">
+                <h2 class="card-title">
+                    <span class="emoji">🏦</span> Dernières demandes de retrait
+                </h2>
+
+                {% if last_withdrawals %}
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Affilié</th>
+                            <th>Statut</th>
+                            <th class="num">Montant</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for w in last_withdrawals %}
+                            <tr>
+                                <td>{{ w.created_at|date:"d/m/Y H:i" }}</td>
+                                <td>
+                                    {% if w.affiliate and w.affiliate.user %}
+                                        {{ w.affiliate.user.get_full_name|default:w.affiliate.user.username }}
+                                    {% else %}
+                                        Affilié #{{ w.affiliate_id }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if w.status == "pending" %}
+                                        <span class="badge-soft badge-soft--warning">En attente</span>
+                                    {% elif w.status == "approved" %}
+                                        <span class="badge-soft badge-soft--success">Validé</span>
+                                    {% elif w.status == "rejected" %}
+                                        <span class="badge-soft">Refusé</span>
+                                    {% else %}
+                                        <span class="badge-soft">{{ w.get_status_display|default:w.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="num">
+                                    {{ w.amount|money }} FCFA
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="field-value-muted" style="margin:0;">
+                        Aucune demande récente.
+                    </p>
+                {% endif %}
+            </section>
         </div>
     </div>
 </div>

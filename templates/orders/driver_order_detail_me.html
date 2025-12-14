@@ -1,573 +1,628 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Course {{ order.code|default:order.id }} – Moi livreur{% endblock %}
-
-{% block extra_head %}
-<style>
-    .driver-page {
-        max-width: 780px;
-        margin: 0 auto 80px;
-        padding: 12px 10px 24px;
-    }
-
-    /* ====== BRAND HEADER FAGNI APP LIVREUR ====== */
-    .driver-brand {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 12px;
-        border-radius: 14px;
-        background: #0F172A;
-        color: #E5E7EB;
-        margin-bottom: 10px;
-        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.35);
-    }
-
-    .driver-brand__logo {
-        width: 38px;
-        height: 38px;
-        border-radius: 12px;
-        background: radial-gradient(circle at 30% 20%, #FDBA74, #F97316);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-    }
-
-    .driver-brand__logo img {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-        display: block;
-    }
-
-    .driver-brand__logo-fallback {
-        font-weight: 800;
-        font-size: 14px;
-        letter-spacing: 0.08em;
-        color: #111827;
-    }
-
-    .driver-brand__text {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-    }
-
-    .driver-brand__name {
-        font-size: 14px;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: #F9FAFB;
-    }
-
-    .driver-brand__tagline {
-        font-size: 11px;
-        color: #CBD5F5;
-    }
-
-    .driver-brand__pill {
-        margin-left: auto;
-        font-size: 11px;
-        padding: 4px 9px;
-        border-radius: 999px;
-        border: 1px solid rgba(248, 250, 252, 0.25);
-        background: rgba(15, 23, 42, 0.6);
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        white-space: nowrap;
-    }
-
-    .driver-brand__pill-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 999px;
-        background: #22C55E;
-    }
-
-    /* ====== HEADER PAGE ====== */
-    .page-header {
-        display:flex;
-        justify-content:space-between;
-        gap:10px;
-        align-items:flex-start;
-        margin-bottom:14px;
-    }
-
-    .page-title {
-        font-size:18px;
-        font-weight:700;
-        color:#0f172a;
-        margin:0;
-    }
-
-    .page-subtitle {
-        font-size:12px;
-        color:#64748b;
-        margin:4px 0 0;
-    }
-
-    .badge {
-        display:inline-flex;
-        align-items:center;
-        justify-content:center;
-        padding:4px 10px;
-        border-radius:999px;
-        font-size:11px;
-        font-weight:500;
-        border:1px solid transparent;
-        white-space:nowrap;
-    }
-
-    .badge-status {
-        background:#eff6ff;
-        border-color:#dbeafe;
-        color:#1d4ed8;
-    }
-
-    .badge-warning {
-        background:#fef9c3;
-        border-color:#facc15;
-        color:#854d0e;
-    }
-
-    .card {
-        background:#ffffff;
-        border-radius:14px;
-        padding:12px 14px;
-        margin-bottom:10px;
-        border:1px solid #e5e7eb;
-        box-shadow:0 2px 5px rgba(15,23,42,0.05);
-    }
-
-    .card-title {
-        font-size:14px;
-        font-weight:600;
-        margin:0 0 6px;
-        display:flex;
-        align-items:center;
-        gap:6px;
-        color:#0f172a;
-    }
-
-    .card-title .emoji {
-        font-size:18px;
-    }
-
-    .field-row {
-        display:flex;
-        justify-content:space-between;
-        gap:8px;
-        font-size:13px;
-        margin-bottom:3px;
-    }
-
-    .field-label {
-        color:#6b7280;
-    }
-
-    .field-value {
-        font-weight:500;
-        color:#111827;
-        text-align:right;
-        max-width:60%;
-    }
-
-    .articles-table {
-        width:100%;
-        border-collapse:collapse;
-        font-size:12px;
-        margin-top:4px;
-    }
-
-    .articles-table th,
-    .articles-table td {
-        padding:4px 4px;
-        border-bottom:1px solid #e5e7eb;
-        vertical-align:top;
-    }
-
-    .articles-table thead th {
-        background:#f9fafb;
-        font-weight:600;
-        color:#6b7280;
-    }
-
-    .articles-table td.num {
-        text-align:right;
-        white-space:nowrap;
-    }
-
-    .line-designation {
-        font-weight:500;
-        color:#111827;
-        font-size:12px;
-    }
-
-    .line-meta {
-        font-size:10px;
-        color:#6b7280;
-    }
-
-    .gallery-grid {
-        display:grid;
-        grid-template-columns:repeat(auto-fill, minmax(82px, 1fr));
-        gap:6px;
-        margin-top:6px;
-    }
-
-    .gallery-grid a {
-        display:block;
-    }
-
-    .gallery-grid img {
-        width:100%;
-        height:82px;
-        object-fit:cover;
-        border-radius:10px;
-        border:1px solid #e5e7eb;
-    }
-
-    .totals-row {
-        display:flex;
-        justify-content:space-between;
-        font-size:13px;
-        margin-bottom:3px;
-    }
-
-    .totals-row strong {
-        color:#0f172a;
-    }
-
-    .driver-actions-footer {
-        margin-top: 8px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        justify-content: flex-end;
-        font-size: 12px;
-    }
-
-    .btn-driver {
-        border-radius: 999px;
-        border: 1px solid #e5e7eb;
-        background: #f9fafb;
-        padding: 6px 10px;
-        font-size: 12px;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        text-decoration: none;
-        color: #0f172a;
-    }
-
-    .btn-driver-primary {
-        background: #0F172A;
-        color: #ffffff;
-        border-color: #0F172A;
-    }
-
-    .btn-driver-primary:hover {
-        background: #020617;
-    }
-
-    @media (max-width: 640px) {
-        .driver-page {
-            padding-left:6px;
-            padding-right:6px;
-        }
-        .page-header {
-            flex-direction:column;
-        }
-        .field-value {
-            max-width:55%;
-        }
-    }
-
-    /* NAVBAR BASSE APP LIVREUR */
-    .driver-bottom-nav {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 56px;
-        background: #ffffff;
-        border-top: 1px solid #e2e8f0;
-        display: flex;
-        justify-content: space-around;
-        align-items: center;
-        z-index: 40;
-    }
-
-    .driver-bottom-nav__item {
-        flex: 1;
-        text-align: center;
-        font-size: 11px;
-        color: #94a3b8;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 2px;
-        text-decoration: none;
-    }
-
-    .driver-bottom-nav__icon {
-        font-size: 16px;
-        line-height: 1;
-    }
-
-    .driver-bottom-nav__item--active {
-        color: #0f172a;
-        font-weight: 600;
-    }
-
-    .driver-bottom-nav__item--active .driver-bottom-nav__icon {
-        transform: translateY(-1px);
-    }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="driver-page">
+<div class="driver-order-page">
 
-    <!-- BRAND FAGNI -->
+    <!-- BRAND FAGNI (même header visuel que le HUB) -->
     <div class="driver-brand">
         <div class="driver-brand__logo">
-            {# adapte le chemin du logo si besoin #}
-            <img src="{% static 'img/fagni/logo_fagni_light.png' %}"
+            <img src="{% static 'img/fagni_logo_ok.png' %}"
                  alt="Logo FAGNI"
                  onerror="this.style.display='none';this.parentElement.innerHTML='<span class=&quot;driver-brand__logo-fallback&quot;>FG</span>';">
         </div>
         <div class="driver-brand__text">
             <div class="driver-brand__name">FAGNI</div>
-            <div class="driver-brand__tagline">App livreur – Détail de la course</div>
+            <div class="driver-brand__tagline">Détail de la course</div>
         </div>
         <div class="driver-brand__pill">
             <span class="driver-brand__pill-dot"></span>
-            <span>Connecté</span>
+            <span>Vue chauffeur</span>
         </div>
     </div>
 
-    <!-- HEADER -->
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">Détail de la course</h1>
-            <p class="page-subtitle">
-                Course {{ order.code|default:order.id }} – vue livreur FAGNI.
-            </p>
-        </div>
-        <div style="text-align:right;">
-            <div class="badge badge-status">
-                {{ order.get_status_display|default:order.status }}
-            </div>
-            <div style="font-size:11px;color:#6b7280;margin-top:4px;">
-                Créée le
-                {% if order.created_at %}
-                    {{ order.created_at|date:"d/m/Y H:i" }}
-                {% else %}
-                    —
-                {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <!-- RÉSUMÉ RAPIDE -->
-    <section class="card">
-        <h2 class="card-title">
-            <span class="emoji">📌</span> Résumé de la commande
-        </h2>
-
-        <div class="field-row">
-            <span class="field-label">Code :</span>
-            <span class="field-value">{{ order.code|default:order.id }}</span>
-        </div>
-
-        <div class="field-row">
-            <span class="field-label">Client :</span>
-            <span class="field-value">{{ order.customer.name|default:"—" }}</span>
-        </div>
-
-        <div class="field-row">
-            <span class="field-label">Téléphone :</span>
-            <span class="field-value">{{ order.customer.phone|default:"—" }}</span>
-        </div>
-
-        <div class="field-row">
-            <span class="field-label">Adresse :</span>
-            <span class="field-value">
-                {{ order.customer.address|default:"—" }}
-            </span>
-        </div>
-
-        <div class="field-row">
-            <span class="field-label">Parrain :</span>
-            <span class="field-value">
-                {{ order.referral_code|default:"—" }}
-            </span>
-        </div>
-
-        <div class="field-row">
-            <span class="field-label">Blanchisserie :</span>
-            <span class="field-value">
-                {{ order.laundry_partner|default:"—" }}
-            </span>
-        </div>
-
-        <div class="field-row">
-            <span class="field-label">Total à contrôler :</span>
-            <span class="field-value">
-                {{ order.grand_total|default:order.total|default:0|floatformat:0 }} FCFA
-            </span>
-        </div>
-
-        <div class="driver-actions-footer">
-            <a href="{% url 'orders:driver_app' %}" class="btn-driver">
-                ← Retour à mes courses
-            </a>
-
-            {% if order.customer.address %}
-                <a href="https://www.google.com/maps/search/?api=1&query={{ order.customer.address|urlencode }}"
-                   target="_blank"
-                   class="btn-driver">
-                    🧭 Itinéraire client
-                </a>
-            {% endif %}
-
-            <a href="{% url 'orders:order_ticket_thermal_pdf' order.id %}"
-               target="_blank"
-               class="btn-driver btn-driver-primary">
-                🧾 Ticket thermique
-            </a>
-        </div>
-    </section>
-
-    <!-- ARTICLES POUR CONTRÔLE -->
-    <section class="card">
-        <h2 class="card-title">
-            <span class="emoji">📦</span> Articles à vérifier
-        </h2>
-
-        <table class="articles-table">
-            <thead>
-                <tr>
-                    <th>Article</th>
-                    <th class="num">Qté</th>
-                    <th class="num">PU</th>
-                    <th class="num">Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in order.items.all %}
-                    {% with service=item.service %}
-                    <tr>
-                        <td>
-                            <div class="line-designation">
-                                {{ item.designation|default:service.name }}
-                            </div>
-                            <div class="line-meta">
-                                {% if service and service.category %}
-                                    {{ service.category.name }} •
-                                {% endif %}
-                                ID #{{ service.id|default:"—" }}
-                            </div>
-                        </td>
-                        <td class="num">{{ item.quantity }}</td>
-                        <td class="num">{{ item.unit_price|floatformat:0 }}</td>
-                        <td class="num">{{ item.total|floatformat:0 }}</td>
-                    </tr>
-                    {% endwith %}
-                {% empty %}
-                    <tr>
-                        <td colspan="4" style="font-size:12px;color:#6b7280;">
-                            Aucune ligne dans cette commande.
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-
-        <div style="margin-top:6px;border-top:1px dashed #e5e7eb;padding-top:6px;">
-            <div class="totals-row">
-                <span>Sous-total prestations</span>
-                <strong>{{ order.total_ht|default:order.total|default:0|floatformat:0 }} FCFA</strong>
-            </div>
-            <div class="totals-row">
-                <span>Livraison</span>
-                <strong>{{ order.delivery_fee|default:0|floatformat:0 }} FCFA</strong>
-            </div>
-            <div class="totals-row">
-                <span><strong>Total client</strong></span>
-                <strong>{{ order.grand_total|default:order.total|default:0|floatformat:0 }} FCFA</strong>
-            </div>
-        </div>
-    </section>
-
-    <!-- GALERIE GLOBALE DES PHOTOS -->
-    <section class="card">
-        <h2 class="card-title">
-            <span class="emoji">📷</span> Photos de la commande
-        </h2>
-
-        {% if order.items.all %}
-            {% with has_photos=False %}
-                {% for item in order.items.all %}
-                    {% if item.photos.all %}
-                        {% with has_photos=True %}{% endwith %}
+    <!-- HEADER COURSE -->
+    <header class="driver-order-header card">
+        <div class="driver-order-header__top">
+            <div>
+                <div class="driver-order-code">
+                    Course {{ order.code|default:order.id }}
+                </div>
+                <div class="driver-order-date">
+                    {% if order.created_at %}
+                        Créée le {{ order.created_at|date:"d/m/Y à H:i" }}
+                    {% else %}
+                        Date inconnue
                     {% endif %}
-                {% endfor %}
-            {% endwith %}
-        {% endif %}
-
-        {% if order.items.all.0.photos.all %}
-            <div class="gallery-grid">
-                {% for item in order.items.all %}
-                    {% for photo in item.photos.all %}
-                        <a href="{{ photo.image.url }}" target="_blank" title="Article {{ item.id }}">
-                            <img src="{{ photo.image.url }}" alt="Photo course {{ order.code }}">
-                        </a>
-                    {% endfor %}
-                {% endfor %}
+                </div>
             </div>
-        {% else %}
-            <p style="font-size:12px;color:#6b7280;margin:4px 0 0;">
-                Aucune photo enregistrée pour cette commande.
-            </p>
-        {% endif %}
+            <div class="driver-order-status-pill driver-order-status-pill--{{ order.status|default:'pending' }}">
+                {{ order.get_status_display|default:"Statut inconnu" }}
+            </div>
+        </div>
+
+        <div class="driver-order-header__meta">
+            <div class="driver-order-header__meta-item">
+                <span class="driver-order-header__meta-label">Client</span>
+                <span class="driver-order-header__meta-value">
+                    {{ order.customer.name|default:"Client inconnu" }}
+                </span>
+            </div>
+            <div class="driver-order-header__meta-item">
+                <span class="driver-order-header__meta-label">Téléphone</span>
+                <span class="driver-order-header__meta-value">
+                    {{ order.customer.phone|default:"-" }}
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- PARCOURS (client / blanchisserie / client) -->
+    <section class="card driver-order-section">
+        <div class="driver-order-section__header">
+            <h2 class="driver-order-section__title">Parcours</h2>
+        </div>
+
+        <div class="driver-order-flow">
+            <!-- Point 1 : Client (pickup) -->
+            <div class="driver-order-flow__step">
+                <div class="driver-order-flow__icon driver-order-flow__icon--start">①</div>
+                <div class="driver-order-flow__content">
+                    <div class="driver-order-flow__label">Collecte client</div>
+                    <div class="driver-order-flow__value">
+                        {{ order.customer.address|default:"Adresse client non renseignée" }}
+                    </div>
+                    {% if order.customer.city %}
+                        <div class="driver-order-flow__sub">
+                            {{ order.customer.city }}
+                        </div>
+                    {% endif %}
+                    {% if order.customer.address %}
+                        <a href="https://www.google.com/maps/search/?api=1&query={{ order.customer.address|urlencode }}"
+                           target="_blank"
+                           class="driver-order-flow__link">
+                            🧭 Ouvrir dans Google Maps
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Ligne verticale -->
+            <div class="driver-order-flow__line"></div>
+
+            <!-- Point 2 : Blanchisserie -->
+            <div class="driver-order-flow__step">
+                <div class="driver-order-flow__icon driver-order-flow__icon--middle">②</div>
+                <div class="driver-order-flow__content">
+                    <div class="driver-order-flow__label">Blanchisserie</div>
+                    <div class="driver-order-flow__value">
+                        {% if order.laundry_partner %}
+                            {{ order.laundry_partner.name|default:"Blanchisserie partenaire" }}
+                        {% else %}
+                            Aucune blanchisserie assignée
+                        {% endif %}
+                    </div>
+                    {% if order.laundry_partner and order.laundry_partner.address %}
+                        <div class="driver-order-flow__sub">
+                            {{ order.laundry_partner.address }}
+                            {% if order.laundry_partner.city %}
+                                – {{ order.laundry_partner.city }}
+                            {% endif %}
+                        </div>
+                        <a href="https://www.google.com/maps/search/?api=1&query={{ order.laundry_partner.address|urlencode }}"
+                           target="_blank"
+                           class="driver-order-flow__link">
+                            🧭 Itinéraire blanchisserie
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Ligne verticale -->
+            <div class="driver-order-flow__line"></div>
+
+            <!-- Point 3 : Livraison client finale -->
+            <div class="driver-order-flow__step">
+                <div class="driver-order-flow__icon driver-order-flow__icon--end">③</div>
+                <div class="driver-order-flow__content">
+                    <div class="driver-order-flow__label">Retour / Livraison finale</div>
+                    <div class="driver-order-flow__value">
+                        {% if order.delivery_address %}
+                            {{ order.delivery_address }}
+                        {% else %}
+                            {{ order.customer.address|default:"Adresse client non renseignée" }}
+                        {% endif %}
+                    </div>
+                    {% if order.delivery_address %}
+                        <a href="https://www.google.com/maps/search/?api=1&query={{ order.delivery_address|urlencode }}"
+                           target="_blank"
+                           class="driver-order-flow__link">
+                            🧭 Itinéraire livraison
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
     </section>
 
-    {% if order.notes %}
-        <section class="card">
-            <h2 class="card-title">
-                <span class="emoji">📝</span> Notes & consignes
-            </h2>
-            <p style="font-size:12px;color:#111827;white-space:pre-line;margin:0;">
-                {{ order.notes }}
-            </p>
-        </section>
-    {% endif %}
+    <!-- BLOC LOGISTIQUE & REVENUS LIVREUR -->
+    <section class="card driver-order-section">
+        <div class="driver-order-section__header">
+            <h2 class="driver-order-section__title">Logistique & revenus</h2>
+        </div>
+
+        <div class="driver-order-metrics">
+            <div class="driver-order-metric">
+                <div class="driver-order-metric__label">Distance A/R</div>
+                <div class="driver-order-metric__value">
+                    {% if order.distance_km %}
+                        {{ order.distance_km|floatformat:"2" }} <span class="driver-order-metric__unit">km</span>
+                    {% else %}
+                        n.d.
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="driver-order-metric">
+                <div class="driver-order-metric__label">Frais de livraison facturés</div>
+                <div class="driver-order-metric__value">
+                    {{ order.delivery_fee|default_if_none:0 }} <span class="driver-order-metric__unit">FCFA</span>
+                </div>
+            </div>
+
+            <div class="driver-order-metric">
+                <div class="driver-order-metric__label">Revenu livreur</div>
+                <div class="driver-order-metric__value driver-order-metric__value--highlight">
+                    {{ order.driver_logistic_cost|default_if_none:0 }} <span class="driver-order-metric__unit">FCFA</span>
+                </div>
+            </div>
+
+            <div class="driver-order-metric">
+                <div class="driver-order-metric__label">Montant total client</div>
+                <div class="driver-order-metric__value">
+                    {{ order.total|default_if_none:0 }} <span class="driver-order-metric__unit">FCFA</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- STATUT / TIMELINE -->
+    <section class="card driver-order-section">
+        <div class="driver-order-section__header">
+            <h2 class="driver-order-section__title">Suivi de statut</h2>
+        </div>
+
+        <div class="driver-order-timeline">
+            <div class="driver-order-timeline__step {% if order.status in 'pending,assigned,in_progress,done' %}is-active{% endif %}">
+                <span class="driver-order-timeline__dot"></span>
+                <span class="driver-order-timeline__label">Course créée</span>
+            </div>
+            <div class="driver-order-timeline__step {% if order.status in 'assigned,in_progress,done' %}is-active{% endif %}">
+                <span class="driver-order-timeline__dot"></span>
+                <span class="driver-order-timeline__label">Acceptée par un livreur</span>
+            </div>
+            <div class="driver-order-timeline__step {% if order.status in 'in_progress,done' %}is-active{% endif %}">
+                <span class="driver-order-timeline__dot"></span>
+                <span class="driver-order-timeline__label">En cours de livraison</span>
+            </div>
+            <div class="driver-order-timeline__step {% if order.status == 'done' %}is-active{% endif %}">
+                <span class="driver-order-timeline__dot"></span>
+                <span class="driver-order-timeline__label">Course terminée</span>
+            </div>
+        </div>
+    </section>
+
+    <div class="driver-order-bottom-spacer"></div>
 </div>
 
-<!-- NAVBAR BASSE APP LIVREUR -->
-<nav class="driver-bottom-nav">
-    <a href="{% url 'orders:driver_hub' %}" class="driver-bottom-nav__item">
-        <span class="driver-bottom-nav__icon">🏠</span>
-        <span class="driver-bottom-nav__label">Hub</span>
-    </a>
-    <a href="{% url 'orders:driver_app' %}" class="driver-bottom-nav__item">
-        <span class="driver-bottom-nav__icon">📋</span>
-        <span class="driver-bottom-nav__label">Courses</span>
-    </a>
-    <a href="{% url 'orders:driver_map' %}" class="driver-bottom-nav__item">
-        <span class="driver-bottom-nav__icon">🗺️</span>
-        <span class="driver-bottom-nav__label">Carte</span>
-    </a>
-    <a href="{% url 'orders:driver_me_app' %}" class="driver-bottom-nav__item driver-bottom-nav__item--active">
-        <span class="driver-bottom-nav__icon">👤</span>
-        <span class="driver-bottom-nav__label">Moi</span>
-    </a>
-</nav>
+<!-- BARRE D’ACTION + NAV BAS -->
+<div class="driver-order-cta-wrapper">
+    <div class="driver-order-cta-inner">
+        <!-- CTA principal (bouton sombre style C) -->
+        <button type="button" class="driver-order-cta-button">
+            {% if order.status == "pending" %}
+                Je prends cette course
+            {% elif order.status == "assigned" %}
+                Je démarre la course
+            {% elif order.status == "in_progress" %}
+                Je suis arrivé(e) / Course livrée
+            {% elif order.status == "done" %}
+                Course terminée
+            {% elif order.status == "canceled" %}
+                Course annulée
+            {% else %}
+                Mettre à jour le statut
+            {% endif %}
+        </button>
+    </div>
+
+    <!-- NAVBAR FIXE BAS (même que HUB, onglet Courses actif ici) -->
+    <nav class="driver-bottom-nav">
+        <a href="{% url 'orders:driver_hub' %}" class="driver-bottom-nav__item">
+            <span class="driver-bottom-nav__icon">🏠</span>
+            <span class="driver-bottom-nav__label">Hub</span>
+        </a>
+        <a href="{% url 'orders:driver_app' %}" class="driver-bottom-nav__item driver-bottom-nav__item--active">
+            <span class="driver-bottom-nav__icon">📋</span>
+            <span class="driver-bottom-nav__label">Courses</span>
+        </a>
+        <a href="{% url 'orders:driver_map' %}" class="driver-bottom-nav__item">
+            <span class="driver-bottom-nav__icon">🗺️</span>
+            <span class="driver-bottom-nav__label">Carte</span>
+        </a>
+        <a href="{% url 'orders:driver_me_app' %}" class="driver-bottom-nav__item">
+            <span class="driver-bottom-nav__icon">👤</span>
+            <span class="driver-bottom-nav__label">Moi</span>
+        </a>
+    </nav>
+</div>
+
+<style>
+    .driver-order-page{
+        max-width:800px;
+        margin:0 auto;
+        padding:10px 12px 110px;
+    }
+
+    .card{
+        background:#ffffff;
+        border-radius:16px;
+        padding:12px 14px;
+        box-shadow:0 2px 6px rgba(15,23,42,0.08);
+        border:1px solid #e5e7eb;
+        margin-bottom:10px;
+    }
+
+    /* BRAND (même style que HUB) */
+    .driver-brand{
+        display:flex;
+        align-items:center;
+        gap:10px;
+        padding:10px 12px;
+        border-radius:16px;
+        background:#0F172A;
+        color:#E5E7EB;
+        margin-bottom:10px;
+        box-shadow:0 4px 10px rgba(15,23,42,0.35);
+    }
+    .driver-brand__logo{
+        width:38px;
+        height:38px;
+        border-radius:12px;
+        background:radial-gradient(circle at 30% 20%, #FDBA74, #F97316);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        overflow:hidden;
+    }
+    .driver-brand__logo-fallback{
+        font-weight:800;
+        font-size:14px;
+        letter-spacing:0.08em;
+        color:#111827;
+    }
+    .driver-brand__text{
+        display:flex;
+        flex-direction:column;
+        gap:2px;
+    }
+    .driver-brand__name{
+        font-size:14px;
+        font-weight:700;
+        letter-spacing:0.08em;
+        text-transform:uppercase;
+        color:#F9FAFB;
+    }
+    .driver-brand__tagline{
+        font-size:11px;
+        color:#CBD5F5;
+    }
+    .driver-brand__pill{
+        margin-left:auto;
+        font-size:11px;
+        padding:4px 9px;
+        border-radius:999px;
+        border:1px solid rgba(248,250,252,0.25);
+        background:rgba(15,23,42,0.6);
+        display:inline-flex;
+        align-items:center;
+        gap:4px;
+        white-space:nowrap;
+    }
+    .driver-brand__pill-dot{
+        width:7px;
+        height:7px;
+        border-radius:999px;
+        background:#22C55E;
+    }
+
+    /* HEADER COURSE */
+    .driver-order-header__top{
+        display:flex;
+        justify-content:space-between;
+        gap:8px;
+        align-items:flex-start;
+        margin-bottom:6px;
+    }
+    .driver-order-code{
+        font-size:14px;
+        font-weight:700;
+        color:#0F172A;
+    }
+    .driver-order-date{
+        font-size:11px;
+        color:#6B7280;
+    }
+    .driver-order-status-pill{
+        font-size:11px;
+        padding:4px 10px;
+        border-radius:999px;
+        border:1px solid #E5E7EB;
+        background:#F3F4F6;
+        color:#111827;
+        white-space:nowrap;
+    }
+    .driver-order-status-pill--pending{
+        background:rgba(234,179,8,0.1);
+        border-color:rgba(234,179,8,0.5);
+        color:#854D0E;
+    }
+    .driver-order-status-pill--in_progress{
+        background:rgba(59,130,246,0.1);
+        border-color:rgba(59,130,246,0.5);
+        color:#1D4ED8;
+    }
+    .driver-order-status-pill--done{
+        background:rgba(34,197,94,0.12);
+        border-color:rgba(34,197,94,0.5);
+        color:#166534;
+    }
+    .driver-order-status-pill--canceled{
+        background:rgba(248,113,113,0.15);
+        border-color:rgba(248,113,113,0.5);
+        color:#7F1D1D;
+    }
+
+    .driver-order-header__meta{
+        display:flex;
+        flex-wrap:wrap;
+        gap:10px;
+        margin-top:6px;
+        border-top:1px dashed #E5E7EB;
+        padding-top:6px;
+    }
+    .driver-order-header__meta-item{
+        display:flex;
+        flex-direction:column;
+        font-size:11px;
+    }
+    .driver-order-header__meta-label{
+        color:#6B7280;
+    }
+    .driver-order-header__meta-value{
+        font-weight:600;
+        color:#111827;
+    }
+
+    /* SECTIONS */
+    .driver-order-section__header{
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        margin-bottom:6px;
+    }
+    .driver-order-section__title{
+        font-size:13px;
+        font-weight:600;
+        color:#0F172A;
+    }
+
+    /* FLOW */
+    .driver-order-flow{
+        display:flex;
+        flex-direction:column;
+        gap:4px;
+    }
+    .driver-order-flow__step{
+        display:flex;
+        gap:10px;
+    }
+    .driver-order-flow__icon{
+        width:22px;
+        height:22px;
+        border-radius:999px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:11px;
+        font-weight:600;
+        flex-shrink:0;
+    }
+    .driver-order-flow__icon--start{
+        background:#0F172A;
+        color:#F9FAFB;
+    }
+    .driver-order-flow__icon--middle{
+        background:#1D4ED8;
+        color:#EFF6FF;
+    }
+    .driver-order-flow__icon--end{
+        background:#F97316;
+        color:#111827;
+    }
+    .driver-order-flow__content{
+        flex:1;
+        font-size:11px;
+    }
+    .driver-order-flow__label{
+        font-weight:600;
+        color:#111827;
+        margin-bottom:1px;
+    }
+    .driver-order-flow__value{
+        color:#111827;
+    }
+    .driver-order-flow__sub{
+        color:#6B7280;
+        margin-top:1px;
+    }
+    .driver-order-flow__link{
+        display:inline-block;
+        margin-top:3px;
+        font-size:11px;
+        color:#1D4ED8;
+        text-decoration:underline;
+    }
+    .driver-order-flow__line{
+        width:1px;
+        height:14px;
+        background:linear-gradient(to bottom, rgba(148,163,184,0.2), rgba(148,163,184,0.6));
+        margin:0 0 0 10px;
+    }
+
+    /* METRICS */
+    .driver-order-metrics{
+        display:grid;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:8px;
+        margin-top:4px;
+    }
+    @media(min-width:640px){
+        .driver-order-metrics{
+            grid-template-columns:repeat(4,minmax(0,1fr));
+        }
+    }
+    .driver-order-metric{
+        background:#F9FAFB;
+        border-radius:10px;
+        padding:6px 8px;
+        border:1px solid #E5E7EB;
+        font-size:11px;
+    }
+    .driver-order-metric__label{
+        color:#6B7280;
+        margin-bottom:2px;
+    }
+    .driver-order-metric__value{
+        font-weight:600;
+        color:#111827;
+    }
+    .driver-order-metric__value--highlight{
+        color:#16A34A;
+    }
+    .driver-order-metric__unit{
+        font-size:10px;
+        color:#6B7280;
+        margin-left:2px;
+    }
+
+    /* TIMELINE */
+    .driver-order-timeline{
+        display:flex;
+        justify-content:space-between;
+        gap:4px;
+        margin-top:6px;
+    }
+    .driver-order-timeline__step{
+        flex:1;
+        text-align:center;
+        font-size:9px;
+        color:#9CA3AF;
+        position:relative;
+        padding-top:12px;
+    }
+    .driver-order-timeline__dot{
+        width:8px;
+        height:8px;
+        border-radius:999px;
+        background:#E5E7EB;
+        display:block;
+        margin:0 auto 3px;
+    }
+    .driver-order-timeline__step.is-active{
+        color:#0F172A;
+        font-weight:600;
+    }
+    .driver-order-timeline__step.is-active .driver-order-timeline__dot{
+        background:#F97316;
+        box-shadow:0 0 0 4px rgba(248, 171, 95, 0.25);
+    }
+
+    /* CTA + NAV BAS */
+    .driver-order-cta-wrapper{
+        position:fixed;
+        left:0;
+        right:0;
+        bottom:0;
+        background:linear-gradient(to top, #020617, rgba(15,23,42,0.9) 40%, transparent);
+        padding:8px 8px 10px;
+        z-index:40;
+    }
+    .driver-order-cta-inner{
+        max-width:800px;
+        margin:0 auto 6px;
+    }
+    .driver-order-cta-button{
+        width:100%;
+        border:none;
+        border-radius:999px;
+        padding:10px 16px;
+        font-size:13px;
+        font-weight:600;
+        background:#020617; /* sombre (C) */
+        color:#FED7AA;      /* texte orangé doux */
+        box-shadow:0 6px 18px rgba(15,23,42,0.8);
+        cursor:pointer;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        gap:6px;
+    }
+    .driver-order-cta-button:active{
+        transform:translateY(1px);
+        box-shadow:0 4px 12px rgba(15,23,42,0.7);
+    }
+
+    /* NAV BAS (reprise du HUB : Courses actif) */
+    .driver-bottom-nav{
+        max-width:800px;
+        margin:0 auto;
+        background:#020617;
+        border-radius:999px;
+        padding:6px 8px;
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:6px;
+        border:1px solid rgba(148,163,184,0.4);
+    }
+    .driver-bottom-nav__item{
+        flex:1;
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+        gap:2px;
+        font-size:10px;
+        padding:4px 0;
+        border-radius:999px;
+        color:#9CA3AF;
+    }
+    .driver-bottom-nav__item--active{
+        background:linear-gradient(90deg,#F97316,#FACC15);
+        color:#111827;
+        font-weight:600;
+    }
+    .driver-bottom-nav__icon{
+        font-size:13px;
+        line-height:1;
+    }
+    .driver-bottom-nav__label{
+        line-height:1;
+    }
+
+    .driver-order-bottom-spacer{
+        height:20px;
+    }
+</style>
 {% endblock %}

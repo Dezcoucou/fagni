@@ -75,3 +75,13 @@ orders/templates/orders/*save*
 
 # === Tests temporaires ===
 test_chain.py
+
+# Backups / tmp
+*.bak
+*.bak_*
+*~ 
+*.swp
+*.swo
+
+# Local config folders
+config/

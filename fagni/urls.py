@@ -4,6 +4,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.views.generic import RedirectView
+from django.http import HttpResponse
+
+
+def chrome_devtools_wellknown(_request):
+    return HttpResponse(status=204)
 
 
 # ============================
@@ -43,6 +48,8 @@ urlpatterns = [
     ),
 
     path("wallets/", include("wallets.urls")),
+
+    path(".well-known/appspecific/com.chrome.devtools.json", chrome_devtools_wellknown),
 ]
 
 # Fichiers médias en dev

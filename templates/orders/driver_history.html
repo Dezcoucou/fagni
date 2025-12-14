@@ -102,11 +102,12 @@
                 <tbody>
                     {% for o in orders %}
                         <tr>
-                            <td>{{ o.created_at|date:"d/m/Y H:i" }}</td>
-                            <td>{{ o.code|default:o.id }}</td>
-                            <td>{{ o.customer.name|default:"-" }}</td>
-                            <td>{{ o.get_status_display }}</td>
-                            <td>
+                            <td data-label="Date">{{ o.created_at|date:"d/m/Y H:i" }}</td>
+                            <td data-label="Code">{{ o.code|default:o.id }}</td>
+                            <td data-label="Client">{{ o.customer.name|default:"-" }}</td>
+                            <td data-label="Statut">{{ o.get_status_display }}</td>
+
+                            <td data-label="Distance (km)">
                                 {% if o.distance_km %}
                                     {{ o.distance_km|floatformat:"g" }}
                                 {% else %}
@@ -114,10 +115,11 @@
                                 {% endif %}
                             </td>
 
-                            <td>
+                            <td data-label="Montant client (FCFA)">
                                 {{ o.total_client|floatformat:"g" }}
                             </td>
-                            <td>
+
+                            <td data-label="Revenu livreur (FCFA)">
                                 {{ o.driver_earnings_display|floatformat:"g" }}
                             </td>
                         </tr>

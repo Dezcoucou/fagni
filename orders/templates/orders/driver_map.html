@@ -1,0 +1,468 @@
+{% extends "base.html" %}
+{% load static %}
+{% load money_filters %}
+
+{% block title %}OPS – Carte des livreurs | FAGNI{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
+<style>
+  :root{
+    --fagni-orange:#ff7a00;
+    --fagni-blue:#0056b3;
+    --border:#e5e7eb;
+    --text:#0f172a;
+    --muted:#64748b;
+    --shadow:0 2px 10px rgba(15,23,42,0.06);
+    --shadow2:0 10px 28px rgba(15,23,42,0.10);
+  }
+
+  .page{ max-width:1150px; margin:0 auto 32px; padding:12px 10px 24px; }
+
+  .hero{
+    border-radius:18px;
+    padding:14px 16px;
+    margin-bottom:14px;
+    background:linear-gradient(90deg, rgba(255,122,0,0.12), rgba(0,86,179,0.10));
+    border:1px solid rgba(229,231,235,0.95);
+    box-shadow:var(--shadow);
+  }
+
+  .hero-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .title{ margin:0; font-size:20px; font-weight:800; color:var(--text); letter-spacing:-0.01em; }
+  .subtitle{ margin:4px 0 0; font-size:13px; color:#475569; }
+
+  .hero-actions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center;
+    padding:7px 13px; border-radius:999px; font-size:13px;
+    border:1px solid transparent; cursor:pointer; text-decoration:none; white-space:nowrap; gap:6px;
+  }
+  .btn-light{ background:#fff; border-color:var(--border); color:#374151; }
+  .btn-light:hover{ background:#f9fafb; }
+  .btn-primary{
+    background:linear-gradient(90deg, var(--fagni-orange), var(--fagni-blue));
+    color:#fff; border:none; box-shadow:0 2px 8px rgba(0,0,0,0.10);
+  }
+  .btn-primary:hover{ opacity:0.96; }
+
+  .layout{
+    display:grid;
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.3fr);
+    gap:14px;
+    align-items:start;
+  }
+  @media (max-width: 980px){ .layout{ grid-template-columns:1fr; } }
+
+  .card{
+    background:#fff;
+    border-radius:16px;
+    padding:12px 12px;
+    border:1px solid var(--border);
+    box-shadow:var(--shadow);
+  }
+  .card-title{
+    font-size:14px; font-weight:700; margin:0 0 10px; color:var(--text);
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  .pill{
+    font-size:11px; color:#0f172a;
+    border:1px solid var(--border);
+    padding:4px 10px; border-radius:999px;
+    background:#fff;
+  }
+
+  /* Map */
+  #map-shell{
+    position:relative;
+    width:100%;
+    height:520px;
+    border-radius:14px;
+    overflow:hidden;
+    border:1px solid var(--border);
+    background:#e5f2ff;
+    box-shadow:var(--shadow2);
+  }
+  #driver-map{ width:100%; height:100%; }
+
+  #overlay{
+    position:absolute; inset:0;
+    background: linear-gradient(135deg, rgba(15,23,42,0.86), rgba(15,23,42,0.72));
+    color:#f9fafb;
+    display:flex; align-items:center; justify-content:center;
+    text-align:center; padding:16px;
+    z-index:500;
+  }
+  #overlay .box{ max-width:360px; font-size:13px; line-height:1.45; }
+  #overlay .box strong{ display:block; font-size:14px; margin-bottom:6px; }
+
+  .statusbar{
+    display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+    margin-top:10px;
+  }
+  .status-pill{
+    font-size:11px;
+    padding:4px 10px;
+    border-radius:999px;
+    background:#0f172a;
+    color:#e2e8f0;
+    display:inline-flex;
+    gap:6px;
+    align-items:center;
+  }
+  .dot{ width:8px; height:8px; border-radius:999px; background:#22c55e; display:inline-block; }
+  .dot.warn{ background:#f59e0b; }
+  .dot.err{ background:#ef4444; }
+
+  /* Right column */
+  .controls{
+    display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;
+  }
+  .search{
+    width:100%;
+    padding:10px 12px;
+    border-radius:12px;
+    border:1px solid var(--border);
+    font-size:13px;
+    outline:none;
+  }
+
+  .driver-list{
+    max-height:520px;
+    overflow:auto;
+    padding-right:2px;
+  }
+  .driver-card{
+    border-radius:12px;
+    border:1px solid var(--border);
+    padding:10px 10px;
+    margin-bottom:10px;
+    background:#fff;
+    cursor:pointer;
+    transition:transform .05s ease, background .1s ease;
+  }
+  .driver-card:hover{ background:#f9fafb; transform:translateY(-1px); }
+
+  .row-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .name{ font-size:13px; font-weight:800; color:#111827; }
+  .city{ font-size:11px; color:#6b7280; margin-top:2px; }
+
+  .mini{
+    font-size:11px; color:#475569; display:flex; justify-content:space-between; gap:10px; margin-top:8px;
+  }
+  .mini strong{ color:#0f172a; font-weight:800; }
+
+  .actions{
+    display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:center;
+  }
+  .btn-xs{
+    padding:6px 10px;
+    font-size:11px;
+    border-radius:999px;
+    border:1px solid var(--border);
+    background:#fff;
+    color:#374151;
+    text-decoration:none;
+  }
+  .btn-xs:hover{ background:#f9fafb; }
+  .btn-xs-primary{
+    border:none;
+    background:linear-gradient(90deg, var(--fagni-orange), var(--fagni-blue));
+    color:#fff;
+  }
+  .btn-xs-primary:hover{ opacity:0.96; }
+
+  .empty{
+    font-size:12px;
+    color:#94a3b8;
+    padding:6px 2px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="hero">
+    <div class="hero-top">
+      <div>
+        <h1 class="title">🧭 OPS — Carte des livreurs</h1>
+        <p class="subtitle">Vue temps réel : positions GPS + performances semaine. Clique un livreur pour le focaliser.</p>
+      </div>
+
+      <div class="hero-actions">
+        <a class="btn btn-light" href="{% url 'orders:ops_dashboard' %}">← Retour OPS</a>
+        <button class="btn btn-primary" id="btnRefresh">🔄 Rafraîchir</button>
+      </div>
+    </div>
+
+    <div class="statusbar">
+      <span class="status-pill" id="livePill"><span class="dot warn" id="liveDot"></span><span id="liveText">Chargement…</span></span>
+      <span class="pill">Livreurs visibles : <strong id="driversCount">0</strong></span>
+      <span class="pill">Auto-refresh : <strong id="refreshEvery">15s</strong></span>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="card">
+      <div class="card-title">
+        <span>🗺️ Carte</span>
+        <span class="pill" id="mapHint">Clique un point pour détails</span>
+      </div>
+
+      <div id="map-shell">
+        <div id="driver-map"></div>
+        <div id="overlay">
+          <div class="box">
+            <strong>Chargement de la carte…</strong>
+            Si rien ne s’affiche : vérifie qu’au moins 1 livreur a latitude/longitude.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>🚴 Livreurs</span>
+        <span class="pill">Semaine en cours</span>
+      </div>
+
+      <div class="controls">
+        <input type="text" id="q" class="search" placeholder="Rechercher (nom, ville)…">
+      </div>
+
+      <div class="driver-list" id="driverList">
+        {% if drivers %}
+          {% for d in drivers %}
+            <div class="driver-card"
+                 data-id="{{ d.id }}"
+                 data-lat="{{ d.latitude }}"
+                 data-lng="{{ d.longitude }}"
+                 data-name="{{ d.name|default:'' }}"
+                 data-city="{{ d.city|default:'' }}">
+              <div class="row-top">
+                <div>
+                  <div class="name">{{ d.name }}</div>
+                  <div class="city">{{ d.city|default:"—" }}</div>
+                </div>
+                <span class="pill">ID #{{ d.id }}</span>
+              </div>
+
+              <div class="mini">
+                <span>Cmds : <strong>{{ d.week_orders }}</strong></span>
+                <span>Gain : <strong>{{ d.week_earnings|money }}</strong> FCFA</span>
+              </div>
+
+              <div class="actions">
+                <button class="btn-xs" data-focus="{{ d.id }}">🎯 Focus</button>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty">Aucun livreur avec coordonnées GPS pour le moment.</div>
+        {% endif %}
+      </div>
+
+      <script id="drivers-json" type="application/json">{{ drivers_json|safe }}</script>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ----------------------------
+  // Config
+  // ----------------------------
+  var REFRESH_MS = 15000;
+
+  // ----------------------------
+  // DOM
+  // ----------------------------
+  var overlay = document.getElementById("overlay");
+  var listEl  = document.getElementById("driverList");
+  var qEl     = document.getElementById("q");
+  var btnRefresh = document.getElementById("btnRefresh");
+  var liveDot = document.getElementById("liveDot");
+  var liveText = document.getElementById("liveText");
+  var driversCountEl = document.getElementById("driversCount");
+  var refreshEveryEl = document.getElementById("refreshEvery");
+
+  if (refreshEveryEl) refreshEveryEl.textContent = Math.round(REFRESH_MS/1000) + "s";
+
+  function setLive(state, text){
+    // state: ok|warn|err
+    if (!liveDot || !liveText) return;
+    liveDot.className = "dot " + (state === "ok" ? "" : (state === "err" ? "err" : "warn"));
+    liveText.textContent = text || "";
+  }
+
+  // ----------------------------
+  // Parse initial JSON
+  // ----------------------------
+  function getInitialDrivers(){
+    var el = document.getElementById("drivers-json");
+    if (!el) return [];
+    try { return JSON.parse(el.textContent || "[]"); }
+    catch(e){ return []; }
+  }
+
+  // ----------------------------
+  // Leaflet init
+  // ----------------------------
+  var map = L.map("driver-map", { zoomControl:true });
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap"
+  }).addTo(map);
+
+  var markersById = {};
+  var layerGroup = L.layerGroup().addTo(map);
+
+  function clearMarkers(){
+    layerGroup.clearLayers();
+    markersById = {};
+  }
+
+  function fitDrivers(drivers){
+    if (!drivers || drivers.length === 0) {
+      map.setView([5.35, -4.02], 12); // Abidjan default (safe)
+      return;
+    }
+    var b = L.latLngBounds([]);
+    drivers.forEach(function(d){ b.extend([d.latitude, d.longitude]); });
+    try { map.fitBounds(b, { padding:[20,20] }); }
+    catch(e){ map.setView([drivers[0].latitude, drivers[0].longitude], 13); }
+  }
+
+  function popupHtml(d){
+    var orderLine = d.active_order_id
+      ? ("<div style='margin-top:6px;font-size:12px;'><strong>Commande active :</strong> " +
+         (d.active_order_code ? d.active_order_code : ("#" + d.active_order_id)) +
+         "</div>")
+      : "<div style='margin-top:6px;font-size:12px;color:#64748b;'>Aucune commande active</div>";
+
+    var updated = d.updated_at ? ("<div style='margin-top:6px;font-size:11px;color:#64748b;'>MAJ : " + d.updated_at + "</div>") : "";
+
+    return (
+      "<div style='font-size:13px;line-height:1.35;min-width:220px;'>" +
+        "<div style='font-weight:800;color:#0f172a;'>" + (d.name || "Livreur") + "</div>" +
+        "<div style='font-size:11px;color:#64748b;margin-top:2px;'>" + (d.city || "—") + "</div>" +
+        "<div style='margin-top:8px;font-size:12px;display:flex;justify-content:space-between;gap:10px;'>" +
+          "<span>Cmds semaine</span><strong>" + (d.week_orders || 0) + "</strong>" +
+        "</div>" +
+        "<div style='margin-top:6px;font-size:12px;display:flex;justify-content:space-between;gap:10px;'>" +
+          "<span>Gain semaine</span><strong>" + (d.week_earnings || 0) + " FCFA</strong>" +
+        "</div>" +
+        orderLine +
+        updated +
+      "</div>"
+    );
+  }
+
+  function renderDrivers(drivers){
+    clearMarkers();
+
+    if (driversCountEl) driversCountEl.textContent = drivers.length;
+
+    if (!drivers || drivers.length === 0){
+      if (overlay) overlay.style.display = "flex";
+      setLive("warn", "Aucun livreur GPS");
+      fitDrivers([]);
+      return;
+    }
+
+    if (overlay) overlay.style.display = "none";
+
+    drivers.forEach(function(d){
+      var m = L.marker([d.latitude, d.longitude]).addTo(layerGroup);
+      m.bindPopup(popupHtml(d));
+      markersById[String(d.id)] = { marker: m, data: d };
+    });
+
+    fitDrivers(drivers);
+    setLive("ok", "OK — " + drivers.length + " livreur(s)");
+  }
+
+  function focusDriver(driverId){
+    var key = String(driverId);
+    var obj = markersById[key];
+    if (!obj) return;
+    var d = obj.data;
+    map.setView([d.latitude, d.longitude], 16);
+    obj.marker.openPopup();
+  }
+
+  // ----------------------------
+  // List filter + focus buttons
+  // ----------------------------
+  function applyFilter(){
+    var q = (qEl ? qEl.value : "").toLowerCase().trim();
+    if (!listEl) return;
+
+    var cards = listEl.querySelectorAll(".driver-card");
+    cards.forEach(function(card){
+      var name = (card.dataset.name || "").toLowerCase();
+      var city = (card.dataset.city || "").toLowerCase();
+      var ok = !q || name.includes(q) || city.includes(q);
+      card.style.display = ok ? "" : "none";
+    });
+  }
+
+  if (qEl) qEl.addEventListener("input", applyFilter);
+
+  if (listEl){
+    listEl.addEventListener("click", function(e){
+      var btn = e.target.closest("[data-focus]");
+      if (btn){
+        var id = btn.getAttribute("data-focus");
+        focusDriver(id);
+        return;
+      }
+      var card = e.target.closest(".driver-card");
+      if (card){
+        focusDriver(card.dataset.id);
+      }
+    });
+  }
+
+  // ----------------------------
+  // Auto refresh (fetch JSON)
+  // ----------------------------
+  function fetchDrivers(){
+    setLive("warn", "Rafraîchissement…");
+    return fetch("{% url 'orders:driver_map_data' %}", { credentials: "same-origin" })
+      .then(function(r){
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(function(payload){
+        var drivers = (payload && payload.drivers) ? payload.drivers : [];
+        renderDrivers(drivers);
+        applyFilter();
+      })
+      .catch(function(err){
+        console.error(err);
+        setLive("err", "Erreur refresh");
+      });
+  }
+
+  if (btnRefresh) btnRefresh.addEventListener("click", function(){
+    fetchDrivers();
+  });
+
+  // ----------------------------
+  // Boot
+  // ----------------------------
+  renderDrivers(getInitialDrivers());
+  applyFilter();
+
+  // Auto-refresh loop
+  setInterval(fetchDrivers, REFRESH_MS);
+
+})();
+</script>
+{% endblock %}

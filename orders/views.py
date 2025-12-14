@@ -1,9 +1,10 @@
 from bonuses.models import BonusWeek
 from collections import Counter, defaultdict
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from datetime import timedelta
+from datetime import timedelta, datetime, time
 from django.template.loader import render_to_string
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib import messages
 from django.conf import settings
@@ -21,8 +22,19 @@ from django.db.models import (
     ExpressionWrapper,
     Avg,
     DurationField,
+    FloatField,
+    Prefetch,
 )
 from django.db import transaction
+from wallets.models import WalletTransaction, Wallet
+from wallets.services import (
+    get_or_create_wallet_for_customer,
+    get_or_create_wallet_for_delivery_partner,
+    get_or_create_wallet_for_laundry_partner,
+    credit_wallet,
+    debit_wallet,
+    get_or_create_internal_wallet,  # ← celui-là manque
+)
 from django.db.models.functions import Coalesce, Cast, TruncDate
 from django.views.decorators.http import require_POST
 from django.urls import reverse
@@ -30,6 +42,13 @@ from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.utils.dateparse import parse_date
 from django.utils.encoding import smart_str
+
+from orders.utils.pricing import compute_order_amounts
+from orders.utils.settings_loader import get_pricing_settings
+from orders.utils.geocoding import ensure_order_geocoded
+from orders.utils.geo import resolve_pickup_coords, resolve_delivery_coords, resolve_provider_coords
+from .finance import compute_order_financials
+from .config_models import InvoiceSettings
 from .models import (
     Order,
     Customer,
@@ -39,11 +58,12 @@ from .models import (
     ServiceItem,
     DeliveryLeg,
     OrderStatusHistory,
+    haversine_distance_km,
+    LogisticsConfig,
 )
 from .utils import auto_assign_laundry, auto_assign_delivery
-from partners.models import LaundryPartner, DeliveryPartner
+from partners.models import LaundryPartner, DeliveryPartner, RelayPointPartner
 from mlm.services import attach_customer_to_sponsor
-
 from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -66,7 +86,61 @@ import io
 import qrcode
 import csv
 import json
-import datetime
+import re
+
+
+def _strip_django_comment_blocks(txt: str) -> str:
+    if not txt:
+        return ""
+    cleaned = re.sub(r"{#.*?#}", "", str(txt), flags=re.DOTALL)
+    return "\n".join([line.rstrip() for line in cleaned.splitlines() if line.strip()])
+
+def get_invoice_settings_clean():
+    """
+    Retourne InvoiceSettings (singleton pk=1) avec header/footer nettoyés
+    pour éviter l'affichage de {# ... #} dans les PDF/tickets.
+    """
+    try:
+        invoice_settings, _ = InvoiceSettings.objects.get_or_create(pk=1)
+
+        # Nettoyage pour affichage seulement (pas de save)
+        invoice_settings.header_note = _strip_django_comment_blocks(
+            getattr(invoice_settings, "header_note", "")
+        )
+        invoice_settings.footer_text = _strip_django_comment_blocks(
+            getattr(invoice_settings, "footer_text", "")
+        )
+        return invoice_settings
+    except Exception:
+        return None
+
+
+def get_connected_driver(request):
+    """
+    Essaie de retrouver le livreur connecté selon 3 logiques :
+    1) ?driver_id=xx dans l'URL
+    2) email du user == email du DeliveryPartner
+    3) (DEV) fallback : premier livreur actif
+    """
+    user = request.user
+    if not user.is_authenticated:
+        return None
+
+    # 1) driver_id explicite dans l'URL
+    driver_id = request.GET.get("driver_id")
+    if driver_id:
+        d = DeliveryPartner.objects.filter(pk=driver_id, is_active=True).first()
+        if d:
+            return d
+
+    # 2) mapping par email (cas normal en prod)
+    if user.email:
+        d = DeliveryPartner.objects.filter(email__iexact=user.email, is_active=True).first()
+        if d:
+            return d
+
+    # 3) Fallback DEV : on prend le premier livreur actif
+    return DeliveryPartner.objects.filter(is_active=True).order_by("id").first()
 
 
 def haversine_distance_km(lat1, lng1, lat2, lng2):
@@ -160,6 +234,105 @@ def fagni_parse_items_from_post(request):
     return items, total_ht
 
 
+def recompute_order_financials(order):
+    """
+    Recalcule tous les montants financiers d'une commande FAGNI selon les règles métier.
+    - service_fee = max(5% du sous-total prestations, 500 FCFA) si prestation > 0
+    - revenu FAGNI HT = commissions + marge logistique + service_fee
+    - TVA FAGNI = 18% du revenu FAGNI HT
+    - revenu FAGNI TTC = revenu FAGNI HT + TVA FAGNI
+    - total_client_ttc = prestations + service_fee + livraison + TVA FAGNI
+    """
+
+    ZERO = Decimal("0")
+    prestation_total = order.prestation_total or ZERO
+    delivery_fee = order.delivery_fee or ZERO
+    commission_laundry = order.commission_laundry_ht or ZERO
+    commission_delivery = order.commission_delivery_ht or ZERO
+    logistic_margin = order.logistic_margin or ZERO
+
+    # 1) Service FAGNI (HT)
+    if prestation_total > ZERO:
+        sf = (prestation_total * Decimal("0.05"))
+        if sf < Decimal("500"):
+            sf = Decimal("500")
+    else:
+        sf = ZERO
+
+    # on arrondit proprement à l'unité
+    sf = sf.quantize(Decimal("1."), rounding=ROUND_HALF_UP)
+    order.service_fee = sf
+
+    # 2) Revenu FAGNI HT
+    fagni_ht = commission_laundry + commission_delivery + logistic_margin + sf
+    order.fagni_revenue_ht = fagni_ht
+
+    # 3) TVA FAGNI (18%)
+    vat = (fagni_ht * Decimal("0.18")).quantize(Decimal("1."), rounding=ROUND_HALF_UP)
+    order.vat_fagni = vat
+
+    # 4) Revenu FAGNI TTC
+    order.fagni_revenue_ttc = fagni_ht + vat
+
+    # 5) Total TTC facturé au client
+    order.total_client_ttc = prestation_total + sf + delivery_fee + vat
+
+
+# ============================================================
+#  HELPER : PRICING FAGNI
+# ============================================================
+def apply_fagni_pricing(order):
+    """
+    Recalcule tous les montants financiers d'une commande FAGNI selon les règles métier.
+
+    Rappel des règles :
+    - service_fee = max(5% du sous-total prestations, 500 FCFA) si prestation_total > 0, sinon 0
+    - revenu FAGNI HT = commission_laundry_ht + commission_delivery_ht + logistic_margin + service_fee
+    - TVA FAGNI (18%) = 18% du revenu FAGNI HT
+    - revenu FAGNI TTC = revenu FAGNI HT + TVA FAGNI
+    - total_client_ttc = prestation_total + service_fee + delivery_fee + TVA FAGNI
+    """
+
+    DEC = Decimal
+    ZERO = DEC("0")
+
+    # 1) Récup des bases
+    prestation_total = order.prestation_total or ZERO
+    delivery_fee = order.delivery_fee or ZERO
+
+    commission_laundry = getattr(order, "commission_laundry_ht", ZERO) or ZERO
+    commission_delivery = getattr(order, "commission_delivery_ht", ZERO) or ZERO
+    logistic_margin = order.logistic_margin or ZERO
+
+    # 2) Service FAGNI (HT)
+    if prestation_total > ZERO:
+        service_fee = (prestation_total * DEC("0.05"))
+        if service_fee < DEC("500"):
+            service_fee = DEC("500")
+    else:
+        service_fee = ZERO
+
+    service_fee = service_fee.quantize(DEC("1."), rounding=ROUND_HALF_UP)
+    order.service_fee = service_fee
+
+    # 3) Revenu FAGNI HT
+    fagni_ht = commission_laundry + commission_delivery + logistic_margin + service_fee
+    fagni_ht = fagni_ht.quantize(DEC("1."), rounding=ROUND_HALF_UP)
+    order.fagni_revenue_ht = fagni_ht
+
+    # 4) TVA FAGNI (18%)
+    vat_fagni = (fagni_ht * DEC("0.18")).quantize(DEC("1."), rounding=ROUND_HALF_UP)
+    order.vat_fagni = vat_fagni
+
+    # 5) Revenu FAGNI TTC
+    order.fagni_revenue_ttc = fagni_ht + vat_fagni
+
+    # 6) Total TTC facturé au client
+    total_client_ttc = prestation_total + service_fee + delivery_fee + vat_fagni
+    total_client_ttc = total_client_ttc.quantize(DEC("1."), rounding=ROUND_HALF_UP)
+    order.total_client_ttc = total_client_ttc
+
+
 @login_required
 def portal_dashboard(request):
     """
@@ -234,12 +407,14 @@ def _annotate_totals(qs):
 # ============================================================
 #  LISTE DES COMMANDES
 # ============================================================
+@login_required
 def orders_list(request):
     """
     Liste des commandes FAGNI avec :
     - filtre par statut (all / pending / in_progress / done / canceled)
     - recherche plein texte (code, client, téléphone)
     - filtre par date de création (du / au)
+    - pagination
     """
     qs = (
         Order.objects
@@ -281,15 +456,30 @@ def orders_list(request):
     stats_qs = Order.objects.all()
     stats = stats_qs.aggregate(
         total_count=Count("id"),
-        done_total=Sum("total", filter=Q(status="done")),
+        done_total=Sum("total_client_ttc", filter=Q(status="done")),
         pending_count=Count("id", filter=Q(status="pending")),
         in_progress_count=Count("id", filter=Q(status="in_progress")),
         done_count=Count("id", filter=Q(status="done")),
         canceled_count=Count("id", filter=Q(status="canceled")),
     )
 
+    # --- Pagination ---
+    page = request.GET.get("page") or 1
+    paginator = Paginator(qs, 25)  # 25 commandes par page
+
+    try:
+        orders_page = paginator.page(page)
+    except PageNotAnInteger:
+        orders_page = paginator.page(1)
+    except EmptyPage:
+        orders_page = paginator.page(paginator.num_pages)
+
     context = {
-        "orders": qs,
+        "orders": orders_page,
+        "page_obj": orders_page,
+        "paginator": paginator,
+        "is_paginated": orders_page.has_other_pages(),
+
         "total_count": stats["total_count"] or 0,
         "done_total": stats["done_total"] or 0,
         "pending_count": stats["pending_count"] or 0,
@@ -308,31 +498,330 @@ def orders_list(request):
 # ============================================================
 #  TABLEAU OPS FAGNI (COLLECTE / LAVAGE / LIVRAISON)
 # ============================================================
+@login_required
 def ops_dashboard(request):
     """
     Tableau de bord opérationnel FAGNI :
     - En attente
     - En cours
     - Terminées
+
+    Important :
+    - on affiche le TOTAL CLIENT (total_client_ttc)
+    - on recalcule à l'affichage (sans save) pour éviter les incohérences
+    - pagination indépendante par colonne (pending / in_progress / done)
+
+    Lot 4.9:
+    - Alertes SLA (commandes bloquées)
+    - Alertes livreurs (inactive/offline)
+    - drivers_json inclut updated_at + server_time
+
+    Lot 4.9.2:
+    - filtre OPS par livreur via ?driver_id=<id>
     """
+    # ============================================================
+    #  DRIVER FILTER (Lot 4.9.2)
+    # ============================================================
+    raw_driver_id = request.GET.get("driver_id")
+    selected_driver = None
+    selected_driver_id = None
+    try:
+        selected_driver_id = int(raw_driver_id) if raw_driver_id else None
+    except (TypeError, ValueError):
+        selected_driver_id = None
+
+    if selected_driver_id:
+        try:
+            selected_driver = DeliveryPartner.objects.filter(is_active=True).get(pk=selected_driver_id)
+        except DeliveryPartner.DoesNotExist:
+            selected_driver = None
+            selected_driver_id = None
+
+    # ============================================================
+    #  BASE QS (filtrable)
+    # ============================================================
     base_qs = (
         Order.objects
         .select_related("customer", "laundry_partner", "delivery_partner")
         .prefetch_related("items__photos")
+        .order_by("-created_at")
     )
 
-    pending_orders = base_qs.filter(status="pending")
-    in_progress_orders = base_qs.filter(status="in_progress")
-    done_orders = base_qs.filter(status="done")
+    # applique le filtre driver si présent
+    if selected_driver_id:
+        base_qs = base_qs.filter(delivery_partner_id=selected_driver_id)
 
-    agg = done_orders.aggregate(s=Sum("total"))
-    done_total = agg["s"] or Decimal("0.00")
+    pending_qs = base_qs.filter(status="pending")
+    in_progress_qs = base_qs.filter(status="in_progress")
+    done_qs = base_qs.filter(status="done")
+
+    # --------- Pagination (3 colonnes indépendantes) ----------
+    per_page = int(request.GET.get("per_page", 12))
+
+    pending_p = Paginator(pending_qs, per_page)
+    progress_p = Paginator(in_progress_qs, per_page)
+    done_p = Paginator(done_qs, per_page)
+
+    pending_page_num = request.GET.get("pending_page", 1)
+    progress_page_num = request.GET.get("progress_page", 1)
+    done_page_num = request.GET.get("done_page", 1)
+
+    try:
+        pending_page_obj = pending_p.page(pending_page_num)
+    except (PageNotAnInteger, EmptyPage):
+        pending_page_obj = pending_p.page(1)
+
+    try:
+        progress_page_obj = progress_p.page(progress_page_num)
+    except (PageNotAnInteger, EmptyPage):
+        progress_page_obj = progress_p.page(1)
+
+    try:
+        done_page_obj = done_p.page(done_page_num)
+    except (PageNotAnInteger, EmptyPage):
+        done_page_obj = done_p.page(1)
+
+    # --- Recompute display amounts (no save) for consistency ---
+    def _refresh_amounts(page_obj):
+        for o in page_obj.object_list:
+            try:
+                o.compute_totals(save=False)
+            except Exception:
+                pass
+
+    _refresh_amounts(pending_page_obj)
+    _refresh_amounts(progress_page_obj)
+    _refresh_amounts(done_page_obj)
+
+    # Total livré (global) — ici "global" = selon le filtre driver si actif
+    try:
+        DEC = DecimalField(max_digits=12, decimal_places=2)
+        agg = done_qs.aggregate(
+            prestation_sum=Coalesce(Sum(Cast("prestation_total", DEC)), Value(0, output_field=DEC)),
+            total_sum=Coalesce(Sum(Cast("total", DEC)), Value(0, output_field=DEC)),
+        )
+        done_total = (agg["prestation_sum"] or Decimal("0"))
+        if done_total <= 0:
+            done_total = agg["total_sum"] or Decimal("0")
+    except Exception:
+        done_total = sum((o.prestation_total or o.total or Decimal("0")) for o in done_qs[:500])
+
+    # ============================================================
+    #  DRIVERS MAP (initial JSON) — on garde la carte globale
+    # ============================================================
+    today = timezone.localdate()
+    start_week = today - timezone.timedelta(days=today.weekday())
+
+    drivers_qs = DeliveryPartner.objects.filter(
+        is_active=True,
+        latitude__isnull=False,
+        longitude__isnull=False,
+    ).order_by("name")
+
+    # Stats semaine (1 requête)
+    stats_qs = (
+        Order.objects.filter(
+            delivery_partner__in=drivers_qs,
+            created_at__date__gte=start_week,
+            created_at__date__lte=today,
+        )
+        .values("delivery_partner_id")
+        .annotate(
+            week_orders=Count("id"),
+            week_earnings=Coalesce(Sum("amount_driver_partner"), Decimal("0")),
+        )
+    )
+    stats_map = {
+        row["delivery_partner_id"]: {
+            "week_orders": int(row["week_orders"] or 0),
+            "week_earnings": int(row["week_earnings"] or 0),
+        }
+        for row in stats_qs
+    }
+
+    drivers = []
+    for d in drivers_qs:
+        try:
+            lat = float(d.latitude)
+            lng = float(d.longitude)
+        except (TypeError, ValueError):
+            continue
+
+        st = stats_map.get(d.id, {"week_orders": 0, "week_earnings": 0})
+        drivers.append({
+            "id": d.id,
+            "name": d.name,
+            "city": getattr(d, "city", "") or "",
+            "latitude": lat,
+            "longitude": lng,
+            "week_orders": st["week_orders"],
+            "week_earnings": st["week_earnings"],
+            "updated_at": d.updated_at.isoformat() if getattr(d, "updated_at", None) else None,
+        })
+
+    payload = {
+        "ok": True,
+        "count": len(drivers),
+        "drivers": drivers,
+        "server_time": timezone.now().isoformat(),
+    }
+    drivers_json = json.dumps(payload, ensure_ascii=False)
+
+    # --------- helper querystring : conserver les params GET ----------
+    def _qs_without(param_name: str) -> str:
+        qd = request.GET.copy()
+        if param_name in qd:
+            qd.pop(param_name)
+        s = qd.urlencode()
+        return ("&" + s) if s else ""
+
+    # reset url (retire driver_id + focus + highlight, garde le reste)
+    qd_reset = request.GET.copy()
+    for k in ["driver_id", "focus", "highlight", "pending_page", "progress_page", "done_page"]:
+        if k in qd_reset:
+            qd_reset.pop(k)
+    reset_qs = qd_reset.urlencode()
+    reset_url = reverse("orders:ops_dashboard")
+    if reset_qs:
+        reset_url = f"{reset_url}?{reset_qs}"
+
+    highlight = request.GET.get("highlight")
+    try:
+        highlight_order_id = int(highlight) if highlight else None
+    except (TypeError, ValueError):
+        highlight_order_id = None
+
+    # ============================================================
+    #  Lot 4.9 — ALERTES (SLA) (filtrées si driver actif)
+    # ============================================================
+    now = timezone.now()
+
+    SLA_PICKUP_H = 2        # pending -> pickup
+    SLA_DROPOFF_H = 3       # pickup -> dropoff
+    SLA_WASH_H = 48         # dropoff -> wash_done
+    SLA_RETURN_H = 3        # wash_done -> return
+    SLA_DELIVERED_H = 6     # return -> delivered
+
+    alerts_orders = []
+    scan_qs = (
+        Order.objects
+        .select_related("customer", "laundry_partner", "delivery_partner")
+        .filter(status__in=["pending", "in_progress"])
+        .order_by("-created_at")
+    )
+    if selected_driver_id:
+        scan_qs = scan_qs.filter(delivery_partner_id=selected_driver_id)
+
+    scan_qs = scan_qs[:250]
+
+    def _hours(dt_from, dt_to):
+        if not dt_from or not dt_to:
+            return None
+        return (dt_to - dt_from).total_seconds() / 3600.0
+
+    for o in scan_qs:
+        reason = None
+        age_h = None
+        next_step = None
+
+        if o.status == "pending" and not o.pickup_time:
+            age_h = _hours(o.created_at, now) or 0
+            if age_h >= SLA_PICKUP_H:
+                reason = f"Collecte en retard (>{SLA_PICKUP_H}h)"
+                next_step = "pickup"
+
+        if o.status == "in_progress":
+            if o.pickup_time and not o.dropoff_time:
+                age_h = _hours(o.pickup_time, now) or 0
+                if age_h >= SLA_DROPOFF_H:
+                    reason = f"Dépôt blanchisserie en retard (>{SLA_DROPOFF_H}h après collecte)"
+                    next_step = "dropoff"
+
+            elif o.dropoff_time and not o.wash_complete_time:
+                age_h = _hours(o.dropoff_time, now) or 0
+                if age_h >= SLA_WASH_H:
+                    reason = f"Lavage trop long (>{SLA_WASH_H}h après dépôt)"
+                    next_step = "wash_done"
+
+            elif o.wash_complete_time and not o.return_time:
+                age_h = _hours(o.wash_complete_time, now) or 0
+                if age_h >= SLA_RETURN_H:
+                    reason = f"Reprise livreur en retard (>{SLA_RETURN_H}h après lavage)"
+                    next_step = "return"
+
+            elif o.return_time and not o.delivered_time:
+                age_h = _hours(o.return_time, now) or 0
+                if age_h >= SLA_DELIVERED_H:
+                    reason = f"Livraison client en retard (>{SLA_DELIVERED_H}h après reprise)"
+                    next_step = "delivered"
+
+        if reason:
+            alerts_orders.append({
+                "order": o,
+                "reason": reason,
+                "age_h": round(age_h or 0, 1),
+                "next_step": next_step,
+            })
+
+    # Alertes drivers (offline > 10min) — global
+    ACTIVE_MS = 10 * 60  # 10 minutes en secondes
+    drivers_offline = []
+    for d in drivers_qs:
+        if not getattr(d, "updated_at", None):
+            drivers_offline.append({"driver": d, "age_min": None})
+            continue
+        delta = (now - d.updated_at).total_seconds()
+        if delta > ACTIVE_MS:
+            drivers_offline.append({"driver": d, "age_min": int(delta // 60)})
+
+      # ============================================================
+      #  DRIVERS LIST (dropdown filtre) — tous les drivers actifs
+      # ============================================================
+        drivers_list = DeliveryPartner.objects.filter(is_active=True).order_by("name")
+
+        # Total affiché (selon filtre)
+        displayed_total_count = base_qs.count()
 
     context = {
-        "pending_orders": pending_orders,
-        "in_progress_orders": in_progress_orders,
-        "done_orders": done_orders,
+        # counts (selon filtre driver si actif)
+        "pending_count": pending_qs.count(),
+        "in_progress_count": in_progress_qs.count(),
+        "done_count": done_qs.count(),
+
+        "pending_page_obj": pending_page_obj,
+        "progress_page_obj": progress_page_obj,
+        "done_page_obj": done_page_obj,
+
+        "pending_qs": _qs_without("pending_page"),
+        "progress_qs": _qs_without("progress_page"),
+        "done_qs": _qs_without("done_page"),
+
+        "per_page": per_page,
         "done_total": done_total,
+
+        # MAP
+        "drivers_json": drivers_json,
+        "drivers": drivers,
+
+        "highlight_id": highlight_order_id,
+
+        # FILTER UI
+        "selected_driver": selected_driver,
+        "selected_driver_id": selected_driver_id,
+        "ops_reset_url": reset_url,
+
+        # ALERTES
+        "alerts_orders": alerts_orders[:20],
+        "alerts_orders_count": len(alerts_orders),
+        "drivers_offline": drivers_offline[:20],
+        "drivers_offline_count": len(drivers_offline),
+
+        # FILTRE DRIVER (Lot 4.9.2/4.9.3)
+        "selected_driver": selected_driver,
+        "selected_driver_id": selected_driver_id,
+        "drivers_list": drivers_list,
+        "reset_url": reset_url,
+        "displayed_total_count": displayed_total_count,
     }
     return render(request, "orders/ops_dashboard.html", context)
 
@@ -344,45 +833,128 @@ def ops_update_step(request, order_id, action):
     - pickup, dropoff, wash_done, return, delivered
     + bascule éventuellement le statut.
 
-    ⚠️ Hook MLM :
-    - quand l'action est "delivered"
-    - et que la commande n'a pas encore distribué ses commissions
-    → on déclenche distribute_mlm_commissions UNE seule fois.
+    Lot 4.8 :
+    - Messages flash (success/warning/error)
+    - Garde-fous : empêche les étapes dans le mauvais ordre
+    - Redirect avec highlight (?highlight=<id>)
     """
     order = get_object_or_404(Order, pk=order_id)
     now = timezone.now()
 
-    if action == "pickup":
-        order.pickup_time = now
-        if order.status == "pending":
-            order.status = "in_progress"
+    allowed = {"pickup", "dropoff", "wash_done", "return", "delivered"}
+    if action not in allowed:
+        messages.error(request, "Action OPS invalide.")
+        return redirect("orders:ops_dashboard")
 
-    elif action == "dropoff":
-        order.dropoff_time = now
+    mapping = {
+        "pickup": ("pickup_time", "Collecte validée"),
+        "dropoff": ("dropoff_time", "Dépôt blanchisserie validé"),
+        "wash_done": ("wash_complete_time", "Lavage terminé validé"),
+        "return": ("return_time", "Reprise livreur validée"),
+        "delivered": ("delivered_time", "Livraison client validée"),
+    }
+    field_name, label = mapping[action]
 
-    elif action == "wash_done":
-        order.wash_complete_time = now
+    prerequisites = {
+        "pickup": [],
+        "dropoff": ["pickup_time"],
+        "wash_done": ["dropoff_time"],
+        "return": ["wash_complete_time"],
+        "delivered": ["return_time"],
+    }
 
-    elif action == "return":
-        order.return_time = now
+    if getattr(order, field_name, None):
+        messages.warning(request, f"Déjà fait : {label}.")
+        return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}")
 
-    elif action == "delivered":
-        order.delivered_time = now
+    missing = [f for f in prerequisites[action] if not getattr(order, f, None)]
+    if missing:
+        messages.error(request, "Impossible : étape précédente non validée.")
+        return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}")
+
+    setattr(order, field_name, now)
+
+    if action == "pickup" and order.status == "pending":
+        order.status = "in_progress"
+    if action == "delivered":
         order.status = "done"
 
-        # 🔗 HOOK MLM : distribution des commissions à la livraison
-        # - pas déjà distribué
-        # - service_fee > 0
-        if (
-            not order.mlm_distributed
-            and order.service_fee
-            and order.service_fee > 0
-        ):
-            _ = order.distribute_mlm_commissions  # propriété avec effets de bord
+    try:
+        order.compute_totals(save=False)
+    except Exception:
+        pass
 
-    # On sauvegarde les changements (timestamps, statut, mlm_distributed éventuel)
+    if action == "delivered":
+        if (not getattr(order, "mlm_distributed", False)) and (order.service_fee or 0) > 0:
+            _ = order.distribute_mlm_commissions
+
     order.save()
-    return redirect("orders:ops_dashboard")
+    messages.success(request, label)
+    return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}")
+
+
+@login_required
+def ops_drivers_live(request):
+    """
+    Lot 4.9 — JSON LIVE pour la carte Leaflet du OPS Dashboard.
+    Retourne la liste des DeliveryPartner actifs avec latitude/longitude + stats semaine.
+    + updated_at + server_time
+    """
+    today = timezone.localdate()
+    start_week = today - timezone.timedelta(days=today.weekday())
+
+    drivers_qs = DeliveryPartner.objects.filter(
+        is_active=True,
+        latitude__isnull=False,
+        longitude__isnull=False,
+    ).order_by("name")
+
+    stats_qs = (
+        Order.objects.filter(
+            delivery_partner__in=drivers_qs,
+            created_at__date__gte=start_week,
+            created_at__date__lte=today,
+        )
+        .values("delivery_partner_id")
+        .annotate(
+            week_orders=Count("id"),
+            week_earnings=Coalesce(Sum("amount_driver_partner"), Decimal("0")),
+        )
+    )
+    stats_map = {
+        row["delivery_partner_id"]: {
+            "week_orders": int(row["week_orders"] or 0),
+            "week_earnings": int(row["week_earnings"] or 0),
+        }
+        for row in stats_qs
+    }
+
+    drivers = []
+    for d in drivers_qs:
+        try:
+            lat = float(d.latitude)
+            lng = float(d.longitude)
+        except (TypeError, ValueError):
+            continue
+
+        st = stats_map.get(d.id, {"week_orders": 0, "week_earnings": 0})
+        drivers.append({
+            "id": d.id,
+            "name": d.name,
+            "city": getattr(d, "city", "") or "",
+            "latitude": lat,
+            "longitude": lng,
+            "week_orders": st["week_orders"],
+            "week_earnings": st["week_earnings"],
+            "updated_at": d.updated_at.isoformat() if getattr(d, "updated_at", None) else None,
+        })
+
+    return JsonResponse({
+        "ok": True,
+        "count": len(drivers),
+        "drivers": drivers,
+        "server_time": timezone.now().isoformat(),
+    })
 
 
 # ============================================================
@@ -519,80 +1091,6 @@ def orders_dashboard(request):
         "avg_ticket_all": avg_ticket_all,
     }
     return render(request, "orders/dashboard.html", context)
-
-
-# ============================================================
-#  LISTE CLIENTS – MINI CRM
-# ============================================================
-def customers_list(request):
-    """
-    Liste des clients FAGNI (mini CRM) :
-    - Recherche (nom, téléphone, adresse)
-    - Filtre min_orders (nb min de commandes)
-    - Stats : nb commandes, montant total, service FAGNI, livraison
-    Basé directement sur la relation Customer -> orders.
-    """
-
-    q = (request.GET.get("q") or "").strip()
-    min_orders = request.GET.get("min_orders") or ""
-
-    # 1) Base : tous les clients avec agrégats sur la relation "orders"
-    qs = (
-        Customer.objects
-        .annotate(
-            total_orders=Count("orders", distinct=True),
-            total_amount=Coalesce(Sum("orders__total"), DECIMAL_ZERO),
-            total_service_fee=Coalesce(Sum("orders__service_fee"), DECIMAL_ZERO),
-            total_delivery_fee=Coalesce(Sum("orders__delivery_fee"), DECIMAL_ZERO),
-            last_order_date=Max("orders__created_at"),
-        )
-    )
-
-    # 2) Recherche plein texte
-    if q:
-        qs = qs.filter(
-            Q(name__icontains=q)
-            | Q(phone__icontains=q)
-            | Q(address__icontains=q)
-        )
-
-    # 3) Filtre min_orders
-    if min_orders:
-        try:
-            min_o = int(min_orders)
-        except (TypeError, ValueError):
-            min_o = 0
-        if min_o > 0:
-            qs = qs.filter(total_orders__gte=min_o)
-
-    # 4) Tri : dernière commande d'abord, puis nom
-    qs = qs.order_by(
-        F("last_order_date").desc(nulls_last=True),
-        "name",
-    )
-
-    # 5) Totaux de synthèse globaux (pour la barre en haut)
-    total_customers = qs.count()
-    total_with_orders = qs.filter(total_orders__gt=0).count()
-
-    agg = qs.aggregate(
-        total_amount_global=Coalesce(Sum("total_amount"), DECIMAL_ZERO),
-        total_service_global=Coalesce(Sum("total_service_fee"), DECIMAL_ZERO),
-        total_delivery_global=Coalesce(Sum("total_delivery_fee"), DECIMAL_ZERO),
-    )
-
-    context = {
-        "customers": qs,
-        "total_customers": total_customers,
-        "total_with_orders": total_with_orders,
-        "q": q,
-        "min_orders": min_orders,
-        # synthèse globale
-        "total_amount": agg["total_amount_global"],
-        "total_service": agg["total_service_global"],
-        "total_delivery": agg["total_delivery_global"],
-    }
-    return render(request, "orders/customers_list.html", context)
 
 
 @login_required
@@ -889,16 +1387,10 @@ def export_finance_xlsx(request):
     return response
 
 
-from decimal import Decimal, InvalidOperation
-from django.contrib.auth.decorators import login_required
-from django.utils import timezone
-
-# ... tes autres imports déjà présents (Order, etc.)
-
 
 def _safe_dec(value):
     """
-    Convertit proprement une valeur en Decimal.
+    Convertit en Decimal en gérant None / types bizarres.
     Renvoie Decimal('0') si la valeur n’est pas convertible.
     """
     if value is None:
@@ -911,17 +1403,240 @@ def _safe_dec(value):
 
 def _order_effective_total(order):
     """
-    Retourne le montant réellement facturé pour une commande,
-    en utilisant la valeur disponible (total, grand_total, total_ttc, etc.)
+    Montant réellement facturé au client pour une commande.
+    On essaie dans l'ordre :
+    - total_client_ttc (champ dédié si présent)
+    - grand_total / total_ttc / total_ht / total
+    - sinon on reconstruit : items + service + livraison
     """
-    fields = ["grand_total", "total_ttc", "total_ht", "total"]
-
-    for field in fields:
+    # 1) Champs agrégés
+    for field in ["total_client_ttc", "grand_total", "total_ttc", "total_ht", "total"]:
         if hasattr(order, field):
-            val = getattr(order, field)
-            d = _safe_dec(val)
+            d = _safe_dec(getattr(order, field))
             if d > 0:
                 return d
+
+    # 2) Fallback : recomposer à partir des items + frais
+    items_sum = Decimal("0")
+    try:
+        for it in order.items.all():
+            line_total = getattr(it, "line_total", None)
+            if line_total is not None:
+                items_sum += _safe_dec(line_total)
+            else:
+                q = _safe_dec(getattr(it, "quantity", 0))
+                p = _safe_dec(getattr(it, "unit_price", 0))
+                items_sum += q * p
+    except Exception:
+        pass
+
+    service_fee = _safe_dec(getattr(order, "service_fee", None))
+    delivery_fee = _safe_dec(getattr(order, "delivery_fee", None))
+    return items_sum + service_fee + delivery_fee
+
+
+DEC_ZERO = Decimal("0")
+
+
+def _dec_or_zero(val):
+    """
+    Convertit une valeur en Decimal de façon robuste.
+    Retourne Decimal('0') si la conversion échoue.
+    """
+    if val is None:
+        return DEC_ZERO
+    if isinstance(val, Decimal):
+        return val
+    try:
+        return Decimal(str(val))
+    except (InvalidOperation, TypeError, ValueError):
+        return DEC_ZERO
+
+
+def _compute_order_pricing(order):
+    """
+    Calcule tous les montants importants pour une commande FAGNI
+    sans casser ce qui existe déjà en base.
+
+    Retourne un dict avec :
+      - items_total
+      - service_fee
+      - delivery_fee
+      - total_client
+      - driver_income
+      - vat_fagni
+      - fagni_revenue_ht
+      - fagni_revenue_ttc
+      - laundry_amount
+      - logistic_margin
+    """
+    # 1) Sous-total prestations (à partir des items, sinon fallback sur prestation_total)
+    items_total = DEC_ZERO
+    try:
+        items_qs = order.items.all()
+    except Exception:
+        items_qs = []
+
+    for it in items_qs:
+        line_total = _dec_or_zero(getattr(it, "total", None))
+        if line_total > 0:
+            items_total += line_total
+            continue
+
+        q = _dec_or_zero(getattr(it, "quantity", 0))
+        unit = _dec_or_zero(getattr(it, "unit_price", 0))
+        items_total += q * unit
+
+    if items_total <= 0:
+        items_total = _dec_or_zero(getattr(order, "prestation_total", 0))
+
+    # 2) Frais connu directement sur la commande
+    service_fee = _dec_or_zero(getattr(order, "service_fee", 0))
+    delivery_fee = _dec_or_zero(getattr(order, "delivery_fee", 0))
+    vat_fagni = _dec_or_zero(getattr(order, "vat_fagni", 0))
+    total_client_ttc = _dec_or_zero(getattr(order, "total_client_ttc", 0))
+    total_field = _dec_or_zero(getattr(order, "total", 0))
+
+    # 3) Total TTC client (priorité à total_client_ttc si > 0)
+    if total_client_ttc > 0:
+        total_client = total_client_ttc
+    elif total_field > 0:
+        total_client = total_field
+    else:
+        # Reconstruction douce : prestations + frais + TVA FAGNI
+        total_client = items_total + service_fee + delivery_fee + vat_fagni
+
+    # 4) Revenu livreur
+    driver_income = _dec_or_zero(getattr(order, "amount_driver_partner", None))
+    if driver_income <= 0:
+        driver_income = _dec_or_zero(getattr(order, "driver_logistic_cost", None))
+
+    # 5) Marge logistique & revenus FAGNI
+    logistic_margin = _dec_or_zero(getattr(order, "logistic_margin", None))
+    fagni_revenue_ht = service_fee + logistic_margin
+
+    # Si un champ fagni_revenue_ht existe et est déjà renseigné, on le respecte
+    if hasattr(order, "fagni_revenue_ht"):
+        db_fagni_ht = _dec_or_zero(getattr(order, "fagni_revenue_ht", 0))
+        if db_fagni_ht > 0:
+            fagni_revenue_ht = db_fagni_ht
+
+    fagni_revenue_ttc = fagni_revenue_ht + vat_fagni
+
+    # 6) Revenu blanchisserie (fallback simple)
+    laundry_amount = _dec_or_zero(getattr(order, "amount_laundry_partner", None))
+    if laundry_amount <= 0 and items_total > 0:
+        # par défaut, on considère que la blanchisserie touche le montant prestations
+        laundry_amount = items_total
+
+    return {
+        "items_total": items_total,
+        "service_fee": service_fee,
+        "delivery_fee": delivery_fee,
+        "total_client": total_client,
+        "driver_income": driver_income,
+        "vat_fagni": vat_fagni,
+        "fagni_revenue_ht": fagni_revenue_ht,
+        "fagni_revenue_ttc": fagni_revenue_ttc,
+        "laundry_amount": laundry_amount,
+        "logistic_margin": logistic_margin,
+    }
+
+
+def _guess_delivery_fee(order, total_client=None, items_total=None, service_fee=None):
+    """
+    Essaie de deviner le montant de la livraison pour une commande.
+
+    Logique :
+    livraison ≈ total_client_ttc - prestations - service FAGNI - TVA FAGNI
+
+    - total_client : TTC client (total_client_ttc, total ou annotation)
+    - items_total : sous-total prestations (annotation ou recalcul)
+    - service_fee : service FAGNI (order.service_fee)
+    Utilise aussi order.vat_fagni si disponible.
+    """
+    # 1) TTC client
+    total_client = _safe_dec(
+        total_client
+        or getattr(order, "total_client_ttc", None)
+        or getattr(order, "total", None)
+    )
+
+    # 2) Sous-total prestations
+    if items_total is None:
+        items_total = _safe_dec(getattr(order, "items_total", None))
+    else:
+        items_total = _safe_dec(items_total)
+
+    # 3) Service FAGNI et TVA FAGNI
+    vat_fagni = _safe_dec(getattr(order, "vat_fagni", None))
+    if service_fee is None:
+        service_fee = _safe_dec(getattr(order, "service_fee", None))
+    else:
+        service_fee = _safe_dec(service_fee)
+
+    if total_client <= 0:
+        return Decimal("0")
+
+    # livraison = TTC - prestations - service - TVA
+    delivery_guess = total_client - items_total - service_fee - vat_fagni
+    if delivery_guess > 0:
+        return delivery_guess
+
+    return Decimal("0")
+
+
+def _order_driver_income(order, delivery_fee=None):
+    """
+    Calcule le revenu du livreur pour une commande.
+
+    Priorité :
+    1) order.amount_driver_partner si > 0
+    2) order.driver_logistic_cost si > 0
+    3) somme des DeliveryLeg.driver_amount si > 0
+    4) delivery_fee - logistic_margin (après avoir deviné la livraison si nécessaire)
+    Sinon, 0.
+    """
+    # 1) Montant partenaire livreur direct
+    if hasattr(order, "amount_driver_partner") and order.amount_driver_partner is not None:
+        d = _safe_dec(order.amount_driver_partner)
+        if d > 0:
+            return d
+
+    # 2) Coût logistique payé au livreur
+    if hasattr(order, "driver_logistic_cost") and order.driver_logistic_cost is not None:
+        d = _safe_dec(order.driver_logistic_cost)
+        if d > 0:
+            return d
+
+    # 3) Fallback : legs
+    legs_rel = getattr(order, "legs", None)
+    if legs_rel is not None:
+        try:
+            total_legs = Decimal("0")
+            for leg in legs_rel.all():
+                da = _safe_dec(getattr(leg, "driver_amount", None))
+                total_legs += da
+            if total_legs > 0:
+                return total_legs
+        except Exception:
+            pass
+
+    # 4) Gestion livraison
+    if delivery_fee is None:
+        delivery_fee = _safe_dec(getattr(order, "delivery_fee", None))
+    else:
+        delivery_fee = _safe_dec(delivery_fee)
+
+    if delivery_fee <= 0:
+        delivery_fee = _guess_delivery_fee(order)
+
+    logistic_margin = _safe_dec(getattr(order, "logistic_margin", None))
+
+    if delivery_fee > 0 and logistic_margin >= 0:
+        candidate = delivery_fee - logistic_margin
+        if candidate > 0:
+            return candidate
 
     return Decimal("0")
 
@@ -929,162 +1644,90 @@ def _order_effective_total(order):
 @login_required
 def finance_dashboard(request):
     """
-    Dashboard finance FAGNI – version ultra pro.
-    KPIs + filtres + tableau des commandes avec pagination.
+    Dashboard financier FAGNI :
+    - CA client
+    - Montants à verser aux partenaires (blanchisserie + livreur)
+    - Revenu FAGNI (TTC)
+    - Marge logistique
+    - Service fee total FAGNI
     """
-    from datetime import datetime
-    from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
+    payment_filter = request.GET.get("payment", "all")
+    qs = Order.objects.all()
 
-    # -------- Filtres --------
-    date_from_str = request.GET.get("date_from", "") or ""
-    date_to_str = request.GET.get("date_to", "") or ""
-    status_filter = request.GET.get("status", "all") or "all"
-    driver_id = request.GET.get("driver_id", "") or ""
-    laundry_id = request.GET.get("laundry_id", "") or ""
+    if payment_filter == "paid":
+        qs = qs.filter(payment_status="paid")
+    elif payment_filter == "unpaid":
+        qs = qs.exclude(payment_status="paid")
 
-    qs = (
-        Order.objects
-        .select_related("customer", "delivery_partner", "laundry_partner")
-        .order_by("-created_at")
+    DEC = DecimalField(max_digits=12, decimal_places=2)
+
+    qs = qs.annotate(
+        total_client_expr=Coalesce(
+            Cast(F("total_client_ttc"), DEC),
+            Cast(F("prestation_total"), DEC),
+            Cast(F("total"), DEC),
+            Value(0, output_field=DEC),
+        ),
+        amount_laundry_safe=Coalesce(
+            Cast(F("amount_laundry_partner"), DEC),
+            Value(0, output_field=DEC),
+        ),
+        amount_driver_safe=Coalesce(
+            Cast(F("amount_driver_partner"), DEC),
+            Value(0, output_field=DEC),
+        ),
+        fagni_revenue_ttc_safe=(
+            Coalesce(Cast(F("fagni_revenue_ht"), DEC), Value(0, output_field=DEC))
+            + Coalesce(Cast(F("vat_fagni"), DEC), Value(0, output_field=DEC))
+        ),
+        logistic_margin_safe=Coalesce(
+            Cast(F("logistic_margin"), DEC),
+            Value(0, output_field=DEC),
+        ),
+        service_fee_safe=Coalesce(
+            Cast(F("service_fee"), DEC),
+            Value(0, output_field=DEC),
+        ),
+    ).annotate(
+        partners_expr=Cast(F("amount_laundry_safe") + F("amount_driver_safe"), DEC)
     )
 
-    period_parts = []
+    agg = qs.aggregate(
+        ca_client_total=Coalesce(Sum("total_client_expr", output_field=DEC), Value(0, output_field=DEC)),
+        partners_laundry_total=Coalesce(Sum("amount_laundry_safe", output_field=DEC), Value(0, output_field=DEC)),
+        partners_driver_total=Coalesce(Sum("amount_driver_safe", output_field=DEC), Value(0, output_field=DEC)),
+        fagni_revenue_total=Coalesce(Sum("fagni_revenue_ttc_safe", output_field=DEC), Value(0, output_field=DEC)),
+        logistic_margin_total=Coalesce(Sum("logistic_margin_safe", output_field=DEC), Value(0, output_field=DEC)),
+        service_fee_total=Coalesce(Sum("service_fee_safe", output_field=DEC), Value(0, output_field=DEC)),
+    )
 
-    # Filtre dates : date_from
-    if date_from_str:
-        try:
-            df = datetime.strptime(date_from_str, "%Y-%m-%d").date()
-            qs = qs.filter(created_at__date__gte=df)
-            period_parts.append(f"du {df.strftime('%d/%m/%Y')}")
-        except ValueError:
-            pass
+    order_count = qs.count()
+    ca_client_total = agg["ca_client_total"] or Decimal("0")
 
-    # Filtre dates : date_to
-    if date_to_str:
-        try:
-            dt = datetime.strptime(date_to_str, "%Y-%m-%d").date()
-            qs = qs.filter(created_at__date__lte=dt)
-            period_parts.append(f"au {dt.strftime('%d/%m/%Y')}")
-        except ValueError:
-            pass
+    avg_ticket = (ca_client_total / Decimal(order_count)).quantize(Decimal("0.01")) if order_count else Decimal("0.00")
 
-    if not period_parts:
-        period_label = "Aujourd’hui"
-    else:
-        period_label = " ".join(period_parts)
-
-    # Filtre statut
-    if status_filter == "done":
-        qs = qs.filter(status="done")
-    elif status_filter == "pending":
-        qs = qs.filter(status="pending")
-    elif status_filter == "in_progress":
-        qs = qs.filter(status="in_progress")
-    elif status_filter == "canceled":
-        qs = qs.filter(status="canceled")
-    elif status_filter == "active":
-        qs = qs.filter(status__in=["pending", "in_progress"])
-    # "all" => pas de filtre supplémentaire
-
-    # Filtre livreur
-    if driver_id:
-        qs = qs.filter(delivery_partner_id=driver_id)
-
-    # Filtre blanchisserie
-    if laundry_id:
-        qs = qs.filter(laundry_partner_id=laundry_id)
-
-    # -------- KPIs Finance (sur TOUT l’ensemble filtré) --------
-    all_orders = list(qs)  # on calcule les stats sur l'ensemble des résultats filtrés
-
-    total_orders = len(all_orders)
-    if total_orders == 0:
-        total_revenue = Decimal("0")
-        total_service_fee = Decimal("0")
-        total_delivery_fee = Decimal("0")
-        total_driver_income = Decimal("0")
-        total_distance_km = Decimal("0")
-        done_orders = 0
-        canceled_orders = 0
-        avg_basket = Decimal("0")
-        fagni_margin = Decimal("0")
-    else:
-        total_revenue = Decimal("0")
-        total_service_fee = Decimal("0")
-        total_delivery_fee = Decimal("0")
-        total_driver_income = Decimal("0")
-        total_distance_km = Decimal("0")
-        done_orders = 0
-        canceled_orders = 0
-
-        for o in all_orders:
-            total_revenue += _order_effective_total(o)
-            total_service_fee += _safe_dec(getattr(o, "service_fee", 0))
-            total_delivery_fee += _safe_dec(getattr(o, "delivery_fee", 0))
-            total_driver_income += _safe_dec(getattr(o, "driver_logistic_cost", 0))
-            total_distance_km += _safe_dec(getattr(o, "distance_km", 0))
-
-            if getattr(o, "status", None) == "done":
-                done_orders += 1
-            elif getattr(o, "status", None) == "canceled":
-                canceled_orders += 1
-
-        if total_orders > 0:
-            avg_basket = (total_revenue / total_orders).quantize(Decimal("0.01"))
-        else:
-            avg_basket = Decimal("0")
-
-        fagni_margin = (
-            total_service_fee + total_delivery_fee - total_driver_income
-        ).quantize(Decimal("0.01"))
-
-    # -------- Pagination du tableau de commandes --------
-    page = request.GET.get("page", 1)
-    page_size = 50  # tu peux ajuster à 25 / 100 si tu préfères
-
-    paginator = Paginator(qs, page_size)
-
-    try:
-        orders_page = paginator.page(page)
-    except PageNotAnInteger:
-        orders_page = paginator.page(1)
-    except EmptyPage:
-        orders_page = paginator.page(paginator.num_pages)
-
-    # -------- Listes pour les filtres --------
-    drivers = DeliveryPartner.objects.all().order_by("name")
-    laundries = LaundryPartner.objects.all().order_by("name")
-
-    stats = {
-        "total_orders": total_orders,
-        "total_revenue": total_revenue,
-        "total_service_fee": total_service_fee,
-        "total_delivery_fee": total_delivery_fee,
-        "total_driver_income": total_driver_income,
-        "fagni_margin": fagni_margin,
-        "avg_basket": avg_basket,
-        "total_distance_km": total_distance_km,
-        "done_orders": done_orders,
-        "canceled_orders": canceled_orders,
-    }
+    partners_laundry_total = agg["partners_laundry_total"] or Decimal("0")
+    partners_driver_total = agg["partners_driver_total"] or Decimal("0")
+    partners_total = partners_laundry_total + partners_driver_total
 
     context = {
-        "orders": orders_page,         # pour compat avec ton template actuel
-        "page_obj": orders_page,       # pour la navigation de page
-        "paginator": paginator,
-        "stats": stats,
-        "period_label": period_label,
-        "date_from": date_from_str,
-        "date_to": date_to_str,
-        "status_filter": status_filter,
-        "driver_id": driver_id,
-        "laundry_id": laundry_id,
-        "drivers": drivers,
-        "laundries": laundries,
+        "payment_filter": payment_filter,
+        "orders": qs.order_by("-created_at")[:50],
+
+        "ca_client_total": ca_client_total,
+        "order_count": order_count,
+        "avg_ticket": avg_ticket,
+
+        "partners_total": partners_total,
+        "partners_laundry_total": partners_laundry_total,
+        "partners_driver_total": partners_driver_total,
+
+        "fagni_revenue_total": agg["fagni_revenue_total"],
+        "logistic_margin_total": agg["logistic_margin_total"],
+        "service_fee_total": agg["service_fee_total"],
     }
 
     return render(request, "orders/finance_dashboard.html", context)
-
 
 
 # ============================================================
@@ -1801,6 +2444,215 @@ def export_customers_xlsx(request):
 
 
 # ============================================================
+#  LOGISTIQUE : VALIDATION COLLECTE / LIVRAISON (BLOC 1)
+# ============================================================
+
+# Créneaux "standards" qu'on utilise côté front (Bloc 3)
+DEFAULT_SLOTS = [
+    ("08:00-10:00", time(8, 0), time(10, 0)),
+    ("10:00-12:00", time(10, 0), time(12, 0)),
+    ("12:00-14:00", time(12, 0), time(14, 0)),
+    ("14:00-16:00", time(14, 0), time(16, 0)),
+    ("16:00-18:00", time(16, 0), time(18, 0)),
+    ("18:00-20:00", time(18, 0), time(20, 0)),
+]
+
+
+def _find_slot(slot_value):
+    """
+    slot_value est censé être une string du type "08:00-10:00".
+    On renvoie (start_time, end_time) ou (None, None) si introuvable.
+    """
+    if not slot_value:
+        return None, None
+
+    # On tolère quelques formats, mais on recommande "HH:MM-HH:MM"
+    cleaned = slot_value.strip().replace(" ", "").replace("h", ":").replace("–", "-")
+    # ex : "08h00 – 10h00" -> "08:00-10:00"
+
+    for key, start_t, end_t in DEFAULT_SLOTS:
+        key_clean = key.replace(" ", "")
+        if cleaned == key_clean:
+            return start_t, end_t
+
+    # Dernier recours : essayer un split basique
+    try:
+        if "-" in cleaned:
+            left, right = cleaned.split("-", 1)
+            h1, m1 = left.split(":")
+            h2, m2 = right.split(":")
+            return time(int(h1), int(m1)), time(int(h2), int(m2))
+    except Exception:
+        pass
+
+    return None, None
+
+
+def _combine_date_and_time(date_str, time_obj):
+    """
+    Combine une date (YYYY-MM-DD) et un time en datetime aware.
+    """
+    if not date_str or not time_obj:
+        return None
+
+    try:
+        d = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+    naive_dt = datetime.combine(d, time_obj)
+    return timezone.make_aware(naive_dt, timezone.get_current_timezone())
+
+
+def compute_pickup_and_delivery_datetimes(post_data, config, now=None):
+    """
+    Calcule et VALIDE la logique collecte / livraison.
+
+    Retourne :
+    (pickup_mode, pickup_dt,
+     delivery_mode, delivery_dt)
+
+    - pickup_dt : datetime de début du créneau de collecte (ou "maintenant" si immédiate)
+    - delivery_dt : datetime de début du créneau de livraison (ou None si non pertinent)
+    """
+
+    if now is None:
+        now = timezone.localtime()
+
+    # Sécurité si pas de config
+    cutoff_hour = config.pickup_cutoff_hour if config else 10
+    standard_sla_hours = config.standard_sla_hours if config else 48
+    express_sla_hours = config.express_sla_hours if config else 24
+    express_enabled = bool(config.express_enabled) if config else True
+    scheduled_enabled = bool(config.scheduled_slots_enabled) if config else True
+
+    pickup_mode = post_data.get("pickup_mode") or Order.PICKUP_MODE_NOW
+    delivery_mode = post_data.get("delivery_mode") or Order.DELIVERY_MODE_STANDARD
+
+    # -----------------------------
+    # 1) COLLECTE
+    # -----------------------------
+    pickup_dt = None
+
+    if pickup_mode == Order.PICKUP_MODE_NOW:
+        # Collecte immédiate : on fixe la référence à maintenant
+        pickup_dt = now
+
+    elif pickup_mode == Order.PICKUP_MODE_LATER:
+        pickup_date_str = post_data.get("pickup_date") or ""
+        pickup_slot_value = post_data.get("pickup_slot") or ""
+
+        if not pickup_date_str or not pickup_slot_value:
+            raise ValidationError("Merci de choisir une date et un créneau horaire pour la collecte programmée.")
+
+        start_t, end_t = _find_slot(pickup_slot_value)
+        if not start_t or not end_t:
+            raise ValidationError("Le créneau de collecte choisi est invalide.")
+
+        pickup_dt = _combine_date_and_time(pickup_date_str, start_t)
+        if not pickup_dt:
+            raise ValidationError("La date de collecte programmée est invalide.")
+
+        # Interdiction d'un créneau passé
+        if pickup_dt <= now:
+            raise ValidationError("Le créneau de collecte doit être dans le futur.")
+
+    else:
+        # Mode inconnu → on force sur NOW
+        pickup_mode = Order.PICKUP_MODE_NOW
+        pickup_dt = now
+
+    # -----------------------------
+    # 2) LIVRAISON
+    # -----------------------------
+    delivery_dt = None
+
+    # --- Mode STANDARD (≈ 48h) ---
+    if delivery_mode == Order.DELIVERY_MODE_STANDARD:
+        # La livraison est calculée automatiquement : collecte + 48h
+        delivery_dt = pickup_dt + timedelta(hours=standard_sla_hours)
+
+    # --- Mode EXPRESS (≈ 24h) ---
+    elif delivery_mode == Order.DELIVERY_MODE_EXPRESS:
+        if not express_enabled:
+            raise ValidationError("La livraison express n'est pas disponible pour le moment.")
+
+        # Si la collecte est après l'heure limite, on bloque l'express
+        if pickup_dt.hour >= cutoff_hour:
+            raise ValidationError(
+                f"Après {cutoff_hour}h, la formule express n'est plus garantie. "
+                "Merci de choisir Standard ou Programmée."
+            )
+
+        delivery_dt = pickup_dt + timedelta(hours=express_sla_hours)
+
+    # --- Mode PROGRAMMÉ ---
+    elif delivery_mode == Order.DELIVERY_MODE_SCHEDULED:
+        if not scheduled_enabled:
+            raise ValidationError("La livraison programmée n'est pas disponible pour le moment.")
+
+        delivery_date_str = post_data.get("delivery_date") or ""
+        delivery_slot_value = post_data.get("delivery_slot") or ""
+
+        if not delivery_date_str or not delivery_slot_value:
+            raise ValidationError("Merci de choisir une date et un créneau horaire pour la livraison programmée.")
+
+        d_start_t, d_end_t = _find_slot(delivery_slot_value)
+        if not d_start_t or not d_end_t:
+            raise ValidationError("Le créneau de livraison choisi est invalide.")
+
+        delivery_dt = _combine_date_and_time(delivery_date_str, d_start_t)
+        if not delivery_dt:
+            raise ValidationError("La date de livraison programmée est invalide.")
+
+        # Interdiction d'un créneau passé
+        if delivery_dt <= now:
+            raise ValidationError("Le créneau de livraison doit être dans le futur.")
+
+        # Interdiction de livraison avant ou en même temps que la collecte
+        if delivery_dt <= pickup_dt:
+            raise ValidationError("La livraison ne peut pas être avant ou au même créneau que la collecte.")
+
+    else:
+        # Sécurité : si mode inconnu -> on revient à STANDARD
+        delivery_mode = Order.DELIVERY_MODE_STANDARD
+        delivery_dt = pickup_dt + timedelta(hours=standard_sla_hours)
+
+    return pickup_mode, pickup_dt, delivery_mode, delivery_dt
+
+
+def validate_delivery_mode(pickup_dt, delivery_dt, mode):
+    if not pickup_dt or not delivery_dt:
+        return None
+
+    delta_hours = (delivery_dt - pickup_dt).total_seconds() / 3600
+
+    # Express ⇢ ~24h
+    if mode == "express":
+        if not (12 <= delta_hours <= 36):
+            return (
+                "Le mode EXPRESS doit correspondre à une livraison environ 24h après la collecte."
+            )
+
+    # Standard ⇢ ~48h
+    if mode == "standard":
+        if not (36 <= delta_hours <= 72):
+            return (
+                "Le mode STANDARD doit correspondre à une livraison environ 48h après la collecte."
+            )
+
+    # Programmée ⇢ ≥ 72h
+    if mode == "scheduled":
+        if delta_hours < 72:
+            return (
+                "Le mode PROGRAMMÉ nécessite une livraison au moins 72h après la collecte. "
+                "Pour une livraison avant 72h, choisis Standard (48h) ou Express (24h)."
+            )
+
+    return None
+
+
+# ============================================================
 #  CRÉATION COMMANDE
 # ============================================================
 @login_required
@@ -1811,27 +2663,47 @@ def create(request):
     - Lignes de prestations issues du catalogue
     - Photos multiples par ligne (photos_0, photos_1, ...)
     - Assignation automatique d’un livreur si possible
-    - Option : code parrain (referral_code) transmis par GET (?ref= / ?aff=)
-      ou saisi manuellement dans le formulaire.
+    - Code parrain (referral_code)
+    - Logistique : collecte / livraison validées (Bloc 1)
     """
 
     service_categories = ServiceCategory.objects.all()
     service_items = ServiceItem.objects.select_related("category").all()
 
-    # Paramètres logistiques (pour l’UI, create.html)
+    # Paramètres logistiques généraux (tarifs, etc.)
     logi = getattr(settings, "FAGNI_LOGISTICS", {})
+
+    # Configuration logistique (SLA, cutoff, express, programmée…)
+    config = LogisticsConfig.current()
 
     # --- Gestion du code parrain initial (GET ou POST) ---
     if request.method == "POST":
         referral_initial = (request.POST.get("referral_code") or "").strip()
     else:
-        # Si on arrive depuis un lien de parrainage : ?ref=CODE ou ?aff=CODE
         referral_initial = (
             (request.GET.get("ref") or "").strip()
             or (request.GET.get("aff") or "").strip()
         )
 
-    # Contexte de base (utile aussi en cas d’erreur POST)
+    # --- Valeurs par défaut / re-remplissage pour la collecte & la livraison ---
+    if request.method == "POST":
+        pickup_mode_val = request.POST.get("pickup_mode") or Order.PICKUP_MODE_NOW
+        pickup_date_val = request.POST.get("pickup_date") or ""
+        pickup_slot_val = request.POST.get("pickup_slot") or ""
+
+        delivery_mode_val = request.POST.get("delivery_mode") or Order.DELIVERY_MODE_STANDARD
+        delivery_date_val = request.POST.get("delivery_date") or ""
+        delivery_slot_val = request.POST.get("delivery_slot") or ""
+    else:
+        pickup_mode_val = Order.PICKUP_MODE_NOW
+        pickup_date_val = ""
+        pickup_slot_val = ""
+
+        delivery_mode_val = Order.DELIVERY_MODE_STANDARD
+        delivery_date_val = ""
+        delivery_slot_val = ""
+
+    # Contexte de base (utilisé aussi en cas d’erreur POST)
     context = {
         "service_categories": service_categories,
         "service_items": service_items,
@@ -1841,29 +2713,44 @@ def create(request):
         "client_address": request.POST.get("client_address", "") if request.method == "POST" else "",
         "client_lat": request.POST.get("client_lat", "") if request.method == "POST" else "",
         "client_lng": request.POST.get("client_lng", "") if request.method == "POST" else "",
-        # 👉 CE QUI SERT AU CHAMP "Code parrain" DANS create.html
+        "delivery_address": request.POST.get("delivery_address", "") if request.method == "POST" else "",
         "referral_code": referral_initial,
         "order_notes": request.POST.get("order_notes", "") if request.method == "POST" else "",
         "GOOGLE_MAPS_API_KEY": getattr(settings, "GOOGLE_MAPS_API_KEY", ""),
         "delivery_min_fee": logi.get("client_min_fee", 1000),
         "delivery_price_per_km": logi.get("client_price_per_km", 150),
         "delivery_fixed_fee": logi.get("client_fixed_fee", 300),
+        # Infos config logistique (pour affichage dans le template si besoin)
+        "logi_pickup_cutoff_hour": config.pickup_cutoff_hour if config else 10,
+        "logi_standard_sla_hours": config.standard_sla_hours if config else 48,
+        "logi_express_sla_hours": config.express_sla_hours if config else 24,
+        "logi_express_enabled": bool(config.express_enabled) if config else True,
+        "logi_express_extra_flat": config.express_extra_flat if config else 0,
+        "logi_express_extra_percent": config.express_extra_percent if config else 0,
+        "logi_scheduled_enabled": bool(config.scheduled_slots_enabled) if config else True,
+        "pickup_mode": pickup_mode_val,
+        "pickup_date": pickup_date_val,
+        "pickup_slot": pickup_slot_val,
+        "delivery_mode": delivery_mode_val,
+        "delivery_date": delivery_date_val,
+        "delivery_slot": delivery_slot_val,
     }
 
     context["drivers"] = get_active_drivers()
 
-    # --- GET : on affiche juste le formulaire ---
+    # --- GET : on affiche le formulaire ---
     if request.method != "POST":
         return render(request, "orders/create.html", context)
 
     # --- POST : on traite la commande ---
-
     phone = (request.POST.get("client_phone") or "").strip()
     name = (request.POST.get("client_name") or "").strip()
     address = (request.POST.get("client_address") or "").strip()
+
     lat_raw = (request.POST.get("client_lat") or "").strip()
     lng_raw = (request.POST.get("client_lng") or "").strip()
-    # On réutilise referral_initial (priorité au POST)
+
+    delivery_address_input = (request.POST.get("delivery_address") or "").strip()
     referral_code = referral_initial
     notes = (request.POST.get("order_notes") or "").strip()
 
@@ -1889,7 +2776,6 @@ def create(request):
         )
         created = False
 
-    # Mise à jour des infos si elles ont évolué
     changed = False
     if name and customer.name != name:
         customer.name = name
@@ -1907,14 +2793,13 @@ def create(request):
             customer.longitude = Decimal(lng_raw)
             changed = True
     except Exception:
-        # on ne bloque pas la commande pour un problème de lat/lng
+        # On ignore les erreurs de parsing lat/lng
         pass
 
     if changed:
         customer.save()
 
-    # 3) Création de la commande "vide" rattachée au client
-    #    → on génère d'abord un code UNIQUE pour éviter l'erreur SQLite
+    # 3) Création de la commande (vide au début, pour avoir un ID)
     code = uuid.uuid4().hex[:8].upper()
     while Order.objects.filter(code=code).exists():
         code = uuid.uuid4().hex[:8].upper()
@@ -1927,14 +2812,98 @@ def create(request):
         notes=notes,
     )
 
-    # 4) Assignation automatique d’une blanchisserie (intelligente = la plus proche)
+    # 4) Adresses collecte / livraison + géolocalisation
+    order.pickup_address = address or customer.address or ""
+
+    if delivery_address_input:
+        order.delivery_address = delivery_address_input
+    else:
+        # Si rien saisi, livraison = collecte
+        order.delivery_address = order.pickup_address
+
+    try:
+        order.pickup_lat = float(lat_raw) if lat_raw else None
+    except (TypeError, ValueError):
+        order.pickup_lat = None
+
+    try:
+        order.pickup_lng = float(lng_raw) if lng_raw else None
+    except (TypeError, ValueError):
+        order.pickup_lng = None
+
+    # Pour l’instant, si aucune lat/lng spécifique pour la livraison :
+    # - si adresse livraison = collecte → on copie
+    delivery_lat_raw = request.POST.get("delivery_lat") or ""
+    delivery_lng_raw = request.POST.get("delivery_lng") or ""
+
+    if not delivery_address_input:
+        order.delivery_lat = order.pickup_lat
+        order.delivery_lng = order.pickup_lng
+    else:
+        try:
+            order.delivery_lat = float(delivery_lat_raw) if delivery_lat_raw else None
+        except (TypeError, ValueError):
+            order.delivery_lat = None
+        try:
+            order.delivery_lng = float(delivery_lng_raw) if delivery_lng_raw else None
+        except (TypeError, ValueError):
+            order.delivery_lng = None
+
+    # 5) Logistique : collecte & livraison (BLOC 1)
+    try:
+        pickup_mode, pickup_dt, delivery_mode, delivery_dt = compute_pickup_and_delivery_datetimes(
+            request.POST, config
+        )
+    except ValidationError as e:
+        # On supprime la commande vide, on remonte l’erreur à l’UI
+        order.delete()
+        context["error"] = str(e)
+        return render(request, "orders/create.html", context)
+
+    order.pickup_mode = pickup_mode
+    order.delivery_mode = delivery_mode
+
+    # Si collecte programmée → on stocke date & heure de début
+    if pickup_mode == Order.PICKUP_MODE_LATER and pickup_dt:
+        order.pickup_scheduled_date = pickup_dt.date()
+        order.pickup_scheduled_time = pickup_dt.time()
+    else:
+        order.pickup_scheduled_date = None
+        order.pickup_scheduled_time = None
+
+    # Si livraison programmée → on stocke date & heure de début
+    if delivery_mode == Order.DELIVERY_MODE_SCHEDULED and delivery_dt:
+        order.delivery_scheduled_date = delivery_dt.date()
+        order.delivery_scheduled_time = delivery_dt.time()
+    else:
+        order.delivery_scheduled_date = None
+        order.delivery_scheduled_time = None
+
+    error = validate_delivery_mode(pickup_dt, delivery_dt, delivery_mode)
+    if error:
+        context["error"] = error
+        return render(request, "orders/create.html", context)
+
+    order.save()
+
+    # ---------------------------------------------------------
+    # Création / garantie des tronçons logistiques (DeliveryLeg)
+    # ---------------------------------------------------------
+    try:
+        ensure_delivery_legs_for_order(order)
+    except Exception as e:
+        # On loggue, mais on ne bloque pas la création de la commande
+        print("Erreur ensure_delivery_legs_for_order:", e)
+
+    ensure_order_geocoded(order, save=True)
+
+    # 6) Assignation automatique d’une blanchisserie
     laundry = assign_best_laundry(customer)
     if laundry:
         order.laundry_partner = laundry
 
-    # 5) Assignation automatique d’un livreur (si coordonnées client disponibles)
+    # 7) Assignation automatique d’un livreur
     driver = assign_best_driver(customer.latitude, customer.longitude)
-
     if driver:
         order.delivery_partner = driver
         order.delivery_partner_unassigned_reason = None
@@ -1943,18 +2912,16 @@ def create(request):
             "Aucun livreur disponible au moment de la commande."
         )
 
-    # 6) Calcul automatique des frais de livraison (basé sur la distance client ↔ blanchisserie)
+    # 8) Calcul automatique des frais de livraison
     try:
         delivery_fee = order.compute_delivery_fee()
     except Exception:
-        # Si le calcul échoue (coords manquantes ou autre), on retombe au minimum défini
         logi = getattr(settings, "FAGNI_LOGISTICS", {})
         delivery_fee = Decimal(str(logi.get("client_min_fee", 1000)))
 
     order.delivery_fee = delivery_fee
-    order.save()
 
-    # 7) Lecture des lignes du formulaire (array JS : service_id[], designation[], quantity[], unit_price[])
+    # 9) Lignes de commande
     service_ids = request.POST.getlist("service_id[]")
     designations = request.POST.getlist("designation[]")
     quantities = request.POST.getlist("quantity[]")
@@ -1969,13 +2936,11 @@ def create(request):
         if not desc:
             continue
 
-        # quantité
         try:
             qty = int(qty_str)
         except Exception:
             qty = 0
 
-        # prix unitaire
         try:
             pu = Decimal(pu_str)
         except Exception:
@@ -2001,7 +2966,6 @@ def create(request):
         )
         created_any_item = True
 
-        # 8) Photos associées à cette ligne (photos_0, photos_1, etc.)
         file_field_name = f"photos_{idx}"
         for photo_file in request.FILES.getlist(file_field_name):
             if not photo_file:
@@ -2012,24 +2976,17 @@ def create(request):
             )
 
     if not created_any_item:
-        # pas de lignes -> on supprime la commande et on affiche une erreur
         order.delete()
         context["error"] = "Ajoute au moins une ligne de prestation à la commande."
         return render(request, "orders/create.html", context)
 
-    # 9) On laisse la vue détail recalculer proprement le total, service_fee, etc.
+    # 10) Recalcul financier complet (nouveau moteur pricing)
+    recompute_order_financials(order)
+    apply_fagni_pricing(order)
+    order.recompute_distances_from_positions()
+    order.save()
+
     return redirect("orders:detail", order_id=order.id)
-
-
-# Statuts qu'on considère comme "en cours" pour la charge du livreur
-ACTIVE_DRIVER_STATUSES = [
-    "pending",      # commande créée mais pas encore collectée
-    "assigned",     # assignée à un livreur
-    "picked_up",    # collectée mais pas encore livrée/blanchie
-    "in_laundry",   # en traitement
-    "on_route",     # en cours de livraison
-]
-
 
 
 def get_active_drivers():
@@ -2134,26 +3091,86 @@ def assign_best_laundry(customer):
     return best_laundry
 
 
+def build_order_finance_context(order):
+    """
+    Construit le contexte financier FAGNI pour l'écran de détail commande,
+    en s'appuyant sur le moteur compute_order_financials(order).
+
+    Retourne un dict utilisé par le template detail.html pour afficher :
+    - Sous-total prestations
+    - Service FAGNI
+    - Frais de livraison client
+    - TVA FAGNI
+    - Total TTC client
+    - Montant dû blanchisserie / livreur
+    - Total partenaires
+    - Revenu FAGNI
+    - Marge logistique / livraison
+    """
+
+    from .finance import compute_order_financials  # import local pour éviter tout import circulaire
+
+    data = compute_order_financials(order)
+
+    # Sécurisation des valeurs (par défaut 0)
+    prestation_total = data.get("prestation_total", Decimal("0"))
+    service_fee_ht = data.get("service_fee_ht", Decimal("0"))
+    delivery_fee_client = data.get("delivery_fee_client", Decimal("0"))
+    vat_fagni = data.get("vat_fagni", Decimal("0"))
+    total_ttc_client = data.get("total_ttc_client", Decimal("0"))
+
+    amount_laundry = data.get("commission_laundry_ht", Decimal("0"))
+    amount_driver = data.get("commission_delivery_ht", Decimal("0"))
+    partners_total = amount_laundry + amount_driver
+
+    fagni_revenue_ht = data.get("fagni_revenue_ht", Decimal("0"))
+    margin_delivery = data.get("margin_delivery", Decimal("0"))
+    express_surcharge = data.get("express_surcharge", Decimal("0"))
+
+    return {
+        "order": order,
+
+        # Montants "client"
+        "prestation_total": prestation_total,
+        "service_fee_ht": service_fee_ht,
+        "delivery_fee_client": delivery_fee_client,
+        "vat_fagni": vat_fagni,
+        "total_ttc_client": total_ttc_client,
+
+        # Partenaires
+        "amount_laundry": amount_laundry,
+        "amount_driver": amount_driver,
+        "partners_total": partners_total,
+
+        # FAGNI
+        "fagni_revenue_ht": fagni_revenue_ht,
+        "margin_delivery": margin_delivery,
+        "express_surcharge": express_surcharge,
+    }
+
+
 # ============================================================
 #   DETAIL COMMANDE
 # ============================================================
-@login_required
 def detail(request, order_id):
+    """
+    Détail d'une commande FAGNI :
+    - recalcule si besoin les frais de livraison via le moteur intégré de la commande
+    - applique le modèle financier FAGNI via update_financials()
+    - affiche les lignes, photos et historique de statut
+    """
+    # --- Récupération de la commande ---
     order = (
         Order.objects
+        .select_related("customer", "laundry_partner", "delivery_partner")
         .filter(pk=order_id)
-        .select_related(
-            "customer",
-            "laundry_partner",
-            "delivery_partner",
-        )
         .first()
     )
 
     if not order:
         return redirect("orders:list")
 
-    # Lignes de commande avec services & photos
+    # --- Lignes de commande (prestations) ---
     items = (
         OrderItem.objects
         .filter(order=order)
@@ -2161,85 +3178,69 @@ def detail(request, order_id):
         .prefetch_related("photos")
     )
 
-    # On utilise uniquement compute_totals() qui met à jour :
-    # - order.total
-    # - order.service_fee
-    # - order.delivery_fee
-    # - order.vat_amount
-    # - order.grand_total
-    order.compute_totals()
+    # ====================================================================
+    # 1) FRAIS DE LIVRAISON : si 0 ou null, on utilise le moteur interne
+    #    de la commande (compute_delivery_fee)
+    # ====================================================================
+    needs_delivery_recompute = (
+        (not order.delivery_fee or Decimal(str(order.delivery_fee)) == Decimal("0"))
+        and order.customer
+        and order.laundry_partner
+    )
 
-    # ---- FRAIS DE LIVRAISON (recalcul si 0 ou null) ----
-    if not order.delivery_fee or Decimal(str(order.delivery_fee)) == Decimal("0"):
+    if needs_delivery_recompute:
+        # Utilise le moteur dynamique (distance + surge éventuel)
+        delivery_fee = order.compute_delivery_fee()
 
-        logi = getattr(settings, "FAGNI_LOGISTICS", {})
-        client_min_fee = Decimal(str(logi.get("client_min_fee", 1000)))
-        client_price_per_km = Decimal(str(logi.get("client_price_per_km", 100)))
-        client_fixed_fee = Decimal(str(logi.get("client_fixed_fee", 300)))
-        client_max_fee = Decimal(str(logi.get("client_max_fee", 5000)))
-
-        origin_lat = getattr(order.customer, "latitude", None)
-        origin_lng = getattr(order.customer, "longitude", None)
-        dest_lat = getattr(order.laundry_partner, "latitude", None) if order.laundry_partner else None
-        dest_lng = getattr(order.laundry_partner, "longitude", None) if order.laundry_partner else None
-
-        one_way = haversine_distance_km(origin_lat, origin_lng, dest_lat, dest_lng)
-
-        if one_way is None:
-            delivery_fee = client_min_fee
-        else:
-            distance_totale = (one_way * Decimal("2.0")).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
-
-            raw_fee = (client_fixed_fee + distance_totale * client_price_per_km).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
-
-            if raw_fee < client_min_fee:
-                raw_fee = client_min_fee
-            if client_max_fee > 0 and raw_fee > client_max_fee:
-                raw_fee = client_max_fee
-
-            delivery_fee = raw_fee
-
+        # On met à jour la commande avec ce qui a été calculé dans compute_delivery_fee
         order.delivery_fee = delivery_fee
+        # compute_delivery_fee a déjà mis à jour :
+        # - order.distance_km
+        # - order.driver_logistic_cost
+        # - order.logistic_margin
+        order.save(
+            update_fields=[
+                "delivery_fee",
+                "distance_km",
+                "driver_logistic_cost",
+                "logistic_margin",
+            ]
+        )
     else:
-        order.delivery_fee = Decimal(str(order.delivery_fee))
+        # On normalise juste le type Decimal si une valeur existe déjà
+        if order.delivery_fee is not None:
+            order.delivery_fee = Decimal(str(order.delivery_fee))
 
-    # ---- BASE HT = prestations + service fee + livraison ----
-    base_ht = (
-        (order.total or Decimal("0"))
-        + (order.service_fee or Decimal("0"))
-        + (order.delivery_fee or Decimal("0"))
-    )
+    # ====================================================================
+    # 2) APPLICATION DU MODÈLE FAGNI (update_financials)
+    # ====================================================================
+    # -> ceci remplit notamment :
+    #    - prestation_total
+    #    - service_fee
+    #    - commission_laundry_ht / commission_delivery_ht
+    #    - fagni_revenue_ht / fagni_revenue_ttc
+    #    - vat_fagni
+    #    - amount_laundry_partner / amount_driver_partner
+    #    - total_client_ttc
+    data = order.update_financials(save=True)
 
-    # ---- TVA 18% ----
-    vat_rate = Decimal("0.18")
-    tva_amount = (base_ht * vat_rate).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
+    # ====================================================================
+    # 3) PHOTOS & HISTORIQUE
+    # ====================================================================
+    all_photos = OrderItemPhoto.objects.filter(order_item__order=order)
 
-    # ---- TOTAL TTC ----
-    grand_total = (base_ht + tva_amount).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
-
-    # Stockage temporaire pour le template
-    order.vat_amount = tva_amount
-    order.grand_total = grand_total
-
-    # ---- Historique ----
     status_history = (
         OrderStatusHistory.objects
         .filter(order=order)
         .order_by("changed_at")
     )
 
-    all_photos = OrderItemPhoto.objects.filter(order_item__order=order)
-
     ticket_url = reverse("orders:order_ticket_pdf", args=[order.id])
     ticket_thermal_url = reverse("orders:order_ticket_thermal_pdf", args=[order.id])
+
+    # Contexte "finance" déjà utilisé dans le template (avec des fallback
+    # sur les champs order.* si besoin)
+    finance = build_order_finance_context(order)
 
     context = {
         "order": order,
@@ -2248,9 +3249,8 @@ def detail(request, order_id):
         "all_photos": all_photos,
         "ticket_url": ticket_url,
         "ticket_thermal_url": ticket_thermal_url,
-        "base_ht": base_ht,
-        "tva_amount": tva_amount,
-        "grand_total": grand_total,
+        "finance": finance,
+        "financial_data": data,  # si un jour tu veux exploiter directement le dict
     }
 
     return render(request, "orders/detail.html", context)
@@ -2287,6 +3287,7 @@ def client_lookup(request):
 # ============================================================
 #  PLACEHOLDERS ÉDITION / SUPPRESSION (NON UTILISÉS)
 # ============================================================
+
 def edit(request):
     return HttpResponse("edit - placeholder", content_type="text/plain; charset=utf-8")
 
@@ -2312,6 +3313,8 @@ def update_status(request, order_id):
         return redirect("orders:detail", order_id=order.id)
 
     order.status = new_status
+    order.update_financials()
+    recompute_order_financials(order)  # 🔥 applique les règles FAGNI
     order.save(update_fields=["status", "updated_at"])
 
     OrderStatusHistory.objects.create(
@@ -2333,233 +3336,184 @@ def _build_order_public_url(request, order, viewname="orders:detail"):
     return request.build_absolute_uri(relative)
 
 
-from decimal import Decimal, ROUND_HALF_UP
-from django.shortcuts import get_object_or_404, render
-from django.db.models import Sum
-from django.urls import reverse
+def _q(amount: Decimal) -> Decimal:
+    # arrondi FCFA à l'unité (pas de centimes)
+    return Decimal(amount or 0).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
+
+def _get_vat_rate_percent(cfg) -> Decimal:
+    # On essaie de lire un éventuel champ admin.
+    # Sinon fallback à 18% (CI).
+    for attr in ("vat_percent", "vat_rate", "vat_fagni_percent", "tva_percent"):
+        v = getattr(cfg, attr, None)
+        if v is not None:
+            try:
+                return Decimal(str(v))
+            except Exception:
+                pass
+    return Decimal("18")
+
+
+def _build_invoice_context(order):
+    cfg = get_pricing_settings()
+    amounts = compute_order_amounts(order)
+
+    vat_rate = _get_vat_rate_percent(cfg)
+
+    # Total HT client = prestations + livraison + express (si facturé client) + service FAGNI
+    total_ht_client = _q(
+        _q(amounts.get("subtotal", 0))
+        + _q(amounts.get("delivery_fee_client", 0))
+        + _q(amounts.get("express_for_client", 0))
+        + _q(amounts.get("service_fee_ht", 0))
+    )
+
+    # TVA calculée sur revenus FAGNI (HT)
+    fagni_revenue_ht = _q(amounts.get("fagni_revenue_ht", 0))
+    vat_amount = _q((fagni_revenue_ht * vat_rate) / Decimal("100"))
+
+    total_ttc_client = _q(total_ht_client + vat_amount)
+
+    # Compat anciennes variables (si d'autres templates les utilisent)
+    base_ht = total_ht_client
+    grand_total = total_ttc_client
+
+    return {
+        "cfg": cfg,
+        "amounts": amounts,
+        "vat_rate": vat_rate,
+        "vat_amount": vat_amount,
+        "total_ht_client": total_ht_client,
+        "total_ttc_client": total_ttc_client,
+        "base_ht": base_ht,
+        "tva_amount": vat_amount,
+        "grand_total": grand_total,
+    }
+
+
+@login_required
 def order_ticket_pdf(request, order_id):
     """
-    Ticket "joli" pour impression A4 / PDF.
-    Même logique de calcul que le ticket thermique.
+    Ticket PDF (HTML rendu).
+    Source de vérité = compute_order_amounts(order) (pricing.py).
     """
-    order = get_object_or_404(
-        Order.objects.select_related(
-            "customer",
-            "laundry_partner",
-            "delivery_partner",
-        ).prefetch_related(
-            "items__service",
-            "items__photos",
-        ),
-        pk=order_id,
+    order = (
+        Order.objects
+        .filter(pk=order_id)
+        .select_related("customer", "laundry_partner", "delivery_partner")
+        .prefetch_related("items__service", "items__photos")
+        .first()
     )
+    if not order:
+        return redirect("orders:list")
 
     items = order.items.all()
 
-    # --- 1) Sous-total prestations ---
-    agg = items.aggregate(
-        total_prestation=Sum("total"),
-    )
-    total_prestation = agg["total_prestation"] or Decimal("0")
-    order.total = total_prestation
-
-    # --- 2) Service FAGNI : 5% min 500 si total > 0 ---
-    service_fee = Decimal("0")
-    if total_prestation > 0:
-        service_fee = (total_prestation * Decimal("0.05")).quantize(Decimal("1"))
-        if service_fee < Decimal("500"):
-            service_fee = Decimal("500")
-    order.service_fee = service_fee
-
-    # --- 3) Frais de livraison ---
-    if not order.delivery_fee or Decimal(str(order.delivery_fee)) == Decimal("0"):
-        logi = getattr(settings, "FAGNI_LOGISTICS", {})
-        client_min_fee = Decimal(str(logi.get("client_min_fee", 1000)))
-        client_price_per_km = Decimal(str(logi.get("client_price_per_km", 100)))
-        client_fixed_fee = Decimal(str(logi.get("client_fixed_fee", 300)))
-        client_max_fee = Decimal(str(logi.get("client_max_fee", 5000)))
-
-        origin_lat = getattr(order.customer, "latitude", None)
-        origin_lng = getattr(order.customer, "longitude", None)
-        dest_lat = getattr(order.laundry_partner, "latitude", None) if order.laundry_partner else None
-        dest_lng = getattr(order.laundry_partner, "longitude", None) if order.laundry_partner else None
-
-        one_way = haversine_distance_km(origin_lat, origin_lng, dest_lat, dest_lng)
-
-        if one_way is None:
-            delivery_fee = client_min_fee
-        else:
-            distance_totale = (one_way * Decimal("2.0")).quantize(
-                Decimal("0.01"),
-                rounding=ROUND_HALF_UP,
-            )
-
-            fee_raw = (client_fixed_fee + distance_totale * client_price_per_km).quantize(
-                Decimal("0.01"),
-                rounding=ROUND_HALF_UP,
-            )
-
-            if fee_raw < client_min_fee:
-                fee_raw = client_min_fee
-            if client_max_fee > 0 and fee_raw > client_max_fee:
-                fee_raw = client_max_fee
-
-            delivery_fee = fee_raw
-
-        order.delivery_fee = delivery_fee
-    else:
-        order.delivery_fee = Decimal(str(order.delivery_fee))
-
-    # --- 4) Base HT ---
-    base_ht = (
-        (order.total or Decimal("0"))
-        + (order.service_fee or Decimal("0"))
-        + (order.delivery_fee or Decimal("0"))
-    )
-
-    # --- 5) TVA 18% ---
-    vat_rate = Decimal("0.18")
-    tva_amount = (base_ht * vat_rate).quantize(
-        Decimal("0.01"),
-        rounding=ROUND_HALF_UP,
-    )
-
-    # --- 6) Total TTC ---
-    grand_total = (base_ht + tva_amount).quantize(
-        Decimal("0.01"),
-        rounding=ROUND_HALF_UP,
-    )
-
-    order.vat_amount = tva_amount
-    order.grand_total = grand_total
-
-    # --- 7) QR data (lien vers la page détail commande) ---
-    detail_url = request.build_absolute_uri(
-        reverse("orders:detail", args=[order.id])
-    )
-    qr_data = detail_url  # tu peux aussi mettre juste order.code si tu préfères
+    detail_url = request.build_absolute_uri(reverse("orders:detail", args=[order.id]))
+    qr_data = detail_url
 
     context = {
         "order": order,
         "items": items,
-        "base_ht": base_ht,
-        "tva_amount": tva_amount,
-        "grand_total": grand_total,
         "qr_data": qr_data,
+        **_build_invoice_context(order),
+        "invoice_settings": get_invoice_settings_clean(),
     }
     return render(request, "orders/ticket_pdf.html", context)
 
 
-def order_ticket_thermal_pdf(request, order_id):
+@login_required
+def order_invoice_pdf(request, order_id):
     """
-    Ticket thermique (imprimante ticket 80mm).
-    Logique de calcul alignée avec la vue detail :
-    - total = somme des lignes
-    - service_fee = 5% min 500
-    - delivery_fee = calcul distance (client ↔ blanchisserie) ou min
-    - TVA 18% sur (total + service_fee + delivery_fee)
-    - grand_total = base_ht + TVA
+    Génère une FACTURE PDF A4 (WeasyPrint) :
+    - accessible uniquement si commande payée
+    - montants alignés sur le ticket (source unique = _build_invoice_context)
+    - header/footer pilotés par InvoiceSettings (admin)
     """
     order = get_object_or_404(
-        Order.objects.select_related(
-            "customer",
-            "laundry_partner",
-            "delivery_partner",
-        ).prefetch_related(
-            "items__service",
-            "items__photos",
-        ),
-        pk=order_id,
+        Order.objects.select_related("customer", "laundry_partner", "delivery_partner"),
+        pk=order_id
     )
 
-    items = order.items.all()
+    # Sécurité : facture uniquement si payé
+    if order.payment_status != "paid":
+        return HttpResponseForbidden("Facture indisponible : commande non payée.")
 
-    # --- 1) Sous-total prestations ---
-    agg = items.aggregate(total_prestation=Sum("total"))
-    total_prestation = agg["total_prestation"] or Decimal("0")
-    order.total = total_prestation
+    # S'assurer que les montants + invoice_number sont à jour (et persistés)
+    try:
+        order.update_financials(save=True)
+    except Exception:
+        pass
 
-    # --- 2) Service FAGNI : 5% min 500 si total > 0 ---
-    service_fee = Decimal("0")
-    if total_prestation > 0:
-        service_fee = (total_prestation * Decimal("0.05")).quantize(Decimal("1"))
-        if service_fee < Decimal("500"):
-            service_fee = Decimal("500")
-    order.service_fee = service_fee
+    items = order.items.all().order_by("id")
 
-    # --- 3) Frais de livraison (même logique que detail) ---
-    if not order.delivery_fee or Decimal(str(order.delivery_fee)) == Decimal("0"):
-        logi = getattr(settings, "FAGNI_LOGISTICS", {})
-        client_min_fee = Decimal(str(logi.get("client_min_fee", 1000)))
-        client_price_per_km = Decimal(str(logi.get("client_price_per_km", 100)))
-        client_fixed_fee = Decimal(str(logi.get("client_fixed_fee", 300)))
-        client_max_fee = Decimal(str(logi.get("client_max_fee", 5000)))
+    # ✅ Source unique (comme ticket_pdf / ticket_thermal)
+    ctx = _build_invoice_context(order)
 
-        origin_lat = getattr(order.customer, "latitude", None)
-        origin_lng = getattr(order.customer, "longitude", None)
-        dest_lat = getattr(order.laundry_partner, "latitude", None) if order.laundry_partner else None
-        dest_lng = getattr(order.laundry_partner, "longitude", None) if order.laundry_partner else None
-
-        one_way = haversine_distance_km(origin_lat, origin_lng, dest_lat, dest_lng)
-
-        if one_way is None:
-            delivery_fee = client_min_fee
-        else:
-            distance_totale = (one_way * Decimal("2.0")).quantize(
-                Decimal("0.01"),
-                rounding=ROUND_HALF_UP,
-            )
-
-            fee_raw = (client_fixed_fee + distance_totale * client_price_per_km).quantize(
-                Decimal("0.01"),
-                rounding=ROUND_HALF_UP,
-            )
-
-            if fee_raw < client_min_fee:
-                fee_raw = client_min_fee
-            if client_max_fee > 0 and fee_raw > client_max_fee:
-                fee_raw = client_max_fee
-
-            delivery_fee = fee_raw
-
-        order.delivery_fee = delivery_fee
-    else:
-        order.delivery_fee = Decimal(str(order.delivery_fee))
-
-    # --- 4) Base HT ---
-    base_ht = (
-        (order.total or Decimal("0"))
-        + (order.service_fee or Decimal("0"))
-        + (order.delivery_fee or Decimal("0"))
-    )
-
-    # --- 5) TVA 18% ---
-    vat_rate = Decimal("0.18")
-    tva_amount = (base_ht * vat_rate).quantize(
-        Decimal("0.01"),
-        rounding=ROUND_HALF_UP,
-    )
-
-    # --- 6) Total TTC ---
-    grand_total = (base_ht + tva_amount).quantize(
-        Decimal("0.01"),
-        rounding=ROUND_HALF_UP,
-    )
-
-    order.vat_amount = tva_amount
-    order.grand_total = grand_total
-
-    # --- 7) Données pour le QR code ---
-    qr_data = f"CMD:{order.code}|TEL:{order.customer.phone or ''}|TOTAL:{grand_total}"
+    # ✅ Header/Footer admin (nettoyé)
+    invoice_settings = get_invoice_settings_clean()
+    if invoice_settings:
+        ctx["invoice_settings"] = invoice_settings
 
     context = {
         "order": order,
         "items": items,
-        "base_ht": base_ht,
-        "tva_amount": tva_amount,
-        "grand_total": grand_total,
+        "now": timezone.now(),
+        **ctx,
+    }
+
+    html_string = render_to_string("orders/invoice_pdf.html", context=context, request=request)
+    pdf = HTML(string=html_string, base_url=request.build_absolute_uri("/")).write_pdf()
+
+    filename = f"FACTURE-{order.invoice_number or order.code or order.id}.pdf"
+    response = HttpResponse(pdf, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="{smart_str(filename)}"'
+    return response
+
+
+@login_required
+def order_ticket_thermal_pdf(request, order_id):
+    """
+    Ticket thermique (80mm).
+    Source de vérité = compute_order_amounts(order) (pricing.py).
+    """
+    order = (
+        Order.objects
+        .filter(pk=order_id)
+        .select_related("customer", "laundry_partner", "delivery_partner")
+        .prefetch_related("items__service", "items__photos")
+        .first()
+    )
+    if not order:
+        return redirect("orders:list")
+
+    items = order.items.all()
+
+    ctx_amounts = _build_invoice_context(order)
+
+    invoice_settings = get_invoice_settings_clean()
+    if invoice_settings:
+        ctx_amounts["invoice_settings"] = invoice_settings
+
+    # Total à mettre dans le QR (priorité : total_ttc_client sinon grand_total)
+    qr_total = ctx_amounts.get("total_ttc_client") or ctx_amounts.get("grand_total") or Decimal("0")
+
+    customer_phone = ""
+    if getattr(order, "customer", None) and getattr(order.customer, "phone", None):
+        customer_phone = order.customer.phone
+
+    try:
+        qr_total = int(Decimal(qr_total))
+    except Exception:
+        qr_total = 0
+
+    qr_data = f"CMD:{order.code}|TEL:{customer_phone}|TOTAL:{qr_total}"
+
+    context = {
+        "order": order,
+        "items": items,
         "qr_data": qr_data,
+        **ctx_amounts,
     }
     return render(request, "orders/ticket_thermal_pdf.html", context)
 
@@ -2573,7 +3527,6 @@ def safe_decimal(value, default=Decimal("0")):
         return default
 
 
-@transaction.atomic
 def update(request, order_id):
     """
     Édition d’une commande EXISTANTE.
@@ -2586,11 +3539,15 @@ def update(request, order_id):
         * suppression de lignes (diff entre DB et lignes postées)
         * ajout de nouvelles photos par ligne
     """
-
     order = get_object_or_404(
         Order.objects.select_related("customer", "laundry_partner", "delivery_partner"),
         pk=order_id,
     )
+
+    # 🔒 HARD LOCK : une commande payée ne doit plus être modifiable (GET + POST)
+    if getattr(order, "payment_status", None) == "paid":
+        messages.error(request, "Commande payée : modification interdite.")
+        return redirect("orders:detail", order_id=order.id)
 
     # Pour l'affichage (GET) : catalogue de services
     service_categories = ServiceCategory.objects.all().order_by("name")
@@ -2608,7 +3565,6 @@ def update(request, order_id):
 
     if request.method == "POST":
         # --- 1) Mise à jour infos ordre (hors items) ---
-
         status = request.POST.get("status") or order.status
         order.status = status
 
@@ -2633,7 +3589,6 @@ def update(request, order_id):
             order.notes = notes_raw.strip()
 
         # --- 2) Gestion des lignes (update / ajout / suppression) ---
-
         item_indexes = request.POST.getlist("item_index[]")
         item_ids = request.POST.getlist("item_id[]")
         service_ids = request.POST.getlist("service_id[]")
@@ -2641,7 +3596,6 @@ def update(request, order_id):
         quantities = request.POST.getlist("quantity[]")
         unit_prices = request.POST.getlist("unit_price[]")
 
-        # Items existants en DB
         existing_items_qs = (
             order.items.all()
             .select_related("service")
@@ -2649,7 +3603,6 @@ def update(request, order_id):
             .order_by("id")
         )
         existing_by_id = {str(it.id): it for it in existing_items_qs}
-
         kept_ids = set()
 
         nb_rows = len(service_ids)
@@ -2664,20 +3617,15 @@ def update(request, order_id):
 
             existing_item = existing_by_id.get(raw_item_id) if raw_item_id else None
 
-            # 2.a Ancienne ligne sans service_id dans le POST :
-            #    on la garde telle quelle (utile pour vieilles commandes)
+            # Ancienne ligne sans service_id -> on garde (compat vieilles commandes)
             if not raw_service_id and existing_item:
                 kept_ids.add(existing_item.id)
-
-                # nouvelles photos éventuelles
                 if raw_index != "":
                     files = request.FILES.getlist(f"photos_{raw_index}")
                     for f in files:
                         OrderItemPhoto.objects.create(order_item=existing_item, image=f)
-
                 continue
 
-            # Si pas de service_id et pas de ligne existante -> ignore
             if not raw_service_id:
                 continue
 
@@ -2687,7 +3635,7 @@ def update(request, order_id):
             except (TypeError, ValueError):
                 quantity = 0
 
-            # prix unitaire (Decimal, avec nettoyage)
+            # prix unitaire Decimal
             clean_unit_price = (raw_unit_price or "").replace(" ", "").replace("\u00a0", "")
             try:
                 unit_price = Decimal(clean_unit_price)
@@ -2696,7 +3644,6 @@ def update(request, order_id):
 
             # Ligne invalide (nouvelle) : on n’en crée pas
             if quantity <= 0 or unit_price <= 0:
-                # Si c’est une ligne existante, on la garde telle quelle
                 if existing_item:
                     kept_ids.add(existing_item.id)
                     if raw_index != "":
@@ -2707,7 +3654,7 @@ def update(request, order_id):
 
             designation = raw_designation
 
-            # --- 2b) Ligne existante ou nouvelle ? ---
+            # Ligne existante ou nouvelle ?
             if existing_item:
                 existing_item.service_id = int(raw_service_id)
                 if designation:
@@ -2727,24 +3674,23 @@ def update(request, order_id):
 
             kept_ids.add(item.id)
 
-            # --- 2c) Ajout de nouvelles photos pour cette ligne ---
+            # Ajout de nouvelles photos
             if raw_index != "":
                 files = request.FILES.getlist(f"photos_{raw_index}")
                 for f in files:
                     OrderItemPhoto.objects.create(order_item=item, image=f)
 
         # --- 3) Suppression des lignes qui ne sont plus envoyées ---
-        # On ne supprime que si la ligne a complètement disparu du POST
         for it in existing_items_qs:
             if it.id not in kept_ids:
                 it.delete()
 
         # --- 4) Recalcul des totaux ---
-        # Si ton modèle a une méthode dédiée, on l’utilise.
         if hasattr(order, "recalculate_totals"):
             order.recalculate_totals()
 
-        # Puis on sauvegarde l’ordre (statut, notes, partenaires, etc.)
+        order.recompute_distances_from_positions()
+        order.compute_totals(save=True)
         order.save()
 
         messages.success(request, "Commande mise à jour avec succès.")
@@ -3232,333 +4178,975 @@ def driver_performance(request, driver_id):
 
 
 @login_required
-def driver_app_export_xlsx(request):
+def driver_wallet(request):
     """
-    Export Excel 'ultra pro' des courses livreur,
-    avec charte graphique FAGNI.
-    - Si connecté en livreur => uniquement ses courses
-    - Si staff => peut filtrer sur un livreur via ?driver_id=
+    Dashboard du wallet livreur :
+    - solde actuel
+    - total gagné ce mois-ci (entrées)
+    - dernières transactions
     """
+
     user = request.user
-    user_email = (user.email or "").strip()
 
-    from partners.models import DeliveryPartner  # au cas où l'import n'est pas global
+    # 1) Retrouver le livreur lié à l'utilisateur
+    # Ici on part sur le mapping par email (le plus simple & propre)
+    driver = DeliveryPartner.objects.filter(email=user.email).first()
 
-    connected_driver = None
-    if user_email:
-        try:
-            connected_driver = DeliveryPartner.objects.get(email__iexact=user_email)
-        except DeliveryPartner.DoesNotExist:
-            connected_driver = None
-
-    orders_qs = (
-        Order.objects.select_related(
-            "customer",
-            "delivery_partner",
-            "laundry_partner",
+    if not driver:
+        messages.error(
+            request,
+            "Aucun profil livreur n'est lié à ce compte (email). "
+            "Merci de vérifier l'adresse e-mail du livreur."
         )
-        .all()
+        return redirect("orders:driver_app")
+
+    # 2) Récupérer / créer le wallet du livreur
+    wallet = get_or_create_wallet_for_delivery_partner(driver)
+
+    # 3) Transactions récentes
+    tx_qs = wallet.transactions.all().order_by("-created_at")[:50]
+
+    # 4) Total gagné ce mois-ci (entrées)
+    now = timezone.now()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    month_in_qs = wallet.transactions.filter(
+        created_at__gte=month_start,
+        direction="in",
+    )
+    month_earnings = (
+        month_in_qs.aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+    )
+
+    context = {
+        "driver": driver,
+        "wallet": wallet,
+        "transactions": tx_qs,
+        "month_earnings": month_earnings,
+        "month_start": month_start,
+    }
+
+    return render(request, "orders/driver_wallet.html", context)
+
+
+def _get_connected_driver(request, order=None):
+    """
+    Essaie de retrouver le livreur connecté :
+    - request.connected_driver (si tu l'utilises)
+    - user.deliverypartner (si tu as un OneToOne)
+    - fallback : order.delivery_partner (si order est fourni)
+    """
+    if hasattr(request, "connected_driver") and request.connected_driver:
+        return request.connected_driver
+
+    user = getattr(request, "user", None)
+    if user is not None and hasattr(user, "deliverypartner"):
+        return user.deliverypartner
+
+    if order is not None:
+        return getattr(order, "delivery_partner", None)
+
+    return None
+
+    connected_driver = _get_connected_driver(request)
+
+    if not connected_driver and not selected_driver_id:
+        return JsonResponse({
+            "filtered_orders_count": 0,
+            "pending": 0,
+            "in_progress": 0,
+            "done": 0,
+            "canceled": 0,
+            "total_orders": 0,
+            "today_orders": 0,
+            "total_distance_km": 0,
+            "total_driver_income": 0,
+            "source_distance": "—",
+            "source_income": "—",
+        })
+
+
+def ensure_default_driver_legs(order, driver):
+    """
+    Crée les DeliveryLeg pour CE livreur / CETTE commande si nécessaire.
+
+    - Utilise distance_km_pickup / distance_km_delivery si dispo
+    - Sinon, découpe distance_km_total en 2
+    - Répartit amount_driver_partner au prorata des distances
+    """
+    qs = DeliveryLeg.objects.filter(order=order, driver=driver).order_by("id")
+    if qs.exists():
+        return qs
+
+    # --- Distances ---
+    total_distance = (
+        getattr(order, "distance_km_total", None)
+        or getattr(order, "distance_km", None)
+        or 0
+    )
+
+    pickup_distance = getattr(order, "distance_km_pickup", None)
+    delivery_distance = getattr(order, "distance_km_delivery", None)
+
+    # Cas 1 : on a les deux distances
+    if pickup_distance is not None and delivery_distance is not None:
+        pass  # on garde tel quel
+
+    # Cas 2 : on n'a qu'une des deux → l'autre = total - connue (si cohérent)
+    elif pickup_distance is not None and delivery_distance is None:
+        if total_distance and pickup_distance <= total_distance:
+            delivery_distance = max(total_distance - pickup_distance, 0)
+        else:
+            delivery_distance = pickup_distance  # fallback
+    elif delivery_distance is not None and pickup_distance is None:
+        if total_distance and delivery_distance <= total_distance:
+            pickup_distance = max(total_distance - delivery_distance, 0)
+        else:
+            pickup_distance = delivery_distance  # fallback
+
+    # Cas 3 : aucune distance spécifique → on coupe le total en 2
+    else:
+        if total_distance:
+            pickup_distance = total_distance / 2
+            delivery_distance = total_distance / 2
+        else:
+            pickup_distance = 0
+            delivery_distance = 0
+
+    # --- Montant livreur à répartir ---
+    total_amount = getattr(order, "amount_driver_partner", None) or 0
+
+    if pickup_distance + delivery_distance > 0 and total_amount:
+        ratio_pickup = pickup_distance / (pickup_distance + delivery_distance)
+        pickup_amount = round(total_amount * ratio_pickup)
+        delivery_amount = total_amount - pickup_amount
+    else:
+        # Fallback : moitié–moitié
+        pickup_amount = total_amount / 2 if total_amount else 0
+        delivery_amount = total_amount / 2 if total_amount else 0
+
+    # --- Création des 2 tronçons pour ce livreur ---
+    legs = []
+
+    legs.append(
+        DeliveryLeg.objects.create(
+            order=order,
+            driver=driver,
+            leg_type="pickup",
+            distance_km=pickup_distance or 0,
+            driver_amount=pickup_amount or 0,
+            status="assigned",
+        )
+    )
+
+    legs.append(
+        DeliveryLeg.objects.create(
+            order=order,
+            driver=driver,
+            leg_type="delivery",
+            distance_km=delivery_distance or 0,
+            driver_amount=delivery_amount or 0,
+            status="assigned",
+        )
+    )
+
+    return DeliveryLeg.objects.filter(order=order, driver=driver).order_by("id")
+
+
+@login_required
+def driver_order_detail(request, order_id):
+    """
+    Vue détail course côté LIVREUR.
+
+    - Montre uniquement les infos utiles au chauffeur
+    - Calcule la distance & le montant qui lui reviennent
+      à partir des DeliveryLeg
+    - Crée des DeliveryLeg par défaut s'il n'y en a pas encore
+    """
+
+    order = get_object_or_404(
+        Order.objects.select_related("customer", "delivery_partner", "laundry_partner"),
+        pk=order_id,
+    )
+
+    # Pour l’instant, on se base sur le livreur assigné à la commande
+    driver = order.delivery_partner
+
+    # Valeurs par défaut
+    driver_legs_qs = DeliveryLeg.objects.none()
+    driver_leg_distance = 0
+    driver_leg_amount = 0
+    driver_mission_type_label = "Mission unique (A/R ou globale)"
+    driver_wallet = None
+    driver_wallet_url = ""
+
+    if driver is not None:
+        # 1) On s’assure qu’il y a au moins des legs pour (order, driver)
+        driver_legs_qs = ensure_default_driver_legs(order, driver)
+
+        # 2) Agrégats distance / montant pour CE livreur
+        legs_agg = driver_legs_qs.aggregate(
+            total_distance_km=Sum("distance_km"),
+            total_amount=Sum("driver_amount"),
+        )
+        driver_leg_distance = legs_agg["total_distance_km"] or 0
+        driver_leg_amount = legs_agg["total_amount"] or 0
+
+        # 3) Fallback pour très anciennes commandes sans legs
+        if driver_leg_distance == 0 and getattr(order, "distance_km_total", None):
+            driver_leg_distance = order.distance_km_total
+        if driver_leg_amount == 0 and getattr(order, "amount_driver_partner", None):
+            driver_leg_amount = order.amount_driver_partner
+
+        # 4) Libellé type de mission à partir des leg_type
+        leg_types = list(
+            driver_legs_qs.values_list("leg_type", flat=True).distinct()
+        )
+        if not leg_types:
+            driver_mission_type_label = "Mission unique (A/R ou globale)"
+        elif len(leg_types) == 1:
+            lt = leg_types[0]
+            if lt == "pickup":
+                driver_mission_type_label = "Collecte (client → blanchisserie)"
+            elif lt == "delivery":
+                driver_mission_type_label = "Livraison (blanchisserie → client)"
+            elif lt == "round_trip":
+                driver_mission_type_label = "Collecte + livraison (A/R complet)"
+            else:
+                driver_mission_type_label = "Mission particulière"
+        else:
+            driver_mission_type_label = "Collecte + livraison (tronçons multiples)"
+
+        # 5) Wallet livreur
+        try:
+            driver_wallet = get_or_create_wallet_for_delivery_partner(driver)
+            driver_wallet_url = (
+                reverse("wallets:driver_wallet_dashboard") + f"?driver_id={driver.id}"
+            )
+        except Exception:
+            driver_wallet = None
+            driver_wallet_url = ""
+
+    # --- Montants FAGNI cohérents (client + revenus) ---
+    try:
+        data = order.compute_totals(save=False) or {}
+    except Exception:
+        data = {}
+
+    amounts = data
+
+    total_client_ttc = (
+        amounts.get("total_client_ttc")
+        or getattr(order, "total_client_ttc", None)
+        or getattr(order, "total", None)
+        or getattr(order, "prestation_total", None)
+        or Decimal("0")
+    )
+
+    delivery_fee_client = (
+        amounts.get("delivery_fee_client")
+        or getattr(order, "delivery_fee", None)
+        or Decimal("0")
+    )
+
+    # Revenu livreur : priorité aux legs, puis mêmes fallbacks que driver_app
+    driver_income = driver_leg_amount or (
+        amounts.get("amount_driver_partner")
+        or getattr(order, "amount_driver_partner_resolved", None)
+        or getattr(order, "amount_driver_partner", None)
+        or getattr(order, "driver_logistic_cost", None)
+        or Decimal("0")
+    )
+
+    from orders.utils.geo import (
+        resolve_pickup_coords,
+        resolve_delivery_coords,
+        resolve_provider_coords,
+    )
+
+    pickup_coords = resolve_pickup_coords(order)
+    delivery_coords = resolve_delivery_coords(order)
+    provider_coords = resolve_provider_coords(order)
+
+    pickup_lat, pickup_lng = pickup_coords if pickup_coords else (None, None)
+    delivery_lat, delivery_lng = delivery_coords if delivery_coords else (None, None)
+    provider_lat, provider_lng = provider_coords if provider_coords else (None, None)
+
+    context = {
+        "order": order,
+        "driver": driver,
+        "driver_legs_qs": driver_legs_qs,
+        "driver_leg_distance": driver_leg_distance,
+        "driver_leg_amount": driver_leg_amount,
+        "driver_mission_type_label": driver_mission_type_label,
+        "driver_wallet": driver_wallet,
+        "driver_wallet_url": driver_wallet_url,
+        "amounts": amounts,
+        "total_client_ttc": total_client_ttc,
+        "delivery_fee_client": delivery_fee_client,
+        "driver_income": driver_income,
+        "pickup_coords": pickup_coords,
+        "delivery_coords": delivery_coords,
+        "provider_coords": provider_coords,
+        "pickup_lat": pickup_lat,
+        "pickup_lng": pickup_lng,
+        "delivery_lat": delivery_lat,
+        "delivery_lng": delivery_lng,
+        "provider_lat": provider_lat,
+        "provider_lng": provider_lng,
+    }
+    return render(request, "orders/driver_order_detail.html", context)
+
+
+# ===============================================
+#  APP LIVREUR – DATA JSON pour refresh KPIs
+# ===============================================
+@login_required
+def driver_app_data(request):
+    """
+    Version JSON des KPIs App Livreurs.
+    Utilisée par le JS en AJAX dans driver_app.html.
+
+    Harmonisation FAGNI :
+    - Distance = somme legs.distance_km si legs existent sinon fallback order.distance_km_total/distance_km
+    - Revenu  = somme legs.driver_amount si legs existent sinon fallback amount_driver_partner / driver_logistic_cost
+    """
+    connected_driver = _get_connected_driver(request)
+
+    qs = Order.objects.all()
+
+    selected_driver_id = (request.GET.get("driver_id") or "").strip()
+    status_filter = (request.GET.get("status") or "active").strip()
+
+    # Filtre par livreur
+    if connected_driver:
+        qs = qs.filter(delivery_partner=connected_driver)
+    elif selected_driver_id:
+        qs = qs.filter(delivery_partner_id=selected_driver_id)
+
+    # Filtre par statut
+    if status_filter == "active":
+        qs = qs.filter(status__in=["pending", "in_progress"])
+    elif status_filter == "done":
+        qs = qs.filter(status="done")
+    elif status_filter == "canceled":
+        qs = qs.filter(status="canceled")
+    # "all" => pas de filtre supplémentaire
+
+    filtered_orders_count = qs.count()
+    pending = qs.filter(status="pending").count()
+    in_progress = qs.filter(status="in_progress").count()
+    done = qs.filter(status="done").count()
+    canceled = qs.filter(status="canceled").count()
+
+    # Stats globales pour le livreur (toutes ses courses)
+    today = timezone.localdate()
+    today_start = timezone.make_aware(
+        timezone.datetime.combine(today, timezone.datetime.min.time())
+    )
+    today_end = timezone.make_aware(
+        timezone.datetime.combine(today, timezone.datetime.max.time())
+    )
+
+    base_for_driver_stats = Order.objects.all()
+    if connected_driver:
+        base_for_driver_stats = base_for_driver_stats.filter(delivery_partner=connected_driver)
+    elif selected_driver_id:
+        base_for_driver_stats = base_for_driver_stats.filter(delivery_partner_id=selected_driver_id)
+
+    total_orders = base_for_driver_stats.count()
+    today_orders = base_for_driver_stats.filter(
+        created_at__gte=today_start,
+        created_at__lte=today_end,
+    ).count()
+
+    # --- Legs aggregation (distance + income) ---
+    order_ids = list(qs.values_list("id", flat=True))
+    legs_income_map = {}
+    legs_distance_map = {}
+
+    if order_ids:
+        legs_rows = (
+            DeliveryLeg.objects
+            .filter(order_id__in=order_ids)
+            .values("order_id")
+            .annotate(
+                total_income=Sum("driver_amount"),
+                total_dist=Sum("distance_km"),
+            )
+        )
+        legs_income_map = {r["order_id"]: (r["total_income"] or 0) for r in legs_rows}
+        legs_distance_map = {r["order_id"]: (r["total_dist"] or 0) for r in legs_rows}
+
+    total_distance = Decimal("0")
+    total_income = Decimal("0")
+
+    used_legs_for_distance = False
+    used_legs_for_income = False
+
+    # On itère sur les commandes filtrées
+    for o in qs.only("id", "distance_km_total", "distance_km", "amount_driver_partner", "driver_logistic_cost"):
+        legs_income = Decimal(str(legs_income_map.get(o.id, 0) or 0))
+        legs_dist = Decimal(str(legs_distance_map.get(o.id, 0) or 0))
+
+        # Distance à afficher (utile si un jour tu refresh les cartes via JSON)
+        driver_distance_display = (
+            legs_dist
+            or Decimal(str(getattr(o, "distance_km_total", None) or getattr(o, "distance_km", None) or 0))
+        )
+        o.driver_distance_display = float(driver_distance_display or 0)
+
+        # distance
+        if legs_dist > 0:
+            total_distance += legs_dist
+            used_legs_for_distance = True
+        else:
+            fallback_dist = getattr(o, "distance_km_total", None) or getattr(o, "distance_km", None) or 0
+            total_distance += Decimal(str(fallback_dist or 0))
+
+
+        # income
+        if legs_income > 0:
+            total_income += legs_income
+            used_legs_for_income = True
+        else:
+            fallback_income = getattr(o, "amount_driver_partner", None) or getattr(o, "driver_logistic_cost", None) or 0
+            total_income += Decimal(str(fallback_income or 0))
+
+    data = {
+        "filtered_orders_count": filtered_orders_count,
+        "pending": pending,
+        "in_progress": in_progress,
+        "done": done,
+        "canceled": canceled,
+        "total_orders": total_orders,
+        "today_orders": today_orders,
+        "total_distance_km": float(total_distance.quantize(Decimal("0.01"))),
+        "total_driver_income": float(total_income.quantize(Decimal("0.01"))),
+        "source_distance": "legs" if used_legs_for_distance else "order_fallback",
+        "source_income": "legs" if used_legs_for_income else "order_fallback",
+    }
+    return JsonResponse(data)
+
+
+@login_required
+def driver_app(request):
+    """
+    Vue principale "Mes courses" pour le livreur.
+
+    Harmonisation montants FAGNI :
+    - Montant client = compute_totals().total_client_ttc (fallback total / prestation_total)
+    - Frais livraison client = compute_totals().delivery_fee_client (fallback delivery_fee)
+    - Revenu livreur = somme DeliveryLeg.driver_amount (si legs) sinon amount_driver_partner_resolved
+      sinon driver_logistic_cost.
+    """
+    connected_driver = get_connected_driver(request)  # ✅ helper existant
+
+    if not connected_driver:
+        messages.error(
+            request,
+            "Aucun profil livreur détecté. Merci de vérifier l'adresse e-mail ou de passer ?driver_id=XX."
+        )
+        context = {
+            "connected_driver": None,
+            "pending_orders": [],
+            "in_progress_orders": [],
+            "done_orders": [],
+            "pending_count": 0,
+            "in_progress_count": 0,
+            "done_count": 0,
+        }
+        return render(request, "orders/driver_app.html", context)
+
+    # Query principale
+    base_qs = (
+        Order.objects
+        .filter(delivery_partner=connected_driver)
+        .exclude(status="canceled")
+        .select_related("customer", "laundry_partner", "delivery_partner")
+        .prefetch_related("items")
         .order_by("-created_at")
     )
 
+    pending_orders = list(base_qs.filter(status="pending"))
+    in_progress_orders = list(base_qs.filter(status="in_progress"))
+    done_orders = list(base_qs.filter(status="done")[:50])
+
+    # --- Legs (1 seule requête d'agrégation pour toutes les commandes affichées) ---
+    all_orders = pending_orders + in_progress_orders + done_orders
+    order_ids = [o.id for o in all_orders]
+
+    legs_income_map = {}
+    legs_distance_map = {}
+
+    if order_ids:
+        legs_rows = (
+            DeliveryLeg.objects
+            .filter(driver=connected_driver, order_id__in=order_ids)
+            .values("order_id")
+            .annotate(
+                income=Sum("driver_amount"),
+                dist=Sum("distance_km"),
+            )
+        )
+        legs_income_map = {r["order_id"]: (r["income"] or 0) for r in legs_rows}
+        legs_distance_map = {r["order_id"]: (r["dist"] or 0) for r in legs_rows}
+
+    def _enrich(o):
+        # compute_totals ne sauvegarde pas ici
+        try:
+            amounts = o.compute_totals(save=False) or {}
+        except Exception:
+            amounts = {}
+
+        # --- Montant total client TTC ---
+        total_client_display = (
+            amounts.get("total_client_ttc")
+            or getattr(o, "total_client_ttc", None)
+            or getattr(o, "total", None)
+            or getattr(o, "prestation_total", None)
+            or 0
+        )
+
+        # --- Frais livraison client ---
+        delivery_fee_client_display = (
+            amounts.get("delivery_fee_client")
+            or getattr(o, "delivery_fee", None)
+            or 0
+        )
+
+        # --- Legs (revenu + distance) ---
+        legs_income = Decimal(str(legs_income_map.get(o.id, 0) or 0))
+        legs_dist = Decimal(str(legs_distance_map.get(o.id, 0) or 0))
+
+        # --- Distance à afficher (priorité legs) ---
+        driver_distance_display = (
+            legs_dist
+            or Decimal(str(getattr(o, "distance_km_total", None) or getattr(o, "distance_km", None) or 0))
+        )
+
+        # --- Revenu livreur (priorité legs) ---
+        driver_income_display = (
+            legs_income
+            or amounts.get("amount_driver_partner")
+            or getattr(o, "amount_driver_partner_resolved", None)
+            or getattr(o, "amount_driver_partner", None)
+            or getattr(o, "driver_logistic_cost", None)
+            or 0
+        )
+
+        # --- Paiement (PAYÉ / PARTIEL / À ENCAISSER) ---
+        try:
+            amount_paid_display = Decimal(str(getattr(o, "amount_paid", None) or 0))
+        except Exception:
+            amount_paid_display = Decimal("0")
+
+        try:
+            total_dec = Decimal(str(total_client_display or 0))
+        except Exception:
+            total_dec = Decimal("0")
+
+        due_amount_display = total_dec - amount_paid_display
+        if due_amount_display < 0:
+            due_amount_display = Decimal("0")
+
+        pay_status = (getattr(o, "payment_status", "") or "").lower()
+        if pay_status == "paid" or due_amount_display <= 0:
+            pay_status_label = "PAYÉ"
+            due_amount_display = Decimal("0")
+        elif amount_paid_display > 0:
+            pay_status_label = "PARTIEL"
+        else:
+            pay_status_label = "À ENCAISSER"
+
+        # --- Injection des champs DISPLAY pour le template ---
+        o.total_client_display = total_client_display
+        o.delivery_fee_client_display = delivery_fee_client_display
+        o.driver_income_display = driver_income_display
+        o.driver_distance_display = float(driver_distance_display or 0)
+
+        return o
+
+    pending_orders = [_enrich(o) for o in pending_orders]
+    in_progress_orders = [_enrich(o) for o in in_progress_orders]
+    done_orders = [_enrich(o) for o in done_orders]
+
+    context = {
+        "connected_driver": connected_driver,
+        "pending_orders": pending_orders,
+        "in_progress_orders": in_progress_orders,
+        "done_orders": done_orders,
+        "pending_count": len(pending_orders),
+        "in_progress_count": len(in_progress_orders),
+        "done_count": base_qs.filter(status="done").count(),
+    }
+    return render(request, "orders/driver_app.html", context)
+
+
+# ===============================================
+#  APP LIVREUR – EXPORT CSV / XLSX
+# ===============================================
+@login_required
+def driver_app_export_csv(request):
+    """
+    Export CSV des courses visibles dans l'App livreur.
+
+    - Si user livreur : uniquement SES courses
+    - Si user staff : possibilité de filtrer par driver_id
+    - Montants harmonisés FAGNI :
+        * total_client_display = total_client_ttc (si dispo) OU fallback
+        * driver_income_display = amount_driver_partner (fallback driver_logistic_cost)
+    """
+    user = request.user
+    connected_driver = _get_connected_driver(request)
+
+    qs = Order.objects.select_related(
+        "customer",
+        "delivery_partner",
+        "laundry_partner",
+    )
+
+    driver_id = (request.GET.get("driver_id") or "").strip()
+    status_filter = (request.GET.get("status") or "active").strip()
+
     # --- Filtre livreur ---
-    selected_driver_id = request.GET.get("driver_id") or None
-
     if connected_driver and not user.is_staff:
-        # Mode LIVREUR : il ne voit QUE ses commandes
-        orders_qs = orders_qs.filter(delivery_partner=connected_driver)
-    else:
-        # Mode OPS / STAFF : filtre optionnel sur un livreur précis
-        if selected_driver_id:
-            orders_qs = orders_qs.filter(delivery_partner_id=selected_driver_id)
+        # Mode LIVREUR : uniquement ses propres courses
+        qs = qs.filter(delivery_partner=connected_driver)
+    elif driver_id:
+        qs = qs.filter(delivery_partner_id=driver_id)
 
-    # --- Filtre statut ---
-    status_filter = request.GET.get("status", "active")
+    # --- Filtre statut (même logique que driver_app_data) ---
     if status_filter == "active":
-        orders_qs = orders_qs.filter(status__in=["pending", "in_progress"])
-    elif status_filter in ["done", "canceled"]:
-        orders_qs = orders_qs.filter(status=status_filter)
-    elif status_filter == "all":
-        pass
-    else:
-        orders_qs = orders_qs.filter(status__in=["pending", "in_progress"])
+        qs = qs.filter(status__in=["pending", "in_progress"])
+    elif status_filter == "done":
+        qs = qs.filter(status="done")
+    elif status_filter == "canceled":
+        qs = qs.filter(status="canceled")
+    # "all" => pas de filtre supplémentaire
 
-    # =======================
-    # 1) Création du workbook
-    # =======================
+    qs = qs.order_by("-created_at")
+
+    # --- Expressions de montants harmonisés FAGNI ---
+    DEC = DecimalField(max_digits=12, decimal_places=2)
+
+    items_total_expr = Coalesce(
+        Sum(
+            Cast(F("items__quantity"), DEC)
+            * Cast(F("items__unit_price"), DEC)
+        ),
+        Value(0, output_field=DEC),
+    )
+
+    total_client_expr = Coalesce(
+        F("total_client_ttc"),
+        Coalesce(F("total"), items_total_expr)
+        + Coalesce(F("delivery_fee"), Value(0, output_field=DEC))
+        + Coalesce(F("service_fee"), Value(0, output_field=DEC))
+        + Coalesce(F("vat_fagni"), Value(0, output_field=DEC)),
+        output_field=DEC,
+    )
+
+    income_expr = Coalesce(
+        F("amount_driver_partner"),
+        Coalesce(F("driver_logistic_cost"), Value(0, output_field=DEC)),
+        output_field=DEC,
+    )
+
+    qs = qs.annotate(
+        items_total=items_total_expr,
+        total_client_display=total_client_expr,
+        driver_income_display=income_expr,
+    )
+
+    # --- Réponse CSV ---
+    response = HttpResponse(content_type="text/csv")
+
+    filename_parts = ["driver_app"]
+    if connected_driver and not user.is_staff:
+        filename_parts.append(f"driver_{connected_driver.id}")
+    elif driver_id:
+        filename_parts.append(f"driver_{driver_id}")
+
+    filename = "_".join(filename_parts) + ".csv"
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+    writer = csv.writer(response, delimiter=";")
+
+    # En-têtes
+    writer.writerow([
+        "Code commande",
+        "Date création",
+        "Client",
+        "Téléphone",
+        "Adresse",
+        "Statut",
+        "Distance_km",
+        "Montant client TTC",
+        "Revenu livreur (FCFA)",
+    ])
+
+    # Lignes
+    for order in qs:
+        customer = getattr(order, "customer", None)
+
+        writer.writerow([
+            order.code or order.id,
+            order.created_at.strftime("%Y-%m-%d %H:%M") if order.created_at else "",
+            getattr(customer, "name", "") if customer else "",
+            getattr(customer, "phone", "") if customer else "",
+            getattr(customer, "address", "") if customer else "",
+            order.get_status_display(),
+            float(order.distance_km) if order.distance_km is not None else 0,
+            # total client TTC harmonisé
+            float(order.total_client_display) if getattr(order, "total_client_display", None) is not None else 0,
+            # revenu livreur harmonisé
+            float(order.driver_income_display) if getattr(order, "driver_income_display", None) is not None else 0,
+        ])
+
+    return response
+
+
+#@login_required
+#def driver_app_export_xlsx(request):
+#    """
+#    Alias simple vers l'export CSV pour compatibilité.
+ #   (On garde le même contenu, tu pourras l'ouvrir dans Excel et
+#    mettre en forme avec ton template premium.)
+ #   """
+   # return driver_app_export_csv(request)
+
+
+@login_required
+def driver_app_export_xlsx(request):
+    """
+    Export XLSX premium des courses livreur, avec :
+    - filtres par livreur + statut (même logique que driver_app / driver_app_export_csv)
+    - montants alignés sur le modèle FAGNI :
+        * total_client_ttc (fallback : prestation_total + service_fee + delivery_fee + vat_fagni)
+        * revenu livreur = amount_driver_partner (fallback driver_logistic_cost)
+    - mise en forme Excel : en-têtes stylées, auto-filter, freeze pane, totaux avec formules.
+    """
+    user = request.user
+    connected_driver = _get_connected_driver(request)
+    driver_id = None
+
+   # --- Identification du livreur (livreur connecté ou driver_id en GET pour un staff) ---
+    if connected_driver:
+        driver_id = connected_driver.id
+    elif user.is_staff:
+        driver_id_param = request.GET.get("driver_id") or ""
+        if driver_id_param:
+            try:
+                driver_id = int(driver_id_param)
+            except ValueError:
+                driver_id = None
+
+    status_filter = (request.GET.get("status") or "active").strip()
+
+    # On force un DecimalField commun
+    DEC = DecimalField(max_digits=12, decimal_places=2)
+
+    # Base queryset (mêmes relations que l'app livreur)
+    qs = (
+        Order.objects
+        .select_related("customer", "delivery_partner", "laundry_partner")
+        .prefetch_related("items")
+        .order_by("-created_at")
+    )
+
+    if driver_id:
+        qs = qs.filter(delivery_partner_id=driver_id)
+
+    # Filtre statut (même logique que driver_app / driver_app_data / driver_orders_csv)
+    if status_filter == "active":
+        qs = qs.filter(status__in=["pending", "in_progress"])
+    elif status_filter == "done":
+        qs = qs.filter(status="done")
+    elif status_filter == "canceled":
+        qs = qs.filter(status="canceled")
+    # status_filter == "all" => pas de filtre supplémentaire
+
+    # ---------- ANNOTATIONS FINANCIÈRES ALIGNÉES FAGNI ----------
+    # Sous-total prestations = somme (quantity * unit_price)
+    items_total_expr = Coalesce(
+        Sum(
+            Cast(F("items__quantity"), DEC)
+            * Cast(F("items__unit_price"), DEC)
+        ),
+        Value(0, output_field=DEC),
+    )
+
+    # Base prestations = prestation_total (si rempli) sinon somme des lignes
+    prestation_expr = Coalesce(F("prestation_total"), items_total_expr, output_field=DEC)
+
+    service_expr = Coalesce(F("service_fee"), Value(0, output_field=DEC))
+    delivery_expr = Coalesce(F("delivery_fee"), Value(0, output_field=DEC))
+    vat_expr = Coalesce(F("vat_fagni"), Value(0, output_field=DEC))
+
+    base_ht_expr = prestation_expr + service_expr + delivery_expr
+    total_client_fallback = base_ht_expr + vat_expr
+
+    driver_income_expr = Coalesce(
+        F("amount_driver_partner"),
+        Coalesce(F("driver_logistic_cost"), Value(0, output_field=DEC)),
+        output_field=DEC,
+    )
+
+    qs = qs.annotate(
+        items_total=items_total_expr,
+        total_client_display=Coalesce(
+            F("total_client_ttc"),
+            total_client_fallback,
+            output_field=DEC,
+        ),
+        driver_income_display=driver_income_expr,
+    )
+
+    # ---------- CRÉATION DU FICHIER EXCEL ----------
     wb = Workbook()
     ws = wb.active
     ws.title = "Courses livreur"
 
-    # Couleurs FAGNI
-    BLUE = "173B63"
-    ORANGE = "F07C22"
-    LIGHT_BG = "F8FAFC"
-    HEADER_BG = "E5E7EB"
+    # Styles de base
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="2563EB")  # bleu
+    header_alignment = Alignment(horizontal="center", vertical="center")
 
-    # Styles
-    title_font = Font(size=14, bold=True, color=BLUE)
-    header_font = Font(size=11, bold=True, color="FFFFFF")
-    header_fill = PatternFill("solid", fgColor=BLUE)
     thin_border = Border(
         left=Side(style="thin", color="D1D5DB"),
         right=Side(style="thin", color="D1D5DB"),
         top=Side(style="thin", color="D1D5DB"),
         bottom=Side(style="thin", color="D1D5DB"),
     )
-    cell_font = Font(size=10, color="111827")
 
-    # =======================
-    # 2) Titre + sous-titre
-    # =======================
-    ws["A1"] = "FAGNI – Suivi des courses livreur"
-    ws["A1"].font = title_font
-    ws.merge_cells("A1:M1")
+    money_format = "#,##0"  # affichage 1 000 / 10 000 etc. (selon Excel)
 
-    info_txt = "Export généré le " + timezone.localtime(timezone.now()).strftime(
-        "%d/%m/%Y %H:%M"
-    )
-    if connected_driver and not user.is_staff:
-        info_txt += f" • Livreur : {connected_driver.name}"
-    ws["A2"] = info_txt
-    ws["A2"].font = Font(size=9, color="6B7280")
-    ws.merge_cells("A2:M2")
-
-    start_row = 4
-
-    # =======================
-    # 3) Ligne d’en-tête
-    # =======================
+    # En-têtes
     headers = [
-        "Code",
+        "Code commande",
+        "Date création",
         "Client",
         "Téléphone",
         "Adresse",
         "Statut",
-        "Créée le",
-        "Distance A/R (km)",
-        "Total prestations",
-        "Service FAGNI",
-        "Livraison",
-        "Total global client",
-        "Livreur",
-        "Blanchisserie",
+        "Distance (km)",
+        "Total client TTC (FCFA)",
+        "Revenu livreur (FCFA)",
     ]
 
-    for col_index, header in enumerate(headers, start=1):
-        cell = ws.cell(row=start_row, column=col_index, value=header)
+    ws.append(headers)
+
+    for col_idx, _ in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col_idx)
         cell.font = header_font
         cell.fill = header_fill
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.alignment = header_alignment
         cell.border = thin_border
 
-    # =======================
-    # 4) Lignes de données
-    # =======================
-    row = start_row + 1
-    for order in orders_qs:
-        total_client = (order.total or 0) + (order.service_fee or 0) + (order.delivery_fee or 0)
+    # Lignes
+    row_index = 1
+    for order in qs:
+        row_index += 1
+        customer = getattr(order, "customer", None)
 
-        values = [
-            order.code or order.id,
-            getattr(order.customer, "name", "") or "",
-            getattr(order.customer, "phone", "") or "",
-            getattr(order.customer, "address", "") or "",
-            order.get_status_display(),
-            order.created_at.strftime("%d/%m/%Y %H:%M") if order.created_at else "",
-            float(order.distance_km or 0),
-            float(order.total or 0),
-            float(order.service_fee or 0),
-            float(order.delivery_fee or 0),
-            float(total_client),
-            order.delivery_partner.name if order.delivery_partner else "",
-            order.laundry_partner.name if order.laundry_partner else "",
+        code = order.code or str(order.id)
+        created = order.created_at.strftime("%d/%m/%Y %H:%M") if order.created_at else ""
+        client_name = getattr(customer, "name", "") if customer else ""
+        phone = getattr(customer, "phone", "") if customer else ""
+        address = getattr(customer, "address", "") if customer else ""
+        status_display = order.get_status_display()
+        distance_km = float(order.distance_km) if order.distance_km is not None else 0.0
+        total_client = float(order.total_client_display or 0)
+        driver_income = float(order.driver_income_display or 0)
+
+        row_values = [
+            code,
+            created,
+            client_name,
+            phone,
+            address,
+            status_display,
+            distance_km,
+            total_client,
+            driver_income,
         ]
+        ws.append(row_values)
 
-        for col_index, value in enumerate(values, start=1):
-            cell = ws.cell(row=row, column=col_index, value=value)
-            cell.font = cell_font
-            cell.alignment = Alignment(
-                horizontal="left",
-                vertical="center",
-                wrap_text=True,
-            )
+        # Bordures + formats
+        for col_idx in range(1, len(headers) + 1):
+            cell = ws.cell(row=row_index, column=col_idx)
             cell.border = thin_border
+            if col_idx in (7, 8, 9):  # distance + montants
+                cell.number_format = money_format
 
-        row += 1
+    last_data_row = row_index
 
-    last_row = row - 1
+    # ---------- LIGNE TOTAUX ----------
+    total_row = last_data_row + 1
+    ws.cell(row=total_row, column=1, value="Totaux :").font = Font(bold=True)
 
-    # =======================
-    # 5) Formatage colonnes
-    # =======================
-    from openpyxl.utils import get_column_letter
+    # Total distance
+    ws.cell(
+        row=total_row,
+        column=7,
+        value=f"=SUM({get_column_letter(7)}2:{get_column_letter(7)}{last_data_row})",
+    ).number_format = money_format
 
-    col_widths = {
-        1: 14,   # Code
-        2: 22,   # Client
-        3: 14,   # Téléphone
-        4: 30,   # Adresse
-        5: 14,   # Statut
-        6: 18,   # Créée le
-        7: 16,   # Distance
-        8: 18,   # Total prestation
-        9: 16,   # Service
-        10: 16,  # Livraison
-        11: 20,  # Total global
-        12: 20,  # Livre
-        13: 20,  # Blanchisserie
+    # Total client TTC
+    ws.cell(
+        row=total_row,
+        column=8,
+        value=f"=SUM({get_column_letter(8)}2:{get_column_letter(8)}{last_data_row})",
+    ).number_format = money_format
+
+    # Total revenu livreur
+    ws.cell(
+        row=total_row,
+        column=9,
+        value=f"=SUM({get_column_letter(9)}2:{get_column_letter(9)}{last_data_row})",
+    ).number_format = money_format
+
+    for col_idx in range(1, len(headers) + 1):
+        cell = ws.cell(row=total_row, column=col_idx)
+        cell.border = thin_border
+        if col_idx >= 7:
+            cell.font = Font(bold=True)
+
+    # ---------- AUTO-FILTER + FREEZE PANES + LARGEUR COLONNES ----------
+    ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{last_data_row}"
+    ws.freeze_panes = "A2"
+
+    # Largeurs colonnes
+    widths = {
+        1: 16,  # Code
+        2: 18,  # Date
+        3: 24,  # Client
+        4: 16,  # Téléphone
+        5: 40,  # Adresse
+        6: 16,  # Statut
+        7: 14,  # Distance
+        8: 22,  # Total client
+        9: 22,  # Revenu livreur
     }
+    for col_idx, width in widths.items():
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
 
-    for col_index, width in col_widths.items():
-        ws.column_dimensions[get_column_letter(col_index)].width = width
+    # ---------- RÉPONSE HTTP ----------
+    # Nom de fichier
+    base_name = "fagni_courses_livreur"
+    if driver_id:
+        base_name += f"_driver_{driver_id}"
+    if status_filter:
+        base_name += f"_{status_filter}"
+    filename = base_name + ".xlsx"
 
-    # Filtres + freeze panes
-    ws.auto_filter.ref = f"A{start_row}:M{last_row}"
-    ws.freeze_panes = ws["A5"]  # fige la ligne d’en-tête
-
-    # =======================
-    # 6) Réponse HTTP
-    # =======================
-    filename = "fagni_driver_app_export.xlsx"
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-    response["Content-Disposition"] = f'attachment; filename=\"{filename}\"'
-    wb.save(response)
-    return response
-
-
-@login_required
-def driver_app_export_csv(request):
-    """
-    Export CSV des commandes de l'App livreur,
-    avec les mêmes filtres que driver_app :
-    - driver_id
-    - status
-    - date_from / date_to
-    """
-
-    driver_id = request.GET.get("driver_id") or ""
-    status_filter = request.GET.get("status") or "active"
-    date_from_str = request.GET.get("date_from") or ""
-    date_to_str = request.GET.get("date_to") or ""
-
-    date_from = None
-    date_to = None
-
-    if date_from_str:
-        try:
-            date_from = datetime.strptime(date_from_str, "%Y-%m-%d").date()
-        except ValueError:
-            date_from = None
-
-    if date_to_str:
-        try:
-            date_to = datetime.strptime(date_to_str, "%Y-%m-%d").date()
-        except ValueError:
-            date_to = None
-
-    # --- Base queryset comme dans driver_app ---
-    base_qs = (
-        Order.objects.select_related(
-            "customer",
-            "laundry_partner",
-            "delivery_partner",
-        )
-        .prefetch_related("items__service")
-        .order_by("-created_at")
-    )
-
-    # Filtre période
-    if date_from:
-        base_qs = base_qs.filter(created_at__date__gte=date_from)
-    if date_to:
-        base_qs = base_qs.filter(created_at__date__lte=date_to)
-
-    # Filtre livreur
-    if driver_id:
-        try:
-            driver_id_int = int(driver_id)
-        except ValueError:
-            driver_id_int = None
-
-        if driver_id_int:
-            qs_driver = base_qs.filter(delivery_partner_id=driver_id_int)
-        else:
-            qs_driver = base_qs
-    else:
-        qs_driver = base_qs
-
-    # Filtre statut (même logique que driver_app)
-    if status_filter == "active":
-        qs_display = qs_driver.filter(status__in=["pending", "in_progress"])
-    elif status_filter == "done":
-        qs_display = qs_driver.filter(status="done")
-    elif status_filter == "canceled":
-        qs_display = qs_driver.filter(status="canceled")
-    else:
-        qs_display = qs_driver
-
-    # Annotation montant client (total + service + livraison)
-    total_client_expr = ExpressionWrapper(
-        F("total") + F("service_fee") + F("delivery_fee"),
-        output_field=DecimalField(max_digits=12, decimal_places=2),
-    )
-
-    qs_with_amount = qs_display.annotate(total_client_amount=total_client_expr)
-
-    # --- Construction de la réponse CSV ---
-    now = timezone.now()
-    ts = now.strftime("%Y%m%d_%H%M%S")
-    filename = f"fagni_driver_app_{ts}.csv"
-
-    response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
 
-    # séparateur ; pour Excel FR
-    writer = csv.writer(response, delimiter=";")
-
-    # En-têtes
-    writer.writerow([
-        smart_str("ID commande"),
-        smart_str("Code"),
-        smart_str("Créée le"),
-        smart_str("Statut"),
-        smart_str("Livreur"),
-        smart_str("Client"),
-        smart_str("Téléphone client"),
-        smart_str("Adresse client"),
-        smart_str("Blanchisserie"),
-        smart_str("Distance A/R (km)"),
-        smart_str("Montant client (FCFA)"),
-        smart_str("Revenu livreur (FCFA)"),
-    ])
-
-    # Lignes
-    for o in qs_with_amount:
-        created_str = o.created_at.strftime("%d/%m/%Y %H:%M") if o.created_at else ""
-        status_label = o.get_status_display() if hasattr(o, "get_status_display") else o.status
-
-        distance_km = o.distance_km or 0
-        total_client = o.total_client_amount or 0
-        driver_income = o.driver_logistic_cost or 0
-
-        writer.writerow([
-            smart_str(o.id),
-            smart_str(o.code or o.id),
-            smart_str(created_str),
-            smart_str(status_label),
-            smart_str(o.delivery_partner.name if o.delivery_partner else ""),
-            smart_str(o.customer.name if o.customer else ""),
-            smart_str(o.customer.phone if o.customer else ""),
-            smart_str(o.customer.address if o.customer else ""),
-            smart_str(o.laundry_partner.name if o.laundry_partner else ""),
-            f"{float(distance_km):.2f}",
-            f"{float(total_client):.0f}",
-            f"{float(driver_income):.0f}",
-        ])
-
+    wb.save(response)
     return response
 
 
@@ -3646,83 +5234,81 @@ def compute_driver_week_stats(driver):
     }
 
 
+@login_required
 def driver_me_app(request):
-    # 1. Récupérer le livreur connecté
-    delivery_partner = None
-    if request.user.is_authenticated:
-        from orders.models import DeliveryPartner  # si pas déjà importé en haut
-        delivery_partner = DeliveryPartner.objects.filter(
-            email=request.user.email
-        ).first()
+    """
+    Espace 'Moi' du livreur :
+    - stats globales (total courses, du mois, distance, revenus)
+    - stats d'activité du jour (en attente / en cours / terminées / annulées)
+    """
 
-    # Si on n’a pas de livreur, tu peux gérer un fallback propre
-    qs = Order.objects.all()
-    if delivery_partner:
-        qs = qs.filter(delivery_partner=delivery_partner)
+    user = request.user
 
-    # 2. Périodes
+    # On matche le livreur par email (ajuste si tu utilises un autre lien)
+    try:
+        driver = DeliveryPartner.objects.get(email=user.email)
+    except DeliveryPartner.DoesNotExist:
+        # fallback : tu peux rediriger vers le hub ou afficher un message
+        return redirect("orders:driver_hub")
+
     today = timezone.localdate()
-    month_start = today.replace(day=1)
 
-    # 3. Stats de base
-    total_orders = qs.count()
-    month_orders = qs.filter(created_at__date__gte=month_start).count()
+    # Toutes les courses du livreur
+    qs = Order.objects.filter(delivery_partner=driver)
 
-    total_distance_km = qs.aggregate(
-        total=Coalesce(Sum("distance_km"), Decimal("0"))
-    )["total"]
+    # Période du mois en cours
+    month_qs = qs.filter(
+        created_at__year=today.year,
+        created_at__month=today.month,
+    )
 
-    total_income = qs.aggregate(
-        total=Coalesce(Sum("driver_logistic_cost"), Decimal("0"))
-    )["total"]
+    # Activité du jour
+    today_qs = qs.filter(created_at__date=today)
 
-    # 4. 👉 Stats d’activité (celles qui manquent au template)
-    pending_orders = qs.filter(status="pending").count()
-    in_progress_orders = qs.filter(status="in_progress").count()
+    # --- Agrégats simples (sans distance) ---
+    raw_stats = qs.aggregate(
+        total_orders=Count("id", distinct=True),
+        # adapte ce filtre si tu as déjà un start_month dans ta fonction
+        month_orders=Count(
+            "id",
+            filter=Q(created_at__gte=start_month) if "start_month" in locals() else Q(),
+            distinct=True,
+        ),
+        total_income=Coalesce(
+            Sum("driver_logistic_cost"),
+            Decimal("0.0"),
+        ),
+    )
 
-    # 5. Dictionnaire stats COMPLET
+    # --- Distance totale en Python (on évite l'expression mixte ORM) ---
+    legs_qs = DeliveryLeg.objects.filter(
+        order__in=qs,
+        distance_km__isnull=False,
+    ).values_list("distance_km", flat=True)
+
+    total_distance_km = Decimal("0.0")
+    for d in legs_qs:
+        # d est un float ou Decimal → on le convertit proprement en Decimal
+        if d is not None:
+            total_distance_km += Decimal(str(d))
+
+    # On peut arrondir à 1 décimale si tu veux un rendu propre
+    total_distance_km = total_distance_km.quantize(Decimal("0.1"))
+
     stats = {
-        "total_orders": total_orders,
-        "month_orders": month_orders,
+        "total_orders": raw_stats["total_orders"] or 0,
+        "month_orders": raw_stats["month_orders"] or 0,
         "total_distance_km": total_distance_km,
-        "total_income": total_income,
-        "pending_orders": pending_orders,
-        "in_progress_orders": in_progress_orders,
+        "total_income": raw_stats["total_income"] or Decimal("0.0"),
     }
-
-    # 6. Dernières commandes du chauffeur
-    orders = qs.order_by("-created_at")[:10]
 
     context = {
-        "delivery_partner": delivery_partner,
-        "connected_driver": delivery_partner,
-        "orders": orders,
+        "driver": driver,
         "stats": stats,
+        "today": today,
+        "orders": qs.order_by("-created_at")[:10],  # dernières courses, par ex
     }
     return render(request, "orders/driver_me.html", context)
-
-
-# ===========================================================
-#  OUTIL INTERNE : récupérer le livreur connecté (si existe)
-# ===========================================================
-def _get_connected_driver(request):
-    """
-    Essaie d'associer l'utilisateur connecté à un DeliveryPartner
-    via son email (exact ou insensible à la casse).
-    Renvoie (driver or None).
-    """
-    user = request.user
-    if not user.is_authenticated:
-        return None
-
-    email = (user.email or "").strip()
-    if not email:
-        return None
-
-    try:
-        return DeliveryPartner.objects.get(email__iexact=email)
-    except DeliveryPartner.DoesNotExist:
-        return None
 
 
 # ===============================================
@@ -3854,180 +5440,68 @@ def driver_hub(request):
 
 
 # ===============================================
-#  APP LIVREUR – LISTE DES COURSES
-# ===============================================
-@login_required
-def driver_app(request):
-    """
-    App livreur – liste des commandes vues côté livreur.
-    Deux modes :
-    - LIVREUR connecté (DeliveryPartner lié à l'email) => filtré sur lui
-    - Sinon (ops / admin) => filtre 'Livreur' disponible
-    """
-    connected_driver = _get_connected_driver(request)
-
-    # Base queryset
-    qs = Order.objects.select_related(
-        "customer",
-        "laundry_partner",
-        "delivery_partner",
-    )
-
-    # --- Filtre livreur ---
-    selected_driver_id = request.GET.get("driver_id", "") or ""
-
-    if connected_driver:
-        # Mode livreur : on force le filtre sur lui
-        qs = qs.filter(delivery_partner=connected_driver)
-        selected_driver = connected_driver
-        selected_driver_id = str(connected_driver.id)
-    else:
-        selected_driver = None
-        if selected_driver_id:
-            qs = qs.filter(delivery_partner_id=selected_driver_id)
-
-    # --- Filtre statut ---
-    status_filter = request.GET.get("status", "active")
-    if status_filter == "active":
-        qs = qs.filter(status__in=["pending", "in_progress"])
-    elif status_filter == "done":
-        qs = qs.filter(status="done")
-    elif status_filter == "canceled":
-        qs = qs.filter(status="canceled")
-    # "all" = pas de filtre
-
-    # --- Stats / KPIs ---
-    filtered_orders_count = qs.count()
-
-    today = timezone.localdate()
-    today_start = timezone.make_aware(
-        timezone.datetime.combine(today, timezone.datetime.min.time())
-    )
-    today_end = timezone.make_aware(
-        timezone.datetime.combine(today, timezone.datetime.max.time())
-    )
-
-    base_for_driver_stats = Order.objects.all()
-    if selected_driver_id:
-        base_for_driver_stats = base_for_driver_stats.filter(
-            delivery_partner_id=selected_driver_id
-        )
-
-    total_orders = base_for_driver_stats.count()
-    today_orders = base_for_driver_stats.filter(
-        created_at__gte=today_start,
-        created_at__lte=today_end,
-    ).count()
-
-    aggregates = qs.aggregate(
-        total_distance_km=Sum("distance_km"),
-        total_driver_income=Sum("driver_logistic_cost"),
-    )
-
-    total_distance_km = aggregates["total_distance_km"] or 0
-    total_driver_income = aggregates["total_driver_income"] or 0
-
-    # Liste des livreurs (pour le mode "ops")
-    drivers = DeliveryPartner.objects.all().order_by("name")
-
-    context = {
-        "orders": qs.order_by("-created_at"),
-        "drivers": drivers,
-        "selected_driver_id": selected_driver_id,
-        "status_filter": status_filter,
-        "filtered_orders_count": filtered_orders_count,
-        "total_orders": total_orders,
-        "today_orders": today_orders,
-        "pending": qs.filter(status="pending").count(),
-        "in_progress": qs.filter(status="in_progress").count(),
-        "done": qs.filter(status="done").count(),
-        "canceled": qs.filter(status="canceled").count(),
-        "total_distance_km": total_distance_km,
-        "total_driver_income": total_driver_income,
-        "connected_driver": selected_driver,  # ou None
-    }
-
-    return render(request, "orders/driver_app.html", context)
-
-
-# ===============================================
 #  APP LIVREUR – DATA JSON pour refresh KPIs
 # ===============================================
 @login_required
-def driver_app_data(request):
+def driver_me_data(request):
     """
-    Version JSON des KPIs App Livreurs.
-    Utilisée par le JS en AJAX dans driver_app.html
+    Endpoint JSON pour l’auto-refresh des KPI de driver_me_app.
+
+    Montants harmonisés FAGNI :
+    - Revenu livreur = amount_driver_partner (fallback driver_logistic_cost)
     """
-    connected_driver = _get_connected_driver(request)
+    user_email = (request.user.email or "").strip()
+    if not user_email:
+        return JsonResponse({"error": "no_email"}, status=403)
 
-    qs = Order.objects.all()
-
-    selected_driver_id = request.GET.get("driver_id", "") or ""
-    status_filter = request.GET.get("status", "active")
-
-    if connected_driver:
-        qs = qs.filter(delivery_partner=connected_driver)
-    elif selected_driver_id:
-        qs = qs.filter(delivery_partner_id=selected_driver_id)
-
-    if status_filter == "active":
-        qs = qs.filter(status__in=["pending", "in_progress"])
-    elif status_filter == "done":
-        qs = qs.filter(status="done")
-    elif status_filter == "canceled":
-        qs = qs.filter(status="canceled")
-    # "all" => pas de filtre
-
-    filtered_orders_count = qs.count()
-    pending = qs.filter(status="pending").count()
-    in_progress = qs.filter(status="in_progress").count()
-    done = qs.filter(status="done").count()
-    canceled = qs.filter(status="canceled").count()
+    try:
+        driver = DeliveryPartner.objects.get(email__iexact=user_email)
+    except DeliveryPartner.DoesNotExist:
+        return JsonResponse({"error": "no_driver_profile"}, status=403)
 
     today = timezone.localdate()
-    today_start = timezone.make_aware(
-        timezone.datetime.combine(today, timezone.datetime.min.time())
+
+    # Toutes les courses du jour pour ce livreur
+    qs_today = Order.objects.filter(
+        delivery_partner=driver,
+        created_at__date=today,
     )
-    today_end = timezone.make_aware(
-        timezone.datetime.combine(today, timezone.datetime.max.time())
+
+    # Comptages par statut
+    total_orders_today = qs_today.count()
+    pending_today = qs_today.filter(status="pending").count()
+    in_progress_today = qs_today.filter(status="in_progress").count()
+    done_today = qs_today.filter(status="done").count()
+    canceled_today = qs_today.filter(status="canceled").count()
+
+    # Agrégats distance + revenu livreur (harmonisé)
+    DEC = DecimalField(max_digits=12, decimal_places=2)
+
+    income_expr = Coalesce(
+        F("amount_driver_partner"),
+        Coalesce(F("driver_logistic_cost"), Value(0, output_field=DEC)),
+        output_field=DEC,
     )
 
-    base_for_driver_stats = Order.objects.all()
-    if connected_driver:
-        base_for_driver_stats = base_for_driver_stats.filter(
-            delivery_partner=connected_driver
-        )
-    elif selected_driver_id:
-        base_for_driver_stats = base_for_driver_stats.filter(
-            delivery_partner_id=selected_driver_id
-        )
-
-    total_orders = base_for_driver_stats.count()
-    today_orders = base_for_driver_stats.filter(
-        created_at__gte=today_start,
-        created_at__lte=today_end,
-    ).count()
-
-    aggregates = qs.aggregate(
+    aggregates = qs_today.aggregate(
         total_distance_km=Sum("distance_km"),
-        total_driver_income=Sum("driver_logistic_cost"),
+        total_driver_income=Sum(income_expr),
     )
 
-    total_distance_km = float(aggregates["total_distance_km"] or 0)
-    total_driver_income = float(aggregates["total_driver_income"] or 0)
+    total_distance_km_today = float(aggregates["total_distance_km"] or 0)
+    total_driver_income_today = float(aggregates["total_driver_income"] or 0)
 
     data = {
-        "filtered_orders_count": filtered_orders_count,
-        "pending": pending,
-        "in_progress": in_progress,
-        "done": done,
-        "canceled": canceled,
-        "total_orders": total_orders,
-        "today_orders": today_orders,
-        "total_distance_km": round(total_distance_km, 2),
-        "total_driver_income": round(total_driver_income, 2),
+        "date": str(today),
+        "total_orders_today": total_orders_today,
+        "pending_today": pending_today,
+        "in_progress_today": in_progress_today,
+        "done_today": done_today,
+        "canceled_today": canceled_today,
+        "total_distance_km_today": round(total_distance_km_today, 2),
+        "total_driver_income_today": round(total_driver_income_today, 2),
     }
+
     return JsonResponse(data)
 
 
@@ -4035,60 +5509,14 @@ def driver_app_data(request):
 #  DÉTAIL COURSE – APP LIVREUR
 # ===============================================
 @login_required
-def driver_order_detail(request, order_id):
-    """
-    Détail d’une course côté livreur :
-    - Accès réservé au livreur assigné
-    - Vue optimisée pour mobile
-    """
-    connected_driver = _get_connected_driver(request)
-    if not connected_driver:
-        return HttpResponseForbidden(
-            "Aucun profil livreur associé à votre compte utilisateur."
-        )
-
-    order = get_object_or_404(
-        Order.objects.select_related(
-            "customer",
-            "laundry_partner",
-            "delivery_partner",
-        ).prefetch_related("items__service", "items__photos"),
-        pk=order_id,
-    )
-
-    # Vérif d’accès
-    if order.delivery_partner_id != connected_driver.id:
-        return HttpResponseForbidden("Vous n’êtes pas assigné à cette course.")
-
-    # Timeline : étapes principales
-    timeline = [
-        ("Collecte chez le client", order.pickup_time),
-        ("Dépôt blanchisserie", order.dropoff_time),
-        ("Fin de lavage", order.wash_complete_time),
-        ("Reprise blanchisserie", order.return_time),
-        ("Livraison client", order.delivered_time),
-    ]
-
-    # Montants côté client
-    total_client = (order.total or 0) + (order.service_fee or 0) + (order.delivery_fee or 0)
-    driver_income = order.driver_logistic_cost or 0
-
-    context = {
-        "delivery_partner": connected_driver,
-        "order": order,
-        "timeline": timeline,
-        "total_client": total_client,
-        "driver_income": driver_income,
-    }
-    return render(request, "orders/driver_order_detail.html", context)
-
-
-@login_required
 def driver_kpi(request):
     """
     Vue KPI livreur :
     - Si user staff : choix du livreur + filtres
     - Si user livreur : KPI uniquement sur ses propres courses
+
+    Montants harmonisés avec FAGNI :
+    - Revenu livreur = amount_driver_partner (fallback driver_logistic_cost)
     """
     user = request.user
     connected_driver = None
@@ -4148,11 +5576,19 @@ def driver_kpi(request):
     if dt_start:
         orders_qs = orders_qs.filter(created_at__gte=dt_start)
 
-    # --- Agrégats globaux ---
+    # --- Agrégats globaux harmonisés FAGNI ---
+    DEC = DecimalField(max_digits=12, decimal_places=2)
+
+    driver_income_expr = Coalesce(
+        F("amount_driver_partner"),
+        Coalesce(F("driver_logistic_cost"), Value(0, output_field=DEC)),
+        output_field=DEC,
+    )
+
     aggregates = orders_qs.aggregate(
         total_orders=Count("id"),
         total_distance_km=Sum("distance_km"),
-        total_driver_income=Sum("driver_logistic_cost"),
+        total_driver_income=Sum(driver_income_expr),
     )
 
     total_orders = aggregates.get("total_orders") or 0
@@ -4163,7 +5599,7 @@ def driver_kpi(request):
     avg_driver_income = total_driver_income / total_orders if total_orders else 0
 
     # --- Répartition par statut ---
-    status_counts = { "pending": 0, "in_progress": 0, "done": 0, "canceled": 0 }
+    status_counts = {"pending": 0, "in_progress": 0, "done": 0, "canceled": 0}
     for row in orders_qs.values("status").annotate(c=Count("id")):
         status = row["status"]
         c = row["c"] or 0
@@ -4199,6 +5635,10 @@ def driver_orders_csv(request):
     Export CSV des courses livreur selon filtres :
     - Si user staff : peut filtrer par livreur + statut
     - Si user livreur : uniquement ses propres courses
+
+    ⚠️ Revenu livreur harmonisé avec le modèle FAGNI :
+    - on prend en priorité amount_driver_partner
+    - sinon driver_logistic_cost
     """
     user = request.user
     connected_driver = None
@@ -4277,6 +5717,14 @@ def driver_orders_csv(request):
     # Lignes
     for order in orders_qs:
         customer = getattr(order, "customer", None)
+
+        # Revenu livreur harmonisé FAGNI :
+        # 1) amount_driver_partner (montant dû au livreur)
+        # 2) fallback : driver_logistic_cost
+        driver_income = order.amount_driver_partner
+        if driver_income is None or driver_income == 0:
+            driver_income = order.driver_logistic_cost or 0
+
         writer.writerow([
             order.code or order.id,
             order.created_at.strftime("%Y-%m-%d %H:%M") if order.created_at else "",
@@ -4285,7 +5733,7 @@ def driver_orders_csv(request):
             getattr(customer, "address", "") if customer else "",
             order.get_status_display(),
             float(order.distance_km) if order.distance_km is not None else 0,
-            float(order.driver_logistic_cost) if order.driver_logistic_cost is not None else 0,
+            float(driver_income),
         ])
 
     return response
@@ -4298,6 +5746,12 @@ def driver_history_me(request):
     - filtre par période (7j, 30j, mois en cours)
     - filtre par statut
     - bilan : nb courses, distance, revenus, cash à remettre
+
+    Montants harmonisés avec FAGNI :
+    - Montant client = total_client_ttc (compute_totals) fallback total_client_ttc / total
+    - Revenu livreur = priorité aux legs (DeliveryLeg.driver_amount), sinon amount_driver_partner,
+      sinon driver_logistic_cost, sinon estimation distance * 75
+    - Cash à remettre (approche cash simplifiée) = montant client - revenu livreur (>= 0)
     """
     user_email = (request.user.email or "").strip()
     if not user_email:
@@ -4313,8 +5767,8 @@ def driver_history_me(request):
     today = timezone.localdate()
 
     # Filtres
-    period = request.GET.get("period") or "7d"
-    status_filter = request.GET.get("status") or "all"
+    period = (request.GET.get("period") or "7d").strip()
+    status_filter = (request.GET.get("status") or "all").strip()
 
     # Période
     if period == "30d":
@@ -4322,19 +5776,27 @@ def driver_history_me(request):
     elif period == "month":
         start_date = today.replace(day=1)
     else:  # "7d"
+        period = "7d"
         start_date = today - timedelta(days=7)
 
-    qs = Order.objects.filter(
-        delivery_partner=delivery_partner,
-        created_at__date__gte=start_date,
-        created_at__date__lte=today,
-    ).select_related("customer", "laundry_partner")
+    qs = (
+        Order.objects
+        .filter(
+            delivery_partner=delivery_partner,
+            created_at__date__gte=start_date,
+            created_at__date__lte=today,
+        )
+        .select_related("customer", "laundry_partner")
+        .prefetch_related("items", "items__photos")
+    )
 
     # Statut
     if status_filter == "active":
         qs = qs.filter(status__in=["pending", "in_progress"])
     elif status_filter in ["pending", "in_progress", "done", "canceled"]:
         qs = qs.filter(status=status_filter)
+    else:
+        status_filter = "all"
 
     orders = list(qs.order_by("-created_at"))
 
@@ -4346,30 +5808,69 @@ def driver_history_me(request):
     total_driver_earnings = Decimal("0.00")
     client_total = Decimal("0.00")
 
-    # Tarif de secours par km si driver_logistic_cost est vide
-    # (on pourra le mettre dans settings plus tard)
+    # Tarif de secours par km si aucun revenu renseigné
     fallback_price_per_km = Decimal("75")
 
-    for o in orders:
-        # Montant client = prestations + service FAGNI + livraison
-        total_prestations = o.total or Decimal("0.00")
-        service_fee = o.service_fee or Decimal("0.00")
-        delivery_fee = o.delivery_fee or Decimal("0.00")
+    DEC = DecimalField(max_digits=12, decimal_places=2)
 
-        total_client = total_prestations + service_fee + delivery_fee
+    for o in orders:
+        # 1) Montants client (source de vérité = compute_totals)
+        data = {}
+        try:
+            data = o.compute_totals(save=False) or {}
+        except Exception:
+            data = {}
+
+        total_client = (
+            data.get("total_client_ttc")
+            or getattr(o, "total_client_ttc", None)
+            or getattr(o, "total", None)
+            or Decimal("0.00")
+        )
+        try:
+            total_client = Decimal(str(total_client))
+        except Exception:
+            total_client = Decimal("0.00")
+
         o.total_client = total_client
         client_total += total_client
 
-        # Revenu livreur : valeur réelle si renseignée,
-        # sinon estimation simple distance * 75 FCFA
-        earning = o.driver_logistic_cost or Decimal("0.00")
-        if (earning == 0 or earning is None) and o.distance_km:
-            earning = (o.distance_km or Decimal("0.00")) * fallback_price_per_km
+        # 2) Revenu livreur : priorité aux legs (si la mission est découpée)
+        legs_agg = DeliveryLeg.objects.filter(
+            order=o,
+            driver=delivery_partner,
+        ).aggregate(
+            total_amount=Sum("driver_amount", output_field=DEC),
+            total_distance=Sum("distance_km", output_field=DEC),
+        )
+
+        legs_amount = legs_agg.get("total_amount") or Decimal("0.00")
+        if legs_amount:
+            earning = legs_amount
+        else:
+            earning = (
+                data.get("amount_driver_partner")
+                or getattr(o, "amount_driver_partner", None)
+                or getattr(o, "driver_logistic_cost", None)
+                or Decimal("0.00")
+            )
+
+        try:
+            earning = Decimal(str(earning))
+        except Exception:
+            earning = Decimal("0.00")
+
+        # 3) Dernier filet : distance * 75
+        if (earning is None or earning == 0) and o.distance_km:
+            try:
+                earning = Decimal(str(o.distance_km)) * fallback_price_per_km
+            except Exception:
+                earning = Decimal("0.00")
 
         o.driver_earnings_display = earning
         total_driver_earnings += earning
 
-    # Cash à remettre = montant client - revenus livreur
+    # Cash à remettre = montant client - revenus livreur (simplifié)
     cash_to_remit = client_total - total_driver_earnings
     if cash_to_remit < 0:
         cash_to_remit = Decimal("0.00")
@@ -4392,89 +5893,6 @@ def driver_history_me(request):
         "cash_to_remit": cash_to_remit,
     }
     return render(request, "orders/driver_history.html", context)
-
-
-@login_required
-def driver_me_data(request):
-    """
-    Endpoint JSON pour l’auto-refresh des KPI de driver_me_app.
-    Mapping par email entre User et DeliveryPartner.
-    Inclut KPI jour + semaine + progression.
-    """
-
-    user_email = (request.user.email or "").strip()
-    if not user_email:
-        return JsonResponse({"error": "no_email"}, status=403)
-
-    try:
-        delivery_partner = DeliveryPartner.objects.get(email__iexact=user_email)
-    except DeliveryPartner.DoesNotExist:
-        return JsonResponse({"error": "no_driver_profile"}, status=403)
-
-    today = timezone.localdate()
-    start_of_week = today - timedelta(days=today.weekday())
-
-    base_qs = Order.objects.filter(delivery_partner=delivery_partner)
-
-    today_qs = base_qs.filter(created_at__date=today)
-    week_qs = base_qs.filter(
-        created_at__date__gte=start_of_week,
-        created_at__date__lte=today,
-    )
-
-    total_today = today_qs.count()
-    pending = today_qs.filter(status="pending").count()
-    in_progress = today_qs.filter(status="in_progress").count()
-    done = today_qs.filter(status="done").count()
-    canceled = today_qs.filter(status="canceled").count()
-
-    total_distance_km = today_qs.aggregate(
-        total=Sum("distance_km")
-    )["total"] or 0
-
-    driver_earnings = today_qs.aggregate(
-        total=Sum("driver_logistic_cost")
-    )["total"] or 0
-
-    weekly_orders = week_qs.count()
-    weekly_earnings = week_qs.aggregate(
-        total=Sum("driver_logistic_cost")
-    )["total"] or 0
-
-    WEEKLY_TARGET_ORDERS = 40
-    WEEKLY_TARGET_EARNINGS = 80000
-
-    def compute_progress(value, target):
-        if not target or target <= 0:
-            return 0
-        pct = int((value / target) * 100)
-        return 100 if pct > 100 else pct
-
-    weekly_orders_progress = compute_progress(weekly_orders, WEEKLY_TARGET_ORDERS)
-    weekly_earnings_progress = compute_progress(
-        float(weekly_earnings or 0), float(WEEKLY_TARGET_EARNINGS)
-    )
-
-    data = {
-        # jour
-        "total_today": total_today,
-        "pending": pending,
-        "in_progress": in_progress,
-        "done": done,
-        "canceled": canceled,
-        "total_distance_km": float(total_distance_km),
-        "driver_earnings": float(driver_earnings),
-
-        # semaine
-        "weekly_orders": weekly_orders,
-        "weekly_earnings": float(weekly_earnings or 0),
-        "weekly_target_orders": WEEKLY_TARGET_ORDERS,
-        "weekly_target_earnings": WEEKLY_TARGET_EARNINGS,
-        "weekly_orders_progress": weekly_orders_progress,
-        "weekly_earnings_progress": weekly_earnings_progress,
-    }
-
-    return JsonResponse(data)
 
 
 @login_required
@@ -4525,43 +5943,122 @@ def driver_leaderboard(request):
     return render(request, "orders/driver_leaderboard.html", context)
 
 
-@login_required
-def driver_me_order_detail(request, order_id):
+@transaction.atomic
+def ensure_delivery_legs_for_order(order):
     """
-    Page détail d'une commande pour le livreur connecté.
-    Vue "mobile / app livreur" avec timeline dynamique.
+    S'assure que la commande a des DeliveryLeg cohérents pour le livreur.
+
+    - Si des legs existent déjà -> on ne recrée rien.
+    - Sinon, on crée au minimum :
+        * 1 leg 'pickup'  (Client -> Blanchisserie)
+        * 1 leg 'return'  (Blanchisserie -> Client)
+    - La distance et le montant livreur sont répartis entre les jambes.
     """
-    # On récupère le livreur connecté via son email
-    delivery_partner = None
+
+    # Est-ce qu'il y a déjà des legs pour cette commande ?
+    existing_legs = DeliveryLeg.objects.filter(order=order)
+    if existing_legs.exists():
+        return existing_legs
+
+    # Pas de livreur -> on ne crée rien (logique de fallback globale restera utilisée)
+    driver = getattr(order, "delivery_partner", None)
+    if not driver:
+        return existing_legs
+
+    # ==== Distances ====
+    # On récupère ce qu'on peut depuis la commande
+    pickup_dist = getattr(order, "distance_km_pickup", None)
+    delivery_dist = getattr(order, "distance_km_delivery", None)
+
+    total_command_dist = (
+        getattr(order, "distance_km_total", None)
+        or getattr(order, "distance_km", None)
+    )
+
+    # Normalisation : float ou 0
+    def _to_float_or_none(v):
+        try:
+            if v is None:
+                return None
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
+    pickup_dist = _to_float_or_none(pickup_dist)
+    delivery_dist = _to_float_or_none(delivery_dist)
+    total_command_dist = _to_float_or_none(total_command_dist)
+
+    # Si pickup + delivery sont absents ou incohérents, on se base sur la distance totale
+    if (pickup_dist is None or pickup_dist <= 0) or (delivery_dist is None or delivery_dist <= 0):
+        if total_command_dist and total_command_dist > 0:
+            # Répartition simple 50/50
+            pickup_dist = round(total_command_dist / 2, 3)
+            delivery_dist = round(total_command_dist - pickup_dist, 3)
+        else:
+            # Aucun chiffre fiable -> on laisse à 0
+            pickup_dist = 0.0
+            delivery_dist = 0.0
+
+    # ==== Montant livreur ====
+    total_driver_amount = getattr(order, "amount_driver_partner", None)
     try:
-        delivery_partner = DeliveryPartner.objects.get(email=request.user.email)
-    except DeliveryPartner.DoesNotExist:
-        delivery_partner = None
+        total_driver_amount = float(total_driver_amount or 0)
+    except (TypeError, ValueError):
+        total_driver_amount = 0.0
 
-    order = get_object_or_404(Order, pk=order_id)
+    pickup_amount = 0.0
+    delivery_amount = 0.0
 
-    # (Optionnel) Tu peux contrôler ici que ce livreur est bien associé à la commande :
-    # if delivery_partner and order.delivery_partner_id != delivery_partner.id:
-    #     return HttpResponseForbidden("Cette commande ne t'est pas assignée.")
+    if total_driver_amount > 0:
+        dist_sum = (pickup_dist or 0) + (delivery_dist or 0)
+        if dist_sum > 0:
+            # Répartition proportionnelle à la distance
+            pickup_amount = round(total_driver_amount * (pickup_dist / dist_sum))
+            delivery_amount = round(total_driver_amount - pickup_amount)
+        else:
+            # Fallback 50/50
+            pickup_amount = round(total_driver_amount / 2)
+            delivery_amount = round(total_driver_amount - pickup_amount)
 
-    context = {
-        "order": order,
-        "delivery_partner": delivery_partner,
-    }
-    return render(request, "orders/driver_order_detail.html", context)
+    now = timezone.now()
 
+    legs_to_create = []
 
-@login_required
-def driver_app_order_detail(request, order_id):
-    """
-    Détail d'une commande pour l'app livreur.
+    # Leg PICKUP : Client -> Blanchisserie
+    legs_to_create.append(
+        DeliveryLeg(
+            order=order,
+            driver=driver,
+            leg_type="pickup",
+            status="assigned",
+            distance_km=pickup_dist,
+            driver_amount=pickup_amount,
+            client_fee_share=0,
+            fagni_margin=0,
+            started_at=None,
+            finished_at=None,
+        )
+    )
 
-    Pour l’instant, on réutilise simplement la vue 'detail'
-    afin de ne pas dupliquer la logique.
-    Si plus tard tu veux un template 100 % mobile, on pourra
-    faire un template dédié (ex: orders/driver_app_order_detail.html).
-    """
-    return detail(request, order_id)
+    # Leg RETURN : Blanchisserie -> Client
+    legs_to_create.append(
+        DeliveryLeg(
+            order=order,
+            driver=driver,
+            leg_type="return",
+            status="assigned",
+            distance_km=delivery_dist,
+            driver_amount=delivery_amount,
+            client_fee_share=0,
+            fagni_margin=0,
+            started_at=None,
+            finished_at=None,
+        )
+    )
+
+    DeliveryLeg.objects.bulk_create(legs_to_create)
+
+    return DeliveryLeg.objects.filter(order=order)
 
 
 @require_POST
@@ -4569,76 +6066,242 @@ def driver_app_order_detail(request, order_id):
 def driver_leg_action(request, leg_id, action):
     """
     Action côté livreur sur une jambe de livraison (DeliveryLeg).
+    Actions : accept / start / finish / cancel
 
-    Actions possibles :
-    - accept   : le livreur prend la course
-    - start    : il démarre réellement la course
-    - finish   : il termine la course
-    - cancel   : il annule
+    Règles :
+    - Un livreur ne peut agir que sur SES jambes (sauf admin/staff).
+    - Interdit de lancer/terminer une jambe "return/delivery" tant que wash_complete_time n'est pas renseigné.
+    - Interdit de démarrer une jambe return/delivery si la jambe pickup n'est pas terminée.
+    - Interdit d'avoir 2 jambes in_progress en même temps sur une même commande.
+    - Statut global commande recalculé depuis les jambes.
     """
     leg = get_object_or_404(
-        DeliveryLeg.objects.select_related("order"),
+        DeliveryLeg.objects.select_related("order", "driver"),
         pk=leg_id,
     )
-
-    # TODO plus tard : vérifier que request.user est bien linked à leg.driver
-
+    order = leg.order
     old_status = leg.status
     now = timezone.now()
-    order = leg.order
+
+    # Sécurité : un livreur ne peut agir que sur ses legs
+    # (si ton DeliveryPartner n'a pas de lien user, adapte ici)
+    if not (request.user.is_staff or request.user.is_superuser):
+        # Si DeliveryPartner possède un champ user :
+        dp_user = getattr(leg.driver, "user", None)
+        if dp_user and dp_user != request.user:
+            return HttpResponseForbidden("Accès refusé (ce leg ne t'appartient pas).")
+
+    # Toutes les jambes de la commande
+    legs_qs = DeliveryLeg.objects.filter(order=order).order_by("id")
+    pickup_legs = legs_qs.filter(leg_type="pickup")
+
+    # Robustesse (legacy)
+    DELIVERY_TYPES = {"return", "delivery"}
+
+    def all_pickups_done():
+        if not pickup_legs.exists():
+            return False
+        return not pickup_legs.exclude(status="done").exists()
+
+    def any_leg_in_progress_other_than(current_leg):
+        return legs_qs.exclude(pk=current_leg.pk).filter(status="in_progress").exists()
+
+    # ---------------------------------------
+    # 🔒 Blocage livraison si linge pas prêt
+    # ---------------------------------------
+    if leg.leg_type in DELIVERY_TYPES and action in {"accept", "start", "finish"}:
+        if not order.wash_complete_time:
+            messages.error(
+                request,
+                "La blanchisserie n'a pas encore confirmé que le linge est prêt. Livraison bloquée."
+            )
+            return redirect("orders:driver_order_detail", order_id=order.id)
+
+    # ---------------------------------------
+    # 🔒 Bloquer start/finish return tant que pickup pas terminé
+    # ---------------------------------------
+    if pickup_legs.exists() and leg.leg_type != "pickup" and action in {"start", "finish"}:
+        if not all_pickups_done():
+            messages.error(
+                request,
+                "Tu dois d'abord terminer la collecte (Client → Blanchisserie) avant de démarrer la livraison."
+            )
+            return redirect("orders:driver_order_detail", order_id=order.id)
+
+    # ---------------------------------------
+    # 🔒 Empêcher deux jambes in_progress
+    # ---------------------------------------
+    if action == "start" and any_leg_in_progress_other_than(leg):
+        messages.warning(
+            request,
+            "Une autre étape de cette course est déjà en cours. Termine-la avant d'en démarrer une nouvelle."
+        )
+        return redirect("orders:driver_order_detail", order_id=order.id)
+
+    # =========================
+    #   Transitions statut LEG
+    # =========================
+    valid_actions = {"accept", "start", "finish", "cancel"}
+    if action not in valid_actions:
+        return HttpResponseBadRequest("Action non reconnue")
 
     if action == "accept":
-        # Le livreur se positionne officiellement sur la course
-        if leg.status in ["pending", "assigned"]:
+        # pending -> assigned
+        if leg.status == "pending":
             leg.status = "assigned"
 
     elif action == "start":
-        # Démarrage effectif de la course
-        if leg.status in ["pending", "assigned"]:
+        # pending/assigned -> in_progress
+        if leg.status in {"pending", "assigned"}:
             leg.status = "in_progress"
+            if not leg.started_at:
+                leg.started_at = now
 
-            # on peut tracer le début sur la commande
-            if leg.leg_type == "pickup":
-                if not order.pickup_time:
-                    order.pickup_time = now
-            elif leg.leg_type == "delivery":
-                # on peut utiliser return_time comme début du retour / livraison
-                if not order.return_time:
-                    order.return_time = now
-            order.save(update_fields=["pickup_time", "return_time"])
+            # timestamps commande
+            if leg.leg_type == "pickup" and not order.pickup_time:
+                order.pickup_time = now
+                order.save(update_fields=["pickup_time"])
+            elif leg.leg_type in DELIVERY_TYPES and not order.return_time:
+                order.return_time = now
+                order.save(update_fields=["return_time"])
 
     elif action == "finish":
-        # Course terminée
-        if leg.status in ["in_progress", "assigned"]:
+        # assigned/in_progress -> done
+        if leg.status in {"assigned", "in_progress"}:
             leg.status = "done"
-
-            # marquage côté commande
-            if leg.leg_type == "pickup":
-                # fin de la jambe client → blanchisseur
-                if not order.dropoff_time:
-                    order.dropoff_time = now
-            elif leg.leg_type == "delivery":
-                # fin de la jambe blanchisseur → client
-                if not order.delivered_time:
-                    order.delivered_time = now
-            order.save(update_fields=["dropoff_time", "delivered_time"])
+            if not leg.finished_at:
+                leg.finished_at = now
 
     elif action == "cancel":
-        # Annulation par le livreur
-        if leg.status not in ["done"]:
+        # tout sauf done -> canceled
+        if leg.status != "done":
             leg.status = "canceled"
+            if not leg.finished_at:
+                leg.finished_at = now
 
-    else:
-        return HttpResponseBadRequest("Action non reconnue")
-
-    # Si rien n’a changé, on ne fait rien
+    # Si rien n’a changé
     if leg.status == old_status:
-        messages.info(request, "Aucune modification de statut pour cette course.")
-        return redirect("orders:driver_app")
+        messages.info(request, "Aucune modification de statut pour cette étape.")
+        return redirect("orders:driver_order_detail", order_id=order.id)
 
-    leg.save()
-    messages.success(request, f"Course mise à jour ({old_status} → {leg.status}).")
-    return redirect("orders:driver_app")
+    # Sauvegarde jambe
+    update_fields = ["status"]
+    if leg.started_at:
+        update_fields.append("started_at")
+    if leg.finished_at:
+        update_fields.append("finished_at")
+    leg.save(update_fields=list(set(update_fields)))
+
+    # =========================
+    # Refresh legs + timestamps commande
+    # =========================
+    legs = list(DeliveryLeg.objects.filter(order=order).values_list("leg_type", "status"))
+    statuses = {s for (_, s) in legs}
+    pickup_statuses = [s for (t, s) in legs if t == "pickup"]
+
+    DELIVERY_TYPES = {"return", "delivery"}  # simple et propre
+    delivery_statuses = [s for (t, s) in legs if t in DELIVERY_TYPES]
+
+    # dropoff_time : quand toutes les pickups sont done
+    if pickup_statuses and all(s == "done" for s in pickup_statuses):
+        if not order.dropoff_time:
+            order.dropoff_time = now
+            order.save(update_fields=["dropoff_time"])
+
+    # delivered_time : quand toutes les return/delivery sont done
+    if delivery_statuses and all(s == "done" for s in delivery_statuses):
+        if not order.delivered_time:
+            order.delivered_time = now
+            order.save(update_fields=["delivered_time"])
+
+    # =========================
+    # Statut global commande
+    # =========================
+    new_order_status = order.status
+
+    # Si au moins une jambe canceled et aucune jambe active -> on peut annuler
+    if statuses and statuses.issubset({"canceled"}):
+        new_order_status = "canceled"
+    elif statuses == {"done"}:
+        new_order_status = "done"
+    elif "in_progress" in statuses or "done" in statuses or "assigned" in statuses:
+        new_order_status = "in_progress"
+    else:
+        new_order_status = "pending"
+
+    if new_order_status != order.status:
+        order.status = new_order_status
+        order.save(update_fields=["status"])
+
+    messages.success(request, "Statut mis à jour.")
+    return redirect("orders:driver_order_detail", order_id=order.id)
+
+
+from django.http import JsonResponse  # <-- si pas déjà importé
+
+@login_required
+def driver_order_live_status(request, order_id):
+    """
+    Lot 4.4 — Endpoint JSON pour rafraîchir la vue livreur sans reload.
+    Retourne statut commande + timestamps + legs (type/status/montants/distance).
+
+    Sécurité :
+    - staff/superuser OK
+    - sinon : l'utilisateur doit être le propriétaire d'au moins un leg de cette commande
+      (si DeliveryPartner a un champ user)
+    """
+    order = get_object_or_404(Order.objects.select_related("laundry_partner", "customer"), pk=order_id)
+
+    legs_qs = DeliveryLeg.objects.filter(order=order).select_related("driver").order_by("id")
+
+    # --- sécurité : user doit être le driver (si modèle le permet)
+    if not (request.user.is_staff or request.user.is_superuser):
+        # si ton DeliveryPartner a un champ user
+        allowed = False
+        for leg in legs_qs[:10]:  # petit cut pour éviter boucle énorme (normalement peu de legs)
+            dp_user = getattr(leg.driver, "user", None)
+            if dp_user and dp_user == request.user:
+                allowed = True
+                break
+        if not allowed and legs_qs.exists():
+            # si on ne peut pas vérifier user (dp_user None partout), on laisse passer
+            # MAIS si dp_user existe et ne match pas => refus
+            any_dp_user = any(getattr(l.driver, "user", None) is not None for l in legs_qs)
+            if any_dp_user:
+                return HttpResponseForbidden("Accès refusé.")
+
+    def dt(v):
+        return v.isoformat() if v else None
+
+    legs = []
+    for leg in legs_qs:
+        legs.append({
+            "id": leg.id,
+            "leg_type": leg.leg_type,
+            "status": leg.status,
+            "distance_km": float(leg.distance_km or 0),
+            "driver_amount": float(getattr(leg, "driver_amount", 0) or 0),
+            "started_at": dt(getattr(leg, "started_at", None)),
+            "finished_at": dt(getattr(leg, "finished_at", None)),
+        })
+
+    payload = {
+        "ok": True,
+        "order": {
+            "id": order.id,
+            "code": getattr(order, "code", None),
+            "status": order.status,
+            "created_at": dt(getattr(order, "created_at", None)),
+            "pickup_time": dt(getattr(order, "pickup_time", None)),
+            "dropoff_time": dt(getattr(order, "dropoff_time", None)),
+            "wash_complete_time": dt(getattr(order, "wash_complete_time", None)),
+            "return_time": dt(getattr(order, "return_time", None)),
+            "delivered_time": dt(getattr(order, "delivered_time", None)),
+        },
+        "legs": legs,
+        "server_time": dt(timezone.now()),
+    }
+    return JsonResponse(payload)
 
 
 # ============================================================
@@ -4832,26 +6495,6 @@ def change_status(request, order_id):
     return redirect(next_url)
 
 
-def _order_effective_total(o):
-    """
-    Renvoie un total "efficace" pour une commande :
-    - essaie d'abord o.total
-    - sinon grand_total, puis total_ttc, puis total_ht
-    - retourne toujours un Decimal >= 0
-    """
-    candidates = [
-        getattr(o, "total", None),
-        getattr(o, "grand_total", None),
-        getattr(o, "total_ttc", None),
-        getattr(o, "total_ht", None),
-    ]
-    for val in candidates:
-        dec = _safe_dec(val)
-        if dec > DECIMAL_ZERO:
-            return dec
-    return DECIMAL_ZERO
-
-
 @login_required
 def driver_update_location(request):
     """
@@ -4893,22 +6536,85 @@ def driver_update_location(request):
     return JsonResponse({"ok": True})
 
 
-# orders/views.py
-
-import json
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
-from django.utils import timezone
-
-from partners.models import DeliveryPartner
-from orders.models import Order
-
-
 @login_required
 def driver_map(request):
     """
-    Carte des livreurs FAGNI.
+    Carte des livreurs FAGNI :
+    - Affiche les livreurs actifs avec coordonnées.
+    - Envoie les données JSON pour Leaflet.
     """
+
+    from decimal import Decimal
+    from django.db.models import Sum
+
+    # Période de la semaine courante
+    today = timezone.localdate()
+    start_week = today - timezone.timedelta(days=today.weekday())
+
+    # On ne garde que les livreurs actifs avec latitude & longitude renseignées
+    drivers_qs = DeliveryPartner.objects.filter(
+        is_active=True,
+        latitude__isnull=False,
+        longitude__isnull=False,
+    ).order_by("name")
+
+    drivers = []
+
+    for d in drivers_qs:
+        # Commandes de la semaine pour ce livreur
+        week_orders = Order.objects.filter(
+            delivery_partner=d,
+            created_at__date__gte=start_week,
+            created_at__date__lte=today,
+        )
+
+        week_orders_count = week_orders.count()
+        week_earnings = week_orders.aggregate(
+            total=Sum("amount_driver_partner")
+        )["total"] or Decimal("0")
+
+        # Conversion des coordonnées en float pour Leaflet
+        try:
+            lat = float(d.latitude)
+            lng = float(d.longitude)
+        except (TypeError, ValueError):
+            # Si on n'arrive pas à convertir, on skip ce livreur
+            continue
+
+        drivers.append({
+            "id": d.id,
+            "name": d.name,
+            "city": getattr(d, "city", "") or "",
+            "latitude": lat,
+            "longitude": lng,
+            "week_orders": week_orders_count,
+            # on convertit en int pour éviter les Decimals en JSON
+            "week_earnings": int(week_earnings),
+        })
+
+    # JSON pour le JS (Leaflet)
+    drivers_json = json.dumps(drivers, ensure_ascii=False)
+
+    context = {
+        "drivers": drivers,  # utilisé dans la colonne de droite
+        "drivers_json": drivers_json,  # utilisé par le <script id="drivers-json">
+        "connected_driver": get_connected_driver(request),
+    }
+    return render(request, "orders/driver_map.html", context)
+
+
+@require_GET
+@login_required
+def driver_map_data(request):
+    """
+    Endpoint JSON pour rafraîchir la carte des livreurs (Leaflet).
+    Utilisé par driver_map.html en auto-refresh.
+    """
+    from decimal import Decimal
+    from django.db.models import Sum
+
+    today = timezone.localdate()
+    start_week = today - timezone.timedelta(days=today.weekday())
 
     drivers_qs = DeliveryPartner.objects.filter(
         is_active=True,
@@ -4916,44 +6622,43 @@ def driver_map(request):
         longitude__isnull=False,
     ).order_by("name")
 
-    drivers_data = []
-    today = timezone.localdate()
-    start_week = today - timezone.timedelta(days=today.weekday())
+    drivers = []
 
     for d in drivers_qs:
+        week_orders = Order.objects.filter(
+            delivery_partner=d,
+            created_at__date__gte=start_week,
+            created_at__date__lte=today,
+        )
+
+        week_orders_count = week_orders.count()
+        week_earnings = week_orders.aggregate(total=Sum("amount_driver_partner"))["total"] or Decimal("0")
+
+        # Dernière commande active (optionnel, utile OPS)
+        active_order = (
+            Order.objects.filter(delivery_partner=d, status__in=["pending", "in_progress"])
+            .order_by("-created_at")
+            .first()
+        )
+
         try:
             lat = float(d.latitude)
             lng = float(d.longitude)
         except (TypeError, ValueError):
             continue
 
-        week_orders = Order.objects.filter(
-            delivery_partner=d,
-            created_at__date__gte=start_week,
-            created_at__date__lte=today,
-            status="done",
-        ).count()
-
-        drivers_data.append({
+        drivers.append({
             "id": d.id,
             "name": d.name,
-            "city": d.city or "",
-            "phone": d.phone or "",
-            "lat": lat,
-            "lng": lng,
-            "week_orders": week_orders,
+            "city": getattr(d, "city", "") or "",
+            "latitude": lat,
+            "longitude": lng,
+            "week_orders": int(week_orders_count),
+            "week_earnings": int(week_earnings),
+            "active_order_id": active_order.id if active_order else None,
+            "active_order_code": getattr(active_order, "code", None) if active_order else None,
+            "updated_at": getattr(d, "updated_at", None).isoformat() if getattr(d, "updated_at", None) else None,
         })
 
-    default_center = {"lat": 5.3453, "lng": -4.0244}
-    if drivers_data:
-        default_center = {
-            "lat": drivers_data[0]["lat"],
-            "lng": drivers_data[0]["lng"],
-        }
+    return JsonResponse({"drivers": drivers})
 
-    context = {
-        "drivers": drivers_qs,
-        "drivers_json": json.dumps(drivers_data),
-        "default_center": default_center,
-    }
-    return render(request, "orders/driver_map.html", context)

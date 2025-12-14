@@ -26,6 +26,28 @@
         color: #6b7280;
         font-size: 12px;
     }
+    .ticket-meta {
+        margin-top: 8px;
+        font-size: 12px;
+        color: #374151;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 10px;
+    }
+    .ticket-meta .item {
+        display:flex;
+        justify-content:space-between;
+        gap:8px;
+        border: 1px solid #f3f4f6;
+        background:#fafafa;
+        padding:6px 8px;
+        border-radius:8px;
+    }
+    .ticket-meta .label {
+        color:#6b7280;
+        white-space:nowrap;
+    }
+
     .ticket-section-title {
         font-weight: 600;
         font-size: 13px;
@@ -37,9 +59,11 @@
         display: flex;
         justify-content: space-between;
         margin-bottom: 2px;
+        gap:10px;
     }
     .ticket-line span.label {
         color: #6b7280;
+        white-space:nowrap;
     }
     table.ticket-items {
         width: 100%;
@@ -59,7 +83,7 @@
         white-space: nowrap;
     }
     .ticket-totals {
-        margin-top: 8px;
+        margin-top: 10px;
         font-size: 12px;
     }
     .ticket-totals .line {
@@ -70,6 +94,9 @@
     .ticket-totals .grand {
         font-weight: 700;
         color: #ff7a00;
+        border-top: 1px dashed #e5e7eb;
+        padding-top: 6px;
+        margin-top: 6px;
     }
     .ticket-footer {
         margin-top: 10px;
@@ -83,6 +110,24 @@
     <div class="ticket-header">
         <h1>Ticket FAGNI</h1>
         <p>Commande {{ order.code|default:order.id }} – {{ order.created_at|date:"d/m/Y H:i" }}</p>
+
+        <div class="ticket-meta">
+            <div class="item">
+                <span class="label">Statut</span>
+                <span>{{ order.get_status_display|default:order.status }}</span>
+            </div>
+            <div class="item">
+                <span class="label">Paiement</span>
+                <span>{{ order.get_payment_status_display|default:order.payment_status }}</span>
+            </div>
+
+            {% if order.invoice_number %}
+            <div class="item" style="grid-column: 1 / -1;">
+                <span class="label">Facture</span>
+                <span><strong>{{ order.invoice_number }}</strong></span>
+            </div>
+            {% endif %}
+        </div>
     </div>
 
     <div>
@@ -99,6 +144,16 @@
             <span class="label">Adresse :</span>
             <span>{{ order.customer.address|default:"—" }}</span>
         </div>
+
+        <div class="ticket-line">
+            <span class="label">Collecte :</span>
+            <span>{{ order.pickup_address|default:order.customer.address|default:"—" }}</span>
+        </div>
+        <div class="ticket-line">
+            <span class="label">Livraison :</span>
+            <span>{{ order.delivery_address|default:order.pickup_address|default:order.customer.address|default:"—" }}</span>
+        </div>
+
         {% if order.referral_code %}
         <div class="ticket-line">
             <span class="label">Code parrain :</span>
@@ -137,26 +192,35 @@
 
     <div class="ticket-totals">
         <div class="line">
-            <span>Sous-total prestations :</span>
-            <span>{{ order.total|default:0|floatformat:0 }} FCFA</span>
+            <span>Sous-total prestations (HT) :</span>
+            <span>{{ order.prestation_total|default:0|floatformat:0 }} FCFA</span>
         </div>
         <div class="line">
-            <span>Service FAGNI :</span>
+            <span>Service FAGNI (HT) :</span>
             <span>{{ order.service_fee|default:0|floatformat:0 }} FCFA</span>
         </div>
         <div class="line">
             <span>Frais de livraison :</span>
             <span>{{ order.delivery_fee|default:0|floatformat:0 }} FCFA</span>
         </div>
-        {% if tva_amount %}
+
+        {% if order.express_extra_fee and order.express_extra_fee > 0 %}
         <div class="line">
-            <span>TVA (18 %) :</span>
-            <span>{{ tva_amount|floatformat:0 }} FCFA</span>
+            <span>Supplément express :</span>
+            <span>{{ order.express_extra_fee|floatformat:0 }} FCFA</span>
         </div>
         {% endif %}
+
+        {% if order.vat_fagni and order.vat_fagni > 0 %}
+        <div class="line">
+            <span>TVA FAGNI :</span>
+            <span>{{ order.vat_fagni|floatformat:0 }} FCFA</span>
+        </div>
+        {% endif %}
+
         <div class="line grand">
             <span>Total TTC client :</span>
-            <span>{{ order.grand_total|default:0|floatformat:0 }} FCFA</span>
+            <span>{{ order.total_client_ttc|default:0|floatformat:0 }} FCFA</span>
         </div>
     </div>
 

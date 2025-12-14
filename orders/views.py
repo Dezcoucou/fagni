@@ -774,13 +774,13 @@ def ops_dashboard(request):
         if delta > ACTIVE_MS:
             drivers_offline.append({"driver": d, "age_min": int(delta // 60)})
 
-      # ============================================================
-      #  DRIVERS LIST (dropdown filtre) — tous les drivers actifs
-      # ============================================================
-        drivers_list = DeliveryPartner.objects.filter(is_active=True).order_by("name")
+    # ============================================================
+    #  DRIVERS LIST (dropdown filtre) — tous les drivers actifs
+    # ============================================================
+    drivers_list = DeliveryPartner.objects.filter(is_active=True).order_by("name")
 
-        # Total affiché (selon filtre)
-        displayed_total_count = base_qs.count()
+    # Total affiché (selon filtre)
+    displayed_total_count = base_qs.count()
 
     context = {
         # counts (selon filtre driver si actif)
@@ -817,8 +817,6 @@ def ops_dashboard(request):
         "drivers_offline_count": len(drivers_offline),
 
         # FILTRE DRIVER (Lot 4.9.2/4.9.3)
-        "selected_driver": selected_driver,
-        "selected_driver_id": selected_driver_id,
         "drivers_list": drivers_list,
         "reset_url": reset_url,
         "displayed_total_count": displayed_total_count,

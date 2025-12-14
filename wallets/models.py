@@ -244,3 +244,164 @@ class WalletTransaction(models.Model):
         if self.direction == "out":
             return -self.amount
         return self.amount
+
+
+class WithdrawalRequest(models.Model):
+    """
+    Demande de retrait d'un livreur sur son wallet.
+    Le débit réel du wallet + transaction sont faits quand la demande passe en 'paid'.
+    """
+
+    STATUS_CHOICES = [
+        ("pending", "En attente"),
+        ("approved", "Approuvée"),
+        ("paid", "Payée"),
+        ("rejected", "Rejetée"),
+    ]
+
+    wallet = models.ForeignKey(
+        Wallet,
+        on_delete=models.CASCADE,
+        related_name="withdrawals",
+        verbose_name="Wallet livreur",
+    )
+
+    delivery_partner = models.ForeignKey(
+        DeliveryPartner,
+        on_delete=models.CASCADE,
+        related_name="withdrawals",
+        verbose_name="Livreur",
+    )
+
+    requested_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="withdrawals_requested",
+        verbose_name="Demandé par (user)",
+    )
+
+    amount = models.DecimalField(
+        "Montant demandé",
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    status = models.CharField(
+        "Statut",
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending",
+    )
+
+    created_at = models.DateTimeField("Créée le", auto_now_add=True)
+
+    # Renseignés quand on traite la demande (approuvée / payée / rejetée)
+    processed_at = models.DateTimeField(
+        "Traitée le",
+        null=True,
+        blank=True,
+    )
+    processed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="withdrawals_processed",
+        verbose_name="Traitée par",
+    )
+
+    admin_notes = models.TextField(
+        "Notes internes",
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = "Demande de retrait livreur"
+        verbose_name_plural = "Demandes de retrait livreur"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"[{self.get_status_display()}] {self.delivery_partner} – {self.amount} {self.wallet.currency}"
+
+    # ---------- LOGIQUE MÉTIER ----------
+
+    def _can_debit_wallet(self) -> bool:
+        """
+        Sécurité : on ne débite que si :
+        - montant > 0
+        - statut = 'paid'
+        - processed_at encore vide (pour éviter les doublons)
+        - solde suffisant
+        """
+        if self.status != "paid":
+            return False
+
+        if self.processed_at is not None:
+            # Déjà traité
+            return False
+
+        amount = self.amount or Decimal("0.00")
+        if amount <= 0:
+            return False
+
+        if amount > (self.wallet.balance or Decimal("0.00")):
+            # On bloque juste si pas assez de solde
+            return False
+
+        return True
+
+    def apply_payout(self):
+        """
+        Applique le retrait sur le wallet + crée la transaction.
+        Appelée automatiquement quand le statut passe à 'paid'.
+        """
+        if not self._can_debit_wallet():
+            return
+
+        amount = self.amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        # 1) Débit du wallet
+        self.wallet.balance = (self.wallet.balance - amount).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
+        self.wallet.save(update_fields=["balance", "updated_at"])
+
+        # 2) Transaction associée
+        WalletTransaction.objects.create(
+            wallet=self.wallet,
+            order=None,
+            type="payout",
+            direction="out",
+            amount=amount,
+            description=f"Retrait livreur {self.delivery_partner.name}",
+        )
+
+        # 3) Marquage comme traité
+        self.processed_at = timezone.now()
+
+    def save(self, *args, **kwargs):
+        """
+        On surveille le changement de statut.
+        Si on vient de passer à 'paid', on applique le retrait.
+        """
+        old_status = None
+        if self.pk:
+            old_status = (
+                type(self).objects.filter(pk=self.pk)
+                .values_list("status", flat=True)
+                .first()
+            )
+
+        super().save(*args, **kwargs)
+
+        # Si on vient de passer en 'paid', on applique le retrait une seule fois
+        if old_status is not None and old_status != "paid" and self.status == "paid":
+            refreshed = type(self).objects.get(pk=self.pk)
+            refreshed.apply_payout()
+            type(self).objects.filter(pk=self.pk).update(
+                processed_at=refreshed.processed_at
+            )
+

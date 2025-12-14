@@ -1,10 +1,20 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Commande {{ order.code }} – FAGNI{% endblock %}
+{% block title %}Détail commande {{ order.code|default:order.id }} – FAGNI{% endblock %}
 
 {% block extra_head %}
 <style>
+    :root {
+        --fagni-orange: #ff7a00;
+        --fagni-blue: #0056b3;
+        --bg-soft: #f5f5f7;
+        --card-bg: #ffffff;
+        --border-soft: #e5e7eb;
+        --text-main: #111827;
+        --text-muted: #6b7280;
+    }
+
     .page {
         max-width: 1100px;
         margin: 0 auto 32px;
@@ -32,22 +42,53 @@
         margin:4px 0 0;
     }
 
-    .status-badge {
+    .page-header__right {
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px;
+        justify-content:flex-end;
+    }
+
+    .badge-status {
         display:inline-flex;
         align-items:center;
+        gap:4px;
         padding:4px 10px;
         border-radius:999px;
         font-size:11px;
-        font-weight:600;
-        background:#eff6ff;
-        color:#1d4ed8;
+        font-weight:500;
     }
 
-    .status-badge--pending { background:#fffbeb; color:#92400e; }
-    .status-badge--assigned { background:#ecfdf3; color:#166534; }
-    .status-badge--in_progress { background:#e0f2fe; color:#0369a1; }
-    .status-badge--completed { background:#ecfdf3; color:#166534; }
-    .status-badge--canceled { background:#fef2f2; color:#b91c1c; }
+    .badge-status.pending {
+        background:#fef3c7;
+        color:#92400e;
+    }
+    .badge-status.in_progress {
+        background:#dbeafe;
+        color:#1d4ed8;
+    }
+    .badge-status.done {
+        background:#dcfce7;
+        color:#166534;
+    }
+    .badge-status.canceled {
+        background:#fee2e2;
+        color:#b91c1c;
+    }
+
+    .chip {
+        display:inline-flex;
+        align-items:center;
+        gap:4px;
+        padding:3px 8px;
+        border-radius:999px;
+        font-size:11px;
+        border:1px solid #e5e7eb;
+        background:#f9fafb;
+        color:#4b5563;
+        margin-right:4px;
+        margin-bottom:4px;
+    }
 
     .card {
         background:#ffffff;
@@ -55,7 +96,7 @@
         padding:16px 16px;
         margin-bottom:14px;
         border:1px solid #e5e7eb;
-        box-shadow:0 2px 6px rgba(15,23,42,0.08);
+        box-shadow:0 2px 6px rgba(15,23,42,0.06);
     }
 
     .card-title {
@@ -72,67 +113,77 @@
         font-size:18px;
     }
 
-    .grid-2 {
+    .card-subtitle {
+        font-size:12px;
+        color:#6b7280;
+        margin:0 0 8px;
+    }
+
+    .two-cols {
         display:grid;
-        grid-template-columns: 1.1fr 0.9fr;
+        grid-template-columns:1.1fr 0.9fr;
         gap:14px;
     }
 
-    .field {
-        margin-bottom:6px;
-        font-size:13px;
-    }
-
-    .field-label {
+    .label {
         font-size:11px;
         text-transform:uppercase;
         letter-spacing:0.04em;
         color:#9ca3af;
-        margin-bottom:1px;
+        margin-bottom:2px;
     }
 
-    .field-value {
+    .value {
+        font-size:13px;
         color:#111827;
-        font-weight:500;
     }
 
-    .field-value-muted {
+    .muted {
         color:#6b7280;
-        font-weight:400;
     }
 
-    .badge-soft {
-        padding:3px 8px;
-        border-radius:999px;
-        font-size:11px;
-        background:#f3f4f6;
-        color:#4b5563;
-        display:inline-flex;
-        align-items:center;
-        gap:4px;
+    .grid {
+        display:grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap:10px 14px;
     }
 
-    .badge-soft--danger {
-        background:#fef2f2;
-        color:#b91c1c;
-    }
-
-    .badge-soft--success {
-        background:#ecfdf3;
-        color:#166534;
+    .divider {
+        margin:10px 0;
+        border-top:1px dashed #e5e7eb;
     }
 
     .btn {
         display:inline-flex;
         align-items:center;
         justify-content:center;
-        padding:7px 12px;
+        padding:8px 14px;
         border-radius:999px;
         font-size:13px;
         border:1px solid transparent;
         cursor:pointer;
         text-decoration:none;
         white-space:nowrap;
+    }
+
+    .btn-primary {
+        background:#0f172a;
+        border-color:#0f172a;
+        color:#fff;
+    }
+
+    .btn-primary:hover {
+        opacity:0.95;
+    }
+
+    /* ✅ Ajout : btn-secondary (tu l’utilises dans le template) */
+    .btn-secondary {
+        background:#ffffff;
+        border-color:#e5e7eb;
+        color:#374151;
+    }
+    .btn-secondary:hover {
+        background:#f9fafb;
     }
 
     .btn-light {
@@ -145,59 +196,138 @@
         background:#f9fafb;
     }
 
-    .top-actions {
-        display:flex;
-        gap:8px;
-        flex-wrap:wrap;
-        justify-content:flex-end;
-        margin-bottom:6px;
+    .btn-soft {
+        border-radius:999px;
+        border:1px solid #e5e7eb;
+        background:#f9fafb;
+        padding:6px 11px;
+        font-size:12px;
+        color:#374151;
+        text-decoration:none;
+        display:inline-flex;
+        align-items:center;
+        gap:4px;
+        margin-right:4px;
+        margin-bottom:4px;
     }
 
-    table.command-items {
+    .btn-soft:hover {
+        background:#eef2ff;
+        border-color:#c7d2fe;
+    }
+
+    .pill {
+        display:inline-flex;
+        align-items:center;
+        gap:4px;
+        padding:3px 8px;
+        border-radius:999px;
+        background:#eff6ff;
+        color:#1d4ed8;
+        font-size:11px;
+    }
+
+    .timeline {
+        position:relative;
+        margin-top:8px;
+    }
+
+    .timeline::before {
+        content:"";
+        position:absolute;
+        top:4px;
+        left:8px;
+        width:2px;
+        height:calc(100% - 4px);
+        background:#e5e7eb;
+    }
+
+    .timeline-item {
+        position:relative;
+        padding-left:26px;
+        margin-bottom:8px;
+    }
+
+    .timeline-bullet {
+        position:absolute;
+        left:2px;
+        top:4px;
+        width:12px;
+        height:12px;
+        border-radius:999px;
+        background:#fff;
+        border:2px solid #0f172a;
+    }
+
+    .timeline-title {
+        font-size:13px;
+        font-weight:500;
+        color:#111827;
+        margin:0;
+    }
+
+    .timeline-meta {
+        font-size:11px;
+        color:#6b7280;
+        margin:2px 0 0;
+    }
+
+    .articles-table-wrapper {
+        width:100%;
+        overflow-x:auto;
+        border:1px solid #e5e7eb;
+        border-radius:12px;
+        margin-top:4px;
+    }
+
+    table {
         width:100%;
         border-collapse:collapse;
         font-size:13px;
-        margin-top:6px;
+        min-width:680px;
     }
 
-    table.command-items th,
-    table.command-items td {
-        padding:7px 6px;
+    th, td {
+        padding:7px 8px;
         border-bottom:1px solid #e5e7eb;
+        text-align:left;
         vertical-align:top;
     }
 
-    table.command-items thead th {
+    thead th {
         background:#f9fafb;
         font-weight:600;
         color:#6b7280;
         font-size:12px;
     }
 
-    td.num {
+    tbody tr:nth-child(even) {
+        background:#fcfcfd;
+    }
+
+    .num {
         text-align:right;
         white-space:nowrap;
     }
 
     .line-designation {
         font-weight:500;
-        color:#111827;
     }
 
     .line-meta {
-        font-size:11px;
+        font-size:10px;
         color:#6b7280;
         margin-top:2px;
     }
 
-    .thumbs {
+    .photo-thumbs {
         display:flex;
         flex-wrap:wrap;
         gap:4px;
         margin-top:2px;
     }
 
-    .thumbs img {
+    .photo-thumbs img {
         width:34px;
         height:34px;
         object-fit:cover;
@@ -205,9 +335,13 @@
         border:1px solid #e5e7eb;
     }
 
+    .photo-thumbs a {
+        text-decoration:none;
+    }
+
     .totals-box {
-        margin-top:10px;
-        padding:10px;
+        margin-top:12px;
+        padding:12px;
         border-radius:12px;
         background:#f9fafb;
         border:1px solid #e5e7eb;
@@ -217,76 +351,159 @@
     .totals-row {
         display:flex;
         justify-content:space-between;
-        margin-bottom:3px;
+        margin-bottom:4px;
     }
 
     .totals-row strong {
         color:#0f172a;
     }
 
-    .timeline {
-        margin:0;
-        padding:0;
-        list-style:none;
-        font-size:13px;
+    .totals-row.total-grand {
+        margin-top:6px;
+        font-size:15px;
     }
 
-    .timeline-item {
+    .totals-row.total-grand strong:last-child {
+        color:var(--fagni-orange);
+    }
+
+    .note {
+        font-size:11px;
+        color:#6b7280;
+        margin-top:6px;
+    }
+
+    .tag-list {
         display:flex;
-        align-items:flex-start;
-        gap:8px;
-        padding:6px 0;
-        border-bottom:1px dashed #e5e7eb;
-    }
-
-    .timeline-item:last-child {
-        border-bottom:none;
-    }
-
-    .timeline-dot {
-        width:9px;
-        height:9px;
-        border-radius:999px;
-        background:#0f172a;
+        flex-wrap:wrap;
+        gap:4px;
         margin-top:4px;
     }
 
-    .timeline-content {
-        flex:1;
-    }
-
-    .timeline-title {
-        font-weight:500;
-        color:#111827;
-    }
-
-    .timeline-meta {
+    .tag {
+        padding:3px 8px;
+        border-radius:999px;
         font-size:11px;
-        color:#6b7280;
-        margin-top:1px;
+        border:1px solid #e5e7eb;
+        background:#f9fafb;
+        color:#4b5563;
+    }
+
+    .notes-box {
+        padding:10px;
+        border-radius:10px;
+        background:#fffbeb;
+        border:1px dashed #facc15;
+        font-size:13px;
+        color:#78350f;
+        margin-top:4px;
+        white-space:pre-wrap;
     }
 
     .photos-grid {
         display:flex;
         flex-wrap:wrap;
+        gap:8px;
+    }
+
+    .photo-card {
+        width:88px;
+        font-size:11px;
+        color:#4b5563;
+        text-align:center;
+    }
+
+    .photo-card img {
+        width:100%;
+        height:70px;
+        object-fit:cover;
+        border-radius:8px;
+        border:1px solid #e5e7eb;
+        margin-bottom:2px;
+    }
+
+    .actions {
+        margin-top:20px;
+        display:flex;
+        gap:10px;
+        justify-content:flex-end;
+        flex-wrap:wrap;
+    }
+
+    /* Carte Wallet */
+    .wallet-card {
+        margin-top:8px;
+        padding:10px 12px;
+        border-radius:12px;
+        background:linear-gradient(135deg, #0f172a, #1e293b);
+        color:#e5e7eb;
+        display:flex;
+        flex-direction:column;
+        gap:4px;
+    }
+
+    .wallet-header {
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:8px;
+        margin-bottom:4px;
+    }
+
+    .wallet-title {
+        font-size:13px;
+        font-weight:600;
+        display:flex;
+        align-items:center;
         gap:6px;
     }
 
-    .photos-grid a {
-        display:inline-block;
+    .wallet-balance {
+        font-size:18px;
+        font-weight:700;
+        color:#fbbf24;
     }
 
-    .photos-grid img {
-        width:70px;
-        height:70px;
-        object-fit:cover;
-        border-radius:10px;
-        border:1px solid #e5e7eb;
+    .wallet-meta {
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px;
+        font-size:11px;
+        opacity:0.9;
+    }
+
+    .wallet-chip {
+        padding:3px 8px;
+        border-radius:999px;
+        background:rgba(15,23,42,0.6);
+        border:1px solid rgba(148,163,184,0.5);
+    }
+
+    .wallet-btn {
+        border-radius:999px;
+        padding:5px 10px;
+        border:1px solid rgba(148,163,184,0.6);
+        background:rgba(15,23,42,0.9);
+        color:#e5e7eb;
+        font-size:11px;
+        text-decoration:none;
+        display:inline-flex;
+        align-items:center;
+        gap:4px;
+    }
+
+    .wallet-btn:hover {
+        background:#fbbf24;
+        color:#111827;
+        border-color:#facc15;
     }
 
     @media (max-width: 900px) {
-        .grid-2 {
-            grid-template-columns: 1fr;
+        .two-cols {
+            grid-template-columns:1fr;
+        }
+        table {
+            min-width:0;
         }
     }
 </style>
@@ -295,408 +512,707 @@
 {% block content %}
 <div class="page">
 
-   <!-- HEADER -->
-   <div class="page-header">
-       <div>
-           <h1 class="page-title">
-               Commande {{ order.code|default:order.id }}
-           </h1>
-           <p class="page-subtitle">
-               Créée le {{ order.created_at|date:"d/m/Y H:i" }} –
-               <span class="status-badge status-badge--{{ order.status }}">
-                   {{ order.get_status_display }}
-               </span>
-           </p>
-       </div>
+    <!-- HEADER -->
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                Commande {{ order.code|default:order.id }}
+            </h1>
+            <p class="page-subtitle">
+                Vue complète FAGNI – client, logistique, finances et photos pour contrôle qualité.
+            </p>
 
-       <div>
-       </div>
-   </div>
+            <div style="margin-top:6px;">
+                {% with s=order.status %}
+                    <span class="badge-status {{ s }}">
+                        {% if s == "pending" %}⏳ En attente
+                        {% elif s == "in_progress" %}🚦 En cours
+                        {% elif s == "done" %}✅ Terminée
+                        {% elif s == "canceled" %}❌ Annulée
+                        {% else %}📦 {{ order.get_status_display }}
+                        {% endif %}
+                    </span>
+                {% endwith %}
 
-   <!-- ACTIONS -->
-   <div class="top-actions">
-       <a href="{% url 'orders:list' %}" class="btn btn-light">📋 Liste des commandes</a>
-       <a href="{% url 'orders:update' order.id %}" class="btn btn-light">✏️ Modifier</a>
-    <!-- Tickets -->
-       <a href="{% url 'orders:order_ticket_pdf' order.id %}" target="_blank" class="btn btn-light">
-          🧾 Ticket PDF
-       </a>
+                {% if order.payment_status %}
+                    <span class="chip">
+                        💳 Paiement : {{ order.get_payment_status_display|default:order.payment_status }}
+                    </span>
+                {% endif %}
 
-       <a href="{% url 'orders:order_ticket_thermal_pdf' order.id %}" target="_blank" class="btn btn-light">
-          🧾 Ticket thermique
-       </a>
-   </div>
+                <span class="chip">
+                    🕒 Créée le :
+                    {{ order.created_at|date:"d/m/Y H:i" }}
+                </span>
 
-   <!-- GRID PRINCIPALE -->
-   <div class="grid-2">
-       <!-- COLONNE GAUCHE : CLIENT, LOGISTIQUE, TIMELINE -->
-       <div class="col-left">
+                {% if order.payment_status == "paid" and order.invoice_number %}
+                    <span class="chip">
+                        🧾 Facture : {{ order.invoice_number }}
+                    </span>
+                {% endif %}
+            </div>
+        </div>
 
-           <!-- CLIENT -->
-           <section class="card">
-               <h2 class="card-title">
-                   <span class="emoji">👤</span> Client & contact
-               </h2>
+        <div class="page-header__right">
+            <a href="{% url 'orders:list' %}" class="btn btn-secondary">
+                ← Retour aux commandes
+            </a>
 
-               <div class="field">
-                   <div class="field-label">Nom</div>
-                   <div class="field-value">
-                       {{ order.customer.name|default:"—" }}
-                   </div>
-               </div>
+            {% if order.id %}
+                {% if order.payment_status != "paid" %}
+                    <a href="{% url 'orders:update' order.id %}" class="btn btn-primary">
+                        ✏️ Modifier la commande
+                    </a>
+                {% else %}
+                    <span class="chip">🔒 Commande verrouillée (payée)</span>
+                {% endif %}
 
-               <div class="field">
-                   <div class="field-label">Téléphone</div>
-                   <div class="field-value">
-                       {% if order.customer.phone %}
-                           <a href="tel:{{ order.customer.phone }}">{{ order.customer.phone }}</a>
-                       {% else %}
-                           <span class="field-value-muted">Non renseigné</span>
-                       {% endif %}
-                   </div>
-               </div>
+                <a href="{% url 'orders:order_ticket_pdf' order.id %}"
+                   class="btn btn-primary" target="_blank">
+                    🧾 Ticket client (A4)
+                </a>
 
-               <div class="field">
-                   <div class="field-label">Adresse</div>
-                   <div class="field-value">
-                       {{ order.customer.address|default:"—" }}
-                   </div>
-               </div>
-    
-           <section class="card">
-               <h2 class="card-title">
-                   <span class="emoji">🌱</span> Programme de parrainage & commissions
-               </h2>
+                <a href="{% url 'orders:order_ticket_thermal_pdf' order.id %}"
+                   class="btn btn-primary" target="_blank">
+                    🧾 Ticket thermique (80mm)
+                </a>
 
-               {# On récupère le profil MLM du client, s'il existe #}
-               {% with profile=order.customer.referral_profiles.first %}
+                {% if order.payment_status == "paid" %}
+                    <a href="{% url 'orders:order_invoice_pdf' order.id %}"
+                       class="btn btn-primary" target="_blank">
+                        ✅ Facture fiscale (A4)
+                        {% if order.invoice_number %}
+                            <span style="margin-left:6px; opacity:.75;">{{ order.invoice_number }}</span>
+                        {% endif %}
+                    </a>
+                {% endif %}
 
-                   <!-- 🧷 PARRAIN DU CLIENT -->
-                  <div class="field">
-                      <div class="field-label">Parrain du client</div>
-                      <div class="field-value">
-                          {% if profile and profile.sponsor and profile.sponsor.customer %}
-                              {{ profile.sponsor.customer.name }}
-                              <span class="badge badge-soft">
-                                  (code : {{ profile.sponsor.referral_code }})
-                              </span>
-                          {% elif order.referral_code %}
-                              <span class="field-value-muted">
-                                  Code saisi : {{ order.referral_code }}
-                                  (aucun profil parrain identifié)
-                              </span>
-                          {% else %}
-                              <span class="field-value-muted">
-                                  Aucun parrain associé à ce client.
-                              </span>
-                          {% endif %}
-                      </div>
-                  </div>
+            {% endif %}
+        </div>
+    </div>
 
-                  <div class="field">
-                      <div class="field-label">Portefeuille</div>
-                      <div class="field-value">
-                          <a href="{% url 'wallets:customer_wallet_detail' order.customer.id %}" class="btn btn-light btn-sm">
-                              💳 Voir le portefeuille de ce client
-                          </a>
-                      </div>
-                  </div>
+    <div class="two-cols">
+        <!-- COLONNE GAUCHE : CLIENT, PARRAINAGE, LOGISTIQUE -->
+        <div>
+            <!-- CLIENT & CONTACT -->
+            <section class="card">
+                <h2 class="card-title">
+                    <span class="emoji">👤</span> Client & contact
+                </h2>
 
-                  <hr class="card-separator">
+                <div class="grid">
+                    <div>
+                        <div class="label">Nom</div>
+                        <div class="value">
+                            {{ order.customer.name|default:"—" }}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="label">Téléphone</div>
+                        <div class="value">
+                            {{ order.customer.phone|default:"—" }}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="label">Adresse principale</div>
+                        <div class="value">
+                            {{ order.customer.address|default:"—" }}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="label">Adresse de collecte</div>
+                        <div class="value">
+                            {{ order.pickup_address|default:order.customer.address|default:"—" }}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="label">Adresse de livraison</div>
+                        <div class="value">
+                            {{ order.delivery_address|default:order.pickup_address|default:order.customer.address|default:"—" }}
+                        </div>
+                    </div>
+                </div>
+            </section>
 
-                  <!-- 💰 COMMISSIONS MLM DE CETTE COMMANDE -->
-                  <div class="field">
-                      <div class="field-label">Commissions MLM sur cette commande</div>
-                      <div class="field-value">
-                          {% with comms=order.mlm_commissions.all %}
-                              {% if comms %}
-                                  <ul class="mlm-commissions-list">
-                                      {% for c in comms %}
-                                          <li>
-                                              Niveau {{ c.level }} –
-                                              {% if c.beneficiary_profile.customer %}
-                                                  {{ c.beneficiary_profile.customer.name }}
-                                                  ({{ c.beneficiary_profile.referral_code }})
-                                              {% else %}
-                                                  {{ c.beneficiary_profile.referral_code }}
-                                              {% endif %}
-                                               :
-                                               <strong>{{ c.commission_amount }} FCFA</strong>
-                                           </li>
-                                       {% endfor %}
-                                   </ul>
-                               {% else %}
-                                   <span class="field-value-muted">
-                                       Aucune commission générée pour cette commande.
-                                   </span>
-                               {% endif %}
-                           {% endwith %}
-                       </div>
-                   </div>
+            <!-- PARRAINAGE / MLM + WALLET -->
+            <section class="card">
+                <h2 class="card-title">
+                    <span class="emoji">🌱</span> Parrainage & portefeuille
+                </h2>
 
-                   <hr class="card-separator">
+                <div class="grid">
+                    <div>
+                        <div class="label">Parrain du client</div>
+                        <div class="value">
+                            {% if referrer_customer %}
+                                👤 {{ referrer_customer.name|default:"Parrain sans nom" }}
+                                <span class="muted">(code : {{ order.referral_code|default:"—" }})</span>
+                            {% elif order.referral_code %}
+                                Code saisi : <strong>{{ order.referral_code }}</strong> (non rattaché)
+                            {% else %}
+                                <span class="muted">Aucun parrain associé.</span>
+                            {% endif %}
+                        </div>
+                    </div>
 
-                   <!-- 👥 RÉSEAU DU CLIENT (SES FILLEULS) -->
-                   <div class="field">
-                       <div class="field-label">Filleuls de ce client</div>
-                       <div class="field-value">
-                           {% if profile %}
-                               {% with filleuls=profile.direct_referrals.all %}
-                                   {% if filleuls %}
-                                       <ul class="mlm-referrals-list">
-                                           {% for f in filleuls %}
-                                               <li>
-                                                   {% if f.customer %}
-                                                       {{ f.customer.name }}
-                                                       ({{ f.customer.phone|default:"tél. non renseigné" }})
-                                                   {% else %}
-                                                       Profil sans client associé
-                                                   {% endif %}
-                                                   – code : {{ f.referral_code }}
-                                               </li>
-                                           {% endfor %}
-                                       </ul>
-                                   {% else %}
-                                       <span class="field-value-muted">
-                                           Ce client n'a pas encore de filleul.
-                                       </span>
-                                   {% endif %}
-                               {% endwith %}
-                           {% else %}
-                               <span class="field-value-muted">
-                                   Ce client n'est pas encore enregistré dans le programme de parrainage.
-                               </span>
-                           {% endif %}
-                       </div>
-                   </div>
+                    <div>
+                        <div class="label">Filleuls</div>
+                        <div class="value">
+                            {% if direct_referrals %}
+                                <div class="tag-list">
+                                    {% for r in direct_referrals %}
+                                        <span class="tag">
+                                            👤 {{ r.name }} – {{ r.phone }}
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <span class="muted">Aucun filleul enregistré.</span>
+                            {% endif %}
+                        </div>
+                    </div>
 
-               {% endwith %}
-           </section>
+                    <div>
+                        <div class="label">Commissions MLM</div>
+                        <div class="value">
+                            {% if mlm_commissions_for_order %}
+                                <ul style="padding-left:16px;margin:0;">
+                                    {% for c in mlm_commissions_for_order %}
+                                        <li style="font-size:12px;">
+                                            {{ c.level_label }} :
+                                            {{ c.amount|floatformat:0 }} FCFA
+                                            – {{ c.beneficiary_name }}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <span class="muted">Aucune commission générée.</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
 
-           <!-- LOGISTIQUE / ASSIGNATION -->
-           <section class="card">
-               <h2 class="card-title">
-                   <span class="emoji">🚚</span> Logistique & partenaires
-               </h2>
+                <!-- WALLET CLIENT -->
+                <div class="divider"></div>
+                <div class="wallet-card">
+                    <div class="wallet-header">
+                        <div class="wallet-title">
+                            💳 Portefeuille FAGNI du client
+                        </div>
+                        <a
+                            href="{% if customer_wallet_url %}{{ customer_wallet_url }}{% else %}/wallets/customer/{{ order.customer.id }}/{% endif %}"
+                            target="_blank"
+                            class="wallet-btn"
+                        >
+                            Voir le portefeuille
+                            ↗
+                        </a>
+                    </div>
 
-               <div class="field">
-                   <div class="field-label">Livreur</div>
-                   <div class="field-value">
-                       {% if order.delivery_partner %}
-                           <span class="badge-soft badge-soft--success">
-                               🚴 {{ order.delivery_partner.name|default:"Livreur" }}
-                           </span>
-                           {% if order.delivery_partner.phone %}
-                               <span class="field-value-muted"> – {{ order.delivery_partner.phone }}</span>
-                           {% endif %}
-                       {% else %}
-                           <span class="badge-soft badge-soft--danger">
-                               ⚠️ Aucun livreur assigné
-                           </span>
-                           {% if order.delivery_partner_unassigned_reason %}
-                               <div class="field-value-muted" style="margin-top:2px;">
-                                   {{ order.delivery_partner_unassigned_reason }}
-                               </div>
-                           {% else %}
-                               <div class="field-value-muted" style="margin-top:2px;">
-                                   Probablement aucun livreur disponible au moment de la commande
-                                   ou coordonnées client incomplètes.
-                               </div>
-                           {% endif %}
-                       {% endif %}
-                   </div>
-               </div>
+                    {% if customer_wallet %}
+                        <div class="wallet-balance">
+                            {{ customer_wallet.balance|floatformat:0 }} FCFA
+                        </div>
+                        <div class="wallet-meta">
+                            {% if customer_wallet.total_earned %}
+                                <span class="wallet-chip">
+                                    Gains cumulés : {{ customer_wallet.total_earned|floatformat:0 }} FCFA
+                                </span>
+                            {% endif %}
+                            {% if customer_wallet.total_spent %}
+                                <span class="wallet-chip">
+                                    Utilisé : {{ customer_wallet.total_spent|floatformat:0 }} FCFA
+                                </span>
+                            {% endif %}
+                            {% if customer_wallet.pending_amount %}
+                                <span class="wallet-chip">
+                                    En attente : {{ customer_wallet.pending_amount|floatformat:0 }} FCFA
+                                </span>
+                            {% endif %}
+                            {% if not customer_wallet.total_earned and not customer_wallet.total_spent and not customer_wallet.pending_amount %}
+                                <span class="wallet-chip">
+                                    Historique encore léger – ce client commence tout juste à utiliser son wallet.
+                                </span>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <div class="wallet-balance">
+                            —
+                        </div>
+                        <div class="wallet-meta">
+                            <span class="wallet-chip">
+                                Aucun portefeuille encore actif.
+                            </span>
+                        </div>
+                    {% endif %}
+                </div>
+            </section>
 
-               <div class="field" style="margin-top:6px;">
-                   <div class="field-label">Blanchisserie</div>
-                   <div class="field-value">
-                       {% if order.laundry_partner %}
-                           🧺 {{ order.laundry_partner.name }}
-                       {% else %}
-                           <span class="field-value-muted">Non encore affectée</span>
-                       {% endif %}
-                   </div>
-               </div>
+            <!-- LOGISTIQUE / PARTENAIRES -->
+            <section class="card">
+                <h2 class="card-title">
+                    <span class="emoji">🚚</span> Logistique & partenaires
+                </h2>
 
-               <div class="field" style="margin-top:6px;">
-                   <div class="field-label">Infos collecte / livraison</div>
-                   <div class="field-value-muted">
-                       • Créée : {{ order.created_at|date:"d/m/Y H:i" }}<br>
-                       {% if order.pickup_time %}
-                           • Collecte effectuée : {{ order.pickup_time|date:"d/m/Y H:i" }}<br>
-                       {% endif %}
-                       {% if order.delivered_time %}
-                           • Livrée : {{ order.delivered_time|date:"d/m/Y H:i" }}<br>
-                       {% endif %}
-                   </div>
-               </div>
-           </section>
+                <div class="grid">
+                    <div>
+                        <div class="label">Livreur</div>
+                        <div class="value">
+                            {% if order.delivery_partner %}
+                                🚴 {{ order.delivery_partner.name|default:"Livreur" }}
+                                {% if order.delivery_partner.phone %}
+                                    – {{ order.delivery_partner.phone }}
+                                {% endif %}
+                            {% else %}
+                                <span class="muted">⚠️ Aucun livreur assigné</span><br>
+                                {% if order.delivery_partner_unassigned_reason %}
+                                    <span class="muted">{{ order.delivery_partner_unassigned_reason }}</span>
+                                {% else %}
+                                    <span class="muted">
+                                        Probablement aucun livreur disponible au moment de la commande
+                                        ou coordonnées client incomplètes.
+                                    </span>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
 
-           <!-- TIMELINE -->
-           <section class="card">
-               <h2 class="card-title">
-                   <span class="emoji">🕒</span> Timeline de la commande
-               </h2>
+                    <div>
+                        <div class="label">Blanchisserie</div>
+                        <div class="value">
+                            {% if order.laundry_partner %}
+                                🧺 {{ order.laundry_partner.name|default:"Blanchisserie partenaire" }}
+                            {% else %}
+                                <span class="muted">Non encore affectée</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
 
-               <ul class="timeline">
-                   <li class="timeline-item">
-                       <div class="timeline-dot"></div>
-                       <div class="timeline-content">
-                           <div class="timeline-title">
-                               Commande créée ({{ order.get_status_display }})
-                           </div>
-                           <div class="timeline-meta">
-                               {{ order.created_at|date:"d/m/Y H:i" }}
-                               {% if order.created_by %}
-                                   – par {{ order.created_by.get_full_name|default:order.created_by.username }}
-                               {% endif %}
-                           </div>
-                       </div>
-                   </li>
+                <div class="divider"></div>
 
-                   {% for h in status_history %}
-                       <li class="timeline-item">
-                           <div class="timeline-dot"></div>
-                           <div class="timeline-content">
-                               <div class="timeline-title">
-                                   Statut : {{ h.previous_status|default:"(non défini)" }} → {{ h.new_status }}
-                               </div>
-                               <div class="timeline-meta">
-                                   {{ h.changed_at|date:"d/m/Y H:i" }}
-                                   {% if h.changed_by %}
-                                       – par {{ h.changed_by.get_full_name|default:h.changed_by.username }}
-                                   {% endif %}
-                               </div>
-                           </div>
-                       </li>
-                   {% empty %}
-                       <!-- pas encore d'historique enregistré -->
-                   {% endfor %}
-               </ul>
-           </section>
+                <p class="card-subtitle"><strong>Infos collecte / livraison</strong></p>
 
-       </div>
+                <div style="font-size:12px;color:#374151;line-height:1.5;">
+                    • Collecte :
+                    <strong>{{ order.pickup_address|default:order.customer.address|default:"—" }}</strong><br>
+                    • Livraison :
+                    <strong>{{ order.delivery_address|default:order.pickup_address|default:order.customer.address|default:"—" }}</strong><br>
+                    {% if order.distance_km_pickup %}
+                        • Distance aller (client → blanchisserie) :
+                        <strong>{{ order.distance_km_pickup|floatformat:2 }} km</strong><br>
+                    {% endif %}
+                    {% if order.distance_km_delivery %}
+                        • Distance retour (blanchisserie → client) :
+                        <strong>{{ order.distance_km_delivery|floatformat:2 }} km</strong><br>
+                    {% endif %}
+                    {% if order.distance_km_total %}
+                        • Distance totale :
+                        <strong>{{ order.distance_km_total|floatformat:2 }} km</strong><br>
+                    {% elif order.distance_km %}
+                        • Distance totale :
+                        <strong>{{ order.distance_km|floatformat:2 }} km</strong><br>
+                    {% endif %}
+                    • Créée :
+                    <strong>{{ order.created_at|date:"d/m/Y H:i" }}</strong>
+                </div>
 
-       <!-- COLONNE DROITE : LIGNES + TOTAUX + PHOTOS GLOBALES -->
-       <div class="col-right">
+                <div class="divider"></div>
 
-           <!-- LIGNES DE COMMANDE -->
-           <section class="card">
-               <h2 class="card-title">
-                   <span class="emoji">📦</span> Articles & prestations
-               </h2>
+                <p class="card-subtitle"><strong>Modes & timings</strong></p>
 
-               <table class="command-items">
-                   <thead>
-                       <tr>
-                           <th>Prestation / Désignation</th>
-                           <th class="num">Qté</th>
-                           <th class="num">PU</th>
-                           <th class="num">Total</th>
-                           <th>Photos</th>
-                       </tr>
-                   </thead>
-                   <tbody>
-                       {% for item in items %}
-                           {% with service=item.service %}
-                           <tr>
-                               <td>
-                                   <div class="line-designation">{{ item.designation }}</div>
-                                   <div class="line-meta">
-                                       {% if service and service.category %}
-                                           {{ service.category.name }} •
-                                       {% endif %}
-                                       ID #{{ service.id|default:"—" }}
-                                   </div>
-                               </td>
-                               <td class="num">
-                                   {{ item.quantity }}
-                               </td>
-                               <td class="num">
-                                   {{ item.unit_price|floatformat:0 }} FCFA
-                               </td>
-                               <td class="num">
-                                   {{ item.total|floatformat:0 }} FCFA
-                               </td>
-                               <td>
-                                   {% if item.photos.all %}
-                                       <div class="thumbs">
-                                           {% for photo in item.photos.all %}
-                                               <a href="{{ photo.image.url }}" target="_blank">
-                                                   <img src="{{ photo.image.url }}"
-                                                        alt="Photo article {{ item.id }}">
-                                               </a>
-                                           {% endfor %}
-                                       </div>
-                                   {% else %}
-                                       <span class="field-value-muted">Aucune photo</span>
-                                   {% endif %}
-                               </td>
-                           </tr>
-                           {% endwith %}
-                       {% empty %}
-                           <tr>
-                               <td colspan="5" class="field-value-muted">
-                                   Aucune ligne dans cette commande.
-                               </td>
-                           </tr>
-                       {% endfor %}
-                   </tbody>
-               </table>
+                <div class="grid">
+                    <div>
+                        <div class="label">Collecte</div>
+                        <div class="value">
+                            {% if order.pickup_mode == "later" %}
+                                📅 Programmée<br>
+                                {% if order.pickup_scheduled_date %}
+                                    le {{ order.pickup_scheduled_date|date:"d/m/Y" }}
+                                {% endif %}
+                                {% if order.pickup_scheduled_time %}
+                                    à {{ order.pickup_scheduled_time|time:"H:i" }}
+                                {% endif %}
+                            {% else %}
+                                ⚡ Immédiate (dès que possible)
+                            {% endif %}
+                        </div>
+                    </div>
 
-               <div class="totals-box">
-                   <div class="totals-row">
-                       <span>Sous-total prestations (HT)</span>
-                       <strong>{{ order.total|default:0|floatformat:0 }} FCFA</strong>
-                   </div>
+                    <div>
+                        <div class="label">Livraison</div>
+                        <div class="value">
+                            {% if order.delivery_mode == "express" %}
+                                🚀 Express (cible ≈ {{ logi_express_sla_hours|default:24 }}h)
+                            {% elif order.delivery_mode == "scheduled" %}
+                                📅 Programmée<br>
+                                {% if order.delivery_scheduled_date %}
+                                    le {{ order.delivery_scheduled_date|date:"d/m/Y" }}
+                                {% endif %}
+                                {% if order.delivery_scheduled_time %}
+                                    à {{ order.delivery_scheduled_time|time:"H:i" }}
+                                {% endif %}
+                            {% else %}
+                                📦 Standard (cible ≈ {{ logi_standard_sla_hours|default:48 }}h)
+                            {% endif %}
+                        </div>
+                    </div>
 
-                   <div class="totals-row">
-                       <span>Service FAGNI</span>
-                       <strong>{{ order.service_fee|default:0|floatformat:0 }} FCFA</strong>
-                   </div>
+                    <div>
+                        <div class="label">Supplément express (si applicable)</div>
+                        <div class="value">
+                            {% if order.express_extra_fee and order.express_extra_fee > 0 %}
+                                + {{ order.express_extra_fee|floatformat:0 }} FCFA
+                            {% else %}
+                                <span class="muted">Aucun supplément express appliqué.</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </section>
 
-                   <div class="totals-row">
-                       <span>Frais de livraison</span>
-                       <strong>{{ order.delivery_fee|default:0|floatformat:0 }} FCFA</strong>
-                   </div>
+            <!-- TIMELINE -->
+            <section class="card">
+                <h2 class="card-title">
+                    <span class="emoji">🕒</span> Timeline de la commande
+                </h2>
 
-                   <div class="totals-row">
-                       <span>TVA (18%)</span>
-                       <strong>{{ order.vat_amount|default:0|floatformat:0 }} FCFA</strong>
-                   </div>
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-bullet"></div>
+                        <p class="timeline-title">Commande créée ({{ order.get_status_display }})</p>
+                        <p class="timeline-meta">
+                            {{ order.created_at|date:"d/m/Y H:i" }}
+                        </p>
+                    </div>
 
-                   <div class="totals-row" style="margin-top:6px;font-size:15px;">
-                       <span><strong>Total TTC</strong></span>
-                       <strong>{{ order.grand_total|default:0|floatformat:0 }} FCFA</strong>
-                   </div>
-               </div>
+                    {% if order.pickup_time %}
+                        <div class="timeline-item">
+                            <div class="timeline-bullet"></div>
+                            <p class="timeline-title">Collecte effectuée</p>
+                            <p class="timeline-meta">
+                                {{ order.pickup_time|date:"d/m/Y H:i" }}
+                            </p>
+                        </div>
+                    {% endif %}
 
-           <!-- VUE GLOBALE DES PHOTOS (POUR LIVREUR & BLANCHISSEUR) -->
-           <section class="card">
-               <h2 class="card-title">
-                   <span class="emoji">📸</span> Toutes les photos liées à la commande
-               </h2>
+                    {% if order.dropoff_time %}
+                        <div class="timeline-item">
+                            <div class="timeline-bullet"></div>
+                            <p class="timeline-title">Déposée à la blanchisserie</p>
+                            <p class="timeline-meta">
+                                {{ order.dropoff_time|date:"d/m/Y H:i" }}
+                            </p>
+                        </div>
+                    {% endif %}
 
-               {% if all_photos %}
-                   <div class="photos-grid">
-                       {% for p in all_photos %}
-                           <a href="{{ p.image.url }}" target="_blank">
-                               <img src="{{ p.image.url }}" alt="Photo commande {{ order.code }}">
-                           </a>
-                       {% endfor %}
-                   </div>
-                   <p style="font-size:11px;color:#6b7280;margin-top:6px;">
-                       Cette vue globale est idéale pour le contrôle du livreur à la livraison
-                       et pour les vérifications côté blanchisserie.
-                   </p>
-               {% else %}
-                   <p class="field-value-muted" style="margin:0;">
-                       Aucune photo enregistrée pour cette commande.
-                   </p>
-               {% endif %}
-           </section>
+                    {% if order.wash_complete_time %}
+                        <div class="timeline-item">
+                            <div class="timeline-bullet"></div>
+                            <p class="timeline-title">Lavage / repassage terminé</p>
+                            <p class="timeline-meta">
+                                {{ order.wash_complete_time|date:"d/m/Y H:i" }}
+                            </p>
+                        </div>
+                    {% endif %}
 
-       </div>
-   </div>
+                    {% if order.return_time %}
+                        <div class="timeline-item">
+                            <div class="timeline-bullet"></div>
+                            <p class="timeline-title">Reprise par le livreur</p>
+                            <p class="timeline-meta">
+                                {{ order.return_time|date:"d/m/Y H:i" }}
+                            </p>
+                        </div>
+                    {% endif %}
+
+                    {% if order.delivered_time %}
+                        <div class="timeline-item">
+                            <div class="timeline-bullet"></div>
+                            <p class="timeline-title">Livrée au client</p>
+                            <p class="timeline-meta">
+                                {{ order.delivered_time|date:"d/m/Y H:i" }}
+                            </p>
+                        </div>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+
+        <!-- COLONNE DROITE : ARTICLES, NOTES, FINANCES, PHOTOS -->
+        <div>
+            <!-- ARTICLES & PRESTATIONS -->
+            <section class="card">
+                <h2 class="card-title">
+                    <span class="emoji">📦</span> Articles & prestations
+                </h2>
+
+                <p class="card-subtitle">
+                    Détail des pièces confiées pour cette commande.
+                </p>
+
+                <div class="articles-table-wrapper">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Prestation / Désignation</th>
+                            <th class="num">Qté</th>
+                            <th class="num">PU</th>
+                            <th class="num">Total</th>
+                            <th>Photos</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for item in order.items.all %}
+                            <tr>
+                                <td>
+                                    <div class="line-designation">
+                                        {{ item.designation|default:item.service.name }}
+                                    </div>
+                                    <div class="line-meta">
+                                        {% if item.service and item.service.category %}
+                                            {{ item.service.category.name }} •
+                                        {% endif %}
+                                        ID #{{ item.service.id|default:item.id }}
+                                    </div>
+                                </td>
+                                <td class="num">
+                                    {{ item.quantity }}
+                                </td>
+                                <td class="num">
+                                    {{ item.unit_price|floatformat:0 }} FCFA
+                                </td>
+                                <td class="num">
+                                    {{ item.total|floatformat:0 }} FCFA
+                                </td>
+                                <td>
+                                    {% if item.photos.all %}
+                                        <div class="photo-thumbs">
+                                            {% for p in item.photos.all %}
+                                                <a href="{{ p.image.url }}" target="_blank">
+                                                    <img src="{{ p.image.url }}" alt="Photo article {{ item.id }}">
+                                                </a>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <span class="muted">Aucune photo</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="5" style="font-size:12px;color:#6b7280;padding:10px;">
+                                    Aucune ligne de prestation enregistrée pour cette commande.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- NOTES -->
+                <h3 class="card-subtitle" style="margin-top:10px;">
+                    Notes / instructions
+                </h3>
+                {% if order.notes %}
+                    <div class="notes-box">
+                        {{ order.notes }}
+                    </div>
+                {% else %}
+                    <div class="notes-box" style="background:#f9fafb;border-color:#e5e7eb;color:#6b7280;">
+                        Aucune note spécifique n'a été enregistrée pour cette commande.
+                    </div>
+                {% endif %}
+
+                <!-- TOTAUX & RÉPARTITION -->
+                <div class="totals-box">
+
+                    {# Si on a le contexte "finance" (nouveau moteur), on l'utilise #}
+                    {% if finance %}
+                        <div class="totals-row">
+                            <span>Sous-total prestations (HT)</span>
+                            <strong>
+                                {{ finance.prestation_total|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+                        <div class="totals-row">
+                            <span>Service FAGNI (HT)</span>
+                            <strong>
+                                {{ finance.service_fee_ht|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+                        <div class="totals-row">
+                            <span>Frais de livraison facturés au client</span>
+                            <strong>
+                                {{ finance.delivery_fee_client|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+                        <div class="totals-row">
+                            <span>TVA sur revenus FAGNI (18%)</span>
+                            <strong>
+                                {{ finance.vat_fagni|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+                        <div class="totals-row total-grand">
+                            <span><strong>Total TTC facturé au client</strong></span>
+                            <strong>
+                                {{ finance.total_ttc_client|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+
+                        <div class="divider"></div>
+
+                        <div class="totals-row">
+                            <span>Montant dû à la blanchisserie</span>
+                            <strong>
+                                {{ finance.amount_laundry|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+                        <div class="totals-row">
+                            <span>Montant dû au livreur</span>
+                            <strong>
+                                {{ finance.amount_driver|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+                        <div class="totals-row">
+                            <span>Total partenaires</span>
+                            <strong>
+                                {{ finance.partners_total|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+
+                        <div class="divider"></div>
+
+                        <div class="totals-row">
+                            <span>Revenu FAGNI (HT)</span>
+                            <strong>
+                                {{ finance.fagni_revenue_ht|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+                        <div class="totals-row">
+                            <span>Marge logistique / livraison FAGNI</span>
+                            <strong>
+                                {{ finance.margin_delivery|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+
+                    {# Fallback de sécurité si jamais "finance" n'est pas présent #}
+                    {% else %}
+                        <div class="totals-row">
+                            <span>Sous-total prestations (HT)</span>
+                            <strong>
+                                {{ order.prestation_total|default:order.total|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+                        <div class="totals-row">
+                            <span>Service FAGNI (HT)</span>
+                            <strong>
+                                {{ order.service_fee|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+                        <div class="totals-row">
+                            <span>Frais de livraison facturés au client</span>
+                            <strong>
+                                {{ order.delivery_fee|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+                        <div class="totals-row">
+                            <span>TVA sur revenus FAGNI (18%)</span>
+                            <strong>
+                                {{ order.vat_fagni|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+                        <div class="totals-row total-grand">
+                            <span><strong>Total TTC facturé au client</strong></span>
+                            <strong>
+                                {{ order.total_client_ttc|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+
+                        <div class="divider"></div>
+
+                        <div class="totals-row">
+                            <span>Montant dû à la blanchisserie</span>
+                            <strong>
+                                {{ order.amount_laundry_partner|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+                        <div class="totals-row">
+                            <span>Montant dû au livreur</span>
+                            <strong>
+                                {{ order.amount_driver_partner|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+                        <div class="totals-row">
+                            <span>Total partenaires</span>
+                            <strong>
+                                {{ order.amount_laundry_partner|add:order.amount_driver_partner|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+
+                        <div class="divider"></div>
+
+                        <div class="totals-row">
+                            <span>Revenu FAGNI (HT)</span>
+                            <strong>
+                                {{ order.fagni_revenue_ht|floatformat:0 }} FCFA
+                            </strong>
+                        </div>
+                        <div class="totals-row">
+                            <span>Marge logistique / livraison FAGNI</span>
+                            <strong>
+                                {{ order.logistic_margin|default:0 }} FCFA
+                            </strong>
+                        </div>
+                    {% endif %}
+                </div>
+
+            <!-- PHOTOS GLOBALES -->
+            <section class="card">
+                <h2 class="card-title">
+                    <span class="emoji">📸</span> Toutes les photos liées à la commande
+                </h2>
+
+                {% if order.items.count %}
+                    {% with has_photos=False %}
+                        {% for item in order.items.all %}
+                            {% for p in item.photos.all %}
+                                {% if forloop.first and forloop.parentloop.first %}
+                                    <div class="photos-grid">
+                                {% endif %}
+                                <div class="photo-card">
+                                    <a href="{{ p.image.url }}" target="_blank">
+                                        <img src="{{ p.image.url }}" alt="Photo commande {{ order.code|default:order.id }}">
+                                    </a>
+                                    <div>
+                                        {{ item.designation|default:item.service.name }}
+                                    </div>
+                                </div>
+                                {% if forloop.last and forloop.parentloop.last %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% endfor %}
+                    {% endwith %}
+
+                    {% if not order.items.all.0.photos.all %}
+                        <p class="muted" style="font-size:13px;">
+                            Aucune photo globale n'est enregistrée pour cette commande.
+                        </p>
+                    {% endif %}
+                {% else %}
+                    <p class="muted" style="font-size:13px;">
+                        Aucune photo globale n'est enregistrée pour cette commande.
+                    </p>
+                {% endif %}
+
+                <p class="note" style="margin-top:8px;">
+                    Cette vue globale est idéale pour le contrôle du livreur à la livraison
+                    et pour les vérifications côté blanchisserie.
+                </p>
+            </section>
+        </div>
+    </div>
+
 </div>
 {% endblock %}

@@ -1,0 +1,10 @@
+{% if invoice_settings and invoice_settings.footer_text %}
+  {{ invoice_settings.footer_text|linebreaksbr }}
+{% else %}
+  {% if default_footer %}
+    {{ default_footer|linebreaksbr }}
+  {% else %}
+    <strong>FAGNI</strong> – Merci pour votre confiance 🧺<br>
+    <span class="muted">Document généré automatiquement.</span>
+  {% endif %}
+{% endif %}

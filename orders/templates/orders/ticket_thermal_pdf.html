@@ -1,184 +1,166 @@
 {% load static %}
+{% load money_filters %}
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <title>Ticket thermique – {{ order.code }}</title>
-    <style>
-        /* Style adapté à une imprimante thermique (80mm) en PDF */
-        * {
-            box-sizing: border-box;
-        }
+  <meta charset="utf-8">
+  <title>Ticket thermique {{ order.code }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { margin:0; padding:0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 11px; color:#111827; }
+    .ticket { width: 280px; margin: 0 auto; padding: 8px 8px 10px; }
+    .center { text-align:center; }
 
-        html, body {
-            margin: 0;
-            padding: 0;
-        }
+    /* Classes attendues par _doc_header.html */
+    .brand { font-weight:800; font-size:16px; letter-spacing:0.12em; text-transform:uppercase; }
+    .brand span { color:#f97316; }
+    .header-logo { max-width: 140px; max-height: 50px; display:block; margin: 0 auto 4px; }
+    .header-sub { font-size:10px; color:#6b7280; margin-top:2px; }
+    .header-contact { margin-top:4px; font-size:9px; color:#6b7280; }
+    .header-note { margin-top:4px; font-size:9px; color:#6b7280; }
 
-        body {
-            font-family: monospace;
-            font-size: 12px;
-            background: #ffffff;
-        }
+    .line { border-top:1px dashed #d1d5db; margin:6px 0; }
+    .row { display:flex; justify-content:space-between; margin:2px 0; gap:10px; }
+    .label { font-size:10px; color:#6b7280; white-space:nowrap; }
+    .value { font-size:11px; font-weight:500; text-align:right; word-break:break-word; }
 
-        .ticket {
-            width: 300px; /* largeur adaptée 80mm */
-            margin: 0 auto;
-            padding: 6px 8px;
-        }
+    .items { margin-top:4px; }
+    .item-row { display:flex; justify-content:space-between; margin:2px 0; gap:10px; }
+    .item-left { max-width:170px; }
+    .item-name { font-size:11px; }
+    .item-meta { font-size:9px; color:#6b7280; }
+    .right { text-align:right; white-space:nowrap; }
 
-        .center {
-            text-align: center;
-        }
+    .totals { margin-top:6px; }
+    .total-main { margin-top:4px; font-size:12px; font-weight:700; }
 
-        .bold {
-            font-weight: bold;
-        }
+    .qr { margin-top:6px; }
+    .qr img { width:120px; height:120px; }
+    .small { font-size:9px; color:#6b7280; }
 
-        .line {
-            border-top: 1px dashed #000;
-            margin: 4px 0;
-        }
+    /* Badge paiement */
+    .pay-badge {
+      display:inline-block;
+      padding:6px 14px;
+      border-radius:999px;
+      font-weight:800;
+      font-size:12px;
+      margin:6px 0 8px;
+      border:1px solid transparent;
+    }
+    .pay-badge--paid {
+      background:#dcfce7;
+      color:#166534;
+      border-color:#86efac;
+    }
+    .pay-badge--due {
+      background:#fee2e2;
+      color:#991b1b;
+      border-color:#fecaca;
+    }
 
-        .small {
-            font-size: 10px;
-        }
+    /* Message métier bas */
+    .pay-note {
+      margin-top:10px;
+      padding:8px 8px;
+      border-radius:10px;
+      font-size:10px;
+      line-height:1.35;
+      border:1px dashed #d1d5db;
+      background:#f9fafb;
+      color:#111827;
+      text-align:center;
+    }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        td {
-            padding: 2px 0;
-            vertical-align: top;
-        }
-
-        td.num {
-            text-align: right;
-            white-space: nowrap;
-        }
-
-        .section-title {
-            font-weight: bold;
-            margin: 2px 0;
-        }
-
-        .totals-title {
-            margin-top: 2px;
-        }
-
-        .qr {
-            margin-top: 4px;
-        }
-
-        img.qr-img {
-            width: 90px;
-            height: 90px;
-        }
-
-        .total-ttc {
-            font-weight: bold;
-            font-size: 13px;
-            border-top: 1px solid #000;
-            padding-top: 3px;
-            margin-top: 2px;
-        }
-
-        .footer {
-            margin-top: 4px;
-        }
-    </style>
+    .footer { margin-top:6px; }
+    @media print { body { margin:0; padding:0; } .ticket { margin:0; } }
+  </style>
 </head>
-
 <body>
 <div class="ticket">
 
-    <!-- En-tête -->
-    <div class="center bold">
-        FAGNI – Ticket de commande
+  <div class="center">
+    {% include "orders/_doc_header.html" with default_tagline="Pressing & Livraison" %}
+  </div>
+
+  {# ✅ Badge paiement (sans ambiguïté) #}
+  <div class="center">
+    {% if order.payment_status == "paid" %}
+      <div class="pay-badge pay-badge--paid">🟢 COMMANDE PAYÉE</div>
+    {% else %}
+      <div class="pay-badge pay-badge--due">🔴 PAIEMENT À ENCAISSER</div>
+    {% endif %}
+  </div>
+
+  <div class="line"></div>
+
+  <div class="row"><div class="label">Commande</div><div class="value">{{ order.code|default:order.id }}</div></div>
+  <div class="row"><div class="label">Date</div><div class="value">{{ order.created_at|date:"d/m/Y H:i" }}</div></div>
+  <div class="row"><div class="label">Client</div><div class="value">{{ order.customer.name|default:"—" }}</div></div>
+  {% if order.customer.phone %}
+    <div class="row"><div class="label">Tel</div><div class="value">{{ order.customer.phone }}</div></div>
+  {% endif %}
+
+  <div class="line"></div>
+
+  <div class="items">
+    {% for item in items %}
+      <div class="item-row">
+        <div class="item-left">
+          <div class="item-name">{{ item.designation }}</div>
+          <div class="item-meta">{{ item.quantity }} x {{ item.unit_price|money }} FCFA</div>
+        </div>
+        <div class="right">{{ item.total|money }} FCFA</div>
+      </div>
+    {% empty %}
+      <div class="small">Aucune ligne de commande.</div>
+    {% endfor %}
+  </div>
+
+  <div class="line"></div>
+
+  <div class="totals">
+    <div class="row"><div class="label">Sous-total prestations</div><div class="value">{{ amounts.subtotal|default:0|money }} FCFA</div></div>
+    <div class="row"><div class="label">Service FAGNI</div><div class="value">{{ amounts.service_fee_ht|default:0|money }} FCFA</div></div>
+    <div class="row"><div class="label">Livraison</div><div class="value">{{ amounts.delivery_fee_client|default:0|money }} FCFA</div></div>
+
+    {% if amounts.express_for_client and amounts.express_for_client > 0 %}
+      <div class="row"><div class="label">Supplément express</div><div class="value">{{ amounts.express_for_client|money }} FCFA</div></div>
+    {% endif %}
+
+    <div class="row"><div class="label">TVA FAGNI ({{ vat_rate }}%)</div><div class="value">{{ vat_amount|default:0|money }} FCFA</div></div>
+    <div class="row total-main"><div>Total TTC</div><div>{{ total_ttc_client|money }} FCFA</div></div>
+  </div>
+
+  <div class="line"></div>
+
+  <div class="center qr">
+    {% if qr_data %}
+      <img src="https://api.qrserver.com/v1/create-qr-code/?data={{ qr_data|urlencode }}&size=140x140"
+           alt="QR Code commande {{ order.code }}">
+      <div class="small">Scanner pour vérifier la commande</div>
+    {% else %}
+      <div class="small">(QR non disponible)</div>
+    {% endif %}
+  </div>
+
+  {# ✅ Message métier anti-litige #}
+  <div class="pay-note">
+    {% if order.payment_status == "paid" %}
+      <strong>Commande déjà réglée.</strong><br>
+      Aucun paiement n’est à effectuer auprès du livreur.
+    {% else %}
+      <strong>Paiement à effectuer à la livraison.</strong><br>
+      Merci de remettre le montant exact au livreur FAGNI.
+    {% endif %}
+  </div>
+
+  <div class="center footer">
+    <div class="small">
+      {% include "orders/_doc_footer.html" %}
     </div>
-    <div class="center">
-        {{ order.code }}
-    </div>
-    <div class="center small">
-        {{ order.created_at|date:"d/m/Y H:i" }}
-    </div>
-
-    <div class="line"></div>
-
-    <!-- Infos client -->
-    <div class="section-title">Client</div>
-    <div>
-        Nom : {{ order.customer.name|default:"—" }}<br>
-        Tél : {{ order.customer.phone|default:"—" }}<br>
-        Adresse : {{ order.customer.address|default:"—" }}<br>
-        {% if order.referral_code %}
-            Parrain : {{ order.referral_code }}<br>
-        {% endif %}
-    </div>
-
-    <div class="line"></div>
-
-    <!-- Lignes de commande -->
-    <div class="section-title">Détails de la commande</div>
-    <table>
-        {% for item in items %}
-            <tr>
-                <td>{{ item.quantity }} × {{ item.designation }}</td>
-                <td class="num">{{ item.total|floatformat:0 }} FCFA</td>
-            </tr>
-        {% empty %}
-            <tr>
-                <td colspan="2">Aucune ligne.</td>
-            </tr>
-        {% endfor %}
-    </table>
-
-    <div class="line"></div>
-
-    <!-- Totaux -->
-    <div class="section-title">Récapitulatif</div>
-    <table>
-        <tr>
-            <td>Sous-total prestations</td>
-            <td class="num">{{ order.total|default:0|floatformat:0 }} FCFA</td>
-        </tr>
-        <tr>
-            <td>Service FAGNI</td>
-            <td class="num">{{ order.service_fee|default:0|floatformat:0 }} FCFA</td>
-        </tr>
-        <tr>
-            <td>Livraison</td>
-            <td class="num">{{ order.delivery_fee|default:0|floatformat:0 }} FCFA</td>
-        </tr>
-        <tr>
-            <td>TVA (18%)</td>
-            <td class="num">{{ tva_amount|default:0|floatformat:0 }} FCFA</td>
-        </tr>
-        <tr>
-            <td class="total-ttc">TOTAL TTC</td>
-            <td class="num total-ttc">{{ grand_total|default:0|floatformat:0 }} FCFA</td>
-        </tr>
-    </table>
-
-    <div class="line"></div>
-
-    <!-- QR compact -->
-    <div class="center small qr">
-        <img class="qr-img"
-             src="https://api.qrserver.com/v1/create-qr-code/?size=90x90&data={{ qr_data|urlencode }}"
-             alt="QR commande {{ order.code }}"><br>
-        Scanner pour les détails de la commande
-    </div>
-
-    <div class="line"></div>
-
-    <!-- Pied de ticket -->
-    <div class="center small footer">
-        Merci pour votre confiance.<br>
-        FAGNI – Pressing & Services
-    </div>
+  </div>
 
 </div>
 </body>

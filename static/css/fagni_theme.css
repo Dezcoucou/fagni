@@ -1,0 +1,752 @@
+/* =========================================================
+   FAGNI THEME – Super-App logistique & services
+   Palette : Orange #FF7A00 / Bleu #003366
+   ========================================================= */
+
+/* --------- 1. VARIABLES GLOBALES --------- */
+
+:root {
+    /* Couleurs brand */
+    --fagni-orange: #FF7A00;
+    --fagni-blue: #003366;
+    --fagni-blue-dark: #001E3C;
+
+    /* Fond & surfaces */
+    --fagni-bg: #F5F6FA;
+    --fagni-surface: #FFFFFF;
+    --fagni-surface-alt: #F9FAFB;
+
+    /* Bordures & textes */
+    --fagni-border: #E5E7EB;
+    --fagni-border-soft: #EEF0F4;
+    --fagni-text: #111827;
+    --fagni-text-muted: #6B7280;
+    --fagni-text-soft: #9CA3AF;
+
+    /* Statuts */
+    --fagni-success: #16A34A;
+    --fagni-danger: #DC2626;
+    --fagni-warning: #F59E0B;
+    --fagni-info: #0EA5E9;
+
+    /* Badges commandes */
+    --fagni-status-pending-bg: #FFF4CD;
+    --fagni-status-pending-text: #8A6D00;
+
+    --fagni-status-inprogress-bg: #DDEBFF;
+    --fagni-status-inprogress-text: #0A4FC4;
+
+    --fagni-status-done-bg: #D8F7DF;
+    --fagni-status-done-text: #0D7A2B;
+
+    --fagni-status-canceled-bg: #FFE4E4;
+    --fagni-status-canceled-text: #A30000;
+
+    /* Rayons & ombres */
+    --fagni-radius-lg: 14px;
+    --fagni-radius-md: 10px;
+    --fagni-radius-pill: 999px;
+    --fagni-shadow-soft: 0 4px 10px rgba(15, 23, 42, 0.06);
+
+    /* Header gradient */
+    --fagni-header-gradient: linear-gradient(90deg, #FF7A00, #003366);
+}
+
+/* --------- 2. BASE LAYOUT GÉNÉRAL --------- */
+
+body {
+    background-color: var(--fagni-bg);
+    color: var(--fagni-text);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Conteneur principal (héritage de base.html) */
+.page {
+    max-width: 1200px;
+    margin: 20px auto 32px;
+    padding: 0 12px;
+}
+
+/* --------- 3. HEADER GLOBAL (toutes pages) --------- */
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.page-header__left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.page-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 650;
+    color: #0B1220;
+}
+
+.page-subtitle {
+    margin: 0;
+    font-size: 13px;
+    color: var(--fagni-text-muted);
+}
+
+.page-header__right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Header “pilule période” (finance) */
+.finance-period-pill {
+    padding: 8px 12px;
+    border-radius: var(--fagni-radius-pill);
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid var(--fagni-border-soft);
+    font-size: 12px;
+}
+
+.finance-period-label {
+    color: var(--fagni-text-soft);
+    margin-right: 4px;
+}
+
+.finance-period-value {
+    font-weight: 600;
+    color: var(--fagni-blue);
+}
+
+/* Variante header gradient (si utilisé plus tard) */
+.page-header--gradient {
+    background: var(--fagni-header-gradient);
+    color: #fff;
+    padding: 16px 18px;
+    border-radius: 18px;
+    box-shadow: var(--fagni-shadow-soft);
+}
+
+/* --------- 4. CARDS GLOBALES --------- */
+
+.card {
+    background: var(--fagni-surface);
+    border-radius: var(--fagni-radius-lg);
+    border: 1px solid var(--fagni-border-soft);
+    padding: 16px 18px;
+    margin-bottom: 14px;
+    box-shadow: var(--fagni-shadow-soft);
+}
+
+/* Conteneurs neutres */
+.card--flat {
+    box-shadow: none;
+    border-color: var(--fagni-border);
+}
+
+/* --------- 5. BOUTONS FAGNI --------- */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: var(--fagni-radius-pill);
+    border: 1px solid transparent;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.15s ease, color 0.15s ease,
+        border-color 0.15s ease, box-shadow 0.15s ease;
+    white-space: nowrap;
+}
+
+.btn-sm {
+    padding: 6px 11px;
+    font-size: 12px;
+}
+
+.btn-primary {
+    background: var(--fagni-orange);
+    border-color: var(--fagni-orange);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(255, 122, 0, 0.25);
+}
+
+.btn-primary:hover {
+    background: #e86e00;
+    border-color: #e86e00;
+}
+
+.btn-secondary {
+    background: #ffffff;
+    border-color: var(--fagni-blue);
+    color: var(--fagni-blue);
+}
+
+.btn-secondary:hover {
+    background: #f3f6ff;
+}
+
+.btn-light {
+    background: #ffffff;
+    border-color: var(--fagni-border);
+    color: var(--fagni-text-muted);
+}
+
+.btn-light:hover {
+    background: #f9fafb;
+}
+
+.btn-ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--fagni-blue);
+}
+
+.btn-ghost:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.btn.disabled,
+.btn[disabled] {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Liens en forme de bouton */
+.btn-link {
+    text-decoration: none;
+}
+
+/* --------- 6. BADGES DE STATUT COMMANDES --------- */
+
+.badge-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+}
+
+/* Statuts spécifiques (basés sur o.status / driver.status etc.) */
+.badge-status--pending {
+    background-color: var(--fagni-status-pending-bg);
+    color: var(--fagni-status-pending-text);
+}
+
+.badge-status--in_progress {
+    background-color: var(--fagni-status-inprogress-bg);
+    color: var(--fagni-status-inprogress-text);
+}
+
+.badge-status--done {
+    background-color: var(--fagni-status-done-bg);
+    color: var(--fagni-status-done-text);
+}
+
+.badge-status--canceled {
+    background-color: var(--fagni-status-canceled-bg);
+    color: var(--fagni-status-canceled-text);
+}
+
+/* Optionnel : badges complémentaires */
+.badge-status--delayed {
+    background: #ffe4cc;
+    color: #a04900;
+}
+
+/* --------- 7. TABLES GLOBALES --------- */
+
+.table,
+.finance-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.finance-table thead tr {
+    background: #f9fafb;
+}
+
+.finance-table th,
+.finance-table td,
+.table th,
+.table td {
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--fagni-border-soft);
+    vertical-align: top;
+}
+
+.finance-table th,
+.table th {
+    font-weight: 600;
+    text-align: left;
+    color: #4b5563;
+    white-space: nowrap;
+}
+
+.finance-table tr:hover tbody tr:hover,
+.table tbody tr:hover {
+    background-color: #f9fafb;
+}
+
+.finance-col-number {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.finance-col-status {
+    white-space: nowrap;
+}
+
+/* Wrapper scroll horizontal pour mobile */
+.finance-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    border-radius: var(--fagni-radius-md);
+}
+
+/* Lien de détail commande */
+.finance-order-link {
+    color: var(--fagni-blue);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.finance-order-link:hover {
+    text-decoration: underline;
+}
+
+/* --------- 8. PAGINATION GLOBALE --------- */
+
+.finance-pagination {
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.finance-pagination-info {
+    font-size: 12px;
+    color: var(--fagni-text-muted);
+}
+
+/* --------- 9. FORMULAIRES & FILTRES --------- */
+
+.finance-filters-card {
+    margin-bottom: 16px;
+}
+
+.finance-filters-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+    align-items: flex-end;
+}
+
+.finance-filter-block label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: var(--fagni-text-muted);
+}
+
+.finance-filter-block input[type="date"],
+.finance-filter-block select {
+    width: 100%;
+    padding: 7px 8px;
+    border-radius: 9px;
+    border: 1px solid var(--fagni-border);
+    font-size: 13px;
+    background-color: #ffffff;
+}
+
+.finance-filter-block input:focus,
+.finance-filter-block select:focus {
+    outline: none;
+    border-color: var(--fagni-blue);
+    box-shadow: 0 0 0 1px rgba(0, 51, 102, 0.1);
+}
+
+.finance-filter-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+/* Réactivité filtres */
+@media (max-width: 900px) {
+    .finance-filters-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 600px) {
+    .finance-filters-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* --------- 10. KPI FINANCE --------- */
+
+.finance-kpi-card {
+    margin-bottom: 14px;
+}
+
+.finance-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.kpi-card {
+    border-radius: var(--fagni-radius-md);
+    padding: 12px 12px;
+    background: var(--fagni-surface-alt);
+    border: 1px solid var(--fagni-border-soft);
+}
+
+.kpi-card__label {
+    font-size: 11px;
+    color: var(--fagni-text-soft);
+    margin-bottom: 3px;
+}
+
+.kpi-card__value {
+    font-size: 18px;
+    font-weight: 650;
+    color: #111827;
+}
+
+.kpi-card__unit {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--fagni-text-muted);
+    margin-left: 2px;
+}
+
+.kpi-card__sub {
+    margin-top: 3px;
+    font-size: 11px;
+    color: var(--fagni-text-muted);
+}
+
+/* Variantes de fond */
+.kpi-card--primary {
+    background: linear-gradient(135deg, #ff7a00, #ffb347);
+    color: #fff;
+    border-color: transparent;
+}
+
+.kpi-card--primary .kpi-card__label,
+.kpi-card--primary .kpi-card__sub,
+.kpi-card--primary .kpi-card__unit {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.kpi-card--primary .kpi-card__value {
+    color: #ffffff;
+}
+
+.kpi-card--orange {
+    background: #fff7ed;
+    border-color: #fed7aa;
+}
+
+.kpi-card--blue {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+}
+
+.kpi-card--green {
+    background: #ecfdf3;
+    border-color: #bbf7d0;
+}
+
+/* Responsive KPI */
+@media (max-width: 900px) {
+    .finance-kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 600px) {
+    .finance-kpi-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* --------- 11. BLOC DÉTAIL FINANCE --------- */
+
+.finance-breakdown-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.finance-breakdown-item {
+    padding: 10px 10px;
+    border-radius: var(--fagni-radius-md);
+    background: #f9fafb;
+    border: 1px dashed var(--fagni-border-soft);
+}
+
+.finance-breakdown-label {
+    font-size: 11px;
+    color: var(--fagni-text-soft);
+    margin-bottom: 2px;
+}
+
+.finance-breakdown-value {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .finance-breakdown-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 600px) {
+    .finance-breakdown-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* --------- 12. HEADER TABLEAU FINANCE --------- */
+
+.finance-table-card {
+    margin-top: 14px;
+}
+
+.finance-table-header {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 8px;
+}
+
+.finance-table-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.finance-table-subtitle {
+    font-size: 11px;
+    color: var(--fagni-text-muted);
+    margin: 0;
+}
+
+/* --------- 13. LIENS / FOOTER ACTIONS --------- */
+
+.page-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 18px 12px 32px;
+}
+
+/* --------- 14. PLACEHOLDERS / ÉTATS VIDES --------- */
+
+.driver-empty-text,
+.finance-empty-text {
+    font-size: 13px;
+    color: var(--fagni-text-muted);
+    margin: 10px 0;
+}
+
+/* --------- 15. LOGO FAGNI (header & app) --------- */
+
+.fagni-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.fagni-logo img {
+    height: 26px;
+    width: auto;
+    display: block;
+}
+
+.fagni-logo-text {
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    font-size: 13px;
+    text-transform: uppercase;
+    color: #ffffff;
+}
+
+/* Variante sur fond clair */
+.fagni-logo--dark .fagni-logo-text {
+    color: var(--fagni-blue-dark);
+}
+
+/* --------- 16. APP LIVREUR – CLASSES GÉNÉRIQUES --------- */
+/* (Pour harmoniser driver_me.html, driver_hub.html, etc.) */
+
+.driver-page {
+    max-width: 900px;
+    margin: 16px auto 32px;
+    padding: 0 12px;
+}
+
+.driver-header-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.driver-hero {
+    padding: 14px 14px;
+    border-radius: 16px;
+    background: radial-gradient(circle at top left, #ff7a00 0%, #003366 60%);
+    color: #ffffff;
+}
+
+.driver-hero-title {
+    font-size: 16px;
+    font-weight: 650;
+    margin-bottom: 4px;
+}
+
+.driver-hero-subtitle {
+    font-size: 12px;
+    opacity: 0.85;
+}
+
+/* Grille stats livreur */
+.driver-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.driver-stat-card {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.driver-stat-label {
+    font-size: 11px;
+    opacity: 0.85;
+}
+
+.driver-stat-value {
+    font-size: 15px;
+    font-weight: 650;
+}
+
+/* Tabs / filtres d’activité */
+.driver-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    margin: 10px 0;
+}
+
+.driver-tab {
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    border: 1px solid var(--fagni-border);
+    background: #ffffff;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.driver-tab--active {
+    background: var(--fagni-blue);
+    color: #ffffff;
+    border-color: var(--fagni-blue);
+}
+
+/* Cartes de course */
+.driver-card {
+    border-radius: var(--fagni-radius-lg);
+    border: 1px solid var(--fagni-border-soft);
+    padding: 12px 12px;
+    background: #ffffff;
+    margin-bottom: 8px;
+}
+
+.driver-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+    gap: 8px;
+}
+
+.driver-card__code {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--fagni-blue);
+}
+
+.driver-card__status {
+    flex-shrink: 0;
+}
+
+.driver-card__meta {
+    font-size: 11px;
+    color: var(--fagni-text-muted);
+    margin-bottom: 4px;
+}
+
+.driver-card__meta span + span::before {
+    content: "•";
+    margin: 0 4px;
+    color: var(--fagni-text-soft);
+}
+
+.driver-card__footer {
+    margin-top: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.driver-card__price {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* Responsive app livreur */
+@media (max-width: 768px) {
+    .driver-stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 480px) {
+    .driver-stats-grid {
+        grid-template-columns: 1fr;
+    }
+}

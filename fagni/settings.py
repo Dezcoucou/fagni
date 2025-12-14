@@ -230,3 +230,7 @@ LOGOUT_REDIRECT_URL = "/accounts/login/"
 # === EMAILS EN DEV : AFFICHAGE EN CONSOLE ===
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "no-reply@fagni.local"
+
+# === GEO CODING (Lot 2.3) ===
+NOMINATIM_USER_AGENT = "FAGNI/1.0 (Côte d'Ivoire) contact: support@fagni.local"
+GEOCODING_COUNTRY_CODES = "ci"

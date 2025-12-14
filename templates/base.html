@@ -1,144 +1,183 @@
 {% load static %}
-{% get_static_prefix as STATIC_PREFIX %}
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="utf-8">
-    <title>{% block title %}FAGNI{% endblock %}</title>
+    <title>{% block title %}FAGNI – Laundry & Logistics{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#ff7a00">
 
-    <link rel="icon" type="image/x-icon" href="{{ STATIC_PREFIX }}img/favicon.ico">
-    <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/site.css">
+    {# 👉 CSS global existant (remets ici ce que tu avais avant) #}
+    <link rel="stylesheet" href="{% static 'css/site.css' %}">
+    {# Optionnel : autres fichiers si tu les utilises #}
+    {# <link rel="stylesheet" href="{% static 'css/style.css' %}"> #}
+    {# <link rel="stylesheet" href="{% static 'css/ops.css' %}"> #}
+    <link rel="icon" type="image/png" href="{% static 'favicon.png' %}">
+    <link rel="manifest" href="{% static 'manifest.json' %}">
 
-    {# bloc pour ajouter des CSS/JS spécifiques aux pages #}
+    {# 👉 Thème FAGNI global (variables, cards, boutons, etc.) #}
+    <link rel="stylesheet" href="{% static 'css/fagni_theme.css' %}">
+
+    <style>
+        /* Réglages génériques très légers */
+        * {
+            box-sizing: border-box;
+        }
+        img {
+            max-width: 100%;
+            display: block;
+        }
+
+        /* TOPBAR SUPER-APP FAGNI */
+        .fagni-topbar{
+            background: radial-gradient(circle at 0 0,#111827 0,#020617 45%,#020617 100%);
+            color:#f9fafb;
+            padding:10px 16px;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px;
+        }
+        .fagni-topbar-left{
+            display:flex;
+            align-items:center;
+            gap:10px;
+        }
+        .fagni-logo{
+            display:flex;
+            align-items:center;
+            gap:8px;
+        }
+        .fagni-logo-mark{
+            width:32px;
+            height:32px;
+            border-radius:10px;
+            overflow:hidden;
+            background:#020617;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            padding:4px;
+        }
+        .fagni-logo-mark img{
+            width:100%;
+            height:100%;
+            object-fit:contain;
+        }
+        .fagni-logo-text{
+            display:flex;
+            flex-direction:column;
+            line-height:1.1;
+        }
+        .fagni-logo-text-main{
+            font-weight:700;
+            letter-spacing:0.08em;
+            font-size:11px;
+            text-transform:uppercase;
+        }
+        .fagni-logo-text-sub{
+            font-size:10px;
+            color:#9ca3af;
+        }
+        .fagni-topbar-tag{
+            font-size:10px;
+            padding:3px 8px;
+            border-radius:999px;
+            background:rgba(15,23,42,0.7);
+            border:1px solid rgba(148,163,184,0.4);
+            display:inline-flex;
+            align-items:center;
+            gap:4px;
+        }
+        .fagni-topbar-right{
+            display:flex;
+            align-items:center;
+            gap:8px;
+        }
+        .fagni-topbar-user{
+            display:flex;
+            align-items:center;
+            gap:6px;
+            font-size:11px;
+        }
+        .fagni-topbar-avatar{
+            width:26px;
+            height:26px;
+            border-radius:999px;
+            background:#111827;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:12px;
+            font-weight:600;
+            border:1px solid rgba(148,163,184,0.5);
+        }
+        .fagni-topbar-status{
+            font-size:9px;
+            padding:2px 6px;
+            border-radius:999px;
+            background:rgba(34,197,94,0.12);
+            color:#bbf7d0;
+            border:1px solid rgba(34,197,94,0.4);
+        }
+
+        /* Conteneur principal – on reste simple, ton thème gère le reste */
+        .fagni-shell{
+            max-width:1200px;
+            margin:0 auto;
+            padding:10px 10px 24px;
+        }
+        @media(min-width:1024px){
+            .fagni-shell{
+                padding:18px 18px 30px;
+            }
+            .fagni-topbar{
+                padding:12px 32px;
+            }
+        }
+    </style>
+
     {% block extra_head %}{% endblock %}
 </head>
-<body class="{% block body_class %}{% endblock %}">
+<body>
 
-<!-- ============================================================
-     HEADER GLOBAL FAGNI — NAVY PREMIUM
-   ============================================================ -->
-<header class="app-shell-header">
-    <div class="app-shell-header-inner">
-
-        <!-- Branding -->
-        <a href="{% url 'orders:list' %}" class="app-shell-brand">
-            <div class="app-shell-logo-mark">
-                <span class="app-shell-logo-f">F</span>
-            </div>
-            <div class="app-shell-brand-text">
-                <span class="app-shell-brand-main">FAGNI</span>
-                <span class="app-shell-brand-sub">Laundry &amp; Logistics</span>
-            </div>
+<header class="fagni-topbar">
+    <div class="fagni-topbar-left">
+        <a href="{% url 'orders:driver_hub' %}" class="fagni-logo">
+            <span class="fagni-logo-mark">
+                <img src="{% static 'img/fagni_logo_ok.png' %}" alt="FAGNI">
+            </span>
+            <span class="fagni-logo-text">
+                <span class="fagni-logo-text-main">FAGNI</span>
+                <span class="fagni-logo-text-sub">Laundry • Logistics • Affiliation</span>
+            </span>
         </a>
+        <span class="fagni-topbar-tag">
+            🚀 Super-App
+        </span>
+    </div>
 
-        <!-- Navigation principale -->
-        {% with current=request.resolver_match.url_name %}
-        <nav class="app-shell-nav">
-            <a href="{% url 'orders:list' %}"
-               class="app-shell-nav-link {% if current in 'list orders_list' %}is-active{% endif %}">
-                Commandes
-            </a>
-
-            <a href="{% url 'orders:dashboard' %}"
-               class="app-shell-nav-link {% if current == 'dashboard' %}is-active{% endif %}">
-                Dashboard
-            </a>
-
-            <a href="{% url 'orders:driver_hub' %}"
-               class="app-shell-nav-link {% if current in 'driver_hub driver_app driver_me_app' %}is-active{% endif %}">
-                App livreur
-            </a>
-
-            <a href="{% url 'orders:finance_dashboard' %}"
-               class="app-shell-nav-link {% if current == 'finance_dashboard' %}is-active{% endif %}">
-                Finance
-            </a>
-
-            {# 🔹 Lien vers l’espace affilié (visible pour tout user connecté) #}
-            {% if request.user.is_authenticated %}
-                <a href="{% url 'mlm:affiliate_dashboard' %}"
-                   class="app-shell-nav-link {% if current == 'affiliate_dashboard' %}is-active{% endif %}">
-                    Affiliation
-                </a>
-            {% endif %}
-
-            {# 🔹 Liens réservés staff / admin #}
-            {% if request.user.is_staff %}
-                <a href="{% url 'mlm:global_dashboard' %}"
-                   class="app-shell-nav-link {% if current == 'global_dashboard' %}is-active{% endif %}">
-                    🌍 MLM Global
-                </a>
-
-                <a href="{% url 'orders:portal_dashboard' %}"
-                   class="app-shell-nav-link {% if current == 'portal_dashboard' %}is-active{% endif %}">
-                    ⚙️ Portal
-                </a>
-            {% endif %}
-        </nav>
-        {% endwith %}
-
-        <!-- User mini-profile -->
-        <div class="app-shell-user">
-            <div class="app-shell-user-avatar">
-                {% if request.user.is_authenticated %}
-                    {{ request.user.username|first|upper }}
-                {% else %}
-                    ?
-                {% endif %}
+    <div class="fagni-topbar-right">
+        {% if request.user.is_authenticated %}
+            <div class="fagni-topbar-user">
+                <div class="fagni-topbar-avatar">
+                    {{ request.user.first_name|default:request.user.username|first|upper }}
+                </div>
+                <div>
+                    <div style="font-size:11px;">
+                        {{ request.user.email|default:request.user.username }}
+                    </div>
+                    <div class="fagni-topbar-status">Connecté</div>
+                </div>
             </div>
-            <div class="app-shell-user-meta">
-                {% if request.user.is_authenticated %}
-                    <div class="app-shell-user-name">
-                        {{ request.user.username }}
-                    </div>
-                    <div class="app-shell-user-role">
-                        Connecté
-                    </div>
-                {% else %}
-                    <div class="app-shell-user-name">
-                        Invité
-                    </div>
-                    <div class="app-shell-user-role">
-                        Non connecté
-                    </div>
-                {% endif %}
-            </div>
-        </div>
+        {% endif %}
     </div>
 </header>
 
-<!-- ============================================================
-     CONTENU PRINCIPAL
-   ============================================================ -->
-<main class="app-shell-main">
-    <div class="app-shell-main-inner">
+<div class="fagni-shell">
+    {% block content %}{% endblock %}
+</div>
 
-        {% if messages %}
-            <div class="app-messages">
-                {% for message in messages %}
-                    <div class="app-message app-message--{{ message.tags }}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
-
-        {% block content %}{% endblock %}
-    </div>
-</main>
-
-<!-- ============================================================
-     FOOTER GLOBAL
-   ============================================================ -->
-<footer class="app-shell-footer">
-    <div class="app-shell-footer-inner">
-        <span>© {% now "Y" %} FAGNI</span>
-        <span class="app-shell-footer-dot">•</span>
-        <span>Plateforme pressing &amp; logistique</span>
-    </div>
-</footer>
-
-{% block extra_scripts %}{% endblock %}
+{% block extra_js %}{% endblock %}
 </body>
 </html>

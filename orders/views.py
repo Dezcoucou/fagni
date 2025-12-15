@@ -1,6 +1,5 @@
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-import datetime
-from datetime import timedelta, time
+from datetime import datetime, timedelta, time
 from django.template.loader import render_to_string
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.exceptions import ValidationError

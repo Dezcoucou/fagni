@@ -1,11 +1,9 @@
-from bonuses.models import BonusWeek
-from collections import Counter, defaultdict
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from datetime import timedelta, datetime, time
+import datetime
+from datetime import timedelta, time
 from django.template.loader import render_to_string
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.exceptions import ValidationError
-from django.db import models
 from django.contrib import messages
 from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
@@ -20,20 +18,10 @@ from django.db.models import (
     Max,
     DecimalField,
     ExpressionWrapper,
-    Avg,
-    DurationField,
-    FloatField,
-    Prefetch,
 )
 from django.db import transaction
-from wallets.models import WalletTransaction, Wallet
 from wallets.services import (
-    get_or_create_wallet_for_customer,
-    get_or_create_wallet_for_delivery_partner,
-    get_or_create_wallet_for_laundry_partner,
-    credit_wallet,
-    debit_wallet,
-    get_or_create_internal_wallet,  # ← celui-là manque
+    get_or_create_wallet_for_delivery_partner,  # ← celui-là manque
 )
 from django.db.models.functions import Coalesce, Cast, TruncDate
 from django.views.decorators.http import require_POST
@@ -47,7 +35,6 @@ from orders.utils.pricing import compute_order_amounts
 from orders.utils.settings_loader import get_pricing_settings
 from orders.utils.geocoding import ensure_order_geocoded
 from orders.utils.geo import resolve_pickup_coords, resolve_delivery_coords, resolve_provider_coords
-from .finance import compute_order_financials
 from .config_models import InvoiceSettings
 from .models import (
     Order,
@@ -61,29 +48,15 @@ from .models import (
     haversine_distance_km,
     LogisticsConfig,
 )
-from .utils import auto_assign_laundry, auto_assign_delivery
-from partners.models import LaundryPartner, DeliveryPartner, RelayPointPartner
-from mlm.services import attach_customer_to_sponsor
+from partners.models import LaundryPartner, DeliveryPartner
 from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4, A6, mm
-from reportlab.lib.units import mm
 
-from reportlab.lib import colors
-from reportlab.lib.utils import ImageReader
-from reportlab.graphics.barcode import qr
-from reportlab.graphics.shapes import Drawing
-from reportlab.graphics import renderPDF
-from math import radians, sin, cos, asin, sqrt, atan2
 from weasyprint import HTML
 import uuid
-import os
-import io
-import qrcode
 import csv
 import json
 import re
@@ -141,36 +114,6 @@ def get_connected_driver(request):
 
     # 3) Fallback DEV : on prend le premier livreur actif
     return DeliveryPartner.objects.filter(is_active=True).order_by("id").first()
-
-
-def haversine_distance_km(lat1, lng1, lat2, lng2):
-    """
-    Distance en kilomètres entre deux points GPS.
-    Retourne None si une coordonnée manque.
-    """
-    if not lat1 or not lng1 or not lat2 or not lng2:
-        return None
-
-    try:
-        lat1, lng1 = float(lat1), float(lng1)
-        lat2, lng2 = float(lat2), float(lng2)
-    except Exception:
-        return None
-
-    R = 6371.0  # Rayon de la Terre en KM
-
-    lat1_r = radians(lat1)
-    lng1_r = radians(lng1)
-    lat2_r = radians(lat2)
-    lng2_r = radians(lng2)
-
-    dlat = lat2_r - lat1_r
-    dlng = lng2_r - lng1_r
-
-    a = sin(dlat/2)**2 + cos(lat1_r) * cos(lat2_r) * sin(dlng/2)**2
-    c = 2 * atan2(sqrt(a), sqrt(1 - a))
-
-    return Decimal(str(R * c)).quantize(Decimal("0.01"))
 
 
 def generate_order_code():
@@ -694,7 +637,6 @@ def ops_dashboard(request):
     # ============================================================
     #  Lot 4.9 — ALERTES (SLA) (filtrées si driver actif)
     # ============================================================
-    now = timezone.now()
 
     SLA_PICKUP_H = 2        # pending -> pickup
     SLA_DROPOFF_H = 3       # pickup -> dropoff
@@ -725,32 +667,32 @@ def ops_dashboard(request):
         next_step = None
 
         if o.status == "pending" and not o.pickup_time:
-            age_h = _hours(o.created_at, now) or 0
+            age_h = _hours(o.created_at, timezone.now()) or 0
             if age_h >= SLA_PICKUP_H:
                 reason = f"Collecte en retard (>{SLA_PICKUP_H}h)"
                 next_step = "pickup"
 
         if o.status == "in_progress":
             if o.pickup_time and not o.dropoff_time:
-                age_h = _hours(o.pickup_time, now) or 0
+                age_h = _hours(o.pickup_time, timezone.now()) or 0
                 if age_h >= SLA_DROPOFF_H:
                     reason = f"Dépôt blanchisserie en retard (>{SLA_DROPOFF_H}h après collecte)"
                     next_step = "dropoff"
 
             elif o.dropoff_time and not o.wash_complete_time:
-                age_h = _hours(o.dropoff_time, now) or 0
+                age_h = _hours(o.dropoff_time, timezone.now()) or 0
                 if age_h >= SLA_WASH_H:
                     reason = f"Lavage trop long (>{SLA_WASH_H}h après dépôt)"
                     next_step = "wash_done"
 
             elif o.wash_complete_time and not o.return_time:
-                age_h = _hours(o.wash_complete_time, now) or 0
+                age_h = _hours(o.wash_complete_time, timezone.now()) or 0
                 if age_h >= SLA_RETURN_H:
                     reason = f"Reprise livreur en retard (>{SLA_RETURN_H}h après lavage)"
                     next_step = "return"
 
             elif o.return_time and not o.delivered_time:
-                age_h = _hours(o.return_time, now) or 0
+                age_h = _hours(o.return_time, timezone.now()) or 0
                 if age_h >= SLA_DELIVERED_H:
                     reason = f"Livraison client en retard (>{SLA_DELIVERED_H}h après reprise)"
                     next_step = "delivered"
@@ -770,7 +712,7 @@ def ops_dashboard(request):
         if not getattr(d, "updated_at", None):
             drivers_offline.append({"driver": d, "age_min": None})
             continue
-        delta = (now - d.updated_at).total_seconds()
+        delta = (timezone.now() - d.updated_at).total_seconds()
         if delta > ACTIVE_MS:
             drivers_offline.append({"driver": d, "age_min": int(delta // 60)})
 
@@ -837,7 +779,6 @@ def ops_update_step(request, order_id, action):
     - Redirect avec highlight (?highlight=<id>)
     """
     order = get_object_or_404(Order, pk=order_id)
-    now = timezone.now()
 
     allowed = {"pickup", "dropoff", "wash_done", "return", "delivered"}
     if action not in allowed:
@@ -870,7 +811,7 @@ def ops_update_step(request, order_id, action):
         messages.error(request, "Impossible : étape précédente non validée.")
         return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}")
 
-    setattr(order, field_name, now)
+    setattr(order, field_name, timezone.now())
 
     if action == "pickup" and order.status == "pending":
         order.status = "in_progress"
@@ -2772,7 +2713,6 @@ def create(request):
             .order_by("-id")
             .first()
         )
-        created = False
 
     changed = False
     if name and customer.name != name:
@@ -3068,9 +3008,9 @@ def assign_best_laundry(customer):
     best_laundry = None
     best_key = None  # (nb_commandes_actives, distance_km)
 
-    for l in laundries:
-        dest_lat = getattr(l, "latitude", None)
-        dest_lng = getattr(l, "longitude", None)
+    for laundry in laundries:
+        dest_lat = getattr(laundry, "latitude", None)
+        dest_lng = getattr(laundry, "longitude", None)
         if not dest_lat or not dest_lng:
             continue
 
@@ -3078,12 +3018,12 @@ def assign_best_laundry(customer):
         if dist is None:
             continue
 
-        active_orders = l.orders.exclude(status__in=["done", "canceled"]).count()
+        active_orders = laundry.orders.exclude(status__in=["done", "canceled"]).count()
         current_key = (active_orders, dist)
 
         if best_key is None or current_key < best_key:
             best_key = current_key
-            best_laundry = l
+            best_laundry = laundry
 
     return best_laundry
 
@@ -3104,8 +3044,8 @@ def build_order_finance_context(order):
     - Revenu FAGNI
     - Marge logistique / livraison
     """
+    from .finance import compute_order_financials
 
-    from .finance import compute_order_financials  # import local pour éviter tout import circulaire
 
     data = compute_order_financials(order)
 
@@ -3978,7 +3918,7 @@ def driver_order_timeline_action(request, order_id, action):
     current_val = getattr(order, field_name, None)
     if not current_val:
         now = timezone.now()
-        setattr(order, field_name, now)
+        setattr(order, field_name, timezone.now())
         # On essaye d'update updated_at s'il existe
         update_fields = [field_name]
         if hasattr(order, "updated_at"):
@@ -4204,8 +4144,7 @@ def driver_wallet(request):
     tx_qs = wallet.transactions.all().order_by("-created_at")[:50]
 
     # 4) Total gagné ce mois-ci (entrées)
-    now = timezone.now()
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     month_in_qs = wallet.transactions.filter(
         created_at__gte=month_start,
@@ -4244,23 +4183,6 @@ def _get_connected_driver(request, order=None):
         return getattr(order, "delivery_partner", None)
 
     return None
-
-    connected_driver = _get_connected_driver(request)
-
-    if not connected_driver and not selected_driver_id:
-        return JsonResponse({
-            "filtered_orders_count": 0,
-            "pending": 0,
-            "in_progress": 0,
-            "done": 0,
-            "canceled": 0,
-            "total_orders": 0,
-            "today_orders": 0,
-            "total_distance_km": 0,
-            "total_driver_income": 0,
-            "source_distance": "—",
-            "source_income": "—",
-        })
 
 
 def ensure_default_driver_legs(order, driver):
@@ -4455,11 +4377,6 @@ def driver_order_detail(request, order_id):
         or Decimal("0")
     )
 
-    from orders.utils.geo import (
-        resolve_pickup_coords,
-        resolve_delivery_coords,
-        resolve_provider_coords,
-    )
 
     pickup_coords = resolve_pickup_coords(order)
     delivery_coords = resolve_delivery_coords(order)
@@ -4592,7 +4509,6 @@ def driver_app_data(request):
             or Decimal(str(getattr(o, "distance_km_total", None) or getattr(o, "distance_km", None) or 0))
         )
         o.driver_distance_display = float(driver_distance_display or 0)
-
         # distance
         if legs_dist > 0:
             total_distance += legs_dist
@@ -4756,12 +4672,13 @@ def driver_app(request):
         else:
             pay_status_label = "À ENCAISSER"
 
+        o.pay_status_label = pay_status_label
+
         # --- Injection des champs DISPLAY pour le template ---
         o.total_client_display = total_client_display
         o.delivery_fee_client_display = delivery_fee_client_display
         o.driver_income_display = driver_income_display
         o.driver_distance_display = float(driver_distance_display or 0)
-
         return o
 
     pending_orders = [_enrich(o) for o in pending_orders]
@@ -5260,17 +5177,10 @@ def driver_me_app(request):
     )
 
     # Activité du jour
-    today_qs = qs.filter(created_at__date=today)
-
     # --- Agrégats simples (sans distance) ---
     raw_stats = qs.aggregate(
         total_orders=Count("id", distinct=True),
         # adapte ce filtre si tu as déjà un start_month dans ta fonction
-        month_orders=Count(
-            "id",
-            filter=Q(created_at__gte=start_month) if "start_month" in locals() else Q(),
-            distinct=True,
-        ),
         total_income=Coalesce(
             Sum("driver_logistic_cost"),
             Decimal("0.0"),
@@ -5294,7 +5204,7 @@ def driver_me_app(request):
 
     stats = {
         "total_orders": raw_stats["total_orders"] or 0,
-        "month_orders": raw_stats["month_orders"] or 0,
+        "month_orders": month_qs.count(),
         "total_distance_km": total_distance_km,
         "total_income": raw_stats["total_income"] or Decimal("0.0"),
     }
@@ -5336,7 +5246,6 @@ def driver_hub(request):
         global_total_orders = driver_orders_qs.count()
 
         # Période de stats
-        now = timezone.now()
         period_qs = driver_orders_qs
 
         if period == "today":
@@ -5353,11 +5262,11 @@ def driver_hub(request):
             )
             period_label = "Aujourd'hui"
         elif period == "7d":
-            start = now - timedelta(days=7)
+            start = timezone.now() - timedelta(days=7)
             period_qs = driver_orders_qs.filter(created_at__gte=start)
             period_label = "7 derniers jours"
         elif period == "30d":
-            start = now - timedelta(days=30)
+            start = timezone.now() - timedelta(days=30)
             period_qs = driver_orders_qs.filter(created_at__gte=start)
             period_label = "30 derniers jours"
         else:
@@ -5549,15 +5458,14 @@ def driver_kpi(request):
 
     # --- Filtre période ---
     period = (request.GET.get("period") or "30d").strip()
-    now = timezone.now()
     dt_start = None
 
     if period == "today":
-        dt_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        dt_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
     elif period == "7d":
-        dt_start = now - timedelta(days=7)
+        dt_start = timezone.now() - timedelta(days=7)
     elif period == "30d":
-        dt_start = now - timedelta(days=30)
+        dt_start = timezone.now() - timedelta(days=30)
     else:
         period = "all"
         dt_start = None
@@ -6017,7 +5925,6 @@ def ensure_delivery_legs_for_order(order):
             pickup_amount = round(total_driver_amount / 2)
             delivery_amount = round(total_driver_amount - pickup_amount)
 
-    now = timezone.now()
 
     legs_to_create = []
 
@@ -6078,7 +5985,6 @@ def driver_leg_action(request, leg_id, action):
     )
     order = leg.order
     old_status = leg.status
-    now = timezone.now()
 
     # Sécurité : un livreur ne peut agir que sur ses legs
     # (si ton DeliveryPartner n'a pas de lien user, adapte ici)
@@ -6152,14 +6058,14 @@ def driver_leg_action(request, leg_id, action):
         if leg.status in {"pending", "assigned"}:
             leg.status = "in_progress"
             if not leg.started_at:
-                leg.started_at = now
+                leg.started_at = timezone.now()
 
             # timestamps commande
             if leg.leg_type == "pickup" and not order.pickup_time:
-                order.pickup_time = now
+                order.pickup_time = timezone.now()
                 order.save(update_fields=["pickup_time"])
             elif leg.leg_type in DELIVERY_TYPES and not order.return_time:
-                order.return_time = now
+                order.return_time = timezone.now()
                 order.save(update_fields=["return_time"])
 
     elif action == "finish":
@@ -6167,14 +6073,14 @@ def driver_leg_action(request, leg_id, action):
         if leg.status in {"assigned", "in_progress"}:
             leg.status = "done"
             if not leg.finished_at:
-                leg.finished_at = now
+                leg.finished_at = timezone.now()
 
     elif action == "cancel":
         # tout sauf done -> canceled
         if leg.status != "done":
             leg.status = "canceled"
             if not leg.finished_at:
-                leg.finished_at = now
+                leg.finished_at = timezone.now()
 
     # Si rien n’a changé
     if leg.status == old_status:
@@ -6202,13 +6108,13 @@ def driver_leg_action(request, leg_id, action):
     # dropoff_time : quand toutes les pickups sont done
     if pickup_statuses and all(s == "done" for s in pickup_statuses):
         if not order.dropoff_time:
-            order.dropoff_time = now
+            order.dropoff_time = timezone.now()
             order.save(update_fields=["dropoff_time"])
 
     # delivered_time : quand toutes les return/delivery sont done
     if delivery_statuses and all(s == "done" for s in delivery_statuses):
         if not order.delivered_time:
-            order.delivered_time = now
+            order.delivered_time = timezone.now()
             order.save(update_fields=["delivered_time"])
 
     # =========================
@@ -6234,7 +6140,6 @@ def driver_leg_action(request, leg_id, action):
     return redirect("orders:driver_order_detail", order_id=order.id)
 
 
-from django.http import JsonResponse  # <-- si pas déjà importé
 
 @login_required
 def driver_order_live_status(request, order_id):
@@ -6263,7 +6168,7 @@ def driver_order_live_status(request, order_id):
         if not allowed and legs_qs.exists():
             # si on ne peut pas vérifier user (dp_user None partout), on laisse passer
             # MAIS si dp_user existe et ne match pas => refus
-            any_dp_user = any(getattr(l.driver, "user", None) is not None for l in legs_qs)
+            any_dp_user = any(getattr(leg.driver, "user", None) is not None for leg in legs_qs)
             if any_dp_user:
                 return HttpResponseForbidden("Accès refusé.")
 

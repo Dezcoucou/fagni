@@ -2981,23 +2981,13 @@ def create(request):
         context["error"] = "Ajoute au moins une ligne de prestation à la commande."
         return render(request, "orders/create.html", context)
 
-    # 10) Recalcul financier complet (nouveau moteur pricing)
-    recompute_order_financials(order)
-    apply_fagni_pricing(order)
+    # 10) Recalcul financier complet (moteur unique)
+    order.update_financials(save=False)  # utilise compute_order_financials() + express
     order.recompute_distances_from_positions()
     order.save()
 
-    # 10.b) Supplément express (24h) côté serveur
-    try:
-        cfg = LogisticsConfig.current()
-        if cfg and order.delivery_mode == Order.DELIVERY_MODE_EXPRESS:
-            base_amount = (order.prestation_total or Decimal("0")) + (order.service_fee or Decimal("0"))
-            order.express_extra_fee = cfg.compute_express_extra(base_amount)
-        else:
-            order.express_extra_fee = Decimal("0")
-    except Exception:
-        # on ne casse pas la commande si problème de config
-        order.express_extra_fee = Decimal("0")
+    from orders.utils import auto_assign_delivery
+    auto_assign_delivery(order)
 
     return redirect("orders:detail", order_id=order.id)
 
@@ -3008,51 +2998,48 @@ def get_active_drivers():
 
 def assign_best_driver(lat, lng):
     """
-    Assigne automatiquement un livreur 'intelligent' :
-
-    - On filtre les livreurs actifs avec coordonnées.
-    - On calcule la distance client ↔ livreur.
-    - On regarde la charge de travail (nb de commandes non terminées).
-    - On choisit d'abord celui qui a le moins de commandes actives,
-      puis le plus proche en distance.
+    Assigne automatiquement un livreur :
+    - Si coords client OK: on préfère les livreurs actifs avec coords (moins chargés puis plus proches)
+    - Sinon / ou si aucun livreur géolocalisé: fallback sur le 1er livreur actif (mode démo)
     """
+    # 0) Fallback démo si pas de coords client
     if not lat or not lng:
-        return None
+        return DeliveryPartner.objects.filter(is_active=True).order_by("id").first()
 
-    # Livreur actifs avec latitude / longitude
-    drivers = DeliveryPartner.objects.filter(
+    # 1) Livreur actifs avec latitude / longitude
+    drivers_geo = DeliveryPartner.objects.filter(
         is_active=True,
         latitude__isnull=False,
         longitude__isnull=False,
     )
 
-    if not drivers.exists():
-        return None
+    # Si aucun livreur géolocalisé -> fallback démo
+    if not drivers_geo.exists():
+        return DeliveryPartner.objects.filter(is_active=True).order_by("id").first()
 
     best_driver = None
     best_key = None  # (nb_commandes_actives, distance_km)
 
-    for d in drivers:
+    for d in drivers_geo:
         d_lat = d.latitude
         d_lng = d.longitude
         if not d_lat or not d_lng:
             continue
 
-        # Distance en km
         dist = haversine_distance_km(lat, lng, d_lat, d_lng)
         if dist is None:
             continue
 
-        # Charge de travail = nb de commandes non terminées / non annulées
+        # Charge = commandes non terminées / non annulées
         active_orders = d.orders.exclude(status__in=["done", "canceled"]).count()
 
         current_key = (active_orders, dist)
-
         if best_key is None or current_key < best_key:
             best_key = current_key
             best_driver = d
 
-    return best_driver
+    # En dernier recours, fallback
+    return best_driver or DeliveryPartner.objects.filter(is_active=True).order_by("id").first()
 
 
 def assign_best_laundry(customer):

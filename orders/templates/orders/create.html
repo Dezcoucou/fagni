@@ -1087,52 +1087,68 @@ document.addEventListener('DOMContentLoaded', function () {
         // ==================================
         // 2) BOUTON "ME LOCALISER" (COLLECTE)
         // ==================================
-        if (locateBtn && navigator.geolocation) {
+        if (locateBtn) {
             locateBtn.addEventListener('click', function () {
+                 if (!navigator.geolocation) {
+                    alert("Géolocalisation non supportée sur ce navigateur.");
+                    return;
+                }
+
                 locateBtn.disabled = true;
+                const oldText = locateBtn.textContent;
                 locateBtn.textContent = "📍 Localisation...";
 
                 navigator.geolocation.getCurrentPosition(
                     function (pos) {
                         const lat = pos.coords.latitude;
                         const lng = pos.coords.longitude;
-                        const loc = {lat: lat, lng: lng};
+                        const loc = { lat: lat, lng: lng };
 
-                        if (latInput && lngInput) {
-                            latInput.value = lat;
-                            lngInput.value = lng;
+                        // ✅ Toujours remplir les champs cachés
+                        if (latInput) latInput.value = lat;
+                        if (lngInput) lngInput.value = lng;
+
+                        // ✅ Si Google Map est chargée, on met à jour la carte
+                        if (typeof map !== "undefined" && map && typeof marker !== "undefined" && marker) {
+                            map.setCenter(loc);
+                            map.setZoom(14);
+                            marker.setPosition(loc);
                         }
 
-                        if (window.map && window.marker) {
-                            window.map.setCenter(loc);
-                            window.map.setZoom(14);
-                            window.marker.setPosition(loc);
-                        }
-
-                        if (window.geocoder) {
-                            window.geocoder.geocode({ location: loc }, (results, status) => {
+                        // ✅ Reverse geocoding si dispo
+                        if (typeof geocoder !== "undefined" && geocoder && addressInput) {
+                            geocoder.geocode({ location: loc }, (results, status) => {
                                 if (status === 'OK' && results && results[0]) {
-                                    if (addressInput) {
-                                        addressInput.value = results[0].formatted_address;
-                                    }
+                                    addressInput.value = results[0].formatted_address;
                                 } else {
                                     console.warn('Reverse geocode échoué :', status);
                                 }
                             });
+                        } else {
+                            // fallback : on met au moins un texte si l'adresse est vide
+                            if (addressInput && !addressInput.value.trim()) {
+                                addressInput.value = `GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                            }
                         }
 
                         locateBtn.disabled = false;
-                        locateBtn.textContent = "📍 Me localiser";
+                        locateBtn.textContent = oldText;
                     },
                     function (err) {
                         console.error("Erreur géolocalisation :", err);
-                        alert("Impossible de récupérer votre position.");
+
+                        let msg = "Impossible de récupérer votre position.";
+                        if (err && err.code === 1) msg = "Permission GPS refusée. Autorise la localisation dans le navigateur.";
+                        if (err && err.code === 2) msg = "Position indisponible. Active le GPS et réessaie.";
+                        if (err && err.code === 3) msg = "Timeout GPS. Réessaie dans un endroit plus dégagé.";
+
+                        alert(msg);
                         locateBtn.disabled = false;
-                        locateBtn.textContent = "📍 Me localiser";
+                        locateBtn.textContent = oldText;
                     },
                     {
                         enableHighAccuracy: true,
-                        timeout: 10000,
+                        timeout: 20000,
                         maximumAge: 0,
                     }
                 );

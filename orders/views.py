@@ -2902,13 +2902,16 @@ def create(request):
 
     # 7) Assignation automatique d’un livreur
     driver = assign_best_driver(customer.latitude, customer.longitude)
+
+    # Fallback si pas de coords (ou si aucun livreur géolocalisé)
+    if not driver:
+        driver = DeliveryPartner.objects.filter(is_active=True).order_by("id").first()
+
     if driver:
         order.delivery_partner = driver
         order.delivery_partner_unassigned_reason = None
     else:
-        order.delivery_partner_unassigned_reason = (
-            "Aucun livreur disponible au moment de la commande."
-        )
+        order.delivery_partner_unassigned_reason = "Aucun livreur disponible au moment de la commande."
 
     # 8) Calcul automatique des frais de livraison
     try:
@@ -2983,6 +2986,18 @@ def create(request):
     apply_fagni_pricing(order)
     order.recompute_distances_from_positions()
     order.save()
+
+    # 10.b) Supplément express (24h) côté serveur
+    try:
+        cfg = LogisticsConfig.current()
+        if cfg and order.delivery_mode == Order.DELIVERY_MODE_EXPRESS:
+            base_amount = (order.prestation_total or Decimal("0")) + (order.service_fee or Decimal("0"))
+            order.express_extra_fee = cfg.compute_express_extra(base_amount)
+        else:
+            order.express_extra_fee = Decimal("0")
+    except Exception:
+        # on ne casse pas la commande si problème de config
+        order.express_extra_fee = Decimal("0")
 
     return redirect("orders:detail", order_id=order.id)
 

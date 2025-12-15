@@ -1,4 +1,4 @@
-kkfrom django.db import migrations
+from django.db import migrations
 from django.utils.text import slugify
 
 def set_if_has(obj, field, value):

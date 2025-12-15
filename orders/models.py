@@ -881,17 +881,6 @@ class Order(models.Model):
         self.fagni_revenue_ht = data.get("fagni_revenue_ht", Decimal("0"))
         self.vat_fagni = data.get("vat_fagni", Decimal("0"))
 
-        # --- TVA (Lot 4.11.2) ---
-        self.vat_base = (
-            self.service_fee
-            + self.commission_delivery_ht
-            + (self.express_extra_fee or Decimal("0"))
-        )
-
-        self.vat_fagni = (
-            self.vat_base * (self.vat_rate / Decimal("100"))
-        ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-
         # 7) Total TTC client
         self.total_client_ttc = data.get("total_ttc_client", Decimal("0"))
 

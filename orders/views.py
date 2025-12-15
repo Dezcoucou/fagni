@@ -2986,9 +2986,6 @@ def create(request):
     order.recompute_distances_from_positions()
     order.save()
 
-    from orders.utils import auto_assign_delivery
-    auto_assign_delivery(order)
-
     return redirect("orders:detail", order_id=order.id)
 
 

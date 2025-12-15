@@ -1,4 +1,4 @@
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+*from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from datetime import datetime, timedelta, time
 from django.template.loader import render_to_string
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
@@ -3333,12 +3333,11 @@ def order_ticket_pdf(request, order_id):
     Ticket PDF (HTML rendu).
     Source de vérité = compute_order_amounts(order) (pricing.py).
     """
-    order = (
+    order = get_object_or_404(
         Order.objects
-        .filter(pk=order_id)
         .select_related("customer", "laundry_partner", "delivery_partner")
-        .prefetch_related("items__service", "items__photos")
-        .first()
+        .prefetch_related("items__service", "items__photos"),
+        pk=order_id
     )
     if not order:
         return redirect("orders:list")
@@ -5231,142 +5230,127 @@ def driver_me_app(request):
 @login_required
 def driver_hub(request):
     """
-    Hub livreur FAGNI :
-    - Si un DeliveryPartner est associé à l'email -> dashboard perso
-    - Stats filtrées par période (today / 7d / 30d / all)
-    - Courses actives + 5 dernières courses de la période
+    Hub livreur :
+    - affiche KPIs + listes (pending / in_progress / done)
+    - alimente le template orders/driver_hub.html
     """
-    connected_driver = _get_connected_driver(request)
+    connected_driver = get_connected_driver(request)
 
-    stats = None
-    today_orders_count = 0
-    last_orders = []
-    active_orders = []
-    period = request.GET.get("period", "all")  # today | 7d | 30d | all
-    period_label = "Depuis le début"
-
-    if connected_driver:
-        # Toutes les commandes de CE livreur (historique)
-        driver_orders_qs = Order.objects.filter(delivery_partner=connected_driver)
-
-        # Total historique
-        global_total_orders = driver_orders_qs.count()
-
-        # Période de stats
-        period_qs = driver_orders_qs
-
-        if period == "today":
-            today = timezone.localdate()
-            today_start = timezone.make_aware(
-                timezone.datetime.combine(today, timezone.datetime.min.time())
-            )
-            today_end = timezone.make_aware(
-                timezone.datetime.combine(today, timezone.datetime.max.time())
-            )
-            period_qs = driver_orders_qs.filter(
-                created_at__gte=today_start,
-                created_at__lte=today_end,
-            )
-            period_label = "Aujourd'hui"
-        elif period == "7d":
-            start = timezone.now() - timedelta(days=7)
-            period_qs = driver_orders_qs.filter(created_at__gte=start)
-            period_label = "7 derniers jours"
-        elif period == "30d":
-            start = timezone.now() - timedelta(days=30)
-            period_qs = driver_orders_qs.filter(created_at__gte=start)
-            period_label = "30 derniers jours"
-        else:
-            # "all" => on garde tout
-            period_qs = driver_orders_qs
-            period_label = "Depuis le début"
-
-        # Compteurs sur la période choisie
-        total_orders = period_qs.count()
-        done_orders = period_qs.filter(status="done").count()
-        in_progress_orders = period_qs.filter(status="in_progress").count()
-        pending_orders = period_qs.filter(status="pending").count()
-        canceled_orders = period_qs.filter(status="canceled").count()
-
-        # Agrégats numériques (distance / revenu) sur la période
-        aggregates = period_qs.aggregate(
-            distance_km=Sum("distance_km"),
-            driver_income=Sum("driver_logistic_cost"),
-        )
-
-        stats = {
-            "total_orders": total_orders,
-            "done_orders": done_orders,
-            "in_progress_orders": in_progress_orders,
-            "pending_orders": pending_orders,
-            "canceled_orders": canceled_orders,
-            "distance_km": aggregates["distance_km"] or 0,
-            "driver_income": aggregates["driver_income"] or 0,
-            "global_total_orders": global_total_orders,
-        }
-
-        # Commandes du jour (quel que soit le filtre)
-        today = timezone.localdate()
-        today_start = timezone.make_aware(
-            timezone.datetime.combine(today, timezone.datetime.min.time())
-        )
-        today_end = timezone.make_aware(
-            timezone.datetime.combine(today, timezone.datetime.max.time())
-        )
-
-        today_orders_count = driver_orders_qs.filter(
-            created_at__gte=today_start,
-            created_at__lte=today_end,
-        ).count()
-
-        # ✅ Mes 5 dernières courses sur la période choisie
-        last_orders = list(
-            period_qs
-            .select_related("customer")
-            .order_by("-created_at")[:5]
-        )
-
-        # ✅ Mes courses actives (tjrs globales, peu importe la période)
-        active_orders = list(
-            driver_orders_qs
-            .select_related("customer")
-            .filter(status__in=["pending", "in_progress"])
-            .order_by("created_at")[:5]
-        )
-    else:
-        stats = None
-        today_orders_count = 0
-        last_orders = []
-        active_orders = []
-        global_total_orders = 0
-
-    # --- Lists pour affichage HUB (mêmes noms que driver_app si ton template les attend) ---
-    pending_orders = []
-    in_progress_orders = []
-    done_orders = []
-
-    if connected_driver:
-        base = Order.objects.filter(delivery_partner=connected_driver).select_related("customer")
-
-        pending_orders = list(base.filter(status="pending").order_by("created_at")[:20])
-        in_progress_orders = list(base.filter(status="in_progress").order_by("created_at")[:20])
-        done_orders = list(base.filter(status="done").order_by("-created_at")[:20])
-
+    # Valeurs par défaut (hub vide si pas de driver)
     context = {
         "connected_driver": connected_driver,
-        "stats": stats,
-        "today_orders_count": today_orders_count,
-        "last_orders": last_orders,
-        "active_orders": active_orders,
-        "period": period,
-        "period_label": period_label,
+        "pending_orders": [],
+        "in_progress_orders": [],
+        "done_orders": [],
+        "kpi_today_count": 0,
+        "kpi_today_income": Decimal("0"),
+        "kpi_week_done_count": 0,
+        "kpi_week_income": Decimal("0"),
+        "kpi_month_done_count": 0,
+        "kpi_month_income": Decimal("0"),
+    }
+
+    if not connected_driver:
+        return render(request, "orders/driver_hub.html", context)
+
+    # Base queryset
+    qs = (
+        Order.objects
+        .filter(delivery_partner=connected_driver)
+        .select_related("customer", "laundry_partner", "delivery_partner")
+        .prefetch_related("items__service")
+        .order_by("-created_at")
+    )
+
+    # -----------------------------
+    # KPIs
+    # -----------------------------
+    today = timezone.localdate()
+    today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
+    today_end = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+
+    today_qs = qs.filter(created_at__gte=today_start, created_at__lte=today_end)
+
+    kpi_today_count = today_qs.count()
+    kpi_today_income = (
+        today_qs.aggregate(s=Coalesce(Sum("driver_logistic_cost"), Decimal("0")))["s"]
+        or Decimal("0")
+    )
+
+    week_start = timezone.now() - timedelta(days=7)
+    week_qs = qs.filter(created_at__gte=week_start)
+
+    kpi_week_done_count = week_qs.filter(status="done").count()
+    kpi_week_income = (
+        week_qs.aggregate(s=Coalesce(Sum("driver_logistic_cost"), Decimal("0")))["s"]
+        or Decimal("0")
+    )
+
+    month_start = timezone.now() - timedelta(days=30)
+    month_qs = qs.filter(created_at__gte=month_start)
+
+    kpi_month_done_count = month_qs.filter(status="done").count()
+    kpi_month_income = (
+        month_qs.aggregate(s=Coalesce(Sum("driver_logistic_cost"), Decimal("0")))["s"]
+        or Decimal("0")
+    )
+
+    # -----------------------------
+    # Listes affichées dans le hub
+    # -----------------------------
+    pending_orders = list(qs.filter(status="pending")[:20])
+    in_progress_orders = list(qs.filter(status="in_progress")[:20])
+    done_orders = list(qs.filter(status="done")[:20])
+
+    # -----------------------------
+    # Enrichissement affichage montants (pour le template)
+    # total_client_display / driver_income_display
+    # -----------------------------
+    def enrich(order):
+        try:
+            amounts = compute_order_amounts(order) or {}
+        except Exception:
+            amounts = {}
+
+        # Montant client (fallback safe)
+        total_client = (
+            amounts.get("total_client_ttc")
+            or amounts.get("total_client")
+            or amounts.get("total_ttc_client")
+            or amounts.get("grand_total")
+            or order.total
+            or Decimal("0")
+        )
+
+        # Revenu livreur (fallback: driver_logistic_cost)
+        driver_income = (
+            amounts.get("driver_income")
+            or amounts.get("driver_cost")
+            or order.driver_logistic_cost
+            or Decimal("0")
+        )
+
+        # Injecte des "attributs" que le template utilise
+        order.total_client_display = total_client
+        order.driver_income_display = driver_income
+        return order
+
+    pending_orders = [enrich(o) for o in pending_orders]
+    in_progress_orders = [enrich(o) for o in in_progress_orders]
+    done_orders = [enrich(o) for o in done_orders]
+
+    context.update({
         "pending_orders": pending_orders,
         "in_progress_orders": in_progress_orders,
         "done_orders": done_orders,
-        "pending_count": len(pending_orders),
-        "in_progress_count": len(in_progress_orders),
-        "done_count": len(done_orders),
-    }
+        "kpi_today_count": kpi_today_count,
+        "kpi_today_income": kpi_today_income,
+        "kpi_week_done_count": kpi_week_done_count,
+        "kpi_week_income": kpi_week_income,
+        "kpi_month_done_count": kpi_month_done_count,
+        "kpi_month_income": kpi_month_income,
+    })
+
     return render(request, "orders/driver_hub.html", context)
 
 

@@ -1,259 +1,159 @@
 from django.core.management.base import BaseCommand
-from django.utils import timezone
-from decimal import Decimal
-import random
-
-from orders.models import (
-    Customer,
-    Order,
-    OrderItem,
-    ServiceCategory,
-    ServiceItem,
-)
-from partners.models import LaundryPartner, DeliveryPartner
-
+from django.apps import apps
+from django.utils.text import slugify
 
 class Command(BaseCommand):
-    help = "Crée des données de démonstration FAGNI (clients, partenaires, services, commandes)."
+    help = "Seed demo data (categories, services, laundries, drivers) for testing."
 
-    def handle(self, *args, **options):
-        self.stdout.write(self.style.NOTICE("=== SEED DEMO DATA FAGNI ==="))
+    def add_arguments(self, parser):
+        parser.add_argument("--reset", action="store_true", help="Delete existing demo rows before seeding.")
 
-        existing_orders = Order.objects.count()
-        if existing_orders > 0:
-            self.stdout.write(
-                self.style.WARNING(
-                    f"Il y a déjà {existing_orders} commande(s) en base. "
-                    "On ajoute juste des données de démo en plus, sans tout effacer."
-                )
-            )
+    def handle(self, *args, **opts):
+        ServiceCategory = apps.get_model("orders", "ServiceCategory")
+        ServiceItem     = apps.get_model("orders", "ServiceItem")
+        LaundryPartner  = apps.get_model("partners", "LaundryPartner")
+        DeliveryPartner = apps.get_model("partners", "DeliveryPartner")
 
-        # 1) Services & catégories
-        self._seed_services()
+        reset = opts["reset"]
 
-        # 2) Partenaires
-        self._seed_partners()
+        # --- Helpers ---
+        def has_field(Model, name): 
+            return any(f.name == name for f in Model._meta.get_fields())
 
-        # 3) Clients
-        customers = self._seed_customers()
+        def set_if(obj, field, value):
+            if has_field(obj.__class__, field):
+                setattr(obj, field, value)
 
-        # 4) Commandes
-        self._seed_orders(customers)
+        def unique_slug(Model, base):
+            s = slugify(base)[:45] or "item"
+            if not Model.objects.filter(slug=s).exists():
+                return s
+            i = 2
+            while True:
+                ss = f"{s}-{i}"
+                if not Model.objects.filter(slug=ss).exists():
+                    return ss
+                i += 1
 
-        self.stdout.write(self.style.SUCCESS("✔ Données de démo FAGNI créées avec succès."))
+        # --- Optional reset demo rows only (safe-ish) ---
+        if reset:
+            # On supprime uniquement ce qui ressemble à "Demo"
+            ServiceItem.objects.filter(name__icontains="Demo").delete()
+            ServiceCategory.objects.filter(name__icontains="Demo").delete()
+            LaundryPartner.objects.filter(name__icontains="Demo").delete()
+            DeliveryPartner.objects.filter(name__icontains="Demo").delete()
 
-    # ------------------------------------------------------------------
-    # 1) Services / catégories
-    # ------------------------------------------------------------------
-    def _seed_services(self):
-        if ServiceCategory.objects.exists() and ServiceItem.objects.exists():
-            self.stdout.write("Services déjà présents, on ne recrée pas.")
-            return
+        self.stdout.write(self.style.SUCCESS("=== SEED_DEMO: start ==="))
 
-        self.stdout.write("Création de catégories et services de démo...")
+        # =========================
+        # 1) Categories
+        # =========================
+        categories = [
+            "Lavage & Repassage",
+            "Repassage seul",
+            "Couettes & couvertures",
+            "Retouche",
+            "Cordonnerie",
+        ]
+        cat_objs = {}
+        created_c = 0
 
-        cat_linge = ServiceCategory.objects.create(name="Linge quotidien")
-        cat_repassage = ServiceCategory.objects.create(name="Repassage")
-        cat_special = ServiceCategory.objects.create(name="Articles spéciaux")
+        for name in categories:
+            slug = slugify(name)
+            obj = ServiceCategory.objects.filter(slug=slug).first()
+            if not obj:
+                obj = ServiceCategory.objects.create(name=name, slug=slug)
+                created_c += 1
+            cat_objs[name] = obj
 
-        # On ne met PAS de champ de prix ici (ton modèle n'a pas 'base_price')
-        services_data = [
-            (cat_linge, "Chemise"),
-            (cat_linge, "Pantalon"),
-            (cat_linge, "T-shirt"),
-            (cat_repassage, "Repassage chemise"),
-            (cat_repassage, "Repassage pantalon"),
-            (cat_special, "Robe de soirée"),
-            (cat_special, "Costume complet"),
+        self.stdout.write(f"Categories: +{created_c} (total={ServiceCategory.objects.count()})")
+
+        # =========================
+        # 2) Services
+        # =========================
+        services = [
+            ("Lavage & Repassage", "Chemise", 1000),
+            ("Lavage & Repassage", "Pantalon", 1200),
+            ("Lavage & Repassage", "T-shirt", 800),
+            ("Repassage seul", "Chemise (repassage)", 700),
+            ("Repassage seul", "Pantalon (repassage)", 800),
+            ("Couettes & couvertures", "Couette 2 places", 3500),
+            ("Couettes & couvertures", "Drap", 1000),
+            ("Retouche", "Ourlet pantalon", 1500),
+            ("Retouche", "Changement fermeture", 2500),
+            ("Cordonnerie", "Cirage", 1000),
         ]
 
-        for cat, name in services_data:
-            ServiceItem.objects.create(
-                category=cat,
-                name=name,
-                is_active=True,
-            )
+        created_s = 0
+        # champs possibles côté ServiceItem (selon ton modèle)
+        price_fields = ["default_price", "price", "unit_price", "base_price"]
 
-        self.stdout.write(self.style.SUCCESS("✔ Services de démo créés."))
+        for cat_name, svc_name, price in services:
+            cat = cat_objs[cat_name]
+            obj = ServiceItem.objects.filter(name=svc_name, category=cat).first()
+            if not obj:
+                obj = ServiceItem(name=svc_name, category=cat)
+                # slug (si présent)
+                if has_field(ServiceItem, "slug"):
+                    set_if(obj, "slug", unique_slug(ServiceItem, f"{cat_name}-{svc_name}"))
+                # prix (selon champ existant)
+                for pf in price_fields:
+                    if has_field(ServiceItem, pf):
+                        set_if(obj, pf, price)
+                        break
+                # actif
+                set_if(obj, "is_active", True)
+                obj.save()
+                created_s += 1
 
-    # ------------------------------------------------------------------
-    # 2) Partenaires blanchisseries / livreurs
-    # ------------------------------------------------------------------
-    def _seed_partners(self):
-        if LaundryPartner.objects.exists() or DeliveryPartner.objects.exists():
-            self.stdout.write("Partenaires déjà présents, on ne recrée pas.")
-            return
+        self.stdout.write(f"Services: +{created_s} (total={ServiceItem.objects.count()})")
 
-        self.stdout.write("Création de partenaires de démo...")
-
-        LaundryPartner.objects.create(name="Blanchisserie Cocody", city="Abidjan")
-        LaundryPartner.objects.create(name="Blanchisserie Yopougon", city="Abidjan")
-        LaundryPartner.objects.create(name="Blanchisserie Riviera", city="Abidjan")
-
-        DeliveryPartner.objects.create(name="Livreur Alpha")
-        DeliveryPartner.objects.create(name="Livreur Bravo")
-        DeliveryPartner.objects.create(name="Livreur Charlie")
-
-        self.stdout.write(self.style.SUCCESS("✔ Partenaires de démo créés."))
-
-    # ------------------------------------------------------------------
-    # 3) Clients
-    # ------------------------------------------------------------------
-    def _seed_customers(self):
-        self.stdout.write("Création de clients de démo...")
-
-        base_clients = [
-            ("Client Démo 1", "0101010101", "Cocody Angré"),
-            ("Client Démo 2", "0202020202", "Plateau"),
-            ("Client Démo 3", "0303030303", "Yopougon"),
-            ("Client Démo 4", "0404040404", "Marcory"),
-            ("Client Démo 5", "0505050505", "Riviera 2"),
+        # =========================
+        # 3) Laundries (partners)
+        # =========================
+        laundries = [
+            ("Pressing Demo Cocody", "Cocody Angré", 5.371, -3.989),
+            ("Pressing Demo Plateau", "Plateau", 5.323, -4.019),
+            ("Pressing Demo Marcory", "Marcory", 5.292, -3.996),
         ]
 
-        customers = []
-        for name, phone, address in base_clients:
-            c, created = Customer.objects.get_or_create(
-                phone=phone,
-                defaults={
-                    "name": name,
-                    "address": address,
-                },
-            )
-            c.name = name
-            c.address = address
-            c.save()
-            customers.append(c)
+        created_l = 0
+        for name, address, lat, lng in laundries:
+            obj = LaundryPartner.objects.filter(name=name).first()
+            if not obj:
+                obj = LaundryPartner(name=name)
+                set_if(obj, "is_active", True)
+                set_if(obj, "address", address)
+                set_if(obj, "latitude", lat)
+                set_if(obj, "longitude", lng)
+                obj.save()
+                created_l += 1
 
-        self.stdout.write(self.style.SUCCESS(f"✔ {len(customers)} clients de démo prêts."))
-        return customers
+        self.stdout.write(f"Laundries: +{created_l} (total={LaundryPartner.objects.count()})")
 
-    # ------------------------------------------------------------------
-    # 4) Commandes + items
-    # ------------------------------------------------------------------
-    def _seed_orders(self, customers):
-        if not customers:
-            self.stdout.write(self.style.WARNING("Aucun client dispo pour créer des commandes."))
-            return
+        # =========================
+        # 4) Drivers (partners)
+        # =========================
+        drivers = [
+            ("Livreur Demo 1", "0700000001"),
+            ("Livreur Demo 2", "0700000002"),
+            ("Livreur Demo 3", "0700000003"),
+        ]
 
-        services = list(ServiceItem.objects.filter(is_active=True))
-        laundries = list(LaundryPartner.objects.all())
-        drivers = list(DeliveryPartner.objects.all())
+        created_d = 0
+        for name, phone in drivers:
+            obj = DeliveryPartner.objects.filter(name=name).first()
+            if not obj:
+                obj = DeliveryPartner(name=name)
+                set_if(obj, "is_active", True)
+                # phone/mobile selon modèle
+                if has_field(DeliveryPartner, "phone"):
+                    set_if(obj, "phone", phone)
+                elif has_field(DeliveryPartner, "mobile"):
+                    set_if(obj, "mobile", phone)
+                obj.save()
+                created_d += 1
 
-        if not services:
-            self.stdout.write(
-                self.style.WARNING("Pas de services actifs, impossible de créer des commandes.")
-            )
-            return
+        self.stdout.write(f"Drivers: +{created_d} (total={DeliveryPartner.objects.count()})")
 
-        self.stdout.write("Création de commandes de démo...")
-
-        # Petit mapping local pour donner des prix par nom de service
-        price_map = {
-            "Chemise": 500,
-            "Pantalon": 800,
-            "T-shirt": 400,
-            "Repassage chemise": 300,
-            "Repassage pantalon": 400,
-            "Robe de soirée": 2500,
-            "Costume complet": 2000,
-        }
-
-        nb_orders = 20
-        now = timezone.now()
-        created_count = 0
-
-        for i in range(nb_orders):
-            customer = random.choice(customers)
-            laundry = random.choice(laundries) if laundries else None
-            driver = random.choice(drivers) if drivers else None
-
-            status = random.choice(["pending", "in_progress", "done"])
-            created_at = now - timezone.timedelta(days=random.randint(0, 14))
-
-            order = Order.objects.create(
-                customer=customer,
-                status=status,
-                laundry_partner=laundry,
-                delivery_partner=driver,
-            )
-
-            # on force une date de création réaliste
-            try:
-                Order.objects.filter(pk=order.pk).update(created_at=created_at)
-                order.refresh_from_db()
-            except Exception:
-                pass
-
-            nb_items = random.randint(2, 5)
-            total_presta = Decimal("0")
-
-            for _ in range(nb_items):
-                service = random.choice(services)
-                qty = random.randint(1, 5)
-
-                # Prix basé sur le nom du service, sinon 500 par défaut
-                base_price = price_map.get(service.name, 500)
-                unit_price = Decimal(str(base_price))
-
-                item = OrderItem.objects.create(
-                    order=order,
-                    service=service,
-                    designation=service.name,
-                    quantity=qty,
-                    unit_price=unit_price,
-                )
-                total_presta += item.total
-
-            # On alimente quelques champs si présents sur ton modèle Order
-            if hasattr(order, "total_ht") and order.total_ht is None:
-                order.total_ht = total_presta
-
-            if hasattr(order, "total_ttc") and order.total_ttc is None:
-                order.total_ttc = total_presta
-
-            if hasattr(order, "service_fee") and (order.service_fee is None or order.service_fee == 0):
-                service_fee = total_presta * Decimal("0.05")
-                if service_fee < Decimal("500") and total_presta > 0:
-                    service_fee = Decimal("500")
-                order.service_fee = service_fee
-
-            if hasattr(order, "delivery_fee") and (order.delivery_fee is None or order.delivery_fee == 0):
-                order.delivery_fee = Decimal("1000") if total_presta > 0 else Decimal("0")
-
-            if hasattr(order, "amount_paid") and order.amount_paid is None:
-                if status == "done" and random.random() < 0.7:
-                    total_client = (
-                        (order.total_ttc or Decimal("0"))
-                        + (order.service_fee or Decimal("0"))
-                        + (order.delivery_fee or Decimal("0"))
-                    )
-                    order.amount_paid = total_client
-                else:
-                    order.amount_paid = Decimal("0")
-
-            if hasattr(order, "amount_due") and order.amount_due is None:
-                total_client = (
-                    (order.total_ttc or Decimal("0"))
-                    + (order.service_fee or Decimal("0"))
-                    + (order.delivery_fee or Decimal("0"))
-                )
-                order.amount_due = total_client - (order.amount_paid or Decimal("0"))
-
-            if hasattr(order, "distance_km") and order.distance_km is None:
-                order.distance_km = Decimal(str(random.choice([3, 5, 7, 10])))
-
-            if hasattr(order, "driver_logistic_cost") and order.driver_logistic_cost is None:
-                if getattr(order, "distance_km", None):
-                    order.driver_logistic_cost = order.distance_km * Decimal("150")
-
-            if hasattr(order, "logistic_margin") and order.logistic_margin is None:
-                if getattr(order, "delivery_fee", None) is not None and getattr(order, "driver_logistic_cost", None) is not None:
-                    order.logistic_margin = (order.delivery_fee or 0) - (order.driver_logistic_cost or 0)
-
-            if status == "done" and hasattr(order, "delivered_time") and order.delivered_time is None:
-                order.delivered_time = order.created_at + timezone.timedelta(hours=24)
-
-            order.save()
-            created_count += 1
-
-        self.stdout.write(self.style.SUCCESS(f"✔ {created_count} commandes de démo créées."))
+        self.stdout.write(self.style.SUCCESS("=== SEED_DEMO: done ==="))

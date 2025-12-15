@@ -63,9 +63,9 @@ def backwards(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        # ⚠️ Laisse la dépendance auto générée par Django ici
+        ("orders", "0036_alter_invoicesettings_options_and_more"),
     ]
 
     operations = [
-        migrations.RunPython(forwards, backwards),
+        migrations.RunPython(forwards, migrations.RunPython.noop),
     ]

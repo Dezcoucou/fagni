@@ -4355,7 +4355,8 @@ def driver_order_detail(request, order_id):
     amounts = data
 
     total_client_ttc = (
-        amounts.get("total_client_ttc")
+        amounts.get("total_ttc_client")         # ✅ moteur central
+        or amounts.get("total_client_ttc")      # tolérance
         or getattr(order, "total_client_ttc", None)
         or getattr(order, "total", None)
         or getattr(order, "prestation_total", None)
@@ -4363,10 +4364,14 @@ def driver_order_detail(request, order_id):
     )
 
     delivery_fee_client = (
-        amounts.get("delivery_fee_client")
+        amounts.get("delivery_fee_client")      # ✅ moteur central
         or getattr(order, "delivery_fee", None)
         or Decimal("0")
     )
+
+    service_fee_ht = amounts.get("service_fee_ht") or getattr(order, "service_fee", None) or Decimal("0")
+    vat_fagni = amounts.get("vat_fagni") or getattr(order, "vat_fagni", None) or Decimal("0")
+    express_surcharge = amounts.get("express_surcharge") or getattr(order, "express_extra_fee", None) or Decimal("0")
 
     # Revenu livreur : priorité aux legs, puis mêmes fallbacks que driver_app
     driver_income = driver_leg_amount or (
@@ -4408,6 +4413,9 @@ def driver_order_detail(request, order_id):
         "delivery_lng": delivery_lng,
         "provider_lat": provider_lat,
         "provider_lng": provider_lng,
+        "service_fee_ht": service_fee_ht,
+        "vat_fagni": vat_fagni,
+        "express_surcharge": express_surcharge,
     }
     return render(request, "orders/driver_order_detail.html", context)
 

@@ -5340,6 +5340,18 @@ def driver_hub(request):
         active_orders = []
         global_total_orders = 0
 
+    # --- Lists pour affichage HUB (mêmes noms que driver_app si ton template les attend) ---
+    pending_orders = []
+    in_progress_orders = []
+    done_orders = []
+
+    if connected_driver:
+        base = Order.objects.filter(delivery_partner=connected_driver).select_related("customer")
+
+        pending_orders = list(base.filter(status="pending").order_by("created_at")[:20])
+        in_progress_orders = list(base.filter(status="in_progress").order_by("created_at")[:20])
+        done_orders = list(base.filter(status="done").order_by("-created_at")[:20])
+
     context = {
         "connected_driver": connected_driver,
         "stats": stats,
@@ -5348,6 +5360,12 @@ def driver_hub(request):
         "active_orders": active_orders,
         "period": period,
         "period_label": period_label,
+        "pending_orders": pending_orders,
+        "in_progress_orders": in_progress_orders,
+        "done_orders": done_orders,
+        "pending_count": len(pending_orders),
+        "in_progress_count": len(in_progress_orders),
+        "done_count": len(done_orders),
     }
     return render(request, "orders/driver_hub.html", context)
 

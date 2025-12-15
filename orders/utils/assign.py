@@ -1,6 +1,4 @@
-from decimal import Decimal
 import math
-
 from partners.models import LaundryPartner, DeliveryPartner
 
 
@@ -25,7 +23,7 @@ def haversine_km(lat1, lon1, lat2, lon2):
     dphi = math.radians(lat2 - lat1)
     dlambda = math.radians(lon2 - lon1)
 
-    a = math.sin(dphi / 2.0) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2.0) ** 2
+    a = (math.sin(dphi / 2.0) ** 2) + (math.cos(phi1) * math.cos(phi2) * (math.sin(dlambda / 2.0) ** 2))
     c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
 
     return R * c
@@ -77,10 +75,7 @@ def auto_assign_delivery(order):
     if order.delivery_partner:
         return order.delivery_partner
 
-    try:
-        partner = DeliveryPartner.objects.filter(is_active=True).first()
-    except Exception:
-        partner = None
+    partner = DeliveryPartner.objects.filter(is_active=True).first()
 
     if partner:
         order.delivery_partner = partner

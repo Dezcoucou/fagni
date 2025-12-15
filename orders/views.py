@@ -3329,28 +3329,23 @@ def _build_invoice_context(order):
 
 @login_required
 def order_ticket_pdf(request, order_id):
-    """
-    Ticket PDF (HTML rendu).
-    Source de vérité = compute_order_amounts(order) (pricing.py).
-    """
-    order = get_object_or_404(
+    order = (
         Order.objects
         .select_related("customer", "laundry_partner", "delivery_partner")
-        .prefetch_related("items__service", "items__photos"),
-        pk=order_id
+        .prefetch_related("items__service", "items__photos")
+        .filter(pk=order_id)
+        .first()
     )
     if not order:
+        messages.error(request, f"Commande introuvable (ID={order_id}).")
         return redirect("orders:list")
 
     items = order.items.all()
-
     detail_url = request.build_absolute_uri(reverse("orders:detail", args=[order.id]))
-    qr_data = detail_url
-
     context = {
         "order": order,
         "items": items,
-        "qr_data": qr_data,
+        "qr_data": detail_url,
         **_build_invoice_context(order),
         "invoice_settings": get_invoice_settings_clean(),
     }

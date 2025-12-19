@@ -174,8 +174,7 @@ class WalletTransaction(models.Model):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
-        related_name="wallet_transactions",
-        verbose_name="Commande liée",
+        related_name="mlm_wallet_transactions",
     )
 
     description = models.CharField(

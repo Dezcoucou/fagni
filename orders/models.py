@@ -1,7 +1,7 @@
 from decimal import Decimal, ROUND_HALF_UP
 import uuid
 import math
-
+from orders.utils.distances import haversine_distance_km
 from django.db import models
 from django.db.models import Sum, F, DecimalField
 from django.conf import settings
@@ -9,42 +9,6 @@ from django.utils import timezone
 from partners.models import LaundryPartner, DeliveryPartner, RelayPointPartner
 from .finance import compute_order_financials
 from .services import recompute_order_distance_from_legs
-
-
-# =====================
-#  UTILITAIRE DISTANCE
-# =====================
-def haversine_distance_km(origin_lat, origin_lng, dest_lat, dest_lng):
-    """
-    Distance géodésique (en km) entre deux points (lat/lng) avec la formule de Haversine.
-    Aucun appel à Google : fonctionne même sans internet ni clé API.
-    Retourne un Decimal (2 décimales) ou None si impossible.
-    """
-    try:
-        if origin_lat is None or origin_lng is None or dest_lat is None or dest_lng is None:
-            return None
-
-        lat1 = float(origin_lat)
-        lon1 = float(origin_lng)
-        lat2 = float(dest_lat)
-        lon2 = float(dest_lng)
-    except (TypeError, ValueError):
-        return None
-
-    # Rayon moyen de la Terre en km
-    R = 6371.0
-
-    phi1 = math.radians(lat1)
-    phi2 = math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-
-    a = math.sin(dphi / 2.0) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2.0) ** 2
-    c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
-
-    km = R * c
-    # On repasse en Decimal avec 2 décimales
-    return Decimal(str(km)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def _round_fcfa(value):
@@ -74,7 +38,6 @@ def sync_delivery_legs_for_order(order):
     - return  = blanchisserie -> adresse de collecte (classique)
     - delivery = blanchisserie -> adresse de livraison (si différente)
     """
-    from .models import DeliveryLeg  # résolu à l'exécution, pas à l'import
 
     delivery_fee = order.delivery_fee or Decimal("0")
     driver_total = order.amount_driver_partner or Decimal("0")
@@ -770,6 +733,11 @@ class Order(models.Model):
         default=False,
     )
 
+    driver_wallet_credited = models.BooleanField(
+        "Wallet livreur déjà crédité",
+        default=False,
+    )
+
     invoice_number = models.CharField(
         "Numéro de facture",
         max_length=30,
@@ -869,6 +837,18 @@ class Order(models.Model):
         self.commission_laundry_ht = data.get("commission_laundry_ht", Decimal("0"))
         self.commission_delivery_ht = data.get("commission_delivery_ht", Decimal("0"))
 
+        # 4.b Montants à payer aux partenaires (SOURCE WALLETS)
+
+        # Blanchisserie : reçoit sa commission HT
+        self.amount_laundry_partner = (
+            data.get("commission_laundry_ht", Decimal("0"))
+        ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
+        # Livreur : reçoit le coût logistique (driver)
+        self.amount_driver_partner = (
+            data.get("commission_delivery_ht", Decimal("0"))
+        ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
         # 5) Marge logistique FAGNI
         margin_delivery = data.get("margin_delivery", Decimal("0"))
         try:
@@ -880,6 +860,11 @@ class Order(models.Model):
         # 6) Revenus FAGNI & TVA
         self.fagni_revenue_ht = data.get("fagni_revenue_ht", Decimal("0"))
         self.vat_fagni = data.get("vat_fagni", Decimal("0"))
+
+        # Revenu FAGNI TTC (HT + TVA)
+        self.fagni_revenue_ttc = (
+            self.fagni_revenue_ht + self.vat_fagni
+        ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
         # 7) Total TTC client
         self.total_client_ttc = data.get("total_ttc_client", Decimal("0"))
@@ -1382,31 +1367,28 @@ class Order(models.Model):
                 commission_amount=commission_int,
             )
 
-            wallet, _ = Wallet.objects.get_or_create(
-                owner_type="customer",
-                customer=sponsor_customer,
-                defaults={"currency": "XOF"},
-            )
+        from wallets.services import credit_wallet
 
-            commission_amount_decimal = Decimal(commission_int).quantize(
-                Decimal("0.01"),
-                rounding=ROUND_HALF_UP,
-            )
+        # (on garde ton wallet get_or_create)
+        wallet, _ = Wallet.objects.get_or_create(
+            owner_type="customer",
+            customer=sponsor_customer,
+            defaults={"currency": "XOF"},
+        )
 
-            wallet.balance = (wallet.balance + commission_amount_decimal).quantize(
-                Decimal("0.01"),
-                rounding=ROUND_HALF_UP,
-            )
-            wallet.save(update_fields=["balance", "updated_at"])
+        commission_amount_decimal = Decimal(commission_int).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
 
-            WalletTransaction.objects.create(
-                wallet=wallet,
-                order=self,
-                type="mlm_commission",
-                direction="in",
-                amount=commission_amount_decimal,
-                description=f"Commission niveau {level} pour commande {self.code}",
-            )
+        credit_wallet(
+            wallet,
+            commission_amount_decimal,
+            label=f"Commission niveau {level} pour commande {self.code}",
+            order=self,
+            tx_type="mlm_commission",
+        )
+
 
         if self.pk:
             type(self).objects.filter(pk=self.pk).update(mlm_distributed=True)
@@ -1430,18 +1412,175 @@ class Order(models.Model):
         self.wallets_distributed = True
         super(Order, self).save(update_fields=["wallets_distributed"])
 
+
+    def pay_driver_if_needed(self):
+        """
+        Paie le livreur à la fin de course ("done"), mais seulement si la commande est payée.
+
+        Règle anti-bug / anti-doublon :
+        - La SOURCE DE VÉRITÉ = WalletTransaction(type='payout', direction='in', order=self)
+        - Le flag driver_wallet_credited est un cache ; il peut être faux (ou vrai) si DB a été resetée.
+        => Donc on ne doit jamais return juste parce que le flag est True.
+        """
+        from decimal import Decimal
+        from wallets.services import credit_wallet, get_or_create_wallet_for_delivery_partner
+        from wallets.models import WalletTransaction
+
+        # Doit être payée
+        if self.payment_status != "paid":
+            return
+
+        # Doit avoir un livreur
+        if not self.delivery_partner:
+            return
+
+        wallet = get_or_create_wallet_for_delivery_partner(self.delivery_partner)
+
+        # SOURCE DE VÉRITÉ (global) :
+        # si une tx payout driver existe déjà pour CETTE COMMANDE (peu importe le wallet),
+        # on ne repaie jamais.
+        if WalletTransaction.objects.filter(
+            order=self,
+            type="payout",
+            direction="in",
+            wallet__owner_type="driver",
+        ).exists():
+            if not getattr(self, "driver_wallet_credited", False):
+                self.driver_wallet_credited = True
+                super(Order, self).save(update_fields=["driver_wallet_credited"])
+            return
+
+        # Sinon, on tente de payer (même si flag True : cas "flag bloqué" => réparation)
+        amount = self.amount_driver_partner_resolved or Decimal("0")
+        if amount <= 0:
+            return
+
+        credit_wallet(
+            wallet,
+            amount,
+            label=f"Commande {self.code} – paiement livreur (fin de course)",
+            order=self,
+            tx_type="payout",
+        )
+
+        # Marquer comme payé (évite doublon)
+        if not getattr(self, "driver_wallet_credited", False):
+            self.driver_wallet_credited = True
+            super(Order, self).save(update_fields=["driver_wallet_credited"])
+
+    def financial_timeline(self):
+        """
+        Timeline financière (lecture seule) pour affichage UI / admin.
+        Cherche les événements clés via :
+        - payment_status / amount_paid
+        - WalletTransaction liées à la commande (laundry/internal/driver)
+        """
+        from wallets.models import WalletTransaction
+
+        events = []
+
+        def add_event(key, title, ok=False, details=None, at=None):
+            events.append({
+                "key": key,
+                "title": title,
+                "ok": bool(ok),
+                "details": details or "",
+                "at": at,
+            })
+
+        # 1) Paiement client
+        paid = (getattr(self, "payment_status", "unpaid") == "paid")
+        amount_paid = getattr(self, "amount_paid", None)
+        total_ttc = getattr(self, "total_client_ttc", None)
+        add_event(
+            "payment",
+            "Client payé",
+            ok=paid,
+            details=f"amount_paid={amount_paid} / total_client_ttc={total_ttc}",
+            at=None,
+        )
+
+        # 2) Transactions wallets (si le modèle a created_at, on le remonte)
+        txs = (
+            WalletTransaction.objects
+            .filter(order=self)
+            .select_related("wallet")
+            .order_by("id")
+        )
+
+        # Helpers pour trouver une tx spécifique
+        def first_tx(owner_type=None, tx_type=None, direction=None):
+            qs = txs
+            if owner_type:
+                qs = qs.filter(wallet__owner_type=owner_type)
+            if tx_type:
+                qs = qs.filter(type=tx_type)
+            if direction:
+                qs = qs.filter(direction=direction)
+            return qs.first()
+
+        # 2.a Blanchisserie (payout in)
+        laundry_tx = first_tx(owner_type="laundry", tx_type="payout", direction="in")
+        add_event(
+            "laundry",
+            "Blanchisserie créditée",
+            ok=bool(laundry_tx),
+            details=(laundry_tx.description if laundry_tx else ""),
+            at=getattr(laundry_tx, "created_at", None) if laundry_tx else None,
+        )
+
+        # 2.b FAGNI interne (credit in)
+        internal_tx = first_tx(owner_type="internal", tx_type="credit", direction="in")
+        add_event(
+            "internal",
+            "FAGNI encaissé (wallet interne)",
+            ok=bool(internal_tx),
+            details=(internal_tx.description if internal_tx else ""),
+            at=getattr(internal_tx, "created_at", None) if internal_tx else None,
+        )
+
+        # 2.c Livreur (payout in) — doit arriver fin de course
+        driver_tx = first_tx(owner_type="driver", tx_type="payout", direction="in")
+        driver_flag = bool(getattr(self, "driver_wallet_credited", False))
+        add_event(
+            "driver",
+            "Livreur crédité",
+            ok=bool(driver_tx) or driver_flag,
+            details=(driver_tx.description if driver_tx else f"driver_wallet_credited={driver_flag}"),
+            at=getattr(driver_tx, "created_at", None) if driver_tx else None,
+        )
+
+        return events
+
     def save(self, *args, **kwargs):
-        payment_just_paid = False  # ✅ toujours défini
+        payment_just_paid = False
+        status_just_done = False
 
         if self.pk:
             old = Order.objects.filter(pk=self.pk).first()
-            if old and old.payment_status != "paid" and self.payment_status == "paid":
-                payment_just_paid = True
+            if old:
+                if old.payment_status != "paid" and self.payment_status == "paid":
+                    payment_just_paid = True
+                if old.status != "done" and self.status == "done":
+                    status_just_done = True
 
         super().save(*args, **kwargs)
 
+        # 1) Distribution générale (blanchisseur + interne) au paiement
         if payment_just_paid:
             self.mark_as_paid_and_distribute()
+
+        # 2) Paiement livreur (cas normaux)
+        if status_just_done or (payment_just_paid and self.status == "done"):
+            self.pay_driver_if_needed()
+
+        # 3) 🔒 RÉPARATION AUTOMATIQUE (sécurité ultime)
+        if (
+            self.status == "done"
+            and self.payment_status == "paid"
+            and not getattr(self, "driver_wallet_credited", False)
+        ):
+            self.pay_driver_if_needed()
 
 
 def generate_invoice_number():
@@ -1711,3 +1850,22 @@ class OrderStatusHistory(models.Model):
 
     def __str__(self):
         return f"{self.order.code} : {self.previous_status} → {self.new_status} ({self.changed_at})"
+
+
+class Payment(models.Model):
+    order = models.ForeignKey("Order", on_delete=models.CASCADE)
+    amount = models.DecimalField(max_digits=10, decimal_places=0)
+    channel = models.CharField(max_length=20)  # orange, mtn, wave
+    reference = models.CharField(max_length=120, blank=True)
+    confirmed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="confirmed_payments",
+    )
+    source = models.CharField(max_length=20, default="driver")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.order.code} - {self.amount} FCFA"

@@ -3,11 +3,12 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from django.db import transaction
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 
 from orders.models import Order, Customer
 from partners.models import LaundryPartner, DeliveryPartner, RelayPointPartner
-
-from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
@@ -18,6 +19,7 @@ class Wallet(models.Model):
     - côté client
     - côté blanchisserie
     - côté livreur
+    - côté point relais
     - côté interne (FAGNI)
     """
 
@@ -25,6 +27,7 @@ class Wallet(models.Model):
         ("customer", "Client FAGNI"),
         ("laundry", "Blanchisserie partenaire"),
         ("driver", "Livreur partenaire"),
+        ("relay", "Point relais partenaire"),
         ("internal", "Interne FAGNI"),
     ]
 
@@ -99,6 +102,80 @@ class Wallet(models.Model):
     class Meta:
         verbose_name = "Wallet"
         verbose_name_plural = "Wallets"
+        constraints = [
+            # 1 wallet client / devise
+            models.UniqueConstraint(
+                fields=["customer", "currency"],
+                condition=models.Q(owner_type="customer") & models.Q(customer__isnull=False),
+                name="uniq_wallet_customer_currency",
+            ),
+            # 1 wallet blanchisserie / devise
+            models.UniqueConstraint(
+                fields=["laundry_partner", "currency"],
+                condition=models.Q(owner_type="laundry") & models.Q(laundry_partner__isnull=False),
+                name="uniq_wallet_laundry_currency",
+            ),
+            # 1 wallet point relais / devise
+            models.UniqueConstraint(
+                fields=["relay_partner", "currency"],
+                condition=models.Q(owner_type="relay") & models.Q(relay_partner__isnull=False),
+                name="uniq_wallet_relay_currency",
+            ),
+            # 1 wallet livreur / devise
+            models.UniqueConstraint(
+                fields=["delivery_partner", "currency"],
+                condition=models.Q(owner_type="driver") & models.Q(delivery_partner__isnull=False),
+                name="uniq_wallet_driver_currency",
+            ),
+            # 1 wallet interne (user) / devise (si tu veux un wallet par user interne)
+            models.UniqueConstraint(
+                fields=["user", "currency"],
+                condition=models.Q(owner_type="internal") & models.Q(user__isnull=False),
+                name="uniq_wallet_internal_currency",
+            ),
+            # 1 wallet plateforme (owner_type=internal, user NULL) / devise
+            models.UniqueConstraint(
+                fields=["currency"],
+                condition=models.Q(owner_type="internal") & models.Q(user__isnull=True),
+                name="uniq_wallet_internal_platform_currency",
+            ),
+        ]
+
+    def clean(self):
+        """
+        Garde-fou : exactement 1 FK doit être renseigné (sauf internal plateforme),
+        et il doit correspondre à owner_type.
+        """
+        super().clean()
+
+        links = {
+            "customer": self.customer_id,
+            "laundry": self.laundry_partner_id,
+            "driver": self.delivery_partner_id,
+            "relay": self.relay_partner_id,
+            "internal": self.user_id,
+        }
+
+        filled = [k for k, v in links.items() if v is not None]
+
+        if self.owner_type == "internal":
+            # autorise 0 (wallet plateforme) OU 1 (wallet d'un user interne)
+            if len(filled) > 1:
+                raise ValidationError("Wallet interne: renseigne au maximum un seul champ (user).")
+            # Si un champ est rempli, il doit être "internal" (= user)
+            if len(filled) == 1 and filled[0] != "internal":
+                raise ValidationError("Wallet interne: seul le champ 'Utilisateur (interne)' peut être renseigné.")
+            return
+
+        # Tous les autres : exactement 1 champ rempli
+        if len(filled) != 1:
+            raise ValidationError("Un wallet doit avoir exactement 1 propriétaire (un seul champ lié).")
+
+        expected = self.owner_type
+        if filled[0] != expected:
+            raise ValidationError(
+                f"Incohérence: owner_type='{self.owner_type}' mais champ renseigné='{filled[0]}'."
+            )
 
     def __str__(self):
         label = f"{self.get_owner_type_display()} - {self.currency}"
@@ -108,6 +185,12 @@ class Wallet(models.Model):
             label = f"Blanchisserie {self.laundry_partner.name} - {self.currency}"
         elif self.delivery_partner:
             label = f"Livreur {self.delivery_partner.name} - {self.currency}"
+        elif self.relay_partner:
+            label = f"Point relais {self.relay_partner.name} - {self.currency}"
+        elif self.owner_type == "internal" and self.user:
+            label = f"Interne {self.user.username} - {self.currency}"
+        elif self.owner_type == "internal":
+            label = f"Interne FAGNI - {self.currency}"
         return f"{label} (solde : {self.balance} {self.currency})"
 
     def credit(self, amount: Decimal, description: str = ""):
@@ -121,9 +204,7 @@ class Wallet(models.Model):
         if amount <= 0:
             return
 
-        self.balance = (self.balance + amount).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
+        self.balance = (self.balance + amount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         self.save(update_fields=["balance", "updated_at"])
 
         WalletTransaction.objects.create(
@@ -146,9 +227,11 @@ class Wallet(models.Model):
         if amount <= 0:
             return
 
-        self.balance = (self.balance - amount).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
+        if (self.balance or Decimal("0.00")) < amount:
+            # sécurité
+            return
+
+        self.balance = (self.balance - amount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         self.save(update_fields=["balance", "updated_at"])
 
         WalletTransaction.objects.create(
@@ -163,25 +246,20 @@ class Wallet(models.Model):
 
 class WalletTransaction(models.Model):
     """
-    Mouvement sur un wallet :
-    - topup / dépôt
-    - paiement commande
-    - commission MLM
-    - ajustement manuel, etc.
+    Historique des mouvements d'un wallet.
     """
 
-    TRANSACTION_TYPE_CHOICES = [
-        ("topup", "Recharge / Dépôt"),
-        ("payout", "Paiement sortant"),
-        ("mlm_commission", "Commission MLM"),
-        ("adjustment", "Ajustement manuel"),
+    TYPE_CHOICES = [
         ("credit", "Crédit"),
         ("debit", "Débit"),
+        ("payout", "Paiement / Retrait"),
+        ("refund", "Remboursement"),
+        ("adjustment", "Ajustement"),
     ]
 
     DIRECTION_CHOICES = [
-        ("in", "Entrant"),
-        ("out", "Sortant"),
+        ("in", "Entrée"),
+        ("out", "Sortie"),
     ]
 
     wallet = models.ForeignKey(
@@ -191,25 +269,24 @@ class WalletTransaction(models.Model):
         verbose_name="Wallet",
     )
 
-    # ⚠️ IMPORTANT : related_name différent de l'app mlm pour éviter le conflit
     order = models.ForeignKey(
         Order,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
-        related_name="wallet_transactions_wallets",
-        verbose_name="Commande liée",
+        related_name="wallet_transactions",
+        verbose_name="Commande",
     )
 
     type = models.CharField(
-        "Type de transaction",
+        "Type",
         max_length=30,
-        choices=TRANSACTION_TYPE_CHOICES,
+        choices=TYPE_CHOICES,
     )
 
     direction = models.CharField(
         "Sens",
-        max_length=5,
+        max_length=10,
         choices=DIRECTION_CHOICES,
     )
 
@@ -217,20 +294,25 @@ class WalletTransaction(models.Model):
         "Montant",
         max_digits=12,
         decimal_places=2,
+        default=Decimal("0.00"),
     )
 
-    description = models.CharField(
-        "Description",
-        max_length=255,
-        blank=True,
-    )
+    description = models.TextField("Description", blank=True)
 
     created_at = models.DateTimeField("Créée le", auto_now_add=True)
 
     class Meta:
-        verbose_name = "Transaction de wallet"
-        verbose_name_plural = "Transactions de wallet"
+        verbose_name = "Transaction wallet"
+        verbose_name_plural = "Transactions wallet"
         ordering = ["-created_at"]
+        constraints = [
+            # Anti-doublon HARD: 1 seule tx par (wallet, order, type, direction)
+            models.UniqueConstraint(
+                fields=["wallet", "order", "type", "direction"],
+                condition=models.Q(order__isnull=False),
+                name="uniq_wtx_wallet_order_type_dir",
+            ),
+        ]
 
     def __str__(self):
         sign = "+" if self.direction == "in" else "-"
@@ -249,7 +331,11 @@ class WalletTransaction(models.Model):
 class WithdrawalRequest(models.Model):
     """
     Demande de retrait d'un livreur sur son wallet.
-    Le débit réel du wallet + transaction sont faits quand la demande passe en 'paid'.
+
+    Règle :
+    - Le débit réel du wallet + création de WalletTransaction se font
+      UNIQUEMENT quand la demande passe à 'paid'.
+    - Idempotent : si déjà traité (processed_at) ou si la tx existe déjà → on ne refait rien.
     """
 
     STATUS_CHOICES = [
@@ -297,12 +383,7 @@ class WithdrawalRequest(models.Model):
 
     created_at = models.DateTimeField("Créée le", auto_now_add=True)
 
-    # Renseignés quand on traite la demande (approuvée / payée / rejetée)
-    processed_at = models.DateTimeField(
-        "Traitée le",
-        null=True,
-        blank=True,
-    )
+    processed_at = models.DateTimeField("Traitée le", null=True, blank=True)
     processed_by = models.ForeignKey(
         User,
         null=True,
@@ -312,10 +393,7 @@ class WithdrawalRequest(models.Model):
         verbose_name="Traitée par",
     )
 
-    admin_notes = models.TextField(
-        "Notes internes",
-        blank=True,
-    )
+    admin_notes = models.TextField("Notes internes", blank=True)
 
     class Meta:
         verbose_name = "Demande de retrait livreur"
@@ -327,81 +405,70 @@ class WithdrawalRequest(models.Model):
 
     # ---------- LOGIQUE MÉTIER ----------
 
+    def _tx_exists(self) -> bool:
+        """
+        Anti-doublon dur : si une transaction payout out existe déjà pour ce retrait.
+        On s'appuie sur la description normalisée "Retrait #{id} – ...".
+        """
+        if not self.pk:
+            return False
+        needle = f"Retrait #{self.id}"
+        return WalletTransaction.objects.filter(
+            wallet=self.wallet,
+            type="payout",
+            direction="out",
+            amount=self.amount,
+            description__icontains=needle,
+        ).exists()
+
     def _can_debit_wallet(self) -> bool:
-        """
-        Sécurité : on ne débite que si :
-        - montant > 0
-        - statut = 'paid'
-        - processed_at encore vide (pour éviter les doublons)
-        - solde suffisant
-        """
         if self.status != "paid":
             return False
-
         if self.processed_at is not None:
-            # Déjà traité
             return False
-
         amount = self.amount or Decimal("0.00")
         if amount <= 0:
             return False
-
-        if amount > (self.wallet.balance or Decimal("0.00")):
-            # On bloque juste si pas assez de solde
+        if self._tx_exists():
             return False
-
         return True
 
     def apply_payout(self):
         """
-        Applique le retrait sur le wallet + crée la transaction.
-        Appelée automatiquement quand le statut passe à 'paid'.
+        Applique le retrait sur le wallet + crée la transaction (UNE SEULE FOIS).
+        Tout est atomique + wallet verrouillé.
         """
         if not self._can_debit_wallet():
             return
 
-        amount = self.amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        amount = (self.amount or Decimal("0.00")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-        # 1) Débit du wallet
-        self.wallet.balance = (self.wallet.balance - amount).quantize(
-            Decimal("0.01"),
-            rounding=ROUND_HALF_UP,
-        )
-        self.wallet.save(update_fields=["balance", "updated_at"])
+        with transaction.atomic():
+            # Recharger & verrouiller le wallet (anti course)
+            wallet = Wallet.objects.select_for_update().get(pk=self.wallet_id)
 
-        # 2) Transaction associée
-        WalletTransaction.objects.create(
-            wallet=self.wallet,
-            order=None,
-            type="payout",
-            direction="out",
-            amount=amount,
-            description=f"Retrait livreur {self.delivery_partner.name}",
-        )
+            # Re-check sous lock
+            if self.processed_at is not None:
+                return
+            if self._tx_exists():
+                return
+            if (wallet.balance or Decimal("0.00")) < amount:
+                return
 
-        # 3) Marquage comme traité
-        self.processed_at = timezone.now()
+            # 1) Débit wallet
+            wallet.balance = (wallet.balance - amount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            wallet.save(update_fields=["balance", "updated_at"])
 
-    def save(self, *args, **kwargs):
-        """
-        On surveille le changement de statut.
-        Si on vient de passer à 'paid', on applique le retrait.
-        """
-        old_status = None
-        if self.pk:
-            old_status = (
-                type(self).objects.filter(pk=self.pk)
-                .values_list("status", flat=True)
-                .first()
+            # 2) Transaction
+            WalletTransaction.objects.create(
+                wallet=wallet,
+                order=None,
+                type="payout",
+                direction="out",
+                amount=amount,
+                description=f"Retrait #{self.id} – livreur {self.delivery_partner.name}",
             )
 
-        super().save(*args, **kwargs)
-
-        # Si on vient de passer en 'paid', on applique le retrait une seule fois
-        if old_status is not None and old_status != "paid" and self.status == "paid":
-            refreshed = type(self).objects.get(pk=self.pk)
-            refreshed.apply_payout()
-            type(self).objects.filter(pk=self.pk).update(
-                processed_at=refreshed.processed_at
-            )
-
+            # 3) Marquer traité
+            self.processed_at = timezone.now()
+            self.save(update_fields=["processed_at"])

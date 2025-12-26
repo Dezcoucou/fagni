@@ -3315,6 +3315,239 @@ def detail(request, order_id):
     return render(request, "orders/detail.html", context)
 
 
+# ============================================================
+# ✅ APP CLIENT (V1) — Auth par téléphone via session
+# ============================================================
+from django.views.decorators.http import require_http_methods
+
+CLIENT_SESSION_KEY = "client_phone"
+
+
+def _client_phone(request) -> str:
+    return (request.session.get(CLIENT_SESSION_KEY) or "").strip()
+
+
+def _client_required(view_func):
+    def _wrapped(request, *args, **kwargs):
+        if not _client_phone(request):
+            return redirect("orders:client_login")
+        return view_func(request, *args, **kwargs)
+    return _wrapped
+
+
+@require_http_methods(["GET", "POST"])
+def client_login(request):
+    """
+    Login ultra simple : téléphone -> session.
+    Si le client existe déjà, on récupère son nom/adresse en auto.
+    """
+    error = None
+    phone = ""
+    name = ""
+    address = ""
+
+    if request.method == "POST":
+        phone = (request.POST.get("phone") or "").strip()
+        if not phone:
+            error = "Merci de renseigner ton numéro."
+        else:
+            request.session[CLIENT_SESSION_KEY] = phone
+            request.session.modified = True
+            return redirect("orders:client_home")
+
+    # si déjà connecté, go home
+    if _client_phone(request):
+        return redirect("orders:client_home")
+
+    return render(request, "orders/client_login.html", {
+        "error": error,
+        "phone": phone,
+        "name": name,
+        "address": address,
+    })
+
+
+def client_logout(request):
+    request.session.pop(CLIENT_SESSION_KEY, None)
+    request.session.modified = True
+    return redirect("orders:client_login")
+
+
+@_client_required
+def client_home(request):
+    """
+    Liste des commandes du client (par téléphone).
+    """
+    phone = _client_phone(request)
+
+    customer = Customer.objects.filter(phone=phone).order_by("-id").first()
+    orders_qs = Order.objects.none()
+    if customer:
+        orders_qs = (
+            Order.objects
+            .select_related("customer", "laundry_partner", "delivery_partner")
+            .filter(customer=customer)
+            .order_by("-id")
+        )
+
+    return render(request, "orders/client_home.html", {
+        "phone": phone,
+        "customer": customer,
+        "orders": orders_qs[:50],
+    })
+
+
+@require_http_methods(["GET", "POST"])
+@_client_required
+def client_new_order(request):
+    """
+    Création Client V1 (rapide) :
+    - téléphone (session)
+    - nom + adresse + notes
+    -> crée une commande "pending" avec pickup/delivery address.
+    """
+    phone = _client_phone(request)
+    customer = Customer.objects.filter(phone=phone).order_by("-id").first()
+
+    error = None
+    name_init = customer.name if customer else ""
+    address_init = getattr(customer, "address", "") if customer else ""
+
+    if request.method == "POST":
+        name = (request.POST.get("name") or "").strip()
+        address = (request.POST.get("address") or "").strip()
+        notes = (request.POST.get("notes") or "").strip()
+
+        if not name:
+            error = "Merci de renseigner ton nom."
+        elif not address:
+            error = "Merci de renseigner ton adresse."
+        else:
+            # create or update customer
+            customer, _ = Customer.objects.get_or_create(
+                phone=phone,
+                defaults={"name": name, "address": address},
+            )
+            changed = False
+            if name and customer.name != name:
+                customer.name = name
+                changed = True
+            if hasattr(customer, "address") and address and customer.address != address:
+                customer.address = address
+                changed = True
+            if changed:
+                customer.save()
+
+            # create order
+            code = uuid.uuid4().hex[:8].upper()
+            while Order.objects.filter(code=code).exists():
+                code = uuid.uuid4().hex[:8].upper()
+
+            order = Order.objects.create(
+                customer=customer,
+                status="pending",
+                code=code,
+                notes=notes or None,
+                pickup_address=address,
+                delivery_address=address,
+            )
+
+            # si update_financials supporte l'absence d'items => OK
+            try:
+                order.update_financials(save=True)
+            except Exception:
+                pass
+
+            return redirect("orders:client_order_detail", order_id=order.id)
+
+    return render(request, "orders/client_new_order.html", {
+        "phone": phone,
+        "customer": customer,
+        "error": error,
+        "name_init": name_init,
+        "address_init": address_init,
+    })
+
+
+@_client_required
+def client_order_detail(request, order_id):
+    """
+    Détail côté client : statut + timeline + legs (si existants).
+    Sécurisé : seulement si la commande appartient au téléphone session.
+    """
+    phone = _client_phone(request)
+    customer = Customer.objects.filter(phone=phone).order_by("-id").first()
+    if not customer:
+        return redirect("orders:client_home")
+
+    order = (
+        Order.objects
+        .select_related("customer", "laundry_partner", "delivery_partner")
+        .filter(pk=order_id, customer=customer)
+        .first()
+    )
+    if not order:
+        return redirect("orders:client_home")
+
+    legs = list(DeliveryLeg.objects.filter(order=order).order_by("id").values(
+        "id", "leg_type", "status", "driver_amount", "driver_id"
+    ))
+
+    return render(request, "orders/client_order_detail.html", {
+        "phone": phone,
+        "customer": customer,
+        "order": order,
+        "legs": legs,
+    })
+
+
+@require_GET
+@_client_required
+def client_order_live_status(request, order_id):
+    """
+    Live JSON côté client (polling) : statut commande + legs.
+    Sécurisé : seulement si commande du client.
+    """
+    phone = _client_phone(request)
+    customer = Customer.objects.filter(phone=phone).order_by("-id").first()
+    if not customer:
+        return JsonResponse({"ok": False, "error": "not_authenticated"}, status=401)
+
+    order = (
+        Order.objects
+        .select_related("customer", "laundry_partner", "delivery_partner")
+        .filter(pk=order_id, customer=customer)
+        .first()
+    )
+    if not order:
+        return JsonResponse({"ok": False, "error": "not_found"}, status=404)
+
+    legs = []
+    for l in DeliveryLeg.objects.filter(order=order).order_by("id"):
+        legs.append({
+            "id": l.id,
+            "leg_type": l.leg_type,
+            "status": l.status,
+            "driver_amount": float(l.driver_amount or 0),
+            "driver_id": l.driver_id,
+        })
+
+    data = {
+        "ok": True,
+        "order": {
+            "id": order.id,
+            "code": getattr(order, "code", "") or "",
+            "status": order.status,
+            "payment_status": getattr(order, "payment_status", None),
+            "pickup_time": getattr(order, "pickup_time", None),
+            "wash_complete_time": getattr(order, "wash_complete_time", None),
+            "delivered_time": getattr(order, "delivered_time", None),
+        },
+        "legs": legs,
+    }
+    return JsonResponse(data)
+
+
 @require_GET
 def client_lookup(request):
     """

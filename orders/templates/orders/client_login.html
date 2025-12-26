@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="max-width:520px;margin:0 auto;">
+  <div class="card" style="padding:18px;">
+    <h1 class="page-title">FAGNI — Espace client</h1>
+    <p class="page-subtitle">Connecte-toi avec ton numéro pour suivre tes commandes.</p>
+
+    {% if error %}
+      <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      <label style="display:block;font-weight:600;margin:10px 0 6px;">Téléphone</label>
+      <input name="phone" value="{{ phone }}" placeholder="Ex : 0700000000"
+             style="width:100%;padding:12px;border-radius:12px;border:1px solid #e5e7eb;" />
+
+      <button type="submit"
+              style="margin-top:14px;width:100%;padding:12px 14px;border-radius:999px;border:none;background:#0f172a;color:#fff;font-weight:700;">
+        Continuer →
+      </button>
+    </form>
+
+    <p style="margin-top:10px;color:#6b7280;font-size:12px;">
+      Astuce : ton téléphone sert d’identifiant pour retrouver tes commandes.
+    </p>
+  </div>
+</div>
+{% endblock %}

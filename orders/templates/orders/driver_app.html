@@ -81,12 +81,26 @@
     margin:0 0 6px;
     display:flex;
     align-items:center;
-    gap:6px;
+    gap:8px;
     color:#111827;
     letter-spacing:-0.1px;
   }
 
   .column-title span.emoji{ font-size:16px; }
+
+  .col-badge{
+    margin-left:auto;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:3px 9px;
+    border-radius:999px;
+    background:#f3f4f6;
+    color:#374151;
+    font-size:11px;
+    border:1px solid #e5e7eb;
+    font-weight:900;
+  }
 
   .column-helper{
     font-size:11px;
@@ -109,7 +123,6 @@
     gap:8px;
   }
 
-  /* Carte cliquable “premium” */
   .card-course.is-clickable{
     cursor:pointer;
     transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
@@ -195,18 +208,27 @@
     justify-content:flex-end;
   }
   .pay-pill .dot{ width:7px;height:7px;border-radius:999px;display:inline-block; }
+
   .pay-paid{
     background:#ecfdf3;
     color:#166534;
     border-color:#bbf7d0;
   }
   .pay-paid .dot{ background:#16a34a; }
+
   .pay-due{
     background:#fff7ed;
     color:#9a3412;
     border-color:#fed7aa;
   }
   .pay-due .dot{ background:#f97316; }
+
+  .pay-calc{
+    background:#f3f4f6;
+    color:#374151;
+    border-color:#e5e7eb;
+  }
+  .pay-calc .dot{ background:#6b7280; }
 
   .course-body{
     font-size:12px;
@@ -328,9 +350,7 @@
   }
   .btn-wallet-link:hover{ background:#f9fafb; }
 
-  /* =========================
-     KPI LIVE - FINITION UI
-     ========================= */
+  /* KPI LIVE */
   .kpi-header{ align-items:flex-start !important; gap:10px; }
 
   .kpi-meta{
@@ -388,8 +408,8 @@
 {% block content %}
 <div class="page">
 
-  <!-- HEADER -->
   <div class="page-header">
+
     <div>
       <h1 class="page-title">Mes courses</h1>
       <p class="page-subtitle">
@@ -398,13 +418,11 @@
       </p>
     </div>
 
-    <!-- KPIs LIVE -->
     <div class="card-course kpi-card" style="margin-bottom:12px;">
       <div class="course-header kpi-header">
         <div class="course-code">📊 Mes stats (live)</div>
-
         <div class="kpi-meta">
-          <span class="kpi-pill" id="kpi-updated">—</span>
+          <span class="kpi-pill" id="kpi-updated">Chargement…</span>
           <span class="kpi-sub" id="kpi-source">—</span>
         </div>
       </div>
@@ -412,17 +430,17 @@
       <div class="course-body kpi-grid">
         <div class="kpi-item">
           <span class="course-label">En attente</span>
-          <span class="course-value" id="kpi-pending">{{ pending_count|default:0 }}</span>
+          <span class="course-value" id="kpi-pending">—</span>
         </div>
 
         <div class="kpi-item">
           <span class="course-label">En cours</span>
-          <span class="course-value" id="kpi-in-progress">{{ in_progress_count|default:0 }}</span>
+          <span class="course-value" id="kpi-in-progress">—</span>
         </div>
 
         <div class="kpi-item">
           <span class="course-label">Terminées</span>
-          <span class="course-value" id="kpi-done">{{ done_count|default:0 }}</span>
+          <span class="course-value" id="kpi-done">—</span>
         </div>
 
         <div class="kpi-item">
@@ -439,6 +457,10 @@
 
     <div class="page-header-right">
       {% if connected_driver %}
+        <a href="{% url 'orders:driver_missions_history' %}?driver_id={{ connected_driver.id }}"
+           class="btn-wallet-link">
+          📜 Mes missions
+        </a>
         <a href="{% url 'wallets:driver_wallet_dashboard' %}?driver_id={{ connected_driver.id }}"
            class="btn-wallet-link">
           💰 Mon wallet livreur
@@ -455,406 +477,484 @@
     </div>
   </div>
 
-  <!-- Helper calcul encaissement (template-only, sans toucher la vue) -->
-  {% comment %}
-    Règle:
-    - si payment_status == "paid" => encaissement = 0
-    - sinon => encaissement = total_client_display
-  {% endcomment %}
-
-  <!-- COLONNES PAR STATUT -->
   <div class="columns">
 
-    <!-- PENDING -->
     <div>
-      <h2 class="column-title"><span class="emoji">⏳</span> En attente</h2>
+      <h2 class="column-title">
+        <span class="emoji">⏳</span> En attente
+        <span class="col-badge" id="badge-pending">0</span>
+      </h2>
       <p class="column-helper">Courses à venir ou à prendre en charge.</p>
-
-      {% if pending_orders %}
-        {% for order in pending_orders %}
-          {% with is_paid=order.payment_status|default_if_none:""|lower %}
-          <div class="card-course is-clickable" data-href="{% url 'orders:driver_order_detail' order.id %}">
-            <div class="course-header">
-              <div>
-                <div class="course-code">Course {{ order.code|default:order.id }}</div>
-                <div class="course-date">
-                  {% if order.created_at %}Créée le {{ order.created_at|date:"d/m/Y H:i" }}{% endif %}
-                </div>
-              </div>
-              <div style="text-align:right;">
-                <span class="status-pill status-pending"><span class="dot"></span>En attente</span>
-
-                {% if order.pay_status_label == "PAYÉ" %}
-                    <span class="pay-pill pay-paid"><span class="dot"></span>PAYÉ</span>
-                  {% elif order.pay_status_label == "PARTIEL" %}
-                    <span class="pay-pill pay-due"><span class="dot"></span>PARTIEL</span>
-                  {% else %}
-                    <span class="pay-pill pay-due"><span class="dot"></span>À ENCAISSER</span>
-                  {% endif %}
-              </div>
-            </div>
-
-            <div class="course-body">
-              <div class="course-line">
-                <span class="course-label">Client</span>
-                <span class="course-value">
-                  {% if order.customer %}{{ order.customer.name|default:"Client" }}{% else %}—{% endif %}
-                </span>
-              </div>
-
-              <div class="course-line">
-                <span class="course-label">Montant client</span>
-                <span class="course-value amount-client">{{ order.total_client_display|default:0|money }} FCFA</span>
-              </div>
-
-              <div class="course-line">
-                <span class="course-label">À encaisser</span>
-                {% if order.pay_status_label == "PAYÉ" %}
-                    <span class="course-value">0 FCFA</span>
-                  {% else %}
-                    <span class="course-value amount-due">{{ order.due_amount_display|default:0|money }} FCFA</span>
-                  {% endif %}
-              </div>
-
-              <div class="course-line">
-                <span class="course-label">Mon revenu</span>
-                <span class="course-value amount-driver">{{ order.driver_income_display|default:0|money }} FCFA</span>
-              </div>
-
-              {% with d=order.driver_distance_display|default:order.distance_km_total|default:order.distance_km %}
-                {% if d %}
-                  <div class="course-line">
-                    <span class="course-label">Distance</span>
-                    <span class="course-value">{{ d|floatformat:2 }} km</span>
-                  </div>
-                {% endif %}
-              {% endwith %}
-            </div>
-
-            <div class="course-footer">
-              <div class="course-tags">
-                {% if order.pickup_address %}
-                  <span class="tag-small">📥 Collecte : {{ order.pickup_address }}</span>
-                {% elif order.customer and order.customer.address %}
-                  <span class="tag-small">📥 Collecte : {{ order.customer.address }}</span>
-                {% endif %}
-                {% if order.delivery_address %}
-                  <span class="tag-small">📦 Livraison : {{ order.delivery_address }}</span>
-                {% endif %}
-                {% if order.laundry_partner %}
-                  <span class="tag-small">🧺 {{ order.laundry_partner.name }}</span>
-                {% endif %}
-                {% if order.delivery_mode == "express" %}
-                  <span class="tag-small">🚀 Express</span>
-                {% elif order.delivery_mode == "scheduled" %}
-                  <span class="tag-small">📅 Programmée</span>
-                {% else %}
-                  <span class="tag-small">📦 Standard</span>
-                {% endif %}
-              </div>
-
-              <a href="{% url 'orders:driver_order_detail' order.id %}" class="btn btn-primary">
-                Gérer la course →
-              </a>
-            </div>
-          </div>
-          {% endwith %}
-        {% endfor %}
-      {% else %}
-        <p class="empty">Aucune course en attente.</p>
-      {% endif %}
+      <div id="pending-list">
+        <p class="empty">Chargement…</p>
+      </div>
     </div>
 
-    <!-- IN PROGRESS -->
     <div>
-      <h2 class="column-title"><span class="emoji">🚚</span> En cours</h2>
+      <h2 class="column-title">
+        <span class="emoji">🚚</span> En cours
+        <span class="col-badge" id="badge-in-progress">0</span>
+      </h2>
       <p class="column-helper">Courses actuellement en exécution.</p>
-
-      {% if in_progress_orders %}
-        {% for order in in_progress_orders %}
-          {% with is_paid=order.payment_status|default_if_none:""|lower %}
-          <div class="card-course is-clickable" data-href="{% url 'orders:driver_order_detail' order.id %}">
-            <div class="course-header">
-              <div>
-                <div class="course-code">Course {{ order.code|default:order.id }}</div>
-                <div class="course-date">
-                  {% if order.created_at %}Créée le {{ order.created_at|date:"d/m/Y H:i" }}{% endif %}
-                </div>
-              </div>
-              <div style="text-align:right;">
-                <span class="status-pill status-in_progress"><span class="dot"></span>En cours</span>
-
-                {% if order.pay_status_label == "PAYÉ" %}
-                    <span class="pay-pill pay-paid"><span class="dot"></span>PAYÉ</span>
-                  {% elif order.pay_status_label == "PARTIEL" %}
-                    <span class="pay-pill pay-due"><span class="dot"></span>PARTIEL</span>
-                  {% else %}
-                    <span class="pay-pill pay-due"><span class="dot"></span>À ENCAISSER</span>
-                  {% endif %}
-              </div>
-            </div>
-
-            <div class="course-body">
-              <div class="course-line">
-                <span class="course-label">Client</span>
-                <span class="course-value">
-                  {% if order.customer %}{{ order.customer.name|default:"Client" }}{% else %}—{% endif %}
-                </span>
-              </div>
-
-              <div class="course-line">
-                <span class="course-label">Montant client</span>
-                <span class="course-value amount-client">{{ order.total_client_display|default:0|money }} FCFA</span>
-              </div>
-
-              <div class="course-line">
-                <span class="course-label">À encaisser</span>
-                {% if order.pay_status_label == "PAYÉ" %}
-                    <span class="course-value">0 FCFA</span>
-                  {% else %}
-                    <span class="course-value amount-due">{{ order.due_amount_display|default:0|money }} FCFA</span>
-                  {% endif %}
-              </div>
-
-              <div class="course-line">
-                <span class="course-label">Mon revenu</span>
-                <span class="course-value amount-driver">{{ order.driver_income_display|default:0|money }} FCFA</span>
-              </div>
-
-              {% with d=order.driver_distance_display|default:order.distance_km_total|default:order.distance_km %}
-                {% if d %}
-                  <div class="course-line">
-                    <span class="course-label">Distance</span>
-                    <span class="course-value">{{ d|floatformat:2 }} km</span>
-                  </div>
-                {% endif %}
-              {% endwith %}
-            </div>
-
-            <div class="course-footer">
-              <div class="course-tags">
-                {% if order.pickup_address %}
-                  <span class="tag-small">📥 Collecte : {{ order.pickup_address }}</span>
-                {% elif order.customer and order.customer.address %}
-                  <span class="tag-small">📥 Collecte : {{ order.customer.address }}</span>
-                {% endif %}
-                {% if order.delivery_address %}
-                  <span class="tag-small">📦 Livraison : {{ order.delivery_address }}</span>
-                {% endif %}
-                {% if order.laundry_partner %}
-                  <span class="tag-small">🧺 {{ order.laundry_partner.name }}</span>
-                {% endif %}
-                {% if order.delivery_mode == "express" %}
-                  <span class="tag-small">🚀 Express</span>
-                {% elif order.delivery_mode == "scheduled" %}
-                  <span class="tag-small">📅 Programmée</span>
-                {% else %}
-                  <span class="tag-small">📦 Standard</span>
-                {% endif %}
-              </div>
-
-              <a href="{% url 'orders:driver_order_detail' order.id %}" class="btn btn-primary">
-                Gérer la course →
-              </a>
-            </div>
-          </div>
-          {% endwith %}
-        {% endfor %}
-      {% else %}
-        <p class="empty">Aucune course en cours.</p>
-      {% endif %}
+      <div id="in-progress-list">
+        <p class="empty">Chargement…</p>
+      </div>
     </div>
 
-    <!-- DONE -->
     <div>
-      <h2 class="column-title"><span class="emoji">✅</span> Terminées</h2>
+      <h2 class="column-title">
+        <span class="emoji">✅</span> Terminées
+        <span class="col-badge" id="badge-done">0</span>
+      </h2>
       <p class="column-helper">Historique récent des courses achevées.</p>
-
-      {% if done_orders %}
-        {% for order in done_orders %}
-          {% with is_paid=order.payment_status|default_if_none:""|lower %}
-          <div class="card-course is-clickable" data-href="{% url 'orders:driver_order_detail' order.id %}">
-            <div class="course-header">
-              <div>
-                <div class="course-code">Course {{ order.code|default:order.id }}</div>
-                <div class="course-date">
-                  {% if order.created_at %}Créée le {{ order.created_at|date:"d/m/Y H:i" }}{% endif %}
-                </div>
-              </div>
-              <div style="text-align:right;">
-                <span class="status-pill status-done"><span class="dot"></span>Terminée</span>
-
-                {% if order.pay_status_label == "PAYÉ" %}
-                    <span class="pay-pill pay-paid"><span class="dot"></span>PAYÉ</span>
-                  {% elif order.pay_status_label == "PARTIEL" %}
-                    <span class="pay-pill pay-due"><span class="dot"></span>PARTIEL</span>
-                  {% else %}
-                    <span class="pay-pill pay-due"><span class="dot"></span>À ENCAISSER</span>
-                  {% endif %}
-              </div>
-            </div>
-
-            <div class="course-body">
-              <div class="course-line">
-                <span class="course-label">Client</span>
-                <span class="course-value">
-                  {% if order.customer %}{{ order.customer.name|default:"Client" }}{% else %}—{% endif %}
-                </span>
-              </div>
-
-              <div class="course-line">
-                <span class="course-label">Montant client</span>
-                <span class="course-value amount-client">{{ order.total_client_display|default:0|money }} FCFA</span>
-              </div>
-
-              <div class="course-line">
-                <span class="course-label">À encaisser</span>
-                {% if order.pay_status_label == "PAYÉ" %}
-                    <span class="course-value">0 FCFA</span>
-                  {% else %}
-                    <span class="course-value amount-due">{{ order.due_amount_display|default:0|money }} FCFA</span>
-                  {% endif %}
-              </div>
-
-              <div class="course-line">
-                <span class="course-label">Mon revenu</span>
-                <span class="course-value amount-driver">{{ order.driver_income_display|default:0|money }} FCFA</span>
-              </div>
-
-              {% with d=order.driver_distance_display|default:order.distance_km_total|default:order.distance_km %}
-                {% if d %}
-                  <div class="course-line">
-                    <span class="course-label">Distance</span>
-                    <span class="course-value">{{ d|floatformat:2 }} km</span>
-                  </div>
-                {% endif %}
-              {% endwith %}
-            </div>
-
-            <div class="course-footer">
-              <div class="course-tags">
-                {% if order.pickup_address %}
-                  <span class="tag-small">📥 Collecte : {{ order.pickup_address }}</span>
-                {% elif order.customer and order.customer.address %}
-                  <span class="tag-small">📥 Collecte : {{ order.customer.address }}</span>
-                {% endif %}
-                {% if order.delivery_address %}
-                  <span class="tag-small">📦 Livraison : {{ order.delivery_address }}</span>
-                {% endif %}
-                {% if order.laundry_partner %}
-                  <span class="tag-small">🧺 {{ order.laundry_partner.name }}</span>
-                {% endif %}
-                {% if order.delivery_mode == "express" %}
-                  <span class="tag-small">🚀 Express</span>
-                {% elif order.delivery_mode == "scheduled" %}
-                  <span class="tag-small">📅 Programmée</span>
-                {% else %}
-                  <span class="tag-small">📦 Standard</span>
-                {% endif %}
-              </div>
-
-              <a href="{% url 'orders:driver_order_detail' order.id %}" class="btn btn-light">
-                Voir le détail →
-              </a>
-            </div>
-          </div>
-          {% endwith %}
-        {% endfor %}
-      {% else %}
-        <p class="empty">Aucune course terminée récemment.</p>
-      {% endif %}
+      <div id="done-list">
+        <p class="empty">Chargement…</p>
+      </div>
     </div>
 
   </div>
 </div>
 
 <script>
-(function () {
-  // 1) KPI refresh
-  const ENDPOINT = "{% url 'orders:driver_app_data' %}";
-  const REFRESH_MS = 15000;
+(function(){
+  const DATA_URL = "/orders/driver-app/data/" + (window.location.search || "");
+  const refreshMs = 8000;
 
   const els = {
-    pending: document.getElementById("kpi-pending"),
-    inProgress: document.getElementById("kpi-in-progress"),
-    done: document.getElementById("kpi-done"),
-    distance: document.getElementById("kpi-distance"),
-    income: document.getElementById("kpi-income"),
-    source: document.getElementById("kpi-source"),
-    updated: document.getElementById("kpi-updated"),
+    kpiPending: document.getElementById("kpi-pending"),
+    kpiInProgress: document.getElementById("kpi-in-progress"),
+    kpiDone: document.getElementById("kpi-done"),
+    kpiDistance: document.getElementById("kpi-distance"),
+    kpiIncome: document.getElementById("kpi-income"),
+    kpiSource: document.getElementById("kpi-source"),
+    kpiUpdated: document.getElementById("kpi-updated"),
+
+    badgePending: document.getElementById("badge-pending"),
+    badgeInProgress: document.getElementById("badge-in-progress"),
+    badgeDone: document.getElementById("badge-done"),
+
+    listPending: document.getElementById("pending-list"),
+    listInProgress: document.getElementById("in-progress-list"),
+    listDone: document.getElementById("done-list"),
   };
 
-  function fmtMoney(n) {
-    try { return new Intl.NumberFormat("fr-FR").format(Number(n || 0)); }
-    catch (e) { return String(n || 0); }
+  // =========================
+  // Animations (A: fade+slide)
+  // =========================
+  function ensureAnimStyle(){
+    if (document.getElementById("driver-app-anim-style")) return;
+    const s = document.createElement("style");
+    s.id = "driver-app-anim-style";
+    s.textContent = `
+      .card-course { will-change: transform, opacity; }
+      .card-enter {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      .card-enter-active {
+        opacity: 1;
+        transform: translateY(0);
+        transition: opacity 180ms ease, transform 180ms ease;
+      }
+      .card-exit {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .card-exit-active {
+        opacity: 0;
+        transform: translateY(-6px);
+        transition: opacity 160ms ease, transform 160ms ease;
+      }
+    `;
+    document.head.appendChild(s);
+  }
+  ensureAnimStyle();
+
+  function escapeHtml(s){
+    return String(s ?? "").replace(/[&<>"'`=\/]/g, function (c) {
+      return ({
+        "&":"&amp;",
+        "<":"&lt;",
+        ">":"&gt;",
+        '"':"&quot;",
+        "'":"&#39;",
+        "`":"&#x60;",
+        "=":"&#x3D;",
+        "/":"&#x2F;"
+      })[c];
+    });
   }
 
-  function fmtTime(d = new Date()) {
+  function money(n){
+    try { return new Intl.NumberFormat("fr-FR").format(Number(n || 0)); }
+    catch(e){ return String(n || 0); }
+  }
+
+  function timeNow(){
+    const d = new Date();
     const hh = String(d.getHours()).padStart(2, "0");
     const mm = String(d.getMinutes()).padStart(2, "0");
     const ss = String(d.getSeconds()).padStart(2, "0");
     return `${hh}:${mm}:${ss}`;
   }
 
-  function pulse(el) {
-    if (!el) return;
+  function withQuery(url){
+    const currentQs = new URLSearchParams(window.location.search || "");
+    const currentDriverId = currentQs.get("driver_id") || "";
+
+    const u = new URL(url, window.location.origin);
+    const targetQs = new URLSearchParams(u.search || "");
+
+    for (const [k, v] of currentQs.entries()){
+      if (k === "driver_id") continue;
+      targetQs.set(k, v);
+    }
+
+    if (currentDriverId){
+      targetQs.set("driver_id", currentDriverId);
+    } else {
+      targetQs.delete("driver_id");
+    }
+
+    const qsStr = targetQs.toString();
+    u.search = qsStr ? `?${qsStr}` : "";
+    return u.pathname + u.search + u.hash;
+  }
+
+  function pulse(el){
+    if(!el) return;
     el.classList.remove("kpi-pulse");
     void el.offsetWidth;
     el.classList.add("kpi-pulse");
   }
 
-  function setText(el, value) {
-    if (!el) return;
+  function setText(el, value){
+    if(!el) return;
     el.textContent = value;
     pulse(el);
   }
 
-  async function refreshKPIs() {
-    try {
-      if (els.source) els.source.textContent = "Synchronisation…";
-      const res = await fetch(ENDPOINT, {
-        headers: { "X-Requested-With": "XMLHttpRequest" },
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error("bad_status");
-      const data = await res.json();
+  function statusPill(status){
+    if(status === "pending"){
+      return `<span class="status-pill status-pending"><span class="dot"></span>En attente</span>`;
+    }
+    if(status === "in_progress"){
+      return `<span class="status-pill status-in_progress"><span class="dot"></span>En cours</span>`;
+    }
+    if(status === "done"){
+      return `<span class="status-pill status-done"><span class="dot"></span>Terminée</span>`;
+    }
+    return `<span class="status-pill"><span class="dot"></span>${escapeHtml(status || "—")}</span>`;
+  }
 
-      setText(els.pending, data.pending ?? 0);
-      setText(els.inProgress, data.in_progress ?? 0);
-      setText(els.done, data.done ?? 0);
+  function payPill(label){
+    if(label === "PAYÉ"){
+      return `<span class="pay-pill pay-paid"><span class="dot"></span>PAYÉ</span>`;
+    }
+    if(label === "PARTIEL"){
+      return `<span class="pay-pill pay-due"><span class="dot"></span>PARTIEL</span>`;
+    }
+    if(label === "À CALCULER"){
+      return `<span class="pay-pill pay-calc"><span class="dot"></span>À CALCULER</span>`;
+    }
+    return `<span class="pay-pill pay-due"><span class="dot"></span>À ENCAISSER</span>`;
+  }
 
-      const dist = Number(data.total_distance_km ?? 0);
-      setText(els.distance, `${dist.toFixed(2)} km`);
+  function ctaForStatus(status){
+    if(status === "pending") return { label: "Démarrer →", cls: "btn-primary" };
+    if(status === "in_progress") return { label: "Continuer →", cls: "btn-primary" };
+    return { label: "Voir le détail →", cls: "btn-light" };
+  }
 
-      const inc = Number(data.total_driver_income ?? 0);
-      setText(els.income, `${fmtMoney(inc)} FCFA`);
+  function cardHTML(o){
+    const due = Number(o.due_amount || 0);
+    const isCalc = (o.pay_label === "À CALCULER");
+    const totalNum = (o.total_client === null || o.total_client === undefined) ? null : Number(o.total_client || 0);
 
-      if (els.source) {
-        const sd = data.source_distance || "—";
-        const si = data.source_income || "—";
-        els.source.textContent = `Source: distance=${sd} • revenu=${si}`;
-      }
-      if (els.updated) els.updated.textContent = `Mis à jour à ${fmtTime()}`;
-    } catch (e) {
-      if (els.source) els.source.textContent = "Hors ligne (échec sync)";
-      if (els.updated) els.updated.textContent = `Dernier essai ${fmtTime()}`;
+    const totalHtml = isCalc || totalNum === null || isNaN(totalNum) || totalNum <= 0
+      ? `<span class="course-value amount-client">—</span>`
+      : `<span class="course-value amount-client">${money(totalNum)} FCFA</span>`;
+
+    const dueHtml = (isCalc || o.pay_label === "PAYÉ" || due <= 0)
+      ? `<span class="course-value">0 FCFA</span>`
+      : `<span class="course-value amount-due">${money(due)} FCFA</span>`;
+
+    const tags = [];
+    const phone = escapeHtml(o.customer_phone || "");
+    const addr = escapeHtml(o.customer_address || "");
+    if(phone) tags.push(`<span class="tag-small">📞 ${phone}</span>`);
+    if(addr) tags.push(`<span class="tag-small">📍 ${addr}</span>`);
+
+    const created = o.created_at ? `Créée le ${escapeHtml(o.created_at)}` : "";
+    const name = escapeHtml(o.customer_name || "Client");
+    const code = escapeHtml(o.code || "");
+    const detailUrlRaw = String(o.detail_url || "#");
+    const detailUrlBase = withQuery(detailUrlRaw);
+    const back = encodeURIComponent(window.location.pathname + window.location.search);
+    const detailUrl = escapeHtml(detailUrlBase + (detailUrlBase.includes("?") ? "&" : "?") + "back=" + back);
+    const distNum = Number(o.driver_distance || 0);
+    const showDist = distNum > 0;
+
+    const incomeNumRaw = Number(o.driver_income ?? 0);
+    const incomeNum = (isNaN(incomeNumRaw) ? 0 : incomeNumRaw);
+    const cta = ctaForStatus(o.status);
+
+    return `
+      <div class="card-course is-clickable" data-href="${detailUrl}" data-order-id="${Number(o.id)}">
+        <div class="course-header">
+          <div>
+            <div class="course-code">Course ${code}</div>
+            <div class="course-date">${created}</div>
+          </div>
+          <div style="text-align:right;">
+            ${statusPill(o.status)}
+            ${payPill(o.pay_label)}
+          </div>
+        </div>
+
+        <div class="course-body">
+          <div class="course-line">
+            <span class="course-label">Client</span>
+            <span class="course-value">${name}</span>
+          </div>
+
+          <div class="course-line">
+            <span class="course-label">Montant client</span>
+            ${totalHtml}
+          </div>
+
+          <div class="course-line">
+            <span class="course-label">À encaisser</span>
+            ${dueHtml}
+          </div>
+
+          <div class="course-line">
+            <span class="course-label">Mon revenu</span>
+            <span class="course-value amount-driver">${money(incomeNum)} FCFA</span>
+          </div>
+
+          ${showDist ? `
+          <div class="course-line">
+            <span class="course-label">Distance</span>
+            <span class="course-value">${distNum.toFixed(2)} km</span>
+          </div>
+          ` : ``}
+        </div>
+
+        <div class="course-footer">
+          <div class="course-tags">
+            ${tags.join("")}
+          </div>
+          <a class="btn ${cta.cls}" href="${detailUrl}">${escapeHtml(cta.label)}</a>
+        </div>
+      </div>
+    `;
+  }
+
+  // ==========================================
+  // Diff-render par ID + animations (fade+slide)
+  // ==========================================
+  const colState = {
+    pending: new Map(),
+    in_progress: new Map(),
+    done: new Map(),
+  };
+
+  function getCardEl(container, id){
+    return container ? container.querySelector(`.card-course[data-order-id="${id}"]`) : null;
+  }
+
+  function animateIn(el){
+    if(!el) return;
+    el.classList.add("card-enter");
+    requestAnimationFrame(() => {
+      el.classList.add("card-enter-active");
+      el.classList.remove("card-enter");
+      setTimeout(() => {
+        el.classList.remove("card-enter-active");
+      }, 220);
+    });
+  }
+
+  function animateOutAndRemove(el){
+    if(!el) return;
+    el.classList.add("card-exit");
+    requestAnimationFrame(() => {
+      el.classList.add("card-exit-active");
+      setTimeout(() => {
+        el.remove();
+      }, 200);
+    });
+  }
+
+  function renderEmptyIfNeeded(container, emptyText){
+    if(!container) return;
+    const hasCard = container.querySelector(".card-course");
+    if(!hasCard){
+      container.innerHTML = `<p class="empty">${escapeHtml(emptyText)}</p>`;
+    } else {
+      const empty = container.querySelector(".empty");
+      if(empty) empty.remove();
     }
   }
 
-  refreshKPIs();
-  setInterval(refreshKPIs, REFRESH_MS);
+  function applyColumn(container, items, emptyText, key){
+    if(!container) return;
 
-  // 2) Cartes cliquables (sans casser les liens/boutons)
-  document.addEventListener("click", function (ev) {
+    const empty = container.querySelector(".empty");
+    if(empty) empty.remove();
+
+    const next = new Map();
+    for(const o of (items || [])){
+      const id = Number(o.id);
+      next.set(id, cardHTML(o));
+    }
+
+    const prev = colState[key];
+
+    for(const [id] of prev.entries()){
+      if(!next.has(id)){
+        const el = getCardEl(container, id);
+        if(el) animateOutAndRemove(el);
+        prev.delete(id);
+      }
+    }
+
+    const frag = document.createDocumentFragment();
+    for(const [id, html] of next.entries()){
+      let el = getCardEl(container, id);
+
+      if(!el){
+        const tmp = document.createElement("div");
+        tmp.innerHTML = html.trim();
+        el = tmp.firstElementChild;
+        if(el){
+          animateIn(el);
+          prev.set(id, html);
+        }
+      } else {
+        const old = prev.get(id);
+        if(old !== html){
+          const tmp = document.createElement("div");
+          tmp.innerHTML = html.trim();
+          const fresh = tmp.firstElementChild;
+          if(fresh){
+            el.replaceWith(fresh);
+            el = fresh;
+            animateIn(el);
+          }
+          prev.set(id, html);
+        }
+      }
+
+      if(el) frag.appendChild(el);
+    }
+
+    container.innerHTML = "";
+    container.appendChild(frag);
+
+    renderEmptyIfNeeded(container, emptyText);
+  }
+
+  let busy = false;
+
+  function goLogin(nextUrl){
+    const next = encodeURIComponent(nextUrl || (window.location.pathname + window.location.search));
+    window.location.href = `/accounts/login/?next=${next}`;
+  }
+
+  async function refreshAll(){
+    if(busy) return;
+    busy = true;
+
+    try{
+      if(els.kpiSource) els.kpiSource.textContent = "Synchronisation…";
+
+      const res = await fetch(DATA_URL, {
+        method: "GET",
+        credentials: "same-origin",
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+          "Accept": "application/json"
+        },
+        cache: "no-store",
+        redirect: "follow"
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        goLogin(window.location.pathname + window.location.search);
+        return;
+      }
+      if(!res.ok) throw new Error("bad_status");
+
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
+      if(!ct.includes("application/json")) {
+        goLogin(window.location.pathname + window.location.search);
+        return;
+      }
+
+      const data = await res.json();
+
+      const p = Number(data.pending ?? 0);
+      const ip = Number(data.in_progress ?? 0);
+      const d = Number(data.done ?? 0);
+
+      setText(els.kpiPending, p);
+      setText(els.kpiInProgress, ip);
+      setText(els.kpiDone, d);
+
+      setText(els.badgePending, p);
+      setText(els.badgeInProgress, ip);
+      setText(els.badgeDone, d);
+
+      setText(els.kpiDistance, `${Number(data.total_distance_km ?? 0).toFixed(2)} km`);
+
+      // ✅ NEW: display (paid if >0 else potential)
+      const incomeDisplay = Number(data.total_driver_income_display ?? (data.total_driver_income ?? 0));
+      setText(els.kpiIncome, `${money(data.total_driver_income_display ?? data.total_driver_income ?? 0)} FCFA`);
+
+      if(els.kpiSource){
+        const sd = data.source_distance || "—";
+        const si = data.source_income || "—";
+        // small hint: paid vs potential
+        const paid = Number(data.total_driver_income_paid ?? 0);
+        const pot = Number(data.total_driver_income_potential ?? 0);
+        const hint = (paid > 0) ? `payé=${money(paid)} • potentiel=${money(pot)}` : `potentiel=${money(pot)} • payé=${money(paid)}`;
+        els.kpiSource.textContent = `Source: distance=${sd} • revenu=${si} (${hint})`;
+      }
+      if(els.kpiUpdated){
+        els.kpiUpdated.textContent = `Mis à jour à ${data.server_time || timeNow()}`;
+      }
+
+      applyColumn(els.listPending, data.orders_pending, "Aucune course en attente.", "pending");
+      applyColumn(els.listInProgress, data.orders_in_progress, "Aucune course en cours.", "in_progress");
+      applyColumn(els.listDone, data.orders_done, "Aucune course terminée récemment.", "done");
+
+      const kpiCard = document.querySelector(".kpi-card");
+      if(kpiCard){
+        kpiCard.classList.remove("kpi-pulse");
+        void kpiCard.offsetWidth;
+        kpiCard.classList.add("kpi-pulse");
+      }
+
+    } catch(e){
+      if(els.kpiSource) els.kpiSource.textContent = "Hors ligne (échec sync)";
+      if(els.kpiUpdated) els.kpiUpdated.textContent = `Dernier essai ${timeNow()}`;
+    } finally{
+      busy = false;
+    }
+  }
+
+  document.addEventListener("click", function(ev){
     const card = ev.target.closest(".card-course.is-clickable");
-    if (!card) return;
-
-    // Si on clique déjà sur un lien/bouton, on laisse faire
-    if (ev.target.closest("a, button, input, select, textarea, label")) return;
-
+    if(!card) return;
+    if(ev.target.closest("a, button, input, select, textarea, label")) return;
     const href = card.getAttribute("data-href");
-    if (href) window.location.href = href;
-  }, { passive: true });
+    if(href) window.location.href = href;
+  }, {passive:true});
+
+  refreshAll();
+  setInterval(refreshAll, refreshMs);
 })();
 </script>
 {% endblock %}

@@ -1,10 +1,17 @@
 from django.db import migrations
 
+
 def set_if_has(obj, field, value):
     if hasattr(obj, field):
         setattr(obj, field, value)
 
+
 def forwards(apps, schema_editor):
+    # ✅ IMPORTANT: ne pas seed en environnement de test
+    from django.conf import settings
+    if getattr(settings, "TESTING", False):
+        return
+
     LaundryPartner = apps.get_model("partners", "LaundryPartner")
     DeliveryPartner = apps.get_model("partners", "DeliveryPartner")
 
@@ -39,12 +46,16 @@ def forwards(apps, schema_editor):
             set_if_has(obj, "is_active", True)
             obj.save()
 
+
 def backwards(apps, schema_editor):
+    # Optionnel: tu peux supprimer les démos ici si tu veux,
+    # mais on laisse vide pour éviter tout risque.
     pass
+
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('partners', '0004_relaypointpartner_delete_relaypoint'),
+        ("partners", "0004_relaypointpartner_delete_relaypoint"),
     ]
 
     operations = [

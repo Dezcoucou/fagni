@@ -34,17 +34,33 @@ def compute_order_financials(order) -> Dict[str, Any]:
     commission_laundry_ht = base["commission_laundry_ht"]
     commission_delivery_ht = base["commission_delivery_ht"]
     margin_delivery = base["margin_delivery"]
-    fagni_revenue_ht = base["fagni_revenue_ht"]
+
+    # ------------------------------------------------------------
+    # GARDE-FOU (double sécurité) :
+    # - marge logistique ne peut pas être négative
+    # - si coût livreur > prix client livraison, on remonte le prix client
+    #   au minimum au coût livreur et on force marge à 0.
+    # ------------------------------------------------------------
+    if margin_delivery < 0:
+        margin_delivery = Decimal("0")
+
+    if delivery_cost_driver > delivery_fee_client:
+        delivery_fee_client = delivery_cost_driver
+        margin_delivery = Decimal("0")
+
+    # Recalcul revenu FAGNI HT (source-of-truth) = marge livraison + service
+    fagni_revenue_ht = (margin_delivery + service_fee_ht).quantize(
+        Decimal("1"), rounding=ROUND_HALF_UP
+    )
 
     # TVA FAGNI : sur le revenu FAGNI uniquement (par défaut)
     vat_base = fagni_revenue_ht
     if not cfg.apply_vat_on_service_only:
-        # Extension future : on pourrait ajouter d'autres composantes si besoin
         vat_base = fagni_revenue_ht
 
-    vat_fagni = (
-        vat_base * cfg.vat_rate / Decimal("100")
-    ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    vat_fagni = (vat_base * cfg.vat_rate / Decimal("100")).quantize(
+        Decimal("1"), rounding=ROUND_HALF_UP
+    )
 
     total_client_ttc = (
         prestation_total
@@ -60,6 +76,7 @@ def compute_order_financials(order) -> Dict[str, Any]:
         "delivery_cost_driver": delivery_cost_driver,
         "service_fee_ht": service_fee_ht,
         "express_surcharge": express_surcharge,
+        "express_for_client": express_for_client,
         "commission_laundry_ht": commission_laundry_ht,
         "commission_delivery_ht": commission_delivery_ht,
         "margin_delivery": margin_delivery,

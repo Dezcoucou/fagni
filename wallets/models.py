@@ -7,7 +7,7 @@ from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
-from orders.models import Order, Customer
+from orders.models import Order, Customer, DeliveryLeg
 from partners.models import LaundryPartner, DeliveryPartner, RelayPointPartner
 
 User = get_user_model()
@@ -278,6 +278,15 @@ class WalletTransaction(models.Model):
         verbose_name="Commande",
     )
 
+    leg = models.ForeignKey(
+        DeliveryLeg,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,  # ✅ au lieu de SET_NULL
+        related_name="wallet_transactions",
+        verbose_name="Tronçon (leg)",
+    )
+
     type = models.CharField(
         "Type",
         max_length=30,
@@ -306,13 +315,21 @@ class WalletTransaction(models.Model):
         verbose_name_plural = "Transactions wallet"
         ordering = ["-created_at"]
         constraints = [
-            # Anti-doublon HARD: 1 seule tx par (wallet, order, type, direction)
+            # Anti-doublon HARD (nouveau) : 1 seule tx par (wallet, leg, type, direction)
+            models.UniqueConstraint(
+                fields=["wallet", "leg", "type", "direction"],
+                condition=models.Q(leg__isnull=False),
+                name="uniq_wtx_wallet_leg_type_dir",
+            ),
+            # Anti-doublon LEGACY : 1 seule tx par (wallet, order, type, direction)
+            # mais uniquement si leg est NULL (anciens usages)
             models.UniqueConstraint(
                 fields=["wallet", "order", "type", "direction"],
-                condition=models.Q(order__isnull=False),
+                condition=models.Q(order__isnull=False) & models.Q(leg__isnull=True),
                 name="uniq_wtx_wallet_order_type_dir",
             ),
         ]
+
 
     def __str__(self):
         sign = "+" if self.direction == "in" else "-"

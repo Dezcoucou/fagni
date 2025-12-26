@@ -45,13 +45,43 @@ def sync_delivery_legs_for_order(order):
     # distance totale A/R (si renseignée)
     distance_total = order.distance_km or order.distance_km_total or Decimal("0")
 
-    # Si pas de livreur ou pas de livraison facturée -> on supprime tout
+    # Helper: reset timestamps logistiques (anti-legacy)
+    def _reset_logistic_timestamps():
+        # On ne touche PAS wash_complete_time (côté blanchisserie)
+        dirty = False
+        for field in ("pickup_time", "dropoff_time", "return_time", "delivered_time"):
+            if getattr(order, field, None) is not None:
+                setattr(order, field, None)
+                dirty = True
+        return dirty
+
+    # Si pas de livreur ou pas de livraison facturée -> on supprime tout + (optionnel) reset timeline + status
     if not order.delivery_partner or delivery_fee <= 0:
         DeliveryLeg.objects.filter(order=order).delete()
+
+        changed = False
+        # ✅ SAFE : ne reset la timeline que si la commande est encore pending
+        if order.status == "pending":
+            changed = _reset_logistic_timestamps()
+
+        # Statut cohérent : s'il n'y a pas de legs, on revient en pending
+        if order.status != "pending":
+            order.status = "pending"
+            changed = True
+
+        if changed:
+            order.save(update_fields=["pickup_time", "dropoff_time", "return_time", "delivered_time", "status"])
+
         return
 
     # On réinitialise les jambes existantes pour garder une logique claire
     DeliveryLeg.objects.filter(order=order).delete()
+
+    # ✅ SAFE : reset timeline uniquement si la commande est encore en pending
+    # (ne jamais casser l'historique d'une course in_progress/done)
+    changed = False
+    if order.status == "pending":
+        changed = _reset_logistic_timestamps()
 
     # Distance aller simple (si on a une distance totale A/R)
     distance_one_way = None
@@ -73,32 +103,31 @@ def sync_delivery_legs_for_order(order):
     margin_share_2 = _round_fcfa(margin_total - margin_share_1)
 
     # Statut de base des jambes
-    base_status = "assigned" if order.status in ["in_progress", "done"] else "pending"
+    # - commande pending => legs pending
+    # - commande in_progress => legs assigned (prêtes à démarrer)
+    # - commande done => legs done
+    if order.status == "done":
+        base_status = "done"
+    elif order.status == "in_progress":
+        base_status = "assigned"
+    else:
+        base_status = "pending"
 
     # -------- Détermination du type de 2e jambe --------
-    pickup_addr_ref = None
-    if order.pickup_address:
-        pickup_addr_ref = order.pickup_address.strip()
-    elif order.customer and order.customer.address:
-        pickup_addr_ref = order.customer.address.strip()
-
-    delivery_addr_ref = None
-    if order.delivery_address:
-        delivery_addr_ref = order.delivery_address.strip()
-    else:
-        delivery_addr_ref = pickup_addr_ref
-
+    # IMPORTANT : DeliveryLeg.leg_type ne supporte que ("pickup", "return").
+    # L'ancien type "delivery" est legacy et doit rester interdit.
     leg2_type = "return"
-    if pickup_addr_ref and delivery_addr_ref and delivery_addr_ref != pickup_addr_ref:
-        # Adresse de livraison différente => jambe "delivery"
-        leg2_type = "delivery"
 
     legs_data = [
-        ("pickup",  client_share_1, driver_share_1, margin_share_1),
+        ("pickup", client_share_1, driver_share_1, margin_share_1),
         (leg2_type, client_share_2, driver_share_2, margin_share_2),
     ]
 
     for leg_type, client_part, driver_part, margin_part in legs_data:
+        # Anti-legacy : interdit "delivery"
+        if leg_type == "delivery":
+            leg_type = "return"
+
         DeliveryLeg.objects.create(
             order=order,
             driver=order.delivery_partner,
@@ -109,6 +138,32 @@ def sync_delivery_legs_for_order(order):
             driver_amount=driver_part,
             fagni_margin=margin_part,
         )
+
+    # Statut commande cohérent avec les legs recréés
+    # - legs pending  => order pending
+    # - legs assigned => order in_progress
+    # - legs done     => order done
+    if base_status == "done":
+        wanted_status = "done"
+    elif base_status == "assigned":
+        wanted_status = "in_progress"
+    else:
+        wanted_status = "pending"
+
+    if order.status != wanted_status:
+        order.status = wanted_status
+        changed = True
+
+    if changed:
+        fields = []
+        if order.status == wanted_status:
+            fields.append("status")
+        # timeline reset possible (quand pending)
+        fields += ["pickup_time", "dropoff_time", "return_time", "delivered_time"]
+        # on évite les doublons + on garde uniquement ceux existants
+        fields = [f for f in dict.fromkeys(fields) if hasattr(order, f)]
+        if fields:
+            order.save(update_fields=fields)
 
 
 # =====================
@@ -747,7 +802,6 @@ class Order(models.Model):
         help_text="Numéro de facture FAGNI (généré automatiquement au paiement).",
     )
 
-
     def recompute_distances_from_positions(self):
         """
         Recalcule distance_km_pickup / distance_km_delivery / distance_km_total / distance_km
@@ -797,7 +851,6 @@ class Order(models.Model):
 
     def __str__(self):
         return f"{self.code or 'SANS-CODE'} - {self.customer}"
-
 
     # ========= FINANCE FAGNI =========
     def update_financials(self, save: bool = True):
@@ -877,7 +930,6 @@ class Order(models.Model):
             self.save()
 
         return data
-
 
     def compute_totals(self, save: bool = True):
         """
@@ -1245,7 +1297,6 @@ class Order(models.Model):
             rounding=ROUND_HALF_UP,
         )
 
-
     @property
     def amount_driver_partner_resolved(self):
         """
@@ -1280,7 +1331,6 @@ class Order(models.Model):
         # 3) Fallback : coût logistique livreur
         cost = self.driver_logistic_cost or Decimal("0")
         return cost.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
 
     @property
     def distribute_mlm_commissions(self):
@@ -1389,7 +1439,6 @@ class Order(models.Model):
             tx_type="mlm_commission",
         )
 
-
         if self.pk:
             type(self).objects.filter(pk=self.pk).update(mlm_distributed=True)
         self.mlm_distributed = True
@@ -1409,52 +1458,54 @@ class Order(models.Model):
 
         distribute_order_revenues(self, recompute=True)
 
+        # Après distribute_order_revenues(self, recompute=True)
+        from orders.views import _trigger_driver_payout_for_leg
+
+        legs_done = DeliveryLeg.objects.filter(order=self, status="done").select_related("driver")
+        for leg in legs_done:
+            _trigger_driver_payout_for_leg(leg)
+
         self.wallets_distributed = True
         super(Order, self).save(update_fields=["wallets_distributed"])
 
-
     def pay_driver_if_needed(self):
         """
-        Paie le livreur à la fin de course ("done"), mais seulement si la commande est payée.
-
-        Règle anti-bug / anti-doublon :
-        - La SOURCE DE VÉRITÉ = WalletTransaction(type='payout', direction='in', order=self)
-        - Le flag driver_wallet_credited est un cache ; il peut être faux (ou vrai) si DB a été resetée.
-        => Donc on ne doit jamais return juste parce que le flag est True.
+        Paie le livreur à la fin de course ("done"), seulement si la commande est payée.
+        Anti-doublon basé sur WalletTransaction (source de vérité).
         """
         from decimal import Decimal
         from wallets.services import credit_wallet, get_or_create_wallet_for_delivery_partner
         from wallets.models import WalletTransaction
 
-        # Doit être payée
+        # 1) La commande doit être payée
         if self.payment_status != "paid":
             return
 
-        # Doit avoir un livreur
+        # 2) Il doit y avoir un livreur assigné
         if not self.delivery_partner:
             return
 
         wallet = get_or_create_wallet_for_delivery_partner(self.delivery_partner)
 
-        # SOURCE DE VÉRITÉ (global) :
-        # si une tx payout driver existe déjà pour CETTE COMMANDE (peu importe le wallet),
-        # on ne repaie jamais.
+        # 3) 🔐 ANTI-DOUBLON DUR (SOURCE DE VÉRITÉ)
         if WalletTransaction.objects.filter(
+            wallet=wallet,
             order=self,
             type="payout",
             direction="in",
-            wallet__owner_type="driver",
         ).exists():
+            # on synchronise le flag si besoin
             if not getattr(self, "driver_wallet_credited", False):
                 self.driver_wallet_credited = True
-                super(Order, self).save(update_fields=["driver_wallet_credited"])
+                self.save(update_fields=["driver_wallet_credited"])
             return
 
-        # Sinon, on tente de payer (même si flag True : cas "flag bloqué" => réparation)
+        # 4) Montant à payer
         amount = self.amount_driver_partner_resolved or Decimal("0")
         if amount <= 0:
             return
 
+        # 5) Paiement effectif
         credit_wallet(
             wallet,
             amount,
@@ -1463,10 +1514,9 @@ class Order(models.Model):
             tx_type="payout",
         )
 
-        # Marquer comme payé (évite doublon)
-        if not getattr(self, "driver_wallet_credited", False):
-            self.driver_wallet_credited = True
-            super(Order, self).save(update_fields=["driver_wallet_credited"])
+        # 6) Flag cache
+        self.driver_wallet_credited = True
+        self.save(update_fields=["driver_wallet_credited"])
 
     def financial_timeline(self):
         """
@@ -1552,6 +1602,9 @@ class Order(models.Model):
 
         return events
 
+
+
+
     def save(self, *args, **kwargs):
         payment_just_paid = False
         status_just_done = False
@@ -1570,17 +1623,19 @@ class Order(models.Model):
         if payment_just_paid:
             self.mark_as_paid_and_distribute()
 
-        # 2) Paiement livreur (cas normaux)
-        if status_just_done or (payment_just_paid and self.status == "done"):
-            self.pay_driver_if_needed()
+        # 2) Paiement livreur (DÉSACTIVÉ : payout driver géré par legs)
+        # payout driver géré par legs (orders.views._trigger_driver_payout_for_leg)
+        # if status_just_done or (payment_just_paid and self.status == "done"):
+        #     self.pay_driver_if_needed()
 
-        # 3) 🔒 RÉPARATION AUTOMATIQUE (sécurité ultime)
-        if (
-            self.status == "done"
-            and self.payment_status == "paid"
-            and not getattr(self, "driver_wallet_credited", False)
-        ):
-            self.pay_driver_if_needed()
+        # 3) 🔒 RÉPARATION AUTOMATIQUE (DÉSACTIVÉE : payout driver géré par legs)
+        # payout driver géré par legs (orders.views._trigger_driver_payout_for_leg)
+        # if (
+        #     self.status == "done"
+        #     and self.payment_status == "paid"
+        #     and not getattr(self, "driver_wallet_credited", False)
+        # ):
+        #     self.pay_driver_if_needed()
 
 
 def generate_invoice_number():

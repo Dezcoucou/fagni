@@ -2,6 +2,9 @@ import os
 from pathlib import Path
 from decimal import Decimal
 
+import sys
+TESTING = "test" in sys.argv
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ========================
@@ -12,12 +15,24 @@ DEBUG = True  # ⚠️ à mettre à False en prod
 
 ADMINS = [("Admin", "admin@example.com")]
 
+import os
+
+# --- Hosts autorisés (DEV) ---
 ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
+    "0.0.0.0",
+    "100.115.92.198",  # ton IP actuelle (Chromebook)
     "dezcoucou80.pythonanywhere.com",  # tu peux le laisser si tu utilises encore PythonAnywhere
     "fagni-t1s8.onrender.com",
 ]
+
+# Optionnel: si tu as besoin de tester depuis d'autres IP du LAN/VPN
+# ALLOWED_HOSTS += ["192.168.0.0/16"]  # (Django ne supporte pas les CIDR ici)
+
+# Si tu veux une règle "dev only" (moins strict) :
+if os.environ.get("DJANGO_DEBUG_ALLOW_ALL_HOSTS") == "1":
+    ALLOWED_HOSTS = ["*"]
 
 CSRF_TRUSTED_ORIGINS = [
     "https://dezcoucou80.pythonanywhere.com",

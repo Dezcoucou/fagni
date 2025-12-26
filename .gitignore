@@ -85,3 +85,17 @@ test_chain.py
 
 # Local config folders
 config/
+
+# Local exports / scratch
+cookies.txt
+missions*.csv
+missions*.xlsx
+0
+0:
+
+# Archives
+*.ARCHIVE_OLD
+
+# OS / temp
+.DS_Store
+*.log

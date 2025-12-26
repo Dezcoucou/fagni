@@ -1,5 +1,7 @@
 from django.urls import path, include
 from . import views
+from orders import views as views_ops
+
 
 app_name = "orders"
 
@@ -65,12 +67,15 @@ urlpatterns = [
     path("driver/hub/", views.driver_hub, name="driver_hub"),
 
     # Application mobile livreurs
-    path("driver/app/", views.driver_app, name="driver_app"),
+    path("driver-app/", views.driver_app, name="driver_app"),  # ✅ route officielle
+    path("driver/app/", views.driver_app_alias, name="driver_app_legacy"),  # alias compat
     path("driver-app/data/", views.driver_app_data, name="driver_app_data"),
     path("driver/me/", views.driver_me_app, name="driver_me_app"),
     path("driver/me/data/", views.driver_me_data, name="driver_me_data"),
     path("driver/leaderboard/", views.driver_leaderboard, name="driver_leaderboard"),
     path("driver/me/history/", views.driver_history_me, name="driver_history_me"),
+    # Historique missions (V2.1)
+    path("driver/missions/", views.driver_missions_history, name="driver_missions_history"),
 
     path("drivers/app/leg/<int:leg_id>/<str:action>/", views.driver_leg_action, name="driver_leg_action"),
 

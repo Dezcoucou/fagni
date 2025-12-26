@@ -1,9 +1,17 @@
 from django.db import migrations
-from django.contrib.auth import get_user_model
 
 
 def create_default_users(apps, schema_editor):
-    User = get_user_model()
+    # ✅ IMPORTANT: ne pas seed en environnement de test
+    from django.conf import settings
+    if getattr(settings, "TESTING", False):
+        return
+
+    # Récupère le User model de manière sûre en migration
+    UserModelLabel = settings.AUTH_USER_MODEL  # ex: "auth.User" ou "accounts.CustomUser"
+    app_label, model_name = UserModelLabel.split(".")
+    User = apps.get_model(app_label, model_name)
+
     DeliveryPartner = apps.get_model("partners", "DeliveryPartner")
 
     # ========= ADMIN =========
@@ -26,7 +34,7 @@ def create_default_users(apps, schema_editor):
     admin.set_password(admin_password)
     admin.save()
 
-    # ========= LIVREUR =========
+    # ========= LIVREUR (USER) =========
     driver_email = "livreur1@fagni.app"
     driver_password = "FagniDriver2025!"
 
@@ -53,7 +61,11 @@ def create_default_users(apps, schema_editor):
 
 
 def delete_default_users(apps, schema_editor):
-    User = get_user_model()
+    from django.conf import settings
+    UserModelLabel = settings.AUTH_USER_MODEL
+    app_label, model_name = UserModelLabel.split(".")
+    User = apps.get_model(app_label, model_name)
+
     User.objects.filter(
         username__in=["admin@fagni.app", "livreur1@fagni.app"]
     ).delete()

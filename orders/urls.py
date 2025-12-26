@@ -2,28 +2,22 @@ from django.urls import path, include
 from . import views
 from orders import views as views_ops
 
-
 app_name = "orders"
 
 urlpatterns = [
-    # Liste & création
+    # Liste & création (Back-office)
     path("", views.orders_list, name="list"),
     path("create/", views.create, name="create"),
 
-    # Détail / édition / suppression simple
+    # Détail / édition / suppression simple (Back-office)
     path("<int:order_id>/", views.detail, name="detail"),
     path("<int:order_id>/status/", views.update_status, name="update_status"),
-
     path("<int:order_id>/edit/", views.update, name="update"),
     path("<int:order_id>/delete/", views.delete, name="delete"),
 
     # Tableau OPS (collecte / lavage / livraison)
     path("ops-dashboard/", views.ops_dashboard, name="ops_dashboard"),
-    path(
-        "ops-dashboard/<int:order_id>/<str:action>/",
-        views.ops_update_step,
-        name="ops_update_step",
-    ),
+    path("ops-dashboard/<int:order_id>/<str:action>/", views.ops_update_step, name="ops_update_step"),
 
     # Dashboard global des commandes
     path("dashboard/", views.orders_dashboard, name="dashboard"),
@@ -33,7 +27,7 @@ urlpatterns = [
     path("export/csv/", views.export_orders_csv, name="export_orders_csv"),
     path("export/xlsx/", views.export_orders_xlsx, name="export_orders_xlsx"),
 
-    # Clients / mini CRM
+    # Clients / mini CRM (Back-office)
     path("customers/", views.customers_list, name="customers_list"),
     path("customers/export/csv/", views.export_customers_csv, name="export_customers_csv"),
     path("customers/export/xlsx/", views.export_customers_xlsx, name="export_customers_xlsx"),
@@ -41,6 +35,16 @@ urlpatterns = [
 
     # Lookup client (API)
     path("client-lookup/", views.client_lookup, name="client_lookup"),
+
+    # ============================
+    # ✅ APP CLIENT (V1)
+    # ============================
+    path("client/", views.client_login, name="client_login"),
+    path("client/logout/", views.client_logout, name="client_logout"),
+    path("client/home/", views.client_home, name="client_home"),
+    path("client/new/", views.client_new_order, name="client_new_order"),
+    path("client/orders/<int:order_id>/", views.client_order_detail, name="client_order_detail"),
+    path("client/orders/<int:order_id>/live/", views.client_order_live_status, name="client_order_live"),
 
     # Tickets PDF (A4 + thermique)
     path("<int:order_id>/ticket/", views.order_ticket_pdf, name="order_ticket_pdf"),
@@ -67,14 +71,13 @@ urlpatterns = [
     path("driver/hub/", views.driver_hub, name="driver_hub"),
 
     # Application mobile livreurs
-    path("driver-app/", views.driver_app, name="driver_app"),  # ✅ route officielle
-    path("driver/app/", views.driver_app_alias, name="driver_app_legacy"),  # alias compat
+    path("driver-app/", views.driver_app, name="driver_app"),
+    path("driver/app/", views.driver_app_alias, name="driver_app_legacy"),
     path("driver-app/data/", views.driver_app_data, name="driver_app_data"),
     path("driver/me/", views.driver_me_app, name="driver_me_app"),
     path("driver/me/data/", views.driver_me_data, name="driver_me_data"),
     path("driver/leaderboard/", views.driver_leaderboard, name="driver_leaderboard"),
     path("driver/me/history/", views.driver_history_me, name="driver_history_me"),
-    # Historique missions (V2.1)
     path("driver/missions/", views.driver_missions_history, name="driver_missions_history"),
 
     path("drivers/app/leg/<int:leg_id>/<str:action>/", views.driver_leg_action, name="driver_leg_action"),
@@ -84,11 +87,8 @@ urlpatterns = [
     path("driver/map/data/", views.driver_map_data, name="driver_map_data"),
 
     path("driver/orders/<int:order_id>/", views.driver_order_detail, name="driver_order_detail"),
-
-    # ✅ Lot 4.4 — LIVE JSON (polling)
     path("driver/orders/<int:order_id>/live/", views.driver_order_live_status, name="driver_order_live"),
 
-    # Nouvelle route "ME" : sans ID → trouve le livreur connecté
     path("driver/performance/", views.driver_performance_me, name="driver_performance_me"),
     path("driver/performance/<int:driver_id>/", views.driver_performance, name="driver_performance"),
 

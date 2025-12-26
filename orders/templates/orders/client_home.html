@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="max-width:900px;margin:0 auto;">
+  <div class="page-header">
+    <div class="page-header__left">
+      <h1 class="page-title">Mes commandes</h1>
+      <p class="page-subtitle">Téléphone : {{ phone }}</p>
+    </div>
+    <div class="page-header__right" style="display:flex;gap:10px;flex-wrap:wrap;">
+      <a class="btn" href="{% url 'orders:client_new_order' %}">➕ Nouvelle commande</a>
+      <a class="btn btn--ghost" href="{% url 'orders:client_logout' %}">Déconnexion</a>
+    </div>
+  </div>
+
+  <div class="card" style="padding:14px;">
+    {% if not customer %}
+      <p style="color:#6b7280;">Aucun profil client trouvé pour ce numéro. Crée une commande pour démarrer.</p>
+    {% endif %}
+
+    {% if orders %}
+      <div style="display:grid;gap:10px;">
+        {% for o in orders %}
+          <a href="{% url 'orders:client_order_detail' o.id %}"
+             class="card" style="padding:14px;text-decoration:none;color:inherit;border:1px solid #e5e7eb;">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+              <div>
+                <div style="font-weight:800;">Commande {{ o.code|default:o.id }}</div>
+                <div style="color:#6b7280;font-size:12px;">
+                  Créée le {{ o.created_at|date:"d/m/Y H:i" }}
+                </div>
+              </div>
+              <div style="font-weight:700;">Statut : {{ o.status }}</div>
+            </div>
+            <div style="margin-top:8px;color:#374151;font-size:13px;">
+              Adresse : {{ o.pickup_address|default:o.customer.address|default:"—" }}
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p style="color:#6b7280;margin:0;">Aucune commande pour le moment.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

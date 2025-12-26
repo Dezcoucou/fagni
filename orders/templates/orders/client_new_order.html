@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="max-width:720px;margin:0 auto;">
+  <div class="page-header">
+    <div class="page-header__left">
+      <h1 class="page-title">Nouvelle commande</h1>
+      <p class="page-subtitle">On crée une demande rapide, puis l’équipe s’occupe du reste.</p>
+    </div>
+    <div class="page-header__right">
+      <a class="btn btn--ghost" href="{% url 'orders:client_home' %}">← Retour</a>
+    </div>
+  </div>
+
+  <div class="card" style="padding:16px;">
+    {% if error %}
+      <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div style="grid-column:1 / -1;">
+          <label style="display:block;font-weight:700;margin:8px 0 6px;">Téléphone</label>
+          <input value="{{ phone }}" disabled
+                 style="width:100%;padding:12px;border-radius:12px;border:1px solid #e5e7eb;background:#f9fafb;" />
+        </div>
+
+        <div style="grid-column:1 / -1;">
+          <label style="display:block;font-weight:700;margin:8px 0 6px;">Nom</label>
+          <input name="name" value="{{ name_init }}" placeholder="Ton nom"
+                 style="width:100%;padding:12px;border-radius:12px;border:1px solid #e5e7eb;" />
+        </div>
+
+        <div style="grid-column:1 / -1;">
+          <label style="display:block;font-weight:700;margin:8px 0 6px;">Adresse de collecte / livraison</label>
+          <input name="address" value="{{ address_init }}" placeholder="Ex : Cocody Angré 8ème tranche..."
+                 style="width:100%;padding:12px;border-radius:12px;border:1px solid #e5e7eb;" />
+          <small style="display:block;margin-top:6px;color:#6b7280;">
+            On utilisera cette adresse comme point de collecte et de livraison (V1).
+          </small>
+        </div>
+
+        <div style="grid-column:1 / -1;">
+          <label style="display:block;font-weight:700;margin:8px 0 6px;">Détails / Notes</label>
+          <textarea name="notes" rows="4" placeholder="Ex : 2 pantalons, 5 chemises, urgent, etc."
+                    style="width:100%;padding:12px;border-radius:12px;border:1px solid #e5e7eb;"></textarea>
+        </div>
+      </div>
+
+      <button type="submit"
+              style="margin-top:14px;width:100%;padding:12px 14px;border-radius:999px;border:none;background:#f97316;color:#111827;font-weight:800;">
+        Créer la commande →
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

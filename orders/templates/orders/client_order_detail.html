@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="max-width:900px;margin:0 auto;">
+  <div class="page-header">
+    <div class="page-header__left">
+      <h1 class="page-title">Commande {{ order.code|default:order.id }}</h1>
+      <p class="page-subtitle">Suivi en temps réel (refresh automatique).</p>
+    </div>
+    <div class="page-header__right" style="display:flex;gap:10px;flex-wrap:wrap;">
+      <a class="btn btn--ghost" href="{% url 'orders:client_home' %}">← Mes commandes</a>
+      <a class="btn btn--ghost" href="{% url 'orders:client_logout' %}">Déconnexion</a>
+    </div>
+  </div>
+
+  <div class="card" style="padding:14px;">
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <div>
+        <div style="font-weight:800;">Statut : <span id="orderStatus">{{ order.status }}</span></div>
+        <div style="color:#6b7280;font-size:12px;">Créée le {{ order.created_at|date:"d/m/Y H:i" }}</div>
+      </div>
+      <div style="min-width:260px;">
+        <div style="color:#6b7280;font-size:12px;">Adresse</div>
+        <div style="font-weight:600;">{{ order.pickup_address|default:order.customer.address|default:"—" }}</div>
+      </div>
+    </div>
+
+    {% if order.notes %}
+      <div style="margin-top:10px;color:#374151;">
+        <div style="color:#6b7280;font-size:12px;">Notes</div>
+        <div>{{ order.notes }}</div>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card" style="padding:14px;margin-top:12px;">
+    <h3 style="margin:0 0 10px;font-size:14px;font-weight:800;">Livraison (legs)</h3>
+    <div id="legsBox" style="display:grid;gap:8px;">
+      {% if legs %}
+        {% for l in legs %}
+          <div class="card" style="padding:10px;border:1px solid #e5e7eb;">
+            <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+              <div style="font-weight:700;">{{ l.leg_type }} — <span class="leg-status">{{ l.status }}</span></div>
+              <div style="color:#6b7280;font-size:12px;">#{{ l.id }}</div>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div style="color:#6b7280;">Pas encore de mission de livraison affichée.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const liveUrl = "{% url 'orders:client_order_live' order.id %}";
+  const orderStatusEl = document.getElementById("orderStatus");
+  const legsBox = document.getElementById("legsBox");
+
+  function renderLegs(legs){
+    if(!legs || !legs.length){
+      legsBox.innerHTML = '<div style="color:#6b7280;">Pas encore de mission de livraison affichée.</div>';
+      return;
+    }
+    legsBox.innerHTML = legs.map(l => `
+      <div class="card" style="padding:10px;border:1px solid #e5e7eb;">
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+          <div style="font-weight:700;">${l.leg_type} — <span class="leg-status">${l.status}</span></div>
+          <div style="color:#6b7280;font-size:12px;">#${l.id}</div>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  async function tick(){
+    try{
+      const r = await fetch(liveUrl, {credentials:"same-origin"});
+      const data = await r.json();
+      if(!data.ok) return;
+      if(data.order && data.order.status){
+        orderStatusEl.textContent = data.order.status;
+      }
+      renderLegs(data.legs || []);
+    }catch(e){}
+  }
+
+  tick();
+  setInterval(tick, 4000);
+})();
+</script>
+{% endblock %}

@@ -108,12 +108,14 @@ def credit_wallet(
     amount,
     label: str = "",
     order: Optional[Order] = None,
+    leg=None,
     tx_type: str = "credit",
 ) -> Optional[WalletTransaction]:
     """
     Crédite un wallet (entrée d'argent).
     - direction = "in"
     - type = tx_type (par ex: "credit", "topup", "payout", "mlm_commission")
+    - leg est optionnel (payouts logistiques par tronçon)
     """
     amount = _to_decimal(amount)
     if amount <= 0:
@@ -127,6 +129,7 @@ def credit_wallet(
     tx = WalletTransaction.objects.create(
         wallet=wallet,
         order=order,
+        leg=leg,
         type=tx_type,
         direction="in",
         amount=amount,
@@ -140,12 +143,14 @@ def debit_wallet(
     amount,
     label: str = "",
     order: Optional[Order] = None,
+    leg=None,
     tx_type: str = "debit",
 ) -> Optional[WalletTransaction]:
     """
     Débite un wallet (sortie d'argent).
     - direction = "out"
-    - type = tx_type (par ex: "debit", "payout", "adjustment")
+    - type = tx_type
+    - leg optionnel
     """
     amount = _to_decimal(amount)
     if amount <= 0:
@@ -159,6 +164,7 @@ def debit_wallet(
     tx = WalletTransaction.objects.create(
         wallet=wallet,
         order=order,
+        leg=leg,
         type=tx_type,
         direction="out",
         amount=amount,
@@ -184,8 +190,10 @@ def distribute_order_revenues(
     - Optionnellement : recalcule les montants via order.update_financials()
     - Crédite :
         • Wallet blanchisseur (amount_laundry_partner)
-        • Wallet livreur (amount_driver_partner)
         • Wallet interne FAGNI (fagni_revenue_ttc)
+    - ⚠️ IMPORTANT : le livreur n’est PAS payé ici.
+      Le payout livreur se fait UNIQUEMENT à la fin de course (legs done).
+
     - Marque order.wallets_distributed = True pour éviter les doublons.
 
     Paramètres :
@@ -212,7 +220,6 @@ def distribute_order_revenues(
     # 2) Recalcul éventuel des montants financiers
     financial_data = None
     if recompute:
-        # Utilise le moteur FAGNI (compute_order_financials) via update_financials()
         financial_data = order.update_financials(save=True)
 
     # 3) Récupérer les montants
@@ -224,7 +231,6 @@ def distribute_order_revenues(
     fagni_ht = _to_decimal(getattr(order, "fagni_revenue_ht", Decimal("0")))
     fagni_ttc = _to_decimal(getattr(order, "fagni_revenue_ttc", Decimal("0")))
 
-    # 4) Créer / récupérer les wallets nécessaires
     txs: Dict[str, Optional[WalletTransaction]] = {}
 
     # 4.a Wallet blanchisseur
@@ -241,17 +247,8 @@ def distribute_order_revenues(
         txs["laundry"] = None
 
     # 4.b Wallet livreur
-    if order.delivery_partner and amount_driver > 0:
-        wd = get_or_create_wallet_for_delivery_partner(order.delivery_partner)
-        txs["driver"] = credit_wallet(
-            wd,
-            amount_driver,
-            label=f"Commande {order.code} – part livreur",
-            order=order,
-            tx_type="payout",
-        )
-    else:
-        txs["driver"] = None
+    # ⚠️ NE PAS payer au paiement — payé à la fin ("done") via legs.
+    txs["driver"] = None
 
     # 4.c Wallet interne FAGNI (revenu plateforme)
     internal_wallet = get_or_create_internal_wallet()
@@ -266,7 +263,7 @@ def distribute_order_revenues(
     else:
         txs["internal"] = None
 
-    # 5) Marquer la commande comme distribuée
+    # 5) Marquer la commande comme distribuée (post-paiement)
     order.wallets_distributed = True
     order.save(update_fields=["wallets_distributed"])
 

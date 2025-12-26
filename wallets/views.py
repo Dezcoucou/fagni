@@ -79,35 +79,49 @@ def _get_current_driver(request) -> DeliveryPartner | None:
 @login_required
 def driver_wallet_dashboard(request):
     """
-    Dashboard du wallet livreur :
-    - solde actuel
-    - total gagné ce mois-ci (entrées)
-    - dernières transactions
-    - création de demande de retrait
+    Dashboard du wallet livreur.
+
+    IMPORTANT :
+    - DeliveryPartner n'est PAS lié à User dans le modèle (pas de champ user).
+    - Donc on se base sur ?driver_id= pour déterminer le livreur.
+    - Staff : peut choisir n'importe quel driver_id
+    - Non-staff : driver_id est requis (sinon page d'erreur)
     """
+    user = request.user
+    selected_driver_id = (request.GET.get("driver_id") or "").strip()
 
-    driver_id = request.GET.get("driver_id")
+    driver = None
+    if selected_driver_id:
+        driver = DeliveryPartner.objects.filter(pk=selected_driver_id).first()
 
-    if not driver_id:
-        context = {
-            "error_message": (
-                "Aucun livreur sélectionné. Merci d'accéder à cette page "
-                "depuis l'app livreur ou d'ajouter ?driver_id=ID dans l'URL."
-            )
-        }
-        return render(request, "wallets/driver_wallet_dashboard.html", context)
-
-    driver = DeliveryPartner.objects.filter(pk=driver_id).first()
+    # Sécurité : sans driver_id, on ne peut pas deviner le livreur
     if not driver:
         context = {
-            "error_message": "Livreur introuvable pour cet identifiant."
+            "error_message": (
+                "Livreur non identifié. Ouvre d’abord l’app livreur, puis clique sur Wallet "
+                "(le lien doit contenir ?driver_id=...)."
+            )
         }
-        return render(request, "wallets/driver_wallet_dashboard.html", context)
+        return render(request, "orders/driver_wallet.html", context)
+
+    # ------------------------------------------------------------
+    # 🔒 VERROUILLAGE WALLET : non-staff -> wallet uniquement "à lui"
+    # Comme DeliveryPartner n'est pas lié à User, on vérifie par EMAIL si possible.
+    # (Si pas d'email côté driver, on laisse passer mais au moins le détail commande est verrouillé.)
+    # ------------------------------------------------------------
+    if not request.user.is_staff:
+        user_email = (getattr(request.user, "email", "") or "").strip().lower()
+        driver_email = (getattr(driver, "email", "") or "").strip().lower()
+
+        if user_email and driver_email and user_email != driver_email:
+            return render(request, "orders/driver_wallet.html", {
+                "error_message": "Accès refusé : ce wallet n’est pas associé à ton compte."
+            })
 
     # Wallet du livreur
     wallet = get_or_create_wallet_for_delivery_partner(driver)
 
-    # Gestion du POST : demande de retrait
+    # POST : demande de retrait
     if request.method == "POST":
         amount_str = request.POST.get("amount", "").strip() or "0"
         try:
@@ -121,13 +135,9 @@ def driver_wallet_dashboard(request):
             return redirect(f"{reverse('wallets:driver_wallet_dashboard')}?driver_id={driver.id}")
 
         if amount > wallet.balance:
-            messages.error(
-                request,
-                "Le montant demandé dépasse ton solde disponible."
-            )
+            messages.error(request, "Le montant demandé dépasse ton solde disponible.")
             return redirect(f"{reverse('wallets:driver_wallet_dashboard')}?driver_id={driver.id}")
 
-        # Création de la demande de retrait (statut en attente)
         WithdrawalRequest.objects.create(
             wallet=wallet,
             delivery_partner=driver,
@@ -138,10 +148,8 @@ def driver_wallet_dashboard(request):
 
         messages.success(
             request,
-            "Ta demande de paiement a été enregistrée. "
-            "Elle sera traitée par l'équipe FAGNI."
+            "Ta demande de paiement a été enregistrée. Elle sera traitée par l'équipe FAGNI."
         )
-
         return redirect(f"{reverse('wallets:driver_wallet_dashboard')}?driver_id={driver.id}")
 
     # GET : affichage des infos
@@ -149,17 +157,14 @@ def driver_wallet_dashboard(request):
 
     now = timezone.now()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    month_in_qs = wallet.transactions.filter(
-        created_at__gte=month_start,
-        direction="in",
-    )
-    month_earnings = (
-        month_in_qs.aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
-    ).quantize(Decimal("0.01"))
+    month_in_qs = wallet.transactions.filter(created_at__gte=month_start, direction="in")
+    month_earnings = (month_in_qs.aggregate(s=Sum("amount"))["s"] or Decimal("0.00")).quantize(Decimal("0.01"))
 
-    # Demandes de retrait
     pending_withdrawals = wallet.withdrawals.filter(status="pending").order_by("-created_at")
     last_withdrawals = wallet.withdrawals.all().order_by("-created_at")[:10]
+
+    total_credited = wallet.transactions.filter(direction="in").aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+    total_debited  = wallet.transactions.filter(direction="out").aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
 
     context = {
         "driver": driver,
@@ -169,6 +174,8 @@ def driver_wallet_dashboard(request):
         "month_start": month_start,
         "pending_withdrawals": pending_withdrawals,
         "last_withdrawals": last_withdrawals,
+        "selected_driver_id": selected_driver_id,
+        "total_credited": total_credited,
+        "total_debited": total_debited,
     }
-
-    return render(request, "wallets/driver_wallet_dashboard.html", context)
+    return render(request, "orders/driver_wallet.html", context)

@@ -4,6 +4,9 @@ from django.utils.html import format_html
 from django.db.models import Sum
 from django.urls import reverse
 from django.utils import timezone
+from django.db import transaction
+from orders.views import _trigger_driver_payout_for_leg
+
 
 from .models import (
     Customer,
@@ -589,11 +592,11 @@ class OrderAdmin(admin.ModelAdmin):
     # ============================================================
     @admin.action(description="✅ Valider paiement (Cash)")
     def admin_validate_paid_cash(self, request, queryset):
+
         updated = 0
         skipped = 0
 
         for order in queryset.select_related("customer"):
-            # Si déjà payé, on ignore
             if order.payment_status == "paid":
                 skipped += 1
                 continue
@@ -613,19 +616,63 @@ class OrderAdmin(admin.ModelAdmin):
             order.payment_date = timezone.now()
             order.amount_paid = Decimal(total_ttc)
 
-            # Recalcule + facture (invoice_number) + save() déclenche distribution
+            # Recalcule + facture (invoice_number)
             try:
                 order.update_financials(save=False)
             except Exception:
                 pass
 
-            order.save()
+            with transaction.atomic():
+                order.save()
+
+                # 1) Distribution blanchisseur + interne (idempotent)
+                try:
+                    order.mark_as_paid_and_distribute()
+                except Exception:
+                    pass
+
+                # 2) Rattrapage payout driver par legs déjà DONE
+                legs_done = DeliveryLeg.objects.filter(order=order, status="done").select_related("driver")
+                for leg in legs_done:
+                    try:
+                        _trigger_driver_payout_for_leg(leg)
+                    except Exception:
+                        pass
+
             updated += 1
 
-        # ✅ IMPORTANT : message UNE SEULE fois, après la boucle
         messages.success(
             request,
             f"Paiement CASH validé : {updated} commande(s). Ignorées : {skipped}.",
+        )
+
+
+    @admin.action(description="🔁 Rattraper payout legs (commandes PAYÉES)")
+    def admin_catchup_driver_payout_legs(self, request, queryset):
+
+        updated = 0
+        skipped = 0
+
+        for order in queryset:
+            if getattr(order, "payment_status", None) != "paid":
+                skipped += 1
+                continue
+
+            legs_done = (
+                DeliveryLeg.objects
+                .filter(order=order, status="done")
+                .select_related("driver", "order")
+            )
+
+            with transaction.atomic():
+                for leg in legs_done:
+                    _trigger_driver_payout_for_leg(leg)
+
+            updated += 1
+
+        messages.success(
+            request,
+            f"Rattrapage payout legs terminé : {updated} commande(s). Ignorées : {skipped}.",
         )
 
 

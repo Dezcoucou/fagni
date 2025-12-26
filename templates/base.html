@@ -7,26 +7,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#ff7a00">
 
-    {# 👉 CSS global existant (remets ici ce que tu avais avant) #}
     <link rel="stylesheet" href="{% static 'css/site.css' %}">
-    {# Optionnel : autres fichiers si tu les utilises #}
-    {# <link rel="stylesheet" href="{% static 'css/style.css' %}"> #}
-    {# <link rel="stylesheet" href="{% static 'css/ops.css' %}"> #}
     <link rel="icon" type="image/png" href="{% static 'favicon.png' %}">
     <link rel="manifest" href="{% static 'manifest.json' %}">
 
-    {# 👉 Thème FAGNI global (variables, cards, boutons, etc.) #}
     <link rel="stylesheet" href="{% static 'css/fagni_theme.css' %}">
 
     <style>
-        /* Réglages génériques très légers */
-        * {
-            box-sizing: border-box;
-        }
-        img {
-            max-width: 100%;
-            display: block;
-        }
+        * { box-sizing: border-box; }
+        img { max-width: 100%; display: block; }
 
         /* TOPBAR SUPER-APP FAGNI */
         .fagni-topbar{
@@ -38,103 +27,67 @@
             justify-content:space-between;
             gap:12px;
         }
-        .fagni-topbar-left{
-            display:flex;
-            align-items:center;
-            gap:10px;
-        }
-        .fagni-logo{
-            display:flex;
-            align-items:center;
-            gap:8px;
-        }
+        .fagni-topbar-left{ display:flex; align-items:center; gap:10px; }
+        .fagni-logo{ display:flex; align-items:center; gap:8px; text-decoration:none; color:inherit; }
         .fagni-logo-mark{
-            width:32px;
-            height:32px;
-            border-radius:10px;
-            overflow:hidden;
-            background:#020617;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            padding:4px;
+            width:32px;height:32px;border-radius:10px;overflow:hidden;background:#020617;
+            display:flex;align-items:center;justify-content:center;padding:4px;
         }
-        .fagni-logo-mark img{
-            width:100%;
-            height:100%;
-            object-fit:contain;
-        }
-        .fagni-logo-text{
-            display:flex;
-            flex-direction:column;
-            line-height:1.1;
-        }
+        .fagni-logo-mark img{ width:100%; height:100%; object-fit:contain; }
+        .fagni-logo-text{ display:flex; flex-direction:column; line-height:1.1; }
         .fagni-logo-text-main{
-            font-weight:700;
-            letter-spacing:0.08em;
-            font-size:11px;
-            text-transform:uppercase;
+            font-weight:700; letter-spacing:0.08em; font-size:11px; text-transform:uppercase;
         }
-        .fagni-logo-text-sub{
-            font-size:10px;
-            color:#9ca3af;
-        }
+        .fagni-logo-text-sub{ font-size:10px; color:#9ca3af; }
         .fagni-topbar-tag{
-            font-size:10px;
-            padding:3px 8px;
-            border-radius:999px;
-            background:rgba(15,23,42,0.7);
-            border:1px solid rgba(148,163,184,0.4);
-            display:inline-flex;
-            align-items:center;
-            gap:4px;
+            font-size:10px; padding:3px 8px; border-radius:999px;
+            background:rgba(15,23,42,0.7); border:1px solid rgba(148,163,184,0.4);
+            display:inline-flex; align-items:center; gap:4px;
         }
-        .fagni-topbar-right{
-            display:flex;
-            align-items:center;
-            gap:8px;
-        }
-        .fagni-topbar-user{
-            display:flex;
-            align-items:center;
-            gap:6px;
-            font-size:11px;
-        }
+        .fagni-topbar-right{ display:flex; align-items:center; gap:8px; }
+        .fagni-topbar-user{ display:flex; align-items:center; gap:6px; font-size:11px; }
         .fagni-topbar-avatar{
-            width:26px;
-            height:26px;
-            border-radius:999px;
-            background:#111827;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            font-size:12px;
-            font-weight:600;
+            width:26px;height:26px;border-radius:999px;background:#111827;
+            display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;
             border:1px solid rgba(148,163,184,0.5);
         }
         .fagni-topbar-status{
-            font-size:9px;
-            padding:2px 6px;
-            border-radius:999px;
-            background:rgba(34,197,94,0.12);
-            color:#bbf7d0;
+            font-size:9px; padding:2px 6px; border-radius:999px;
+            background:rgba(34,197,94,0.12); color:#bbf7d0;
             border:1px solid rgba(34,197,94,0.4);
         }
 
-        /* Conteneur principal – on reste simple, ton thème gère le reste */
+        /* Conteneur principal */
         .fagni-shell{
             max-width:1200px;
             margin:0 auto;
             padding:10px 10px 24px;
         }
         @media(min-width:1024px){
-            .fagni-shell{
-                padding:18px 18px 30px;
-            }
-            .fagni-topbar{
-                padding:12px 32px;
-            }
+            .fagni-shell{ padding:18px 18px 30px; }
+            .fagni-topbar{ padding:12px 32px; }
         }
+
+        /* Flash messages */
+        .flash-stack{
+            display:flex;
+            flex-direction:column;
+            gap:8px;
+            margin:12px 0 14px;
+        }
+        .flash{
+            padding:10px 12px;
+            border-radius:14px;
+            font-size:13px;
+            border:1px solid rgba(148,163,184,.35);
+            background: rgba(15,23,42,.55);
+            color:#f8fafc;
+            backdrop-filter: blur(6px);
+        }
+        .flash-success{ border-color: rgba(34,197,94,.45); }
+        .flash-error{ border-color: rgba(239,68,68,.45); }
+        .flash-warning{ border-color: rgba(245,158,11,.45); }
+        .flash-info{ border-color: rgba(59,130,246,.45); }
     </style>
 
     {% block extra_head %}{% endblock %}
@@ -152,9 +105,7 @@
                 <span class="fagni-logo-text-sub">Laundry • Logistics • Affiliation</span>
             </span>
         </a>
-        <span class="fagni-topbar-tag">
-            🚀 Super-App
-        </span>
+        <span class="fagni-topbar-tag">🚀 Super-App</span>
     </div>
 
     <div class="fagni-topbar-right">
@@ -175,6 +126,17 @@
 </header>
 
 <div class="fagni-shell">
+
+    {% if messages %}
+        <div class="flash-stack">
+            {% for message in messages %}
+                <div class="flash flash-{{ message.tags|default:'info' }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
     {% block content %}{% endblock %}
 </div>
 

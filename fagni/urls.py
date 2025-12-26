@@ -17,11 +17,15 @@ def chrome_devtools_wellknown(_request):
 def home(request):
     """
     Page d'accueil FAGNI :
-    Pour l'instant, on redirige tout le monde vers la liste des commandes.
-    (Staff et autres pourront ensuite naviguer vers le dashboard, l'app livreur, etc.)
+    - Utilisateur staff → dashboard
+    - Autres / anonymes → liste des commandes
     """
-    return redirect("orders:list")
+    user = getattr(request, "user", None)
 
+    if user and user.is_authenticated and user.is_staff:
+        return redirect("dashboard:index")
+
+    return redirect("orders:list")
 
 urlpatterns = [
     # Admin Django

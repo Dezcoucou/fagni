@@ -9,7 +9,7 @@
         </p>
     </div>
     <div class="page-header__right">
-        <a href="{% url 'orders:driver_app' %}" class="btn btn-light">
+        <a href="{% url 'orders:driver_app' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" class="btn btn-light">
             ← Retour à mes courses
         </a>
     </div>

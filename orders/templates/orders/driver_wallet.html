@@ -357,7 +357,8 @@
                     <button type="button" class="btn btn-primary btn-icon">
                         ⬇️ Demander un retrait
                     </button>
-                    <a href="{% url 'orders:driver_app' %}" class="btn btn-light btn-sm btn-icon">
+                    <a href="{% url 'orders:driver_app' %}?driver_id={{ driver.id }}"
+                       class="btn btn-light btn-sm btn-icon">
                         ← Retour à mes courses
                     </a>
                 </div>
@@ -432,10 +433,10 @@
                                         </small>
                                     </td>
                                     <td>
-                                        {% if tx.order %}
-                                            <a href="{% url 'orders:driver_order_detail' tx.order.id %}"
+                                        {% if tx.order_id %}
+                                            <a href="{% url 'orders:driver_order_detail' tx.order_id %}?driver_id={{ driver.id }}"
                                                class="order-link">
-                                                {{ tx.order.code|default:tx.order.id }}
+                                                {{ tx.order.code|default:tx.order_id }}
                                             </a>
                                         {% else %}
                                             <span style="font-size:11px; color:#9ca3af;">
@@ -473,7 +474,8 @@
             <p style="font-size:12px; color:#6b7280; margin-top:4px;">
                 Si vous pensez que c’est une erreur, contactez l’équipe FAGNI ou votre référent opérationnel.
             </p>
-            <a href="{% url 'orders:driver_app' %}" class="btn btn-light btn-sm" style="margin-top:10px;">
+            <a href="{% url 'orders:driver_app' %}?driver_id={{ driver.id }}"
+               class="btn btn-light btn-sm" style="margin-top:10px;">
                 ← Retour à mes courses
             </a>
         </section>

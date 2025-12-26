@@ -6,8 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('orders', '0039_order_driver_wallet_credited'),
-        ('wallets', '0010_alter_wallet_owner_type_and_more'),
+        ('wallets', '0004_alter_withdrawalrequest_options_and_more'),
     ]
 
     operations = [

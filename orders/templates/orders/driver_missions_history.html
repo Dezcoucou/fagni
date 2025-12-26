@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% load money_filters %}
+
+{% block title %}Mes missions – Historique{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:980px;margin:0 auto;padding:14px 10px 26px;">
+
+  <!-- Header -->
+  <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+    <div>
+      <h1 style="margin:0;font-size:20px;font-weight:900;letter-spacing:-0.2px;">📜 Mes missions</h1>
+      <p style="margin:6px 0 0;color:#64748b;font-size:13px;">
+        Historique (lecture seule) : potentiel vs payé, basé sur les legs et le wallet.
+      </p>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <a class="btn btn-light" href="{% url 'orders:driver_app' %}{% if selected_driver_id %}?driver_id={{ selected_driver_id }}{% endif %}">
+        ← Retour App livreur
+      </a>
+
+      <a class="btn btn-light" href="{% url 'orders:driver_wallet' %}">
+        💼 Wallet
+      </a>
+
+      {% if driver %}
+        <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:999px;background:#f9fafb;font-weight:900;font-size:12px;">
+          🚴‍♂️ {{ driver.name|default:"Livreur" }}
+        </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ✅ FILTRES V2.2 -->
+  <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:12px 12px;margin-bottom:12px;box-shadow:0 1px 4px rgba(15,23,42,0.05);">
+    <form method="get" style="display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:10px;align-items:end;">
+      {% if selected_driver_id %}
+        <input type="hidden" name="driver_id" value="{{ selected_driver_id }}">
+      {% endif %}
+
+      <div style="grid-column:span 3;">
+        <label style="font-size:11px;color:#64748b;font-weight:900;">Statut</label>
+        <select name="status" class="form-control" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:12px;">
+          <option value="all" {% if status_filter == "all" %}selected{% endif %}>Tous</option>
+          <option value="pending" {% if status_filter == "pending" %}selected{% endif %}>En attente</option>
+          <option value="in_progress" {% if status_filter == "in_progress" %}selected{% endif %}>En cours</option>
+          <option value="done" {% if status_filter == "done" %}selected{% endif %}>Terminées</option>
+          <option value="canceled" {% if status_filter == "canceled" %}selected{% endif %}>Annulées</option>
+        </select>
+      </div>
+
+      <div style="grid-column:span 5;">
+        <label style="font-size:11px;color:#64748b;font-weight:900;">Recherche</label>
+        <input
+          type="text"
+          name="q"
+          value="{{ q|default:'' }}"
+          placeholder="Code, nom, téléphone, adresse…"
+          style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:12px;"
+        >
+      </div>
+
+      <div style="grid-column:span 2;">
+        <label style="font-size:11px;color:#64748b;font-weight:900;">Du</label>
+        <input type="date" name="from" value="{{ date_from|default:'' }}" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:12px;">
+      </div>
+
+      <div style="grid-column:span 2;">
+        <label style="font-size:11px;color:#64748b;font-weight:900;">Au</label>
+        <input type="date" name="to" value="{{ date_to|default:'' }}" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:12px;">
+      </div>
+
+      <div style="grid-column:span 4;">
+        <label style="font-size:11px;color:#64748b;font-weight:900;">Tri</label>
+        <select name="sort" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:12px;">
+          <option value="newest" {% if sort == "newest" %}selected{% endif %}>Plus récentes</option>
+          <option value="oldest" {% if sort == "oldest" %}selected{% endif %}>Plus anciennes</option>
+          <option value="remaining_desc" {% if sort == "remaining_desc" %}selected{% endif %}>Reste ↓</option>
+          <option value="paid_desc" {% if sort == "paid_desc" %}selected{% endif %}>Payé ↓</option>
+        </select>
+      </div>
+
+      <div style="grid-column:span 4;display:flex;align-items:center;gap:10px;padding:10px 0;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:900;color:#111827;">
+          <input type="checkbox" name="min_remaining" value="1" {% if min_remaining %}checked{% endif %}>
+          Reste > 0 uniquement
+        </label>
+      </div>
+
+      <div style="grid-column:span 4;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+        <button class="btn btn-primary" type="submit">Filtrer</button>
+
+        <a class="btn btn-light"
+           href="{% url 'orders:driver_missions_history' %}{% if selected_driver_id %}?driver_id={{ selected_driver_id }}{% endif %}">
+          Réinitialiser
+        </a>
+
+        {% if qs_params %}
+          <a class="btn btn-light" href="?{{ qs_params }}&export=csv">Export CSV</a>
+          <a class="btn btn-light" href="?{{ qs_params }}&export=xlsx">Export XLSX</a>
+        {% else %}
+          <a class="btn btn-light" href="?export=csv{% if selected_driver_id %}&driver_id={{ selected_driver_id }}{% endif %}">Export CSV</a>
+          <a class="btn btn-light" href="?export=xlsx{% if selected_driver_id %}&driver_id={{ selected_driver_id }}{% endif %}">Export XLSX</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- ✅ KPI V2.5 (sur items filtrés) -->
+  <div style="margin-bottom:12px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;">
+    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:10px 12px;box-shadow:0 1px 4px rgba(15,23,42,0.05);">
+      <div style="font-size:11px;color:#64748b;font-weight:900;">Missions</div>
+      <div style="font-weight:950;color:#111827;font-size:16px;">{{ kpi_total|default:0 }}</div>
+    </div>
+    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:10px 12px;box-shadow:0 1px 4px rgba(15,23,42,0.05);">
+      <div style="font-size:11px;color:#64748b;font-weight:900;">Potentiel</div>
+      <div style="font-weight:950;color:#111827;font-size:16px;">{{ kpi_potential|floatformat:0 }} FCFA</div>
+    </div>
+    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:10px 12px;box-shadow:0 1px 4px rgba(15,23,42,0.05);">
+      <div style="font-size:11px;color:#64748b;font-weight:900;">Payé</div>
+      <div style="font-weight:950;color:#166534;font-size:16px;">{{ kpi_paid|floatformat:0 }} FCFA</div>
+    </div>
+    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:10px 12px;box-shadow:0 1px 4px rgba(15,23,42,0.05);">
+      <div style="font-size:11px;color:#64748b;font-weight:900;">Reste</div>
+      <div style="font-weight:950;color:#9a3412;font-size:16px;">{{ kpi_remaining|floatformat:0 }} FCFA</div>
+    </div>
+    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:10px 12px;box-shadow:0 1px 4px rgba(15,23,42,0.05);">
+      <div style="font-size:11px;color:#64748b;font-weight:900;">Km</div>
+      <div style="font-weight:950;color:#111827;font-size:16px;">{{ kpi_km|floatformat:2 }} km</div>
+    </div>
+  </div>
+
+  {% for it in page_obj.object_list %}
+    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:12px 12px;margin-bottom:10px;box-shadow:0 1px 4px rgba(15,23,42,0.05);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:900;font-size:13px;color:#111827;">Course {{ it.code }}</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Créée le {{ it.created_at }}</div>
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          {% if it.mission_status == "pending" %}
+            <span style="padding:4px 10px;border-radius:999px;font-size:11px;font-weight:900;background:#fffbeb;color:#92400e;border:1px solid #fde68a;">⏳ En attente</span>
+          {% elif it.mission_status == "in_progress" %}
+            <span style="padding:4px 10px;border-radius:999px;font-size:11px;font-weight:900;background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe;">🚚 En cours</span>
+          {% elif it.mission_status == "done" %}
+            <span style="padding:4px 10px;border-radius:999px;font-size:11px;font-weight:900;background:#ecfdf3;color:#166534;border:1px solid #bbf7d0;">✅ Terminée</span>
+          {% else %}
+            <span style="padding:4px 10px;border-radius:999px;font-size:11px;font-weight:900;background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;">{{ it.mission_status }}</span>
+          {% endif %}
+
+          <a class="btn btn-primary"
+             href="{% url 'orders:driver_order_detail' order_id=it.order.id %}{% if qs_params %}?{{ qs_params }}{% elif selected_driver_id %}?driver_id={{ selected_driver_id }}{% endif %}">
+            Ouvrir →
+          </a>
+        </div>
+      </div>
+
+      <div style="margin-top:10px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;">
+        <div style="border:1px solid #eef2f7;border-radius:14px;padding:10px 12px;">
+          <div style="font-size:11px;color:#64748b;">Potentiel (legs)</div>
+          <div style="font-weight:950;color:#111827;">{{ it.potential|floatformat:0 }} FCFA</div>
+        </div>
+        <div style="border:1px solid #eef2f7;border-radius:14px;padding:10px 12px;">
+          <div style="font-size:11px;color:#64748b;">Payé (wallet net)</div>
+          <div style="font-weight:950;color:#166534;">{{ it.paid|floatformat:0 }} FCFA</div>
+        </div>
+        <div style="border:1px solid #eef2f7;border-radius:14px;padding:10px 12px;">
+          <div style="font-size:11px;color:#64748b;">Reste à gagner</div>
+          <div style="font-weight:950;color:#9a3412;">{{ it.remaining|floatformat:0 }} FCFA</div>
+        </div>
+        <div style="border:1px solid #eef2f7;border-radius:14px;padding:10px 12px;">
+          <div style="font-size:11px;color:#64748b;">Km (total)</div>
+          <div style="font-weight:950;color:#111827;">{{ it.total_km|floatformat:2 }} km</div>
+        </div>
+      </div>
+
+      <div style="margin-top:10px;">
+        <div style="font-size:12px;font-weight:900;color:#111827;margin-bottom:6px;">Tronçons (legs)</div>
+
+        {% if it.legs %}
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            {% for l in it.legs %}
+              <div style="border:1px solid #eef2f7;border-radius:12px;padding:8px 10px;background:#fff;">
+                <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                  <div style="font-weight:900;font-size:12px;">
+                    {% if l.leg_type == "pickup" %}🟣 Pickup{% elif l.leg_type == "return" %}🟢 Return{% else %}🚚 {{ l.leg_type }}{% endif %}
+                    <span style="font-weight:700;color:#64748b;">#{{ l.id }}</span>
+                  </div>
+                  <div style="font-size:12px;font-weight:900;">
+                    {{ l.driver_amount|floatformat:0 }} FCFA • {{ l.distance_km|floatformat:2 }} km
+                  </div>
+                </div>
+                <div style="font-size:11px;color:#64748b;margin-top:2px;">
+                  Statut : <strong style="color:#111827;">{{ l.status }}</strong>
+                  {% if l.started_at %} • Début : {{ l.started_at }}{% endif %}
+                  {% if l.finished_at %} • Fin : {{ l.finished_at }}{% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div style="font-size:12px;color:#94a3b8;">Aucun tronçon trouvé pour cette commande.</div>
+        {% endif %}
+      </div>
+
+    </div>
+  {% empty %}
+    <div style="border:1px dashed #e5e7eb;border-radius:16px;padding:16px;color:#94a3b8;">
+      Aucune mission pour ce livreur.
+    </div>
+  {% endfor %}
+
+  {% if page_obj.paginator.num_pages > 1 %}
+    <div style="display:flex;justify-content:center;gap:10px;margin-top:14px;flex-wrap:wrap;">
+      {% if page_obj.has_previous %}
+        <a class="btn btn-light" href="?{% if qs_params %}{{ qs_params }}&{% endif %}page={{ page_obj.previous_page_number }}">← Précédent</a>
+      {% endif %}
+      <span style="padding:8px 12px;border:1px solid #e5e7eb;border-radius:999px;background:#f9fafb;font-weight:900;font-size:12px;">
+        Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+      </span>
+      {% if page_obj.has_next %}
+        <a class="btn btn-light" href="?{% if qs_params %}{{ qs_params }}&{% endif %}page={{ page_obj.next_page_number }}">Suivant →</a>
+      {% endif %}
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

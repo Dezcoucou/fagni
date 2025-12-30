@@ -1,0 +1,130 @@
+<h2 class="card-title" style="margin-top:10px;">
+    <span class="emoji">📍</span> Localisation & timings
+</h2>
+
+<h3 style="font-size:13px;margin:4px 0 4px;">Collecte</h3>
+<div class="field-group">
+    <label>Mode de collecte :</label>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <label style="font-size:13px;">
+            <input type="radio" name="pickup_mode" value="now"
+                   {% if pickup_mode == "now" or not pickup_mode %}checked{% endif %}>
+            Immédiate (dès que possible)
+        </label>
+        <label style="font-size:13px;">
+            <input type="radio" name="pickup_mode" value="later"
+                   {% if pickup_mode == "later" %}checked{% endif %}>
+            Programmée
+        </label>
+    </div>
+</div>
+
+<div id="scheduled_fields" class="form-grid" style="display:none;">
+    <div>
+        <label for="pickup_date">Date de collecte programmée</label>
+        <input type="date" id="pickup_date" name="pickup_date" value="{{ pickup_date|default:'' }}">
+    </div>
+    <div>
+        <label for="pickup_slot">Créneau horaire de collecte</label>
+        <select id="pickup_slot" name="pickup_slot" data-selected="{{ pickup_slot|default:'' }}">
+            <option value="">-- Choisir un créneau --</option>
+            <option value="08:00-10:00" data-start-minutes="480" data-end-minutes="600"
+                    {% if pickup_slot == "08:00-10:00" %}selected{% endif %}>
+                08h00 – 10h00
+            </option>
+            <option value="10:00-12:00" data-start-minutes="600" data-end-minutes="720"
+                    {% if pickup_slot == "10:00-12:00" %}selected{% endif %}>
+                10h00 – 12h00
+            </option>
+            <option value="12:00-14:00" data-start-minutes="720" data-end-minutes="840"
+                    {% if pickup_slot == "12:00-14:00" %}selected{% endif %}>
+                12h00 – 14h00
+            </option>
+            <option value="14:00-16:00" data-start-minutes="840" data-end-minutes="960"
+                    {% if pickup_slot == "14:00-16:00" %}selected{% endif %}>
+                14h00 – 16h00
+            </option>
+            <option value="16:00-18:00" data-start-minutes="960" data-end-minutes="1080"
+                    {% if pickup_slot == "16:00-18:00" %}selected{% endif %}>
+                16h00 – 18h00
+            </option>
+            <option value="18:00-20:00" data-start-minutes="1080" data-end-minutes="1200"
+                    {% if pickup_slot == "18:00-20:00" %}selected{% endif %}>
+                18h00 – 20h00
+            </option>
+        </select>
+        <!-- champ caché utilisé par la vue Django actuelle -->
+        <input type="hidden" id="pickup_time" name="pickup_time">
+    </div>
+</div>
+
+<div id="map"></div>
+<div class="map-note">
+    Si la carte ne se charge pas, tu peux quand même enregistrer la commande.
+    La localisation pourra être complétée plus tard.
+</div>
+
+<h3 style="font-size:13px;margin:12px 0 4px;">Livraison</h3>
+<div class="field-group">
+    <label>Mode de livraison :</label>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <label style="font-size:13px;">
+            <input type="radio" name="delivery_mode" value="standard"
+                   {% if delivery_mode == "standard" or not delivery_mode %}checked{% endif %}>
+            Standard (≈ {{ logi_standard_sla_hours|default:48 }}h)
+        </label>
+        <label style="font-size:13px;">
+            <input type="radio" name="delivery_mode" value="express"
+                   {% if delivery_mode == "express" %}checked{% endif %}>
+            Express (≈ {{ logi_express_sla_hours|default:24 }}h)
+        </label>
+        <label style="font-size:13px;">
+            <input type="radio" name="delivery_mode" value="scheduled"
+                   {% if delivery_mode == "scheduled" %}checked{% endif %}>
+            Programmée
+        </label>
+    </div>
+    <div class="note-strong">
+        Cutoff collecte : avant {{ logi_pickup_cutoff_hour|default:10 }}h, l’express est mieux garanti.
+    </div>
+</div>
+
+<div id="delivery_scheduled_fields" class="form-grid" style="display:none;">
+    <div>
+        <label for="delivery_date">Date de livraison programmée</label>
+        <input type="date" id="delivery_date" name="delivery_date" value="{{ delivery_date|default:'' }}">
+    </div>
+    <div>
+        <label for="delivery_slot">Créneau horaire de livraison</label>
+        <select id="delivery_slot" name="delivery_slot" data-selected="{{ delivery_slot|default:'' }}">
+            <option value="">-- Choisir un créneau --</option>
+            <option value="08:00-10:00" data-start-minutes="480" data-end-minutes="600"
+                    {% if delivery_slot == "08:00-10:00" %}selected{% endif %}>
+                08h00 – 10h00
+            </option>
+            <option value="10:00-12:00" data-start-minutes="600" data-end-minutes="720"
+                    {% if delivery_slot == "10:00-12:00" %}selected{% endif %}>
+                10h00 – 12h00
+            </option>
+            <option value="12:00-14:00" data-start-minutes="720" data-end-minutes="840"
+                    {% if delivery_slot == "12:00-14:00" %}selected{% endif %}>
+                12h00 – 14h00
+            </option>
+            <option value="14:00-16:00" data-start-minutes="840" data-end-minutes="960"
+                    {% if delivery_slot == "14:00-16:00" %}selected{% endif %}>
+                14h00 – 16h00
+            </option>
+            <option value="16:00-18:00" data-start-minutes="960" data-end-minutes="1080"
+                    {% if delivery_slot == "16:00-18:00" %}selected{% endif %}>
+                16h00 – 18h00
+            </option>
+            <option value="18:00-20:00" data-start-minutes="1080" data-end-minutes="1200"
+                    {% if delivery_slot == "18:00-20:00" %}selected{% endif %}>
+                18h00 – 20h00
+            </option>
+        </select>
+        <!-- champ caché utilisé par la vue Django actuelle -->
+        <input type="hidden" id="delivery_time" name="delivery_time">
+    </div>
+</div>
+

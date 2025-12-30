@@ -1,0 +1,20 @@
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Créer une nouvelle commande</h1>
+        <p class="page-subtitle">
+            Renseigne le client, choisis les prestations dans le catalogue, ajoute les photos et valide.
+        </p>
+        <div class="steps">
+            <div class="step step-1 active">1. Client & localisation</div>
+            <div class="step step-2">2. Prestations</div>
+            <div class="step step-3">3. Récap & validation</div>
+        </div>
+    </div>
+    <div class="page-header__right">
+        <a href="{% url 'orders:list' %}" class="btn btn-light">📋 Liste des commandes</a>
+        <a href="{% url 'orders:ops_dashboard' %}" class="btn btn-light">🚦 Suivi OPS</a>
+        <a href="{% url 'orders:dashboard' %}" class="btn btn-light">📊 Dashboard commandes</a>
+        <a href="{% url 'orders:finance_dashboard' %}" class="btn btn-light">💰 Dashboard financier</a>
+        <a href="{% url 'orders:customers_list' %}" class="btn btn-light">👥 Clients (mini-CRM)</a>
+    </div>
+</div>

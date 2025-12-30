@@ -1,0 +1,66 @@
+<div class="section-header">
+    <h2 class="card-title" style="margin:8px 0 4px;">
+        <span class="emoji">📦</span> Lignes de commande
+    </h2>
+    <span id="items_count_badge" class="badge-soft">0 article</span>
+</div>
+
+<div class="articles-table-wrapper">
+    <table id="itemsTable">
+        <thead>
+            <tr>
+                <th>Prestation / Désignation</th>
+                <th class="num">Qté</th>
+                <th class="num">PU</th>
+                <th class="num">Total ttc</th>
+                <th>Photos / Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Lignes ajoutées en JS -->
+        </tbody>
+    </table>
+</div>
+
+<h2 class="card-title" style="margin-top:14px;">
+    <span class="emoji">📝</span> Notes / instructions
+</h2>
+
+<div>
+    <textarea id="order_notes"
+              name="order_notes"
+              placeholder="Ex : Client absent avant 8h, articles à traiter en urgence, consignes spécifiques…">{{ order_notes|default:'' }}</textarea>
+</div>
+
+<div class="totals-box">
+    <div class="totals-row">
+        <span>Sous-total prestations</span>
+        <strong><span id="total_prestation">0</span> FCFA</strong>
+    </div>
+    <div class="totals-row">
+        <span>Service FAGNI (5% min 500 FCFA)</span>
+        <strong><span id="service_fee_display">0</span> FCFA</strong>
+    </div>
+    <div class="totals-row">
+        <span>Livraison (estimation)</span>
+        <strong><span id="delivery_fee_display">0</span> FCFA</strong>
+    </div>
+    <div class="totals-row total-grand">
+        <span><strong>Total global estimé (TTC)</strong></span>
+        <strong><span id="total_global_display">0</span> FCFA</strong>
+    </div>
+
+    <div class="note">
+        * Transport (estimation) :
+        min <strong>{{ delivery_min_fee|default:0 }} FCFA</strong>,
+        environ {{ delivery_price_per_km|default:0 }} FCFA / km AR
+        (+ fixe {{ delivery_fixed_fee|default:0 }} FCFA).<br>
+        Le montant officiel est recalculé côté serveur en fonction de la distance réelle client ↔ blanchisserie.
+    </div>
+</div>
+
+<div id="summaryBox" style="margin-top:10px; display:none;">
+    <h3 style="margin-top:0;font-size:14px;">Résumé des articles</h3>
+    <div id="summaryContent"></div>
+</div>
+{% include "orders/_create/_right_timeline_summary.html" %}

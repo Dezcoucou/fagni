@@ -1,0 +1,80 @@
+<div class="card" style="margin-top:16px;">
+  <h3 class="card-title">
+    <span class="emoji">🧭</span> Parcours de la commande
+  </h3>
+
+  <!-- Timeline -->
+  <div class="fagni-timeline">
+    <div class="step" id="tl-pickup">
+      <div class="icon">📍</div>
+      <div class="label">Collecte</div>
+      <div class="desc" id="summary-pickup">—</div>
+    </div>
+
+    <div class="arrow">→</div>
+
+    <div class="step" id="tl-wash">
+      <div class="icon">🧺</div>
+      <div class="label">Traitement</div>
+      <div class="desc" id="summary-wash">—</div>
+    </div>
+
+    <div class="arrow">→</div>
+
+    <div class="step" id="tl-delivery">
+      <div class="icon">🚚</div>
+      <div class="label">Livraison</div>
+      <div class="desc" id="summary-delivery">—</div>
+    </div>
+  </div>
+
+  <!-- Messages intelligents -->
+  <div id="timeline-alerts" class="timeline-alerts"></div>
+</div>
+
+<style>
+.fagni-timeline{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-top:12px;
+}
+.fagni-timeline .step{
+  flex:1;
+  text-align:center;
+  padding:10px;
+  border-radius:12px;
+  background:#f8fafc;
+  border:1px solid #e5e7eb;
+}
+.fagni-timeline .icon{
+  font-size:22px;
+}
+.fagni-timeline .label{
+  font-weight:900;
+  font-size:13px;
+  margin-top:4px;
+}
+.fagni-timeline .desc{
+  font-size:12px;
+  color:#475569;
+  margin-top:4px;
+}
+.fagni-timeline .arrow{
+  font-weight:900;
+  color:#94a3b8;
+}
+.timeline-alerts{
+  margin-top:10px;
+  font-size:12px;
+}
+.timeline-alerts .alert{
+  background:#fff7ed;
+  border:1px solid #fed7aa;
+  color:#9a3412;
+  padding:8px 10px;
+  border-radius:10px;
+  margin-top:6px;
+}
+</style>

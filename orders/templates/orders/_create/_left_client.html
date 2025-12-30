@@ -1,0 +1,79 @@
+<h2 class="card-title">
+    <span class="emoji">👤</span> Client & coordonnées
+</h2>
+
+<div class="form-grid">
+    <div>
+        <label for="client_phone">Téléphone</label>
+        <input
+            type="text"
+            id="client_phone"
+            name="client_phone"
+            value="{{ client_phone|default:'' }}"
+            placeholder="Ex : 0700000000"
+            data-lookup-url="{% url 'orders:client_lookup' %}"
+        >
+        <span id="client_status" class="client-status"></span>
+    </div>
+
+    <div>
+        <label for="client_name">Nom et prénoms</label>
+        <input
+            type="text"
+            id="client_name"
+            name="client_name"
+            value="{{ client_name|default:'' }}"
+            placeholder="Nom du client"
+        >
+    </div>
+
+    <!-- MLM: code parrain -->
+    <div>
+        <label for="referral_code">Code parrain (optionnel)</label>
+        <input
+            type="text"
+            id="referral_code"
+            name="referral_code"
+            value="{{ referral_code|default:'' }}"
+            placeholder="Ex : PARRAIN123"
+        >
+    </div>
+
+    <div style="grid-column:1/-1;">
+        <label for="client_address">Adresse de collecte (client)</label>
+        <div class="address-row">
+            <input
+                type="text"
+                id="client_address"
+                name="client_address"
+                value="{{ client_address|default:'' }}"
+                placeholder="Ex : Cocody Angré 8ème tranche"
+            >
+            <button type="button" id="locateBtn" class="btn-small">📍 Me localiser</button>
+        </div>
+        <span class="small-help">
+            Adresse où le livreur vient récupérer le linge (chez le client).
+            Astuce : clique sur la carte pour placer le point, ou déplace le marqueur.
+        </span>
+
+        <label for="delivery_address" style="margin-top:6px;">Adresse de livraison (si différente)</label>
+        <input
+            type="text"
+            id="delivery_address"
+            name="delivery_address"
+            value="{{ delivery_address|default:'' }}"
+            placeholder="Ex : Plateau, bureau du client – laisser vide si identique à la collecte"
+        />
+        <span class="small-help">
+            Si tu laisses vide, FAGNI livrera à l’adresse de collecte (adresse + coordonnées).
+        </span>
+    </div>
+</div>
+
+<!-- Coordonnées collecte -->
+<input type="hidden" id="client_lat" name="client_lat" value="{{ client_lat|default:'' }}">
+<input type="hidden" id="client_lng" name="client_lng" value="{{ client_lng|default:'' }}">
+
+<!-- Coordonnées livraison -->
+<input type="hidden" id="delivery_lat" name="delivery_lat" value="{{ delivery_lat|default:'' }}">
+<input type="hidden" id="delivery_lng" name="delivery_lng" value="{{ delivery_lng|default:'' }}">

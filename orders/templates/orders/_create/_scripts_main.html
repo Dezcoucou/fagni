@@ -1,0 +1,832 @@
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    try {
+        const DELIVERY_MIN_FEE = parseFloat("{{ delivery_min_fee|default:'0' }}") || 0;
+        const DELIVERY_PRICE_PER_KM = parseFloat("{{ delivery_price_per_km|default:'0' }}") || 0;
+        const DELIVERY_FIXED_FEE = parseFloat("{{ delivery_fixed_fee|default:'0' }}") || 0;
+
+        const LAUNDRIES_GEO = (function(){
+            try { return JSON.parse('{{ laundries_geo_json|default:"[]"|escapejs }}'); }
+            catch(e){ return []; }
+        })();
+
+        const phoneInput = document.getElementById('client_phone');
+        const nameInput = document.getElementById('client_name');
+        const addressInput = document.getElementById('client_address');
+        const latInput = document.getElementById('client_lat');
+        const lngInput = document.getElementById('client_lng');
+        const locateBtn = document.getElementById('locateBtn');
+        const form = document.getElementById('orderForm');
+        const clientStatusEl = document.getElementById('client_status');
+
+        const categorySelect = document.getElementById('category_select');
+        const serviceSelect = document.getElementById('service_select');
+        const designationInput = document.getElementById('item_designation');
+        const quantityInput = document.getElementById('item_quantity');
+        const priceInput = document.getElementById('item_price');
+        const addItemBtn = document.getElementById('addItemBtn');
+        const itemsTableBody = document.querySelector('#itemsTable tbody');
+        const itemsCountBadge = document.getElementById('items_count_badge');
+
+        const totalPrestDisplay = document.getElementById('total_prestation');
+        const serviceDisplay = document.getElementById('service_fee_display');
+        const deliveryDisplay = document.getElementById('delivery_fee_display');
+        const totalGlobalDisplay = document.getElementById('total_global_display');
+
+        const previewBtn = document.getElementById('previewBtn');
+        const summaryBox = document.getElementById('summaryBox');
+        const summaryContent = document.getElementById('summaryContent');
+        const submitBtn = document.getElementById('submitBtn');
+
+        const steps = document.querySelectorAll('.step');
+
+        // --- Slots collecte / livraison ---
+        const pickupDateInput = document.getElementById('pickup_date');
+        const pickupSlotSelect = document.getElementById('pickup_slot');
+        const pickupTimeHidden = document.getElementById('pickup_time');
+
+        const deliveryDateInput = document.getElementById('delivery_date');
+        const deliverySlotSelect = document.getElementById('delivery_slot');
+        const deliveryTimeHidden = document.getElementById('delivery_time');
+
+        // Toggle affichage collecte programmée
+        const pickupRadios = document.querySelectorAll('input[name="pickup_mode"]');
+        const scheduledFields = document.getElementById('scheduled_fields');
+        function toggleScheduled() {
+            const checked = document.querySelector('input[name="pickup_mode"]:checked');
+            const mode = checked ? checked.value : 'now';
+            if (scheduledFields) scheduledFields.style.display = (mode === 'later') ? 'grid' : 'none';
+        }
+        pickupRadios.forEach(r => r.addEventListener('change', toggleScheduled));
+        toggleScheduled();
+        if (pickupSlotSelect && pickupTimeHidden && pickupSlotSelect.value) {
+            updateHiddenTimeFromSlot(pickupSlotSelect, pickupTimeHidden);
+        }
+
+        // Toggle affichage livraison programmée
+        const deliveryRadios = document.querySelectorAll('input[name="delivery_mode"]');
+        const deliveryFields = document.getElementById('delivery_scheduled_fields');
+        function toggleDeliveryScheduled() {
+            const checked = document.querySelector('input[name="delivery_mode"]:checked');
+            const mode = checked ? checked.value : 'standard';
+            if (deliveryFields) deliveryFields.style.display = (mode === 'scheduled') ? 'grid' : 'none';
+        }
+        deliveryRadios.forEach(r => r.addEventListener('change', toggleDeliveryScheduled));
+        toggleDeliveryScheduled();
+        if (deliverySlotSelect && deliveryTimeHidden && deliverySlotSelect.value) {
+            updateHiddenTimeFromSlot(deliverySlotSelect, deliveryTimeHidden);
+        }
+
+        function setTodayMinForDate(inputEl) {
+            if (!inputEl) return;
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            inputEl.min = `${year}-${month}-${day}`;
+        }
+
+        function localTodayStr() {
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        function disablePastSlotsForToday(dateInput, selectEl) {
+            if (!dateInput || !selectEl) return;
+            const selectedDate = (dateInput.value || "").trim();
+            const options = Array.from(selectEl.options);
+
+            if (!selectedDate) {
+                options.forEach(opt => opt.disabled = false);
+                return;
+            }
+
+            const todayStr = localTodayStr();
+            if (selectedDate !== todayStr) {
+                options.forEach(opt => opt.disabled = false);
+                return;
+            }
+
+            const now = new Date();
+            const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+            options.forEach(opt => {
+                if (!opt.value) {
+                    opt.disabled = false;
+                    return;
+                }
+                const end = parseInt(opt.dataset.endMinutes || opt.getAttribute('data-end-minutes') || "0", 10);
+                opt.disabled = (end <= nowMinutes);
+            });
+
+            // Si le slot sélectionné vient d’être désactivé, on reset
+            if (selectEl.value) {
+                const sel = selectEl.options[selectEl.selectedIndex];
+                if (sel && sel.disabled) {
+                    selectEl.value = "";
+                }
+            }
+        }
+
+        function updateHiddenTimeFromSlot(selectEl, hiddenInput) {
+            if (!selectEl || !hiddenInput) return;
+            const val = selectEl.value;
+            if (!val) {
+                hiddenInput.value = "";
+                return;
+            }
+            const parts = val.split("-");
+            if (parts.length !== 2) {
+                hiddenInput.value = "";
+                return;
+            }
+            const [startH, startM] = parts[0].split(":").map(x => parseInt(x,10));
+            const [endH, endM] = parts[1].split(":").map(x => parseInt(x,10));
+            if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) {
+                hiddenInput.value = "";
+                return;
+            }
+            const startMinutes = startH*60 + startM;
+            const endMinutes = endH*60 + endM;
+            const mid = Math.floor((startMinutes + endMinutes) / 2);
+            const midH = String(Math.floor(mid/60)).padStart(2, '0');
+            const midM = String(mid%60).padStart(2, '0');
+            hiddenInput.value = `${midH}:${midM}`;
+        }
+
+        function getCheckedValue(name, fallback) {
+            const el = document.querySelector(`input[name="${name}"]:checked`);
+            return el ? el.value : fallback;
+        }
+
+        function applyTimingConstraints() {
+            const todayStr = localTodayStr();
+
+            // Min “aujourd’hui” par défaut
+            setTodayMinForDate(pickupDateInput);
+            setTodayMinForDate(deliveryDateInput);
+
+            const pickupMode = getCheckedValue("pickup_mode", "now");
+            const deliveryMode = getCheckedValue("delivery_mode", "standard");
+
+            // B2 : si collecte programmée + livraison programmée => livraison >= collecte
+            if (pickupMode === "later" && deliveryMode === "scheduled") {
+                const pickupDateVal = (pickupDateInput && pickupDateInput.value) ? pickupDateInput.value : todayStr;
+                if (deliveryDateInput) {
+                    deliveryDateInput.min = pickupDateVal;
+                    if (deliveryDateInput.value && deliveryDateInput.value < pickupDateVal) {
+                        deliveryDateInput.value = pickupDateVal;
+                    }
+                }
+            } else {
+                // Sinon livraison min = aujourd’hui
+                if (deliveryDateInput) deliveryDateInput.min = todayStr;
+            }
+
+            // Désactiver les créneaux passés (si date = today)
+            disablePastSlotsForToday(pickupDateInput, pickupSlotSelect);
+            disablePastSlotsForToday(deliveryDateInput, deliverySlotSelect);
+
+            // Sync hidden times
+            if (pickupSlotSelect && pickupTimeHidden) updateHiddenTimeFromSlot(pickupSlotSelect, pickupTimeHidden);
+            if (deliverySlotSelect && deliveryTimeHidden) updateHiddenTimeFromSlot(deliverySlotSelect, deliveryTimeHidden);
+        }
+
+        // listeners dates/slots
+        if (pickupDateInput) pickupDateInput.addEventListener('change', applyTimingConstraints);
+        if (deliveryDateInput) deliveryDateInput.addEventListener('change', applyTimingConstraints);
+
+        if (pickupSlotSelect) pickupSlotSelect.addEventListener('change', applyTimingConstraints);
+        if (deliverySlotSelect) deliverySlotSelect.addEventListener('change', applyTimingConstraints);
+
+        // listeners radios (quand on bascule now/later ou standard/express/scheduled)
+        const pickupRadiosAll = document.querySelectorAll('input[name="pickup_mode"]');
+        pickupRadiosAll.forEach(r => r.addEventListener('change', applyTimingConstraints));
+
+        const deliveryRadiosAll = document.querySelectorAll('input[name="delivery_mode"]');
+        deliveryRadiosAll.forEach(r => r.addEventListener('change', applyTimingConstraints));
+
+        // Initial
+        applyTimingConstraints();
+
+        // --- Stepper ---
+        function setStep(index) {
+            steps.forEach((s, i) => {
+                s.classList.toggle('active', i <= index);
+            });
+        }
+
+        function updateItemsCount() {
+            if (!itemsCountBadge || !itemsTableBody) return;
+            const count = itemsTableBody.querySelectorAll('tr').length;
+            itemsCountBadge.textContent = count + (count <= 1 ? ' article' : ' articles');
+        }
+
+        // 1) AUTOCOMPLÉTION CLIENT PAR TÉLÉPHONE
+        if (phoneInput && nameInput && addressInput) {
+            const lookupUrl = phoneInput.getAttribute('data-lookup-url') || '/orders/api/client/';
+
+            phoneInput.addEventListener('input', function () {
+                const phone = phoneInput.value.trim();
+                if (clientStatusEl) {
+                    clientStatusEl.textContent = '';
+                    clientStatusEl.className = 'client-status';
+                }
+                if (phone.length < 4) return;
+
+                const url = lookupUrl + (lookupUrl.includes('?') ? '&' : '?') + 'phone=' + encodeURIComponent(phone);
+
+                fetch(url, { headers: { "Accept": "application/json" } })
+                    .then(res => {
+                        if (!res.ok) {
+                            console.warn("Réponse lookup client non OK", res.status);
+                            return null;
+                        }
+                        return res.json();
+                    })
+                    .then(data => {
+                        if (!data) {
+                            if (clientStatusEl) {
+                                clientStatusEl.textContent = 'Nouveau client';
+                                clientStatusEl.className = 'client-status client-status--new';
+                            }
+                            return;
+                        }
+
+                        const existsFlag = (typeof data.exists !== "undefined") ? data.exists : true;
+                        const c = data.customer || data;
+
+                        if (existsFlag === false || !c) {
+                            if (clientStatusEl) {
+                                clientStatusEl.textContent = 'Nouveau client';
+                                clientStatusEl.className = 'client-status client-status--new';
+                            }
+                            return;
+                        }
+
+                        const nameVal = c.name || c.full_name || c.customer_name || '';
+                        const addressVal = c.address || c.customer_address || c.location || '';
+                        const latVal = c.latitude || c.lat || null;
+                        const lngVal = c.longitude || c.lng || null;
+
+                        if (nameVal && !nameInput.value.trim()) nameInput.value = nameVal;
+                        if (addressVal && !addressInput.value.trim()) addressInput.value = addressVal;
+                        if (latInput && latVal) latInput.value = latVal;
+                        if (lngInput && lngVal) lngInput.value = lngVal;
+                        recalcTotals();
+
+                        if (clientStatusEl) {
+                            clientStatusEl.textContent = 'Client existant chargé';
+                            clientStatusEl.className = 'client-status client-status--found';
+                        }
+                    })
+                    .catch(err => console.error('Erreur API client :', err));
+            });
+        }
+
+        // 2) BOUTON "ME LOCALISER" (COLLECTE)
+        if (locateBtn) {
+            locateBtn.addEventListener('click', function () {
+                if (!navigator.geolocation) {
+                    alert("Géolocalisation non supportée sur ce navigateur.");
+                    return;
+                }
+
+                locateBtn.disabled = true;
+                const oldText = locateBtn.textContent;
+                locateBtn.textContent = "📍 Localisation...";
+
+                navigator.geolocation.getCurrentPosition(
+                    function (pos) {
+                        const lat = pos.coords.latitude;
+                        const lng = pos.coords.longitude;
+                        const loc = { lat: lat, lng: lng };
+
+                        if (latInput) latInput.value = lat;
+                        if (lngInput) lngInput.value = lng;
+                        recalcTotals();
+
+                        if (typeof map !== "undefined" && map && typeof marker !== "undefined" && marker) {
+                            map.setCenter(loc);
+                            map.setZoom(14);
+                            marker.setPosition(loc);
+                        }
+
+                        if (typeof geocoder !== "undefined" && geocoder && addressInput) {
+                            geocoder.geocode({ location: loc }, (results, status) => {
+                                if (status === 'OK' && results && results[0]) {
+                                    addressInput.value = results[0].formatted_address;
+                                } else {
+                                    console.warn('Reverse geocode échoué :', status);
+                                }
+                            });
+                        } else {
+                            if (addressInput && !addressInput.value.trim()) {
+                                addressInput.value = `GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                            }
+                        }
+
+                        locateBtn.disabled = false;
+                        locateBtn.textContent = oldText;
+                    },
+                    function (err) {
+                        console.error("Erreur géolocalisation :", err);
+
+                        let msg = "Impossible de récupérer votre position.";
+                        if (err && err.code === 1) msg = "Permission GPS refusée. Autorise la localisation dans le navigateur.";
+                        if (err && err.code === 2) msg = "Position indisponible. Active le GPS et réessaie.";
+                        if (err && err.code === 3) msg = "Timeout GPS. Réessaie dans un endroit plus dégagé.";
+
+                        alert(msg);
+                        locateBtn.disabled = false;
+                        locateBtn.textContent = oldText;
+                    },
+                    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+                );
+            });
+        }
+
+        // 3) FILTRAGE PRESTATIONS PAR CATÉGORIE + PRIX CATALOGUE
+        if (categorySelect && serviceSelect && priceInput && designationInput && quantityInput) {
+            serviceSelect.disabled = true;
+            Array.from(serviceSelect.options).forEach(opt => { if (opt.value) opt.hidden = true; });
+
+            categorySelect.addEventListener('change', function () {
+                const catId = categorySelect.value;
+                serviceSelect.value = "";
+                designationInput.value = "";
+                priceInput.value = "0";
+                priceInput.readOnly = true;
+                priceInput.classList.add('readonly-input');
+                setStep(1);
+
+                if (!catId) {
+                    serviceSelect.disabled = true;
+                    Array.from(serviceSelect.options).forEach(opt => {
+                        if (!opt.value) {
+                            opt.textContent = "-- Choisir une catégorie d'abord --";
+                            opt.hidden = false;
+                        } else {
+                            opt.hidden = true;
+                        }
+                    });
+                    return;
+                }
+
+                serviceSelect.disabled = false;
+                Array.from(serviceSelect.options).forEach(opt => {
+                    if (!opt.value) {
+                        opt.textContent = "-- Choisir une prestation --";
+                        opt.hidden = false;
+                        return;
+                    }
+                    const optCat = opt.getAttribute('data-category');
+                    opt.hidden = (optCat !== catId);
+                });
+
+                serviceSelect.focus();
+            });
+
+            serviceSelect.addEventListener('change', function () {
+                const opt = serviceSelect.options[serviceSelect.selectedIndex];
+                if (!opt || !opt.value) {
+                    priceInput.value = "0";
+                    priceInput.readOnly = true;
+                    priceInput.classList.add('readonly-input');
+                    return;
+                }
+                const defaultPrice = opt.getAttribute('data-price') || "0";
+                const parsedPrice = parseFloat(defaultPrice);
+                priceInput.value = isNaN(parsedPrice) ? 0 : parsedPrice;
+                priceInput.readOnly = true;
+                priceInput.classList.add('readonly-input');
+
+                if (!designationInput.value.trim()) designationInput.value = opt.textContent.trim();
+                quantityInput.focus();
+            });
+        }
+
+        // 4) CALCUL DES TOTAUX
+        function recalcTotals() {
+            let total = 0;
+            const rows = itemsTableBody.querySelectorAll('tr');
+            rows.forEach(row => {
+                const cell = row.querySelector('td[data-line-total]');
+                if (!cell) return;
+                const val = parseFloat(cell.getAttribute('data-line-total') || '0');
+                if (!isNaN(val)) total += val;
+            });
+
+            let serviceFee = Math.round(total * 0.05);
+            if (serviceFee < 500 && total > 0) serviceFee = 500;
+
+            let deliveryFee = 0;
+
+            function haversineKm(lat1, lon1, lat2, lon2){
+                const R = 6371;
+                const toRad = (x) => (x * Math.PI) / 180;
+                const dLat = toRad(lat2 - lat1);
+                const dLon = toRad(lon2 - lon1);
+                const a =
+                    Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                return R * c;
+            }
+
+            function estimateDeliveryFee(){
+                if (!(total > 0)) return 0;
+
+                // fallback
+                let fee = DELIVERY_MIN_FEE;
+
+                // si pas coords client => fallback
+                const clat = parseFloat((latInput && latInput.value) ? latInput.value : "");
+                const clng = parseFloat((lngInput && lngInput.value) ? lngInput.value : "");
+                if (isNaN(clat) || isNaN(clng)) return fee;
+
+                // si pas de blanchisseries geo => fallback
+                if (!Array.isArray(LAUNDRIES_GEO) || !LAUNDRIES_GEO.length) return fee;
+
+                // nearest laundry 
+                let bestKm = null;
+                for (const l of LAUNDRIES_GEO){
+                    const llat = parseFloat(l.latitude);
+                    const llng = parseFloat(l.longitude);
+                    if (isNaN(llat) || isNaN(llng)) continue;
+                    const km = haversineKm(clat, clng, llat, llng);
+                    if (bestKm === null || km < bestKm) bestKm = km;
+                }
+                if (bestKm === null) return fee;
+
+                // km AR
+                const kmAR = bestKm * 2;
+
+                const computed = Math.round((DELIVERY_FIXED_FEE || 0) + (DELIVERY_PRICE_PER_KM || 0) * kmAR);
+                fee = Math.max(DELIVERY_MIN_FEE || 0, computed);
+                return fee;
+            }
+
+            deliveryFee = estimateDeliveryFee();
+
+            if (totalPrestDisplay) totalPrestDisplay.textContent = total.toLocaleString('fr-FR');
+            if (serviceDisplay) serviceDisplay.textContent = serviceFee.toLocaleString('fr-FR');
+            if (deliveryDisplay) deliveryDisplay.textContent = deliveryFee.toLocaleString('fr-FR');
+
+            if (totalGlobalDisplay) {
+                const grand = total + serviceFee + deliveryFee;
+                totalGlobalDisplay.textContent = grand.toLocaleString('fr-FR');
+            }
+            updateItemsCount();
+        }
+
+        recalcTotals();
+        setStep(0);
+        updateItemsCount();
+
+        // 5) AJOUT / SUPPRESSION LIGNES + PHOTOS
+        if (addItemBtn && itemsTableBody) {
+            addItemBtn.addEventListener('click', function () {
+                const serviceId = serviceSelect ? serviceSelect.value : "";
+                const selectedOpt = (serviceSelect && serviceSelect.options[serviceSelect.selectedIndex]) || null;
+                const serviceText = selectedOpt ? selectedOpt.textContent.trim() : "";
+                const catName = selectedOpt ? (selectedOpt.getAttribute('data-cat-name') || "") : "";
+
+                let designation = designationInput.value.trim();
+                const qty = parseInt(quantityInput.value || '0', 10);
+                const price = parseFloat(priceInput.value || '0');
+
+                if (!serviceId) {
+                    alert("Choisis une prestation dans le catalogue.");
+                    if (categorySelect && !categorySelect.value) categorySelect.focus();
+                    else if (serviceSelect) serviceSelect.focus();
+                    return;
+                }
+                if (!qty || qty <= 0) {
+                    alert("La quantité doit être supérieure à 0.");
+                    quantityInput.focus();
+                    return;
+                }
+                if (price <= 0) {
+                    alert("Cette prestation doit avoir un prix valide dans le catalogue.");
+                    return;
+                }
+                if (!designation) designation = serviceText;
+
+                const lineTotal = qty * price;
+                const rowIndex = itemsTableBody.querySelectorAll('tr').length;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <div class="line-designation">${designation}</div>
+                        <div class="line-meta">
+                            ${catName ? `<span>${catName}</span> • ` : ""}
+                            <span>Prestation ID #${serviceId}</span>
+                        </div>
+                        <input type="hidden" name="service_id[]" value="${serviceId}">
+                        <input type="hidden" name="designation[]" value="${designation}">
+                    </td>
+                    <td class="num">
+                        ${qty}
+                        <input type="hidden" name="quantity[]" value="${qty}">
+                    </td>
+                    <td class="num">
+                        ${price.toLocaleString('fr-FR')}
+                        <input type="hidden" name="unit_price[]" value="${price}">
+                    </td>
+                    <td class="num" data-line-total="${lineTotal}">
+                        ${lineTotal.toLocaleString('fr-FR')}
+                    </td>
+                    <td>
+                        <input type="file"
+                               name="photos_${rowIndex}"
+                               accept="image/*"
+                               multiple
+                               capture="environment"
+                               style="display:none;">
+                        <button type="button" class="btn-small btn-photo">📷 Photos</button>
+                        <span class="photo-info"></span>
+                        <button type="button" class="btn-icon btn-remove" title="Supprimer la ligne">✖</button>
+                        <div class="photos-preview"></div>
+                    </td>
+                `;
+                itemsTableBody.appendChild(tr);
+
+                designationInput.value = "";
+                quantityInput.value = 1;
+                priceInput.value = "0";
+                priceInput.readOnly = true;
+                priceInput.classList.add('readonly-input');
+
+                if (serviceSelect) {
+                    serviceSelect.value = "";
+                    serviceSelect.focus();
+                }
+
+                recalcTotals();
+                setStep(1);
+            });
+
+            itemsTableBody.addEventListener('click', function (e) {
+                if (e.target.classList.contains('btn-remove')) {
+                    const tr = e.target.closest('tr');
+                    if (tr) { tr.remove(); recalcTotals(); }
+                }
+
+                if (e.target.classList.contains('btn-photo')) {
+                    const td = e.target.closest('td');
+                    const fileInput = td ? td.querySelector('input[type="file"]') : null;
+                    if (fileInput) fileInput.click();
+                }
+            });
+
+            itemsTableBody.addEventListener('change', function (e) {
+                const input = e.target;
+                if (input.tagName.toLowerCase() !== 'input' || input.type !== 'file') return;
+
+                const td = input.closest('td');
+                if (!td) return;
+
+                const previewDiv = td.querySelector('.photos-preview');
+                const infoSpan = td.querySelector('.photo-info');
+                if (!previewDiv) return;
+
+                previewDiv.innerHTML = '';
+                if (infoSpan) infoSpan.textContent = '';
+
+                const files = Array.from(input.files || []);
+                if (!files.length) {
+                    previewDiv.innerHTML = '<span style="font-size:10px;color:#777;">Aucune nouvelle photo.</span>';
+                    return;
+                }
+
+                files.forEach((file, idx) => {
+                    if (!file.type.startsWith('image/')) return;
+
+                    const reader = new FileReader();
+                    reader.onload = function (ev) {
+                        const img = document.createElement('img');
+                        img.src = ev.target.result;
+                        img.alt = file.name || ('photo_' + idx);
+                        previewDiv.appendChild(img);
+                    };
+                    reader.readAsDataURL(file);
+                });
+
+                if (infoSpan) {
+                    infoSpan.textContent = files.length === 1 ? '1 nouvelle photo' : files.length + ' nouvelles photos';
+                }
+            });
+        }
+
+        // 6) RÉSUMÉ AVANT ENVOI
+        if (previewBtn && summaryBox && summaryContent) {
+            previewBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                const rows = itemsTableBody.querySelectorAll('tr');
+                let html = '';
+                rows.forEach(row => {
+                    const tds = row.querySelectorAll('td');
+                    if (tds.length < 4) return;
+                    const labelEl = tds[0].querySelector('.line-designation');
+                    const designation = labelEl ? labelEl.textContent.trim() : tds[0].textContent.trim();
+                    const qty = tds[1].textContent.trim();
+                    const pu = tds[2].textContent.trim();
+                    const total = tds[3].textContent.trim();
+                    html += `<p class="summary-item"><strong>${qty}</strong> × ${designation} — ${pu} FCFA (=${total} FCFA)</p>`;
+                });
+                if (!html) html = '<p class="summary-item">Aucune ligne dans la commande.</p>';
+                summaryContent.innerHTML = html;
+                summaryBox.style.display = 'block';
+                setStep(2);
+                summaryBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        }
+
+        // 7) VALIDATION AVANT SUBMISSION
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                const rows = itemsTableBody.querySelectorAll('tr');
+                if (!phoneInput.value.trim() || !nameInput.value.trim()) {
+                    e.preventDefault();
+                    alert("Veuillez renseigner au moins le nom et le téléphone du client.");
+                    return;
+                }
+                if (!rows.length) {
+                    e.preventDefault();
+                    alert("Ajoute au moins une ligne de prestation.");
+                    return;
+                }
+                // --- Sécurité delivery adresse/coords ---
+                // Si livraison vide => on copie collecte (adresse + coords)
+                const deliveryAddressInput = document.getElementById('delivery_address');
+                const deliveryLatInput = document.getElementById('delivery_lat');
+                const deliveryLngInput = document.getElementById('delivery_lng');
+
+                if (deliveryAddressInput) {
+                    const dAddr = deliveryAddressInput.value.trim();
+                    if (!dAddr) {
+                        // copie adresse
+                        if (addressInput && addressInput.value.trim()) {
+                            deliveryAddressInput.value = addressInput.value.trim();
+                        }
+                        // copie coords
+                        if (deliveryLatInput && latInput && latInput.value) deliveryLatInput.value = latInput.value;
+                        if (deliveryLngInput && lngInput && lngInput.value) deliveryLngInput.value = lngInput.value;
+                    }
+                }
+
+                // --- Validation timings --- 
+                // Collecte programmée => date + slot obligatoires 
+                const pickupMode = (document.querySelector('input[name="pickup_mode"]:checked') || {}).value || "now";
+                if (pickupMode === "later") {
+                    if (!pickupDateInput || !pickupDateInput.value) {
+                        e.preventDefault();
+                        alert("Choisis une date de collecte programmée.");
+                        return;
+                    }
+                    if (!pickupSlotSelect || !pickupSlotSelect.value) {
+                        e.preventDefault();
+                        alert("Choisis un créneau de collecte.");
+                        return;
+                    }
+                    } else {
+                    // Nettoyage pour éviter des valeurs fantômes
+                    if (pickupDateInput) pickupDateInput.value = "";
+                    if (pickupSlotSelect) pickupSlotSelect.value = "";
+                    if (pickupTimeHidden) pickupTimeHidden.value = "";
+                }
+
+                // Livraison programmée => date + slot obligatoires
+                const deliveryMode = (document.querySelector('input[name="delivery_mode"]:checked') || {}).value || "standard";
+                if (deliveryMode === "scheduled") {
+                    if (!deliveryDateInput || !deliveryDateInput.value) {
+                        e.preventDefault();
+                        alert("Choisis une date de livraison programmée.");
+                        return;
+                    }
+                    if (!deliverySlotSelect || !deliverySlotSelect.value) {
+                        e.preventDefault();
+                        alert("Choisis un créneau de livraison.");
+                        return;
+                    }
+                } else {
+                    if (deliveryDateInput) deliveryDateInput.value = "";
+                    if (deliverySlotSelect) deliverySlotSelect.value = "";
+                    if (deliveryTimeHidden) deliveryTimeHidden.value = "";
+                }
+
+                setStep(2);
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Enregistrement...';
+                }
+            });
+        }
+    } catch (err) {
+        console.error("Erreur JS create.html FAGNI :", err);
+    }
+});
+
+  // ===============================
+  // LOT D — Timeline intelligente & alertes
+  // ===============================
+  function updateTimelineSummary(){
+    const pickupMode = document.querySelector('input[name="pickup_mode"]:checked')?.value || "now";
+    const deliveryMode = document.querySelector('input[name="delivery_mode"]:checked')?.value || "standard";
+
+    const pickupDate = document.getElementById('pickup_date')?.value || "";
+    const pickupSlot = document.getElementById('pickup_slot')?.value || "";
+
+    const deliveryDate = document.getElementById('delivery_date')?.value || "";
+    const deliverySlot = document.getElementById('delivery_slot')?.value || "";
+
+    const pickupEl = document.getElementById('summary-pickup');
+    const washEl = document.getElementById('summary-wash');
+    const deliveryEl = document.getElementById('summary-delivery');
+    const alertsBox = document.getElementById('timeline-alerts');
+
+    if (!pickupEl || !washEl || !deliveryEl) return;
+
+    if (alertsBox) alertsBox.innerHTML = "";
+
+    // --- Helpers ---
+    const pad2 = (n) => String(n).padStart(2, "0");
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${pad2(today.getMonth()+1)}-${pad2(today.getDate())}`;
+    const nowMinutes = today.getHours() * 60 + today.getMinutes();
+
+    // Cutoff (par défaut 10h = 600 min)
+    const CUTOFF_MINUTES = 10 * 60;
+
+    // Collecte
+    if (pickupMode === "later" && pickupDate && pickupSlot){
+      pickupEl.textContent = `Programmée le ${pickupDate} (${pickupSlot})`;
+    } else {
+      pickupEl.textContent = "Immédiate (dès que possible)";
+    }
+
+    // Traitement
+    if (deliveryMode === "express"){
+      washEl.textContent = "Express (~24h)";
+    } else {
+      washEl.textContent = "Standard (~48h)";
+    }
+
+    // Livraison
+    if (deliveryMode === "scheduled" && deliveryDate && deliverySlot){
+      deliveryEl.textContent = `Programmée le ${deliveryDate} (${deliverySlot})`;
+    } else {
+      deliveryEl.textContent = "Automatique après traitement";
+    }
+
+    // --- Alertes intelligentes ---
+    const addAlert = (html) => {
+      if (!alertsBox) return;
+      alertsBox.innerHTML += html;
+    };
+
+    // Alerte express (simple mais utile)
+    if (deliveryMode === "express"){
+      // express + collecte immédiate après cutoff
+      if (pickupMode === "now" && nowMinutes >= CUTOFF_MINUTES){
+        addAlert(`<div class="alert">⚠️ Collecte après 10h : l’express n’est pas garanti.</div>`);
+      }
+
+      // express + collecte programmée aujourd’hui après cutoff
+      if (pickupMode === "later" && pickupDate === todayStr && nowMinutes >= CUTOFF_MINUTES){
+        addAlert(`<div class="alert">⚠️ Collecte programmée aujourd’hui après 10h : l’express est difficile à garantir.</div>`);
+      }
+    }
+
+    // Livraison programmée mais collecte immédiate
+    if (deliveryMode === "scheduled" && pickupMode === "now"){
+      addAlert(`<div class="alert">ℹ️ Livraison programmée avec collecte immédiate.</div>`);
+    }
+  }
+
+  // Écouteurs (change + input sur dates)
+  (function bindTimelineListeners(){
+    const els = [
+      ...document.querySelectorAll('input[name="pickup_mode"], input[name="delivery_mode"]'),
+      document.getElementById('pickup_date'),
+      document.getElementById('pickup_slot'),
+      document.getElementById('delivery_date'),
+      document.getElementById('delivery_slot'),
+    ].filter(Boolean);
+
+    els.forEach(el => {
+      el.addEventListener('change', updateTimelineSummary);
+      if (el.id === 'pickup_date' || el.id === 'delivery_date') {
+        el.addEventListener('input', updateTimelineSummary);
+      }
+    });
+
+    updateTimelineSummary();
+  })();
+</script>

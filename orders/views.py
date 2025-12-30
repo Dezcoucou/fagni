@@ -1,15 +1,15 @@
-
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from datetime import datetime, timedelta, time
 from django.template.loader import render_to_string
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+
 from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_http_methods
 from django.db.models import (
     Count,
     Q,
@@ -68,8 +68,15 @@ import re
 from django.shortcuts import redirect
 
 
+DEC12 = DecimalField(max_digits=12, decimal_places=2)
 DEC = DecimalField(max_digits=12, decimal_places=2)
 DECIMAL_ZERO = Decimal("0")
+
+
+# ============================================================
+# CLIENT (mini-app) – session key
+# ============================================================
+CLIENT_SESSION_KEY = "client_phone"
 
 
 def _wallet_net_expr():
@@ -180,50 +187,6 @@ def fagni_parse_items_from_post(request):
         })
 
     return items, total_ht
-
-
-def recompute_order_financials(order):
-    """
-    Recalcule tous les montants financiers d'une commande FAGNI selon les règles métier.
-    - service_fee = max(5% du sous-total prestations, 500 FCFA) si prestation > 0
-    - revenu FAGNI HT = commissions + marge logistique + service_fee
-    - TVA FAGNI = 18% du revenu FAGNI HT
-    - revenu FAGNI TTC = revenu FAGNI HT + TVA FAGNI
-    - total_client_ttc = prestations + service_fee + livraison + TVA FAGNI
-    """
-
-    ZERO = Decimal("0")
-    prestation_total = order.prestation_total or ZERO
-    delivery_fee = order.delivery_fee or ZERO
-    commission_laundry = order.commission_laundry_ht or ZERO
-    commission_delivery = order.commission_delivery_ht or ZERO
-    logistic_margin = order.logistic_margin or ZERO
-
-    # 1) Service FAGNI (HT)
-    if prestation_total > ZERO:
-        sf = (prestation_total * Decimal("0.05"))
-        if sf < Decimal("500"):
-            sf = Decimal("500")
-    else:
-        sf = ZERO
-
-    # on arrondit proprement à l'unité
-    sf = sf.quantize(Decimal("1."), rounding=ROUND_HALF_UP)
-    order.service_fee = sf
-
-    # 2) Revenu FAGNI HT
-    fagni_ht = commission_laundry + commission_delivery + logistic_margin + sf
-    order.fagni_revenue_ht = fagni_ht
-
-    # 3) TVA FAGNI (18%)
-    vat = (fagni_ht * Decimal("0.18")).quantize(Decimal("1."), rounding=ROUND_HALF_UP)
-    order.vat_fagni = vat
-
-    # 4) Revenu FAGNI TTC
-    order.fagni_revenue_ttc = fagni_ht + vat
-
-    # 5) Total TTC facturé au client
-    order.total_client_ttc = prestation_total + sf + delivery_fee + vat
 
 
 # ============================================================
@@ -2811,6 +2774,17 @@ def create(request):
 
     context["drivers"] = get_active_drivers()
 
+    # --- LOT E : Blanchisseries géolocalisees (pour estimation front) ---
+    laundries_geo = list(
+        LaundryPartner.objects.filter(
+            is_active=True,
+            latitude__isnull=False,
+            longitude__isnull=False,
+        ).values("id", "name", "latitude", "longitude")
+    )
+    context["laundries_geo_json"] = json.dumps(laundries_geo, default=str)
+
+
     # --- GET : on affiche le formulaire ---
     if request.method != "POST":
         return render(request, "orders/create.html", context)
@@ -2834,13 +2808,10 @@ def create(request):
 
     # 2) Création / mise à jour du client
     try:
-        customer, created = Customer.objects.get_or_create(
-            phone=phone,
-            defaults={
-                "name": name,
-                "address": address,
-            },
-        )
+        customer = Customer.objects.filter(phone=phone).order_by("-id").first()
+        if not customer:
+            customer = Customer.objects.create(phone=phone, name=name, address=address)
+
     except Customer.MultipleObjectsReturned:
         customer = (
             Customer.objects.filter(phone=phone)
@@ -2953,6 +2924,8 @@ def create(request):
 
     error = validate_delivery_mode(pickup_dt, delivery_dt, delivery_mode)
     if error:
+        # IMPORTANT: éviter les "commandes fantômes" en base
+        order.delete()
         context["error"] = error
         return render(request, "orders/create.html", context)
 
@@ -2996,38 +2969,49 @@ def create(request):
 
     order.delivery_fee = delivery_fee
 
-    # 9) Lignes de commande
+    # 9) Lignes de commande (PRIX VERROUILLÉS CÔTÉ SERVEUR)
     service_ids = request.POST.getlist("service_id[]")
     designations = request.POST.getlist("designation[]")
     quantities = request.POST.getlist("quantity[]")
-    unit_prices = request.POST.getlist("unit_price[]")
 
     created_any_item = False
 
-    for idx, (sid, desc, qty_str, pu_str) in enumerate(
-        zip(service_ids, designations, quantities, unit_prices)
-    ):
+    for idx, (sid, desc, qty_str) in enumerate(zip(service_ids, designations, quantities)):
+        sid = (sid or "").strip()
         desc = (desc or "").strip()
-        if not desc:
-            continue
 
+        # Quantité
         try:
             qty = int(qty_str)
         except Exception:
             qty = 0
 
+        if qty <= 0:
+            continue
+
+        # Service (obligatoire pour sécuriser le prix)
         try:
-            pu = Decimal(pu_str)
+            service_obj = ServiceItem.objects.get(pk=sid)
+        except (ServiceItem.DoesNotExist, ValueError, TypeError):
+            service_obj = None
+
+        if not service_obj:
+            continue
+
+        # Désignation fallback : si vide, on prend le nom catalogue
+        if not desc:
+            desc = (service_obj.name or "").strip()
+            if not desc:
+                continue
+
+        # PRIX : on ignore complètement ce que le navigateur a envoyé
+        try:
+            pu = Decimal(str(service_obj.default_price))
         except Exception:
             pu = Decimal("0")
 
-        if qty <= 0 or pu <= 0:
+        if pu <= 0:
             continue
-
-        try:
-            service_obj = ServiceItem.objects.get(pk=sid)
-        except ServiceItem.DoesNotExist:
-            service_obj = None
 
         line_total = (pu * qty).quantize(Decimal("0.01"))
 
@@ -3041,6 +3025,7 @@ def create(request):
         )
         created_any_item = True
 
+        # Photos
         file_field_name = f"photos_{idx}"
         for photo_file in request.FILES.getlist(file_field_name):
             if not photo_file:
@@ -3315,16 +3300,35 @@ def detail(request, order_id):
     return render(request, "orders/detail.html", context)
 
 
-# ============================================================
-# ✅ APP CLIENT (V1) — Auth par téléphone via session
-# ============================================================
-from django.views.decorators.http import require_http_methods
+# -------------------------------------------------------------------
+# Helpers Client (session phone)
+# -------------------------------------------------------------------
 
-CLIENT_SESSION_KEY = "client_phone"
+# Assure-toi que CLIENT_SESSION_KEY existe déjà plus haut dans ton fichier.
+# Exemple (si besoin) : CLIENT_SESSION_KEY = "client_phone"
+
+def _normalize_phone(raw: str) -> str:
+    """
+    Normalisation légère pour éviter les espaces/traits.
+    - garde uniquement les chiffres
+    - retire 00225 / 225 si présent (CIV)
+    """
+    s = (raw or "").strip()
+    digits = re.sub(r"\D+", "", s)
+
+    # Côte d'Ivoire: +225 / 00225
+    if digits.startswith("00225"):
+        digits = digits[5:]
+    elif digits.startswith("225") and len(digits) > 10:
+        digits = digits[3:]
+
+    return digits
 
 
 def _client_phone(request) -> str:
-    return (request.session.get(CLIENT_SESSION_KEY) or "").strip()
+    p = request.session.get(CLIENT_SESSION_KEY) or ""
+    p = _normalize_phone(p)
+    return p
 
 
 def _client_required(view_func):
@@ -3335,23 +3339,26 @@ def _client_required(view_func):
     return _wrapped
 
 
+# -------------------------------------------------------------------
+# Auth client (ultra simple)
+# -------------------------------------------------------------------
+
 @require_http_methods(["GET", "POST"])
 def client_login(request):
     """
     Login ultra simple : téléphone -> session.
-    Si le client existe déjà, on récupère son nom/adresse en auto.
     """
     error = None
     phone = ""
-    name = ""
-    address = ""
 
     if request.method == "POST":
-        phone = (request.POST.get("phone") or "").strip()
+        phone_in = (request.POST.get("phone") or "").strip()
+        phone = _normalize_phone(phone_in)
+
         if not phone:
             error = "Merci de renseigner ton numéro."
         else:
-            request.session[CLIENT_SESSION_KEY] = phone
+            request.session[CLIENT_SESSION_KEY] = _normalize_phone(phone)
             request.session.modified = True
             return redirect("orders:client_home")
 
@@ -3362,8 +3369,8 @@ def client_login(request):
     return render(request, "orders/client_login.html", {
         "error": error,
         "phone": phone,
-        "name": name,
-        "address": address,
+        "name": "",
+        "address": "",
     })
 
 
@@ -3373,29 +3380,130 @@ def client_logout(request):
     return redirect("orders:client_login")
 
 
-@_client_required
+# -------------------------------------------------------------------
+# Home client (LISTE)  ✅ FIX: on filtre par phone (pas par customer_id)
+# + UI: total client + paiement (safe fallbacks)
+# -------------------------------------------------------------------
+
 def client_home(request):
     """
-    Liste des commandes du client (par téléphone).
+    Page Accueil Client:
+    - Liste des commandes + filtres statut + pagination
+    - Totaux robustes (fallback sur items_total)
+    - KPI commandes conditionnel selon filtre sélectionné
     """
-    phone = _client_phone(request)
+    from django.core.paginator import Paginator
+    from django.db.models import Sum, F, Value, DecimalField
+    from django.db.models.functions import Coalesce, Cast
 
-    customer = Customer.objects.filter(phone=phone).order_by("-id").first()
+    phone = request.session.get("client_phone") or request.session.get("phone")
+    if not phone:
+        return redirect("orders:client_login")
+
+    customer = Customer.objects.filter(phone=phone).first()
+
+    # Defaults safe
     orders_qs = Order.objects.none()
+    orders_count_all = 0
+    active_orders_count = 0
+    unpaid_orders_count = 0
+
     if customer:
-        orders_qs = (
-            Order.objects
-            .select_related("customer", "laundry_partner", "delivery_partner")
-            .filter(customer=customer)
-            .order_by("-id")
+        items_sum = Coalesce(
+            Sum(
+                Cast(F("items__quantity"), DecimalField(max_digits=10, decimal_places=2))
+                * Cast(F("items__unit_price"), DecimalField(max_digits=10, decimal_places=2)),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            ),
+            Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)),
         )
 
-    return render(request, "orders/client_home.html", {
+        base_qs = (
+            Order.objects.filter(customer=customer)
+            .order_by("-created_at")
+            .annotate(items_total=items_sum)
+            .annotate(
+                total_client_display=Coalesce(
+                    F("total_client_ttc"),
+                    F("total"),
+                    F("items_total"),
+                    Value(0, output_field=DEC12),
+                    output_field=DEC12,
+                )
+            )
+        )
+
+        # KPI globaux (sans filtre)
+        orders_count_all = base_qs.count()
+        active_orders_count = base_qs.filter(status__in=["pending", "in_progress"]).count()
+        unpaid_orders_count = base_qs.filter(payment_status__in=["pending", "unpaid", "failed"]).count()
+
+        orders_qs = base_qs
+
+    # ---------------------------
+    # Filtre statut
+    # ---------------------------
+    current_status = (request.GET.get("status") or "all").strip().lower()
+    valid = {"all", "pending", "in_progress", "done", "canceled"}
+    if current_status not in valid:
+        current_status = "all"
+
+    filtered_qs = orders_qs
+    if current_status != "all":
+        filtered_qs = orders_qs.filter(status=current_status)
+
+    # KPI conditionnel selon filtre sélectionné
+    kpi_orders_count = orders_count_all if current_status == "all" else filtered_qs.count()
+
+    # ---------------------------
+    # Pagination
+    # ---------------------------
+    per_page = 8
+    page_number = request.GET.get("page") or 1
+
+    paginator = Paginator(filtered_qs, per_page)
+    page_obj = paginator.get_page(page_number)
+    is_paginated = paginator.num_pages > 1
+
+    # Pagination “premium”
+    current = page_obj.number
+    last = paginator.num_pages
+    window = 2
+    start = max(2, current - window)
+    end = min(last - 1, current + window)
+    pages = list(range(start, end + 1)) if last >= 3 else []
+    show_left_ellipsis = start > 2
+    show_right_ellipsis = end < (last - 1)
+
+    ctx = {
         "phone": phone,
         "customer": customer,
-        "orders": orders_qs[:50],
-    })
 
+        # liste paginée
+        "orders": page_obj.object_list,
+
+        # pagination
+        "page_obj": page_obj,
+        "is_paginated": is_paginated,
+        "pages": pages,
+        "show_left_ellipsis": show_left_ellipsis,
+        "show_right_ellipsis": show_right_ellipsis,
+
+        # filtre
+        "current_status": current_status,
+
+        # KPI
+        "orders_count_all": orders_count_all,
+        "kpi_orders_count": kpi_orders_count,
+        "active_orders_count": active_orders_count,
+        "unpaid_orders_count": unpaid_orders_count,
+    }
+    return render(request, "orders/client_home.html", ctx)
+
+
+# -------------------------------------------------------------------
+# Nouvelle commande client
+# -------------------------------------------------------------------
 
 @require_http_methods(["GET", "POST"])
 @_client_required
@@ -3404,7 +3512,7 @@ def client_new_order(request):
     Création Client V1 (rapide) :
     - téléphone (session)
     - nom + adresse + notes
-    -> crée une commande "pending" avec pickup/delivery address.
+    -> crée une commande "pending"
     """
     phone = _client_phone(request)
     customer = Customer.objects.filter(phone=phone).order_by("-id").first()
@@ -3423,20 +3531,11 @@ def client_new_order(request):
         elif not address:
             error = "Merci de renseigner ton adresse."
         else:
-            # create or update customer
-            customer, _ = Customer.objects.get_or_create(
+            # ✅ update_or_create évite de multiplier les Customer si tu recrées
+            customer, _created = Customer.objects.update_or_create(
                 phone=phone,
                 defaults={"name": name, "address": address},
             )
-            changed = False
-            if name and customer.name != name:
-                customer.name = name
-                changed = True
-            if hasattr(customer, "address") and address and customer.address != address:
-                customer.address = address
-                changed = True
-            if changed:
-                customer.save()
 
             # create order
             code = uuid.uuid4().hex[:8].upper()
@@ -3452,7 +3551,6 @@ def client_new_order(request):
                 delivery_address=address,
             )
 
-            # si update_financials supporte l'absence d'items => OK
             try:
                 order.update_financials(save=True)
             except Exception:
@@ -3469,13 +3567,82 @@ def client_new_order(request):
     })
 
 
+# -------------------------------------------------------------------
+# Helpers: montants & timeline (client)
+# -------------------------------------------------------------------
+
+def _to_dec(v) -> Decimal:
+    try:
+        return Decimal(str(v or "0"))
+    except Exception:
+        return Decimal("0")
+
+
+def _client_order_amounts(order: Order) -> dict:
+    """
+    Fallback robuste (aligné sur le moteur) :
+    total_ttc = order.total_client_ttc si > 0, sinon (prestation_total + service_fee + delivery_fee + vat_fagni)
+    """
+    prestation_total = _to_dec(getattr(order, "prestation_total", None))
+    service_fee = _to_dec(getattr(order, "service_fee", None))
+    delivery_fee = _to_dec(getattr(order, "delivery_fee", None))
+    vat_fagni = _to_dec(getattr(order, "vat_fagni", None))
+
+    # champ "total client" selon ton modèle
+    total_ttc = getattr(order, "total_client_ttc", None)
+    if total_ttc is None:
+        total_ttc = getattr(order, "total_client_ttc_amount", None)  # au cas où
+    total_ttc = _to_dec(total_ttc)
+
+    if total_ttc <= 0:
+        total_ttc = prestation_total + service_fee + delivery_fee + vat_fagni
+
+    return {
+        "prestation_total": prestation_total,
+        "service_fee": service_fee,
+        "delivery_fee": delivery_fee,
+        "vat_fagni": vat_fagni,
+        "total_ttc": total_ttc,
+    }
+
+
+def _client_order_timeline(order: Order) -> list:
+    """
+    Timeline basée sur timestamps si présents, sinon fallback sur status.
+    Champs optionnels : pickup_time, wash_complete_time, delivered_time
+    """
+    created = getattr(order, "created_at", None)
+    t_pickup = getattr(order, "pickup_time", None)
+    t_wash = getattr(order, "wash_complete_time", None)
+    t_deliv = getattr(order, "delivered_time", None)
+
+    st = (getattr(order, "status", "") or "").lower()
+
+    # fallback "done" si status final
+    pickup_done = bool(t_pickup) or st in ("in_progress", "done")
+    wash_done = bool(t_wash) or st in ("done",)
+    deliv_done = bool(t_deliv) or st in ("done",)
+
+    return [
+        {"key": "created", "label": "Commande créée", "done": bool(created), "ts": created},
+        {"key": "pickup", "label": "Collecte effectuée", "done": pickup_done, "ts": t_pickup},
+        {"key": "wash", "label": "Lavage terminé", "done": wash_done, "ts": t_wash},
+        {"key": "delivered", "label": "Livrée", "done": deliv_done, "ts": t_deliv},
+    ]
+
+
+# -------------------------------------------------------------------
+# Détail client ✅ FIX: sécurisation par phone, pas customer_id
+# -------------------------------------------------------------------
+
 @_client_required
 def client_order_detail(request, order_id):
     """
-    Détail côté client : statut + timeline + legs (si existants).
+    Détail côté client : statut + timeline + legs + paiement/montants.
     Sécurisé : seulement si la commande appartient au téléphone session.
     """
     phone = _client_phone(request)
+
     customer = Customer.objects.filter(phone=phone).order_by("-id").first()
     if not customer:
         return redirect("orders:client_home")
@@ -3483,29 +3650,48 @@ def client_order_detail(request, order_id):
     order = (
         Order.objects
         .select_related("customer", "laundry_partner", "delivery_partner")
-        .filter(pk=order_id, customer=customer)
+        .filter(pk=order_id, customer__phone=phone)
         .first()
     )
     if not order:
         return redirect("orders:client_home")
 
-    legs = list(DeliveryLeg.objects.filter(order=order).order_by("id").values(
-        "id", "leg_type", "status", "driver_amount", "driver_id"
-    ))
+    # legs (simple)
+    legs = list(
+        DeliveryLeg.objects
+        .filter(order=order)
+        .order_by("id")
+        .values("id", "leg_type", "status", "driver_amount", "driver_id")
+    )
+
+    # montants + paiement
+    amounts = _client_order_amounts(order)
+    payment_status = getattr(order, "payment_status", None)
+
+    # timeline
+    timeline = _client_order_timeline(order)
 
     return render(request, "orders/client_order_detail.html", {
         "phone": phone,
         "customer": customer,
         "order": order,
         "legs": legs,
+
+        "amounts": amounts,
+        "payment_status": payment_status,
+        "timeline": timeline,
     })
 
+
+# -------------------------------------------------------------------
+# Live JSON client ✅ FIX: sécurisation par phone
+# -------------------------------------------------------------------
 
 @require_GET
 @_client_required
 def client_order_live_status(request, order_id):
     """
-    Live JSON côté client (polling) : statut commande + legs.
+    Live JSON côté client (polling) : statut commande + legs + paiement + timeline + montants.
     Sécurisé : seulement si commande du client.
     """
     phone = _client_phone(request)
@@ -3516,7 +3702,7 @@ def client_order_live_status(request, order_id):
     order = (
         Order.objects
         .select_related("customer", "laundry_partner", "delivery_partner")
-        .filter(pk=order_id, customer=customer)
+        .filter(pk=order_id, customer__phone=phone)
         .first()
     )
     if not order:
@@ -3532,6 +3718,9 @@ def client_order_live_status(request, order_id):
             "driver_id": l.driver_id,
         })
 
+    amounts = _client_order_amounts(order)
+    timeline = _client_order_timeline(order)
+
     data = {
         "ok": True,
         "order": {
@@ -3539,40 +3728,52 @@ def client_order_live_status(request, order_id):
             "code": getattr(order, "code", "") or "",
             "status": order.status,
             "payment_status": getattr(order, "payment_status", None),
+
             "pickup_time": getattr(order, "pickup_time", None),
             "wash_complete_time": getattr(order, "wash_complete_time", None),
             "delivered_time": getattr(order, "delivered_time", None),
         },
-        "legs": legs,
+        "amounts": {
+            "prestation_total": float(amounts.get("prestation_total") or 0),
+            "service_fee": float(amounts.get("service_fee") or 0),
+            "delivery_fee": float(amounts.get("delivery_fee") or 0),
+            "vat_fagni": float(amounts.get("vat_fagni") or 0),
+            "total_ttc": float(amounts.get("total_ttc") or 0),
+        },
+        "timeline": [
+            {
+                "key": t.get("key"),
+                "label": t.get("label"),
+                "done": bool(t.get("done")),
+                "ts": (t.get("ts").isoformat() if t.get("ts") else None),
+            }
+            for t in (timeline or [])
+        ],
+
     }
     return JsonResponse(data)
 
 
+# -------------------------------------------------------------------
+# Lookup client (inchangé)
+# -------------------------------------------------------------------
+
 @require_GET
 def client_lookup(request):
-    """
-    API simple pour retrouver un client à partir du téléphone.
-    Appelée par le formulaire de création de commande.
-    """
-    phone = (request.GET.get('phone') or "").strip()
-
+    phone = _normalize_phone(request.GET.get("phone") or "")
     if not phone:
-        return JsonResponse({"exists": False})
+        return JsonResponse({"ok": False, "error": "missing_phone"}, status=400)
 
-    # Tu peux mettre phone__icontains, startswith ou exact selon ton besoin
-    qs = Customer.objects.filter(phone__startswith=phone).order_by("id")
-    if not qs.exists():
-        return JsonResponse({"exists": False})
-
-    c = qs.first()
+    c = Customer.objects.filter(phone=phone).order_by("-id").first()
+    if not c:
+        return JsonResponse({"ok": True, "found": False})
 
     return JsonResponse({
-        "exists": True,
+        "ok": True,
+        "found": True,
         "name": c.name or "",
-        "phone": c.phone or "",
         "address": getattr(c, "address", "") or "",
-        "latitude": getattr(c, "latitude", None),
-        "longitude": getattr(c, "longitude", None),
+        "phone": c.phone or phone,
     })
 
 
@@ -3605,9 +3806,7 @@ def update_status(request, order_id):
         return redirect("orders:detail", order_id=order.id)
 
     order.status = new_status
-    order.update_financials()
-    recompute_order_financials(order)  # 🔥 applique les règles FAGNI
-    order.save(update_fields=["status", "updated_at"])
+    order.update_financials(save=True)  # ✅ moteur unique compute_order_financials + sauvegarde
 
     OrderStatusHistory.objects.create(
         order=order,
@@ -5017,14 +5216,35 @@ def driver_order_detail(request, order_id):
 
     if total_client_ttc <= 0:
         try:
-            prestation = getattr(order, "prestation_total", None) or getattr(order, "total", None) or Decimal("0")
-            service = getattr(order, "service_fee", None) or Decimal("0")
-            delivery = getattr(order, "delivery_fee", None) or Decimal("0")
-            express = getattr(order, "express_extra_fee", None) or Decimal("0")
-            vat = getattr(order, "vat_fagni", None) or Decimal("0")
-            total_client_ttc = Decimal(str(prestation)) + Decimal(str(service)) + Decimal(str(delivery)) + Decimal(str(express)) + Decimal(str(vat))
+            # ✅ même logique que driver_app_data : prestation_total sinon somme(items)
+            from django.db.models import F as _F, Value as _Value, DecimalField as _DecimalField, Sum as _Sum
+            from django.db.models.functions import Coalesce as _Coalesce, Cast as _Cast
+
+            DEC = _DecimalField(max_digits=12, decimal_places=2)
+
+            items_total = order.items.aggregate(
+                s=_Coalesce(
+                    _Sum(_Cast(_F("quantity"), DEC) * _Cast(_F("unit_price"), DEC)),
+                    _Value(0, output_field=DEC),
+                )
+            ).get("s") or Decimal("0")
+
+            prestation_raw = getattr(order, "prestation_total", None)
+            prestation = Decimal(str(prestation_raw)) if prestation_raw not in (None, "", 0) else Decimal(str(items_total))
+
+            if prestation <= 0:
+                # fallback ultime (legacy)
+                prestation = Decimal(str(getattr(order, "total", None) or 0))
+
+            service = Decimal(str(getattr(order, "service_fee", None) or 0))
+            delivery = Decimal(str(getattr(order, "delivery_fee", None) or 0))
+            express = Decimal(str(getattr(order, "express_extra_fee", None) or 0))
+            vat = Decimal(str(getattr(order, "vat_fagni", None) or 0))
+
+            total_client_ttc = prestation + service + delivery + express + vat
         except Exception:
             total_client_ttc = Decimal("0")
+
 
     delivery_fee_client = (
         amounts.get("delivery_fee_client")
@@ -5229,7 +5449,7 @@ def driver_app_data(request):
         if selected_driver_id:
             qs = qs.filter(delivery_partner_id=selected_driver_id)
         else:
-            qs = qs.exclude(delivery_partner__isnull=True)
+            qs = qs  # staff voit tout par défaut
 
     qs = qs.order_by("-created_at")
 
@@ -5369,6 +5589,11 @@ def driver_app_data(request):
         # ✅ montant déjà payé (DB)
         paid_num = _safe_float(getattr(order, "amount_paid", 0) or 0)
 
+        # ✅ fallback robustesse: si payment_status dit "paid" mais amount_paid=0
+        payment_status = str(getattr(order, "payment_status", "") or "").lower().strip()
+        if total_client_num > 0 and paid_num <= 0 and payment_status in ("paid", "completed", "succeeded"):
+            paid_num = total_client_num
+
         # ✅ dû = max(0, total - payé)
         due_num = total_client_num - paid_num
         if due_num < 0:
@@ -5434,7 +5659,7 @@ def driver_app_data(request):
 
             "driver_income_paid": _safe_float(income_paid),
             "driver_income_potential": _safe_float(income_potential),
-        }
+    }
 
     # ==========================
     # BUILD DATA (grouping by computed_status)
@@ -5477,7 +5702,6 @@ def driver_app_data(request):
             done_count += 1
             if len(orders_done_list) < 60:
                 orders_done_list.append(serialize(o, cs))
-
 
     # ✅ affichage KPI gains: on affiche le plus grand (paid vs potential)
     total_income_display = max(total_income_paid, total_income_potential)
@@ -5555,19 +5779,24 @@ def driver_app_export_csv(request):
     DEC = DecimalField(max_digits=12, decimal_places=2)
 
     items_total_expr = Coalesce(
-        Sum(
-            Cast(F("items__quantity"), DEC)
-            * Cast(F("items__unit_price"), DEC)
-        ),
+        Sum(Cast(F("items__quantity"), DEC) * Cast(F("items__unit_price"), DEC)),
         Value(0, output_field=DEC),
     )
 
-    total_client_expr = Coalesce(
-        F("total_client_ttc"),
-        Coalesce(F("total"), items_total_expr)
-        + Coalesce(F("delivery_fee"), Value(0, output_field=DEC))
-        + Coalesce(F("service_fee"), Value(0, output_field=DEC))
-        + Coalesce(F("vat_fagni"), Value(0, output_field=DEC)),
+    # ✅ Prestation = prestation_total si dispo, sinon somme des items
+    prestation_expr = Coalesce(F("prestation_total"), items_total_expr, output_field=DEC)
+
+    service_expr = Coalesce(F("service_fee"), Value(0, output_field=DEC))
+    delivery_expr = Coalesce(F("delivery_fee"), Value(0, output_field=DEC))
+    express_expr = Coalesce(F("express_extra_fee"), Value(0, output_field=DEC))
+    vat_expr = Coalesce(F("vat_fagni"), Value(0, output_field=DEC))
+
+    total_client_fallback_expr = prestation_expr + service_expr + delivery_expr + express_expr + vat_expr
+
+    # ✅ IMPORTANT : si total_client_ttc == 0 => fallback (pas Coalesce)
+    total_client_expr = Case(
+        When(total_client_ttc__gt=0, then=Cast(F("total_client_ttc"), DEC)),
+        default=total_client_fallback_expr,
         output_field=DEC,
     )
 
@@ -5577,10 +5806,13 @@ def driver_app_export_csv(request):
         output_field=DEC,
     )
 
+    distance_expr = Coalesce(F("distance_km_total"), Value(0, output_field=DEC), output_field=DEC)
+
     qs = qs.annotate(
         items_total=items_total_expr,
         total_client_display=total_client_expr,
         driver_income_display=income_expr,
+        driver_distance_display=distance_expr,
     )
 
     # --- Réponse CSV ---
@@ -5637,7 +5869,7 @@ def driver_app_export_csv(request):
 
         calc = _is_calc_order(order)
 
-        dist_val = float(order.distance_km_total or 0) if not calc else 0.0
+        dist_val = float(getattr(order, "driver_distance_display", 0) or 0) if not calc else 0.0
         total_val = float(order.total_client_display or 0) if not calc else 0.0
         income_val = float(order.driver_income_display or 0) if not calc else 0.0
 
@@ -5682,7 +5914,7 @@ def driver_app_export_xlsx(request):
     from datetime import datetime
 
     from django.http import HttpResponse
-    from django.db.models import Sum, Value, F
+    from django.db.models import Sum, Value, F, Case, When
     from django.db.models.functions import Coalesce, Cast
     from django.db.models import DecimalField
 
@@ -5743,8 +5975,10 @@ def driver_app_export_xlsx(request):
     delivery_expr = Coalesce(F("delivery_fee"), Value(0, output_field=DEC))
     vat_expr = Coalesce(F("vat_fagni"), Value(0, output_field=DEC))
 
+
+    express_expr = Coalesce(F("express_extra_fee"), Value(0, output_field=DEC))
     base_ht_expr = prestation_expr + service_expr + delivery_expr
-    total_client_fallback = base_ht_expr + vat_expr
+    total_client_fallback = base_ht_expr + express_expr + vat_expr
 
     driver_income_expr = Coalesce(
         F("amount_driver_partner"),
@@ -5760,9 +5994,9 @@ def driver_app_export_xlsx(request):
 
     qs = qs.annotate(
         items_total=items_total_expr,
-        total_client_display=Coalesce(
-            F("total_client_ttc"),
-            total_client_fallback,
+        total_client_display=Case(
+            When(total_client_ttc__gt=0, then=Cast(F("total_client_ttc"), DEC)),
+            default=total_client_fallback,
             output_field=DEC,
         ),
         driver_income_display=driver_income_expr,
@@ -5866,15 +6100,14 @@ def driver_app_export_xlsx(request):
             driver_income = float(getattr(order, "driver_income_display", 0) or 0)
 
             # label paiement similaire à l'API (simple)
-            due_num = 0.0
+            paid_num = 0.0
             try:
-                due_num = float(getattr(order, "amount_due", 0) or 0)
+                paid_num = float(getattr(order, "amount_paid", 0) or 0)
             except Exception:
-                due_num = 0.0
+                paid_num = 0.0
 
-            if total_client > 0:
-                due_num = min(due_num, total_client)
-            else:
+            due_num = total_client - paid_num
+            if due_num < 0:
                 due_num = 0.0
 
             if total_client <= 0:
@@ -6634,17 +6867,27 @@ def driver_history_me(request):
         except Exception:
             data = {}
 
-        total_client = (
-            data.get("total_client_ttc")
-            or getattr(o, "total_client_ttc", None)
-            or getattr(o, "total", None)
-            or Decimal("0.00")
-        )
-        try:
-            total_client = Decimal(str(total_client))
-        except Exception:
-            total_client = Decimal("0.00")
+        def _d(v):
+            try:
+                return Decimal(str(v)) if v is not None else Decimal("0.00")
+            except Exception:
+                return Decimal("0.00")
 
+        tc = _d(data.get("total_client_ttc")) or _d(getattr(o, "total_client_ttc", None))
+
+        # ✅ IMPORTANT : si tc == 0 => fallback calculé (PAS order.total)
+        if tc <= 0:
+            items_total = _d(data.get("prestation_total")) or _d(getattr(o, "prestation_total", None))
+
+            service_fee = _d(data.get("service_fee_ht")) or _d(getattr(o, "service_fee", None))
+            delivery_fee = _d(data.get("delivery_fee_client")) or _d(getattr(o, "delivery_fee", None))
+            vat_fagni = _d(data.get("vat_fagni")) or _d(getattr(o, "vat_fagni", None))
+            express_for_client = _d(data.get("express_for_client"))  # si tu veux l’inclure dans tc fallback
+
+            tc = items_total + service_fee + delivery_fee + express_for_client + vat_fagni
+
+
+        total_client = tc
         o.total_client = total_client
         client_total += total_client
 

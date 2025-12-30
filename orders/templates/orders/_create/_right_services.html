@@ -1,0 +1,91 @@
+<h2 class="card-title">
+    <span class="emoji">🧺</span> Prestations FAGNI
+</h2>
+
+<div class="form-grid">
+    <div>
+        <label for="category_select">Catégorie de service</label>
+        <select id="category_select">
+            <option value="">-- Choisir une catégorie --</option>
+            {% for cat in service_categories %}
+                <option value="{{ cat.id }}">{{ cat.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div>
+        <label for="service_select">Prestation / Article</label>
+        <select id="service_select" disabled>
+            <option value="">-- Choisir une catégorie d'abord --</option>
+            {% for s in service_items %}
+                <option value="{{ s.id }}"
+                        data-category="{{ s.category_id }}"
+                        data-price="{{ s.default_price }}"
+                        data-cat-name="{{ s.category.name }}"
+                        hidden>
+                    {{ s.name }}
+                </option>
+            {% endfor %}
+        </select>
+        <span class="small-help" style="margin-top:-4px;">
+            Choisis une catégorie puis une prestation du catalogue.
+        </span>
+    </div>
+</div>
+
+<!-- Actions rapides -->
+<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:6px;">
+    <button type="button" id="addItemBtn" class="btn-small">
+        ➕ Ajouter une ligne
+    </button>
+
+    <button type="button" id="toggleDetailsBtn" class="btn-small" aria-expanded="false">
+        ⚙️ Ajouter les détails
+    </button>
+
+    <span class="small-help" style="margin:0;">
+        Astuce : tu peux ajouter vite, puis affiner après.
+    </span>
+</div>
+
+<!-- Détails optionnels (cachés par défaut) -->
+<div id="advancedDetails" style="display:none; margin-top:10px;">
+    <div class="form-grid" style="margin-top:4px;">
+        <div style="grid-column:1/-1;">
+            <label for="item_designation">Désignation (optionnel)</label>
+            <input type="text" id="item_designation" placeholder="Texte qui apparaîtra sur la commande (sinon nom catalogue)">
+            <span class="small-help" style="margin-top:-4px;">
+                Si vide, FAGNI reprend automatiquement le nom de la prestation.
+            </span>
+        </div>
+
+        <div>
+            <label for="item_quantity">Quantité</label>
+            <input type="number" id="item_quantity" min="1" value="1">
+        </div>
+
+        <div>
+            <label for="item_price">Prix unitaire (catalogue, non modifiable)</label>
+            <input type="text" id="item_price" value="0" readonly class="readonly-input">
+            <span class="small-help" style="margin-top:-4px;">
+                Les prix proviennent du catalogue FAGNI. Toute mise à jour se fait dans le catalogue.
+            </span>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const btn = document.getElementById("toggleDetailsBtn");
+    const box = document.getElementById("advancedDetails");
+    if (!btn || !box) return;
+
+    btn.addEventListener("click", function () {
+        const isOpen = box.style.display !== "none";
+        box.style.display = isOpen ? "none" : "block";
+        btn.setAttribute("aria-expanded", (!isOpen).toString());
+        btn.textContent = (!isOpen) ? "✅ Masquer les détails" : "⚙️ Ajouter les détails";
+    });
+});
+</script>
+

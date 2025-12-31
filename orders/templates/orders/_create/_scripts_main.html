@@ -5,6 +5,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const DELIVERY_PRICE_PER_KM = parseFloat("{{ delivery_price_per_km|default:'0' }}") || 0;
         const DELIVERY_FIXED_FEE = parseFloat("{{ delivery_fixed_fee|default:'0' }}") || 0;
 
+        const EXPRESS_ENABLED = String("{{ logi_express_enabled|default:'True' }}").toLowerCase() === "true";
+        const EXPRESS_EXTRA_FLAT = parseFloat("{{ logi_express_extra_flat|default:'0' }}") || 0;       // ex: 2000
+        const EXPRESS_EXTRA_PERCENT = parseFloat("{{ logi_express_extra_percent|default:'0' }}") || 0; // ex: 0 ou 10
+
         const LAUNDRIES_GEO = (function(){
             try { return JSON.parse('{{ laundries_geo_json|default:"[]"|escapejs }}'); }
             catch(e){ return []; }
@@ -33,11 +37,16 @@ document.addEventListener('DOMContentLoaded', function () {
         const deliveryDisplay = document.getElementById('delivery_fee_display');
         const totalGlobalDisplay = document.getElementById('total_global_display');
 
+        // LOT G — recap
         const previewBtn = document.getElementById('previewBtn');
         const summaryBox = document.getElementById('summaryBox');
         const summaryContent = document.getElementById('summaryContent');
-        const submitBtn = document.getElementById('submitBtn');
+        const recapClient = document.getElementById('recap_client');
+        const recapTimeline = document.getElementById('recap_timeline');
+        const recapTotals = document.getElementById('recap_totals');
+        const recapNotes = document.getElementById('recap_notes');
 
+        const submitBtn = document.getElementById('submitBtn');
         const steps = document.querySelectorAll('.step');
 
         // --- Slots collecte / livraison ---
@@ -122,7 +131,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 opt.disabled = (end <= nowMinutes);
             });
 
-            // Si le slot sélectionné vient d’être désactivé, on reset
             if (selectEl.value) {
                 const sel = selectEl.options[selectEl.selectedIndex];
                 if (sel && sel.disabled) {
@@ -162,17 +170,79 @@ document.addEventListener('DOMContentLoaded', function () {
             return el ? el.value : fallback;
         }
 
+        // ===============================
+        // LOT D — Timeline intelligente & alertes
+        // ===============================
+        function updateTimelineSummary(){
+            const pickupMode = document.querySelector('input[name="pickup_mode"]:checked')?.value || "now";
+            const deliveryMode = document.querySelector('input[name="delivery_mode"]:checked')?.value || "standard";
+
+            const pickupDate = document.getElementById('pickup_date')?.value || "";
+            const pickupSlot = document.getElementById('pickup_slot')?.value || "";
+
+            const deliveryDate = document.getElementById('delivery_date')?.value || "";
+            const deliverySlot = document.getElementById('delivery_slot')?.value || "";
+
+            const pickupEl = document.getElementById('summary-pickup');
+            const washEl = document.getElementById('summary-wash');
+            const deliveryEl = document.getElementById('summary-delivery');
+            const alertsBox = document.getElementById('timeline-alerts');
+
+            if (!pickupEl || !washEl || !deliveryEl) return;
+            if (alertsBox) alertsBox.innerHTML = "";
+
+            const pad2 = (n) => String(n).padStart(2, "0");
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}-${pad2(today.getMonth()+1)}-${pad2(today.getDate())}`;
+            const nowMinutes = today.getHours() * 60 + today.getMinutes();
+            const CUTOFF_MINUTES = 10 * 60;
+
+            if (pickupMode === "later" && pickupDate && pickupSlot){
+                pickupEl.textContent = `Programmée le ${pickupDate} (${pickupSlot})`;
+            } else {
+                pickupEl.textContent = "Immédiate (dès que possible)";
+            }
+
+            if (deliveryMode === "express"){
+                washEl.textContent = "Express (~24h)";
+            } else {
+                washEl.textContent = "Standard (~48h)";
+            }
+
+            if (deliveryMode === "scheduled" && deliveryDate && deliverySlot){
+                deliveryEl.textContent = `Programmée le ${deliveryDate} (${deliverySlot})`;
+            } else {
+                deliveryEl.textContent = "Automatique après traitement";
+            }
+
+            const addAlert = (html) => {
+                if (!alertsBox) return;
+                alertsBox.innerHTML += html;
+            };
+
+            if (deliveryMode === "express"){
+                if (pickupMode === "now" && nowMinutes >= CUTOFF_MINUTES){
+                    addAlert(`<div class="alert">⚠️ Collecte après 10h : l’express n’est pas garanti.</div>`);
+                }
+                if (pickupMode === "later" && pickupDate === todayStr && nowMinutes >= CUTOFF_MINUTES){
+                    addAlert(`<div class="alert">⚠️ Collecte programmée aujourd’hui après 10h : l’express est difficile à garantir.</div>`);
+                }
+            }
+
+            if (deliveryMode === "scheduled" && pickupMode === "now"){
+                addAlert(`<div class="alert">ℹ️ Livraison programmée avec collecte immédiate.</div>`);
+            }
+        }
+
         function applyTimingConstraints() {
             const todayStr = localTodayStr();
 
-            // Min “aujourd’hui” par défaut
             setTodayMinForDate(pickupDateInput);
             setTodayMinForDate(deliveryDateInput);
 
             const pickupMode = getCheckedValue("pickup_mode", "now");
             const deliveryMode = getCheckedValue("delivery_mode", "standard");
 
-            // B2 : si collecte programmée + livraison programmée => livraison >= collecte
             if (pickupMode === "later" && deliveryMode === "scheduled") {
                 const pickupDateVal = (pickupDateInput && pickupDateInput.value) ? pickupDateInput.value : todayStr;
                 if (deliveryDateInput) {
@@ -182,34 +252,34 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
             } else {
-                // Sinon livraison min = aujourd’hui
                 if (deliveryDateInput) deliveryDateInput.min = todayStr;
             }
 
-            // Désactiver les créneaux passés (si date = today)
             disablePastSlotsForToday(pickupDateInput, pickupSlotSelect);
             disablePastSlotsForToday(deliveryDateInput, deliverySlotSelect);
 
-            // Sync hidden times
             if (pickupSlotSelect && pickupTimeHidden) updateHiddenTimeFromSlot(pickupSlotSelect, pickupTimeHidden);
             if (deliverySlotSelect && deliveryTimeHidden) updateHiddenTimeFromSlot(deliverySlotSelect, deliveryTimeHidden);
+
+            updateTimelineSummary();
         }
 
         // listeners dates/slots
         if (pickupDateInput) pickupDateInput.addEventListener('change', applyTimingConstraints);
         if (deliveryDateInput) deliveryDateInput.addEventListener('change', applyTimingConstraints);
-
         if (pickupSlotSelect) pickupSlotSelect.addEventListener('change', applyTimingConstraints);
         if (deliverySlotSelect) deliverySlotSelect.addEventListener('change', applyTimingConstraints);
 
-        // listeners radios (quand on bascule now/later ou standard/express/scheduled)
+        // listeners radios
         const pickupRadiosAll = document.querySelectorAll('input[name="pickup_mode"]');
         pickupRadiosAll.forEach(r => r.addEventListener('change', applyTimingConstraints));
 
         const deliveryRadiosAll = document.querySelectorAll('input[name="delivery_mode"]');
-        deliveryRadiosAll.forEach(r => r.addEventListener('change', applyTimingConstraints));
+        deliveryRadiosAll.forEach(r => r.addEventListener('change', function(){
+            applyTimingConstraints();
+            recalcTotals(); // express/standard change => totals
+        }));
 
-        // Initial
         applyTimingConstraints();
 
         // --- Stepper ---
@@ -276,7 +346,9 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (addressVal && !addressInput.value.trim()) addressInput.value = addressVal;
                         if (latInput && latVal) latInput.value = latVal;
                         if (lngInput && lngVal) lngInput.value = lngVal;
+
                         recalcTotals();
+                        updateTimelineSummary();
 
                         if (clientStatusEl) {
                             clientStatusEl.textContent = 'Client existant chargé';
@@ -307,13 +379,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
                         if (latInput) latInput.value = lat;
                         if (lngInput) lngInput.value = lng;
-                        recalcTotals();
 
-                        if (typeof map !== "undefined" && map && typeof marker !== "undefined" && marker) {
-                            map.setCenter(loc);
-                            map.setZoom(14);
-                            marker.setPosition(loc);
-                        }
+                        recalcTotals();
+                        updateTimelineSummary();
 
                         if (typeof geocoder !== "undefined" && geocoder && addressInput) {
                             geocoder.geocode({ location: loc }, (results, status) => {
@@ -423,8 +491,6 @@ document.addEventListener('DOMContentLoaded', function () {
             let serviceFee = Math.round(total * 0.05);
             if (serviceFee < 500 && total > 0) serviceFee = 500;
 
-            let deliveryFee = 0;
-
             function haversineKm(lat1, lon1, lat2, lon2){
                 const R = 6371;
                 const toRad = (x) => (x * Math.PI) / 180;
@@ -438,21 +504,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 return R * c;
             }
 
-            function estimateDeliveryFee(){
+            function estimateBaseDeliveryFee(){
                 if (!(total > 0)) return 0;
 
-                // fallback
                 let fee = DELIVERY_MIN_FEE;
 
-                // si pas coords client => fallback
                 const clat = parseFloat((latInput && latInput.value) ? latInput.value : "");
                 const clng = parseFloat((lngInput && lngInput.value) ? lngInput.value : "");
                 if (isNaN(clat) || isNaN(clng)) return fee;
 
-                // si pas de blanchisseries geo => fallback
                 if (!Array.isArray(LAUNDRIES_GEO) || !LAUNDRIES_GEO.length) return fee;
 
-                // nearest laundry 
                 let bestKm = null;
                 for (const l of LAUNDRIES_GEO){
                     const llat = parseFloat(l.latitude);
@@ -463,30 +525,55 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 if (bestKm === null) return fee;
 
-                // km AR
                 const kmAR = bestKm * 2;
-
                 const computed = Math.round((DELIVERY_FIXED_FEE || 0) + (DELIVERY_PRICE_PER_KM || 0) * kmAR);
                 fee = Math.max(DELIVERY_MIN_FEE || 0, computed);
                 return fee;
             }
 
-            deliveryFee = estimateDeliveryFee();
+            // livraison BASE (hors supplément express)
+            const baseDelivery = estimateBaseDeliveryFee();
 
+            // Supplément express (séparé)
+            const deliveryModeNow = (document.querySelector('input[name="delivery_mode"]:checked') || {}).value || "standard";
+            let expressExtra = 0;
+
+            if (deliveryModeNow === "express" && EXPRESS_ENABLED && baseDelivery > 0) {
+                const percentExtra = Math.round(baseDelivery * (EXPRESS_EXTRA_PERCENT / 100));
+                expressExtra = Math.round(EXPRESS_EXTRA_FLAT + percentExtra);
+            }
+
+            const grand = total + serviceFee + baseDelivery + expressExtra;
+
+            // Affichages (totaux box)
             if (totalPrestDisplay) totalPrestDisplay.textContent = total.toLocaleString('fr-FR');
             if (serviceDisplay) serviceDisplay.textContent = serviceFee.toLocaleString('fr-FR');
-            if (deliveryDisplay) deliveryDisplay.textContent = deliveryFee.toLocaleString('fr-FR');
+
+            // Ici on affiche "Livraison (estimation)" = base + express (car c’est ce que le client paie)
+            const deliveryToPay = baseDelivery + expressExtra;
+            if (deliveryDisplay) deliveryDisplay.textContent = deliveryToPay.toLocaleString('fr-FR');
 
             if (totalGlobalDisplay) {
-                const grand = total + serviceFee + deliveryFee;
                 totalGlobalDisplay.textContent = grand.toLocaleString('fr-FR');
             }
+
+            // stockage cohérent pour le récap
+            window.__fagniCreateTotals = {
+                prest: total,
+                service: serviceFee,
+                delivery_base: baseDelivery,
+                delivery_to_pay: deliveryToPay,
+                expressExtra: expressExtra,
+                grand: grand
+            };
+
             updateItemsCount();
         }
 
         recalcTotals();
         setStep(0);
         updateItemsCount();
+        updateTimelineSummary();
 
         // 5) AJOUT / SUPPRESSION LIGNES + PHOTOS
         if (addItemBtn && itemsTableBody) {
@@ -570,12 +657,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 recalcTotals();
                 setStep(1);
+
+                if (summaryBox) summaryBox.style.display = "none";
             });
 
             itemsTableBody.addEventListener('click', function (e) {
                 if (e.target.classList.contains('btn-remove')) {
                     const tr = e.target.closest('tr');
-                    if (tr) { tr.remove(); recalcTotals(); }
+                    if (tr) { tr.remove(); recalcTotals(); if (summaryBox) summaryBox.style.display = "none"; }
                 }
 
                 if (e.target.classList.contains('btn-photo')) {
@@ -621,30 +710,126 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (infoSpan) {
                     infoSpan.textContent = files.length === 1 ? '1 nouvelle photo' : files.length + ' nouvelles photos';
                 }
+
+                if (summaryBox) summaryBox.style.display = "none";
             });
         }
 
-        // 6) RÉSUMÉ AVANT ENVOI
-        if (previewBtn && summaryBox && summaryContent) {
+        // ===============================
+        // LOT G — RÉCAP & VALIDATION (Step 3)
+        // ===============================
+        function buildRecapHtmlForItems(){
+            const rows = itemsTableBody.querySelectorAll('tr');
+            let html = '';
+            rows.forEach((row, idx) => {
+                const tds = row.querySelectorAll('td');
+                if (tds.length < 4) return;
+
+                const labelEl = tds[0].querySelector('.line-designation');
+                const designation = labelEl ? labelEl.textContent.trim() : tds[0].textContent.trim();
+
+                const qty = (tds[1].textContent || "").trim();
+                const pu = (tds[2].textContent || "").trim();
+                const total = (tds[3].textContent || "").trim();
+
+                const fileInput = row.querySelector('input[type="file"]');
+                const photoCount = fileInput && fileInput.files ? fileInput.files.length : 0;
+
+                html += `
+                    <div class="summary-item" style="padding:10px 0; border-bottom:1px dashed #e5e7eb;">
+                        <div style="font-weight:900;">${idx+1}. ${designation}</div>
+                        <div style="font-size:12px; color:#475569; margin-top:2px;">
+                            Qté: <strong>${qty}</strong> • PU: <strong>${pu}</strong> FCFA • Total: <strong>${total}</strong> FCFA
+                            ${photoCount ? ` • 📷 ${photoCount} photo(s)` : ``}
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (!html) html = '<div class="summary-item">Aucune ligne dans la commande.</div>';
+            return html;
+        }
+
+        function buildRecap(){
+            if (!summaryBox || !summaryContent) return;
+
+            // Client
+            const phone = phoneInput ? phoneInput.value.trim() : "";
+            const name = nameInput ? nameInput.value.trim() : "";
+            const pickupAddr = addressInput ? addressInput.value.trim() : "";
+            const dAddrEl = document.getElementById('delivery_address');
+            const deliveryAddr = dAddrEl ? dAddrEl.value.trim() : "";
+
+            const pickupMode = document.querySelector('input[name="pickup_mode"]:checked')?.value || "now";
+            const deliveryMode = document.querySelector('input[name="delivery_mode"]:checked')?.value || "standard";
+
+            const pickupDate = pickupDateInput ? (pickupDateInput.value || "") : "";
+            const pickupSlot = pickupSlotSelect ? (pickupSlotSelect.value || "") : "";
+            const deliveryDate = deliveryDateInput ? (deliveryDateInput.value || "") : "";
+            const deliverySlot = deliverySlotSelect ? (deliverySlotSelect.value || "") : "";
+
+            if (recapClient) {
+                recapClient.innerHTML = `
+                    <div><strong>${name || "—"}</strong> (${phone || "—"})</div>
+                    <div style="margin-top:6px;"><span style="font-weight:900;">Collecte :</span> ${pickupAddr || "—"}</div>
+                    <div style="margin-top:4px;"><span style="font-weight:900;">Livraison :</span> ${deliveryAddr || pickupAddr || "—"}</div>
+                `;
+            }
+
+            if (recapTimeline) {
+                let p = (pickupMode === "later" && pickupDate && pickupSlot) ? `Collecte programmée: ${pickupDate} (${pickupSlot})` : `Collecte: immédiate`;
+                let w = (deliveryMode === "express") ? `Traitement: express (~24h)` : `Traitement: standard (~48h)`;
+                let d = (deliveryMode === "scheduled" && deliveryDate && deliverySlot) ? `Livraison programmée: ${deliveryDate} (${deliverySlot})` : `Livraison: automatique après traitement`;
+                recapTimeline.innerHTML = `<div>${p}</div><div style="margin-top:4px;">${w}</div><div style="margin-top:4px;">${d}</div>`;
+            }
+
+            // Items
+            summaryContent.innerHTML = buildRecapHtmlForItems();
+
+            // Totaux (source de vérité)
+            const t = window.__fagniCreateTotals || null;
+
+            const prest = t ? (t.prest || 0) : 0;
+            const svc = t ? (t.service || 0) : 0;
+            const delBase = t ? (t.delivery_base || 0) : 0;
+            const expressExtra = t ? (t.expressExtra || 0) : 0;
+            const grand = t ? (t.grand || 0) : 0;
+
+            if (recapTotals) {
+                recapTotals.innerHTML = `
+                    <div>Sous-total: <strong>${Number(prest).toLocaleString('fr-FR')}</strong> FCFA</div>
+                    <div style="margin-top:4px;">Service FAGNI: <strong>${Number(svc).toLocaleString('fr-FR')}</strong> FCFA</div>
+
+                    ${expressExtra > 0 ? `
+                      <div style="margin-top:4px;">Supplément express: <strong>${Number(expressExtra).toLocaleString('fr-FR')}</strong> FCFA</div>
+                    ` : ``}
+
+                    <div style="margin-top:4px;">Livraison (estim.): <strong>${Number(delBase).toLocaleString('fr-FR')}</strong> FCFA</div>
+                    <div style="margin-top:6px; font-weight:900;">Total global: ${Number(grand).toLocaleString('fr-FR')} FCFA</div>
+                `;
+            }
+
+            // Note "express extra" dans timeline (optionnel)
+            if (recapTimeline && deliveryMode === "express" && expressExtra > 0) {
+                recapTimeline.innerHTML += `<div style="margin-top:6px; font-weight:900;">+ Supplément express estimé : ${Number(expressExtra).toLocaleString('fr-FR')} FCFA</div>`;
+            }
+
+            // Notes
+            const notesEl = document.getElementById('order_notes');
+            const notes = notesEl ? notesEl.value.trim() : "";
+            if (recapNotes) recapNotes.textContent = notes || "—";
+
+            summaryBox.style.display = 'block';
+            setStep(2);
+            summaryBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        if (previewBtn) {
             previewBtn.addEventListener('click', function (e) {
                 e.preventDefault();
-                const rows = itemsTableBody.querySelectorAll('tr');
-                let html = '';
-                rows.forEach(row => {
-                    const tds = row.querySelectorAll('td');
-                    if (tds.length < 4) return;
-                    const labelEl = tds[0].querySelector('.line-designation');
-                    const designation = labelEl ? labelEl.textContent.trim() : tds[0].textContent.trim();
-                    const qty = tds[1].textContent.trim();
-                    const pu = tds[2].textContent.trim();
-                    const total = tds[3].textContent.trim();
-                    html += `<p class="summary-item"><strong>${qty}</strong> × ${designation} — ${pu} FCFA (=${total} FCFA)</p>`;
-                });
-                if (!html) html = '<p class="summary-item">Aucune ligne dans la commande.</p>';
-                summaryContent.innerHTML = html;
-                summaryBox.style.display = 'block';
-                setStep(2);
-                summaryBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                recalcTotals();
+                updateTimelineSummary();
+                buildRecap();
             });
         }
 
@@ -652,6 +837,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (form) {
             form.addEventListener('submit', function (e) {
                 const rows = itemsTableBody.querySelectorAll('tr');
+
                 if (!phoneInput.value.trim() || !nameInput.value.trim()) {
                     e.preventDefault();
                     alert("Veuillez renseigner au moins le nom et le téléphone du client.");
@@ -662,8 +848,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     alert("Ajoute au moins une ligne de prestation.");
                     return;
                 }
-                // --- Sécurité delivery adresse/coords ---
-                // Si livraison vide => on copie collecte (adresse + coords)
+
+                // Sécurité delivery adresse/coords
                 const deliveryAddressInput = document.getElementById('delivery_address');
                 const deliveryLatInput = document.getElementById('delivery_lat');
                 const deliveryLngInput = document.getElementById('delivery_lng');
@@ -671,18 +857,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (deliveryAddressInput) {
                     const dAddr = deliveryAddressInput.value.trim();
                     if (!dAddr) {
-                        // copie adresse
                         if (addressInput && addressInput.value.trim()) {
                             deliveryAddressInput.value = addressInput.value.trim();
                         }
-                        // copie coords
                         if (deliveryLatInput && latInput && latInput.value) deliveryLatInput.value = latInput.value;
                         if (deliveryLngInput && lngInput && lngInput.value) deliveryLngInput.value = lngInput.value;
                     }
                 }
 
-                // --- Validation timings --- 
-                // Collecte programmée => date + slot obligatoires 
+                // Validation timings
                 const pickupMode = (document.querySelector('input[name="pickup_mode"]:checked') || {}).value || "now";
                 if (pickupMode === "later") {
                     if (!pickupDateInput || !pickupDateInput.value) {
@@ -695,14 +878,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         alert("Choisis un créneau de collecte.");
                         return;
                     }
-                    } else {
-                    // Nettoyage pour éviter des valeurs fantômes
+                } else {
                     if (pickupDateInput) pickupDateInput.value = "";
                     if (pickupSlotSelect) pickupSlotSelect.value = "";
                     if (pickupTimeHidden) pickupTimeHidden.value = "";
                 }
 
-                // Livraison programmée => date + slot obligatoires
                 const deliveryMode = (document.querySelector('input[name="delivery_mode"]:checked') || {}).value || "standard";
                 if (deliveryMode === "scheduled") {
                     if (!deliveryDateInput || !deliveryDateInput.value) {
@@ -728,105 +909,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         }
+
     } catch (err) {
         console.error("Erreur JS create.html FAGNI :", err);
     }
 });
-
-  // ===============================
-  // LOT D — Timeline intelligente & alertes
-  // ===============================
-  function updateTimelineSummary(){
-    const pickupMode = document.querySelector('input[name="pickup_mode"]:checked')?.value || "now";
-    const deliveryMode = document.querySelector('input[name="delivery_mode"]:checked')?.value || "standard";
-
-    const pickupDate = document.getElementById('pickup_date')?.value || "";
-    const pickupSlot = document.getElementById('pickup_slot')?.value || "";
-
-    const deliveryDate = document.getElementById('delivery_date')?.value || "";
-    const deliverySlot = document.getElementById('delivery_slot')?.value || "";
-
-    const pickupEl = document.getElementById('summary-pickup');
-    const washEl = document.getElementById('summary-wash');
-    const deliveryEl = document.getElementById('summary-delivery');
-    const alertsBox = document.getElementById('timeline-alerts');
-
-    if (!pickupEl || !washEl || !deliveryEl) return;
-
-    if (alertsBox) alertsBox.innerHTML = "";
-
-    // --- Helpers ---
-    const pad2 = (n) => String(n).padStart(2, "0");
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${pad2(today.getMonth()+1)}-${pad2(today.getDate())}`;
-    const nowMinutes = today.getHours() * 60 + today.getMinutes();
-
-    // Cutoff (par défaut 10h = 600 min)
-    const CUTOFF_MINUTES = 10 * 60;
-
-    // Collecte
-    if (pickupMode === "later" && pickupDate && pickupSlot){
-      pickupEl.textContent = `Programmée le ${pickupDate} (${pickupSlot})`;
-    } else {
-      pickupEl.textContent = "Immédiate (dès que possible)";
-    }
-
-    // Traitement
-    if (deliveryMode === "express"){
-      washEl.textContent = "Express (~24h)";
-    } else {
-      washEl.textContent = "Standard (~48h)";
-    }
-
-    // Livraison
-    if (deliveryMode === "scheduled" && deliveryDate && deliverySlot){
-      deliveryEl.textContent = `Programmée le ${deliveryDate} (${deliverySlot})`;
-    } else {
-      deliveryEl.textContent = "Automatique après traitement";
-    }
-
-    // --- Alertes intelligentes ---
-    const addAlert = (html) => {
-      if (!alertsBox) return;
-      alertsBox.innerHTML += html;
-    };
-
-    // Alerte express (simple mais utile)
-    if (deliveryMode === "express"){
-      // express + collecte immédiate après cutoff
-      if (pickupMode === "now" && nowMinutes >= CUTOFF_MINUTES){
-        addAlert(`<div class="alert">⚠️ Collecte après 10h : l’express n’est pas garanti.</div>`);
-      }
-
-      // express + collecte programmée aujourd’hui après cutoff
-      if (pickupMode === "later" && pickupDate === todayStr && nowMinutes >= CUTOFF_MINUTES){
-        addAlert(`<div class="alert">⚠️ Collecte programmée aujourd’hui après 10h : l’express est difficile à garantir.</div>`);
-      }
-    }
-
-    // Livraison programmée mais collecte immédiate
-    if (deliveryMode === "scheduled" && pickupMode === "now"){
-      addAlert(`<div class="alert">ℹ️ Livraison programmée avec collecte immédiate.</div>`);
-    }
-  }
-
-  // Écouteurs (change + input sur dates)
-  (function bindTimelineListeners(){
-    const els = [
-      ...document.querySelectorAll('input[name="pickup_mode"], input[name="delivery_mode"]'),
-      document.getElementById('pickup_date'),
-      document.getElementById('pickup_slot'),
-      document.getElementById('delivery_date'),
-      document.getElementById('delivery_slot'),
-    ].filter(Boolean);
-
-    els.forEach(el => {
-      el.addEventListener('change', updateTimelineSummary);
-      if (el.id === 'pickup_date' || el.id === 'delivery_date') {
-        el.addEventListener('input', updateTimelineSummary);
-      }
-    });
-
-    updateTimelineSummary();
-  })();
 </script>

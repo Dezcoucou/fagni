@@ -65,6 +65,20 @@
         <div><strong>Commande :</strong> {{ order.code|default:order.id }}</div>
         <div>Date : {{ now|date:"d/m/Y H:i" }}</div>
         <div class="muted">Statut paiement : {{ order.get_payment_status_display }}</div>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0;">
+        <div><strong>FNE :</strong>
+          {% if order.fne_status %}
+            {{ order.get_fne_status_display|default:order.fne_status }}
+          {% else %}
+            —
+          {% endif %}
+        </div>
+        {% if order.fne_invoice_number %}
+          <div><strong>N° FNE :</strong> {{ order.fne_invoice_number }}</div>
+        {% endif %}
+        {% if order.fne_synced_at %}
+          <div class="muted">Synchro : {{ order.fne_synced_at|date:"d/m/Y H:i" }}</div>
+        {% endif %}
       </div>
     </div>
 
@@ -125,37 +139,22 @@
 
     <div class="totals">
       <div class="totals-card">
+
         <div class="tot">
-          <span>Sous-total prestations (HT)</span>
-          <strong>{{ amounts.subtotal|default:0|money }} FCFA</strong>
+          <span>Total HT facturé au client</span>
+          <strong>{{ total_ht_client|money }} FCFA</strong>
         </div>
 
         <div class="tot">
-          <span>Service FAGNI (HT)</span>
-          <strong>{{ amounts.service_fee_ht|default:0|money }} FCFA</strong>
-        </div>
-
-        <div class="tot">
-          <span>Frais de livraison</span>
-          <strong>{{ amounts.delivery_fee_client|default:0|money }} FCFA</strong>
-        </div>
-
-        {% if amounts.express_for_client and amounts.express_for_client > 0 %}
-        <div class="tot">
-          <span>Supplément express</span>
-          <strong>{{ amounts.express_for_client|money }} FCFA</strong>
-        </div>
-        {% endif %}
-
-        <div class="tot">
-          <span>TVA revenus FAGNI ({{ vat_rate }}%)</span>
-          <strong>{{ vat_amount|default:0|money }} FCFA</strong>
+          <span>TVA sur revenus FAGNI ({{ vat_rate }}%)</span>
+          <strong>{{ vat_amount|money }} FCFA</strong>
         </div>
 
         <div class="tot grand">
           <span>Total TTC client</span>
           <strong>{{ total_ttc_client|money }} FCFA</strong>
         </div>
+
       </div>
     </div>
 

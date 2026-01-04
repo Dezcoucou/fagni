@@ -1,58 +1,118 @@
 {% extends "base.html" %}
+
+{% block title %}Nouvelle commande – Client FAGNI{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root{
+    --fagni-orange:#ff7a00;
+    --fagni-blue:#0056b3;
+    --text:#0f172a;
+    --muted:#64748b;
+    --line:#e5e7eb;
+    --shadow: 0 1px 4px rgba(15,23,42,0.06);
+  }
+
+  .page{ max-width:780px;margin:0 auto 28px;padding:14px 10px 24px; }
+  .page-header{ display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px; }
+  @media (max-width:860px){ .page-header{ flex-direction:column;align-items:stretch; } }
+  .page-title{ font-size:20px;font-weight:950;color:var(--text);margin:0;letter-spacing:-0.2px; }
+  .page-subtitle{ margin:4px 0 0;font-size:13px;color:var(--muted);line-height:1.35; }
+
+  .actions{ display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end; }
+  @media (max-width:860px){ .actions{ justify-content:flex-start; } }
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;padding:9px 14px;border-radius:999px;
+    font-size:13px;font-weight:950;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap;
+    transition: transform .12s ease, opacity .12s ease, background .12s ease, border-color .12s ease;
+  }
+  .btn:active{ transform: translateY(1px); }
+  .btn-ghost{ background:#fff;color:#334155;border:1px solid var(--line); }
+  .btn-ghost:hover{ background:#f9fafb; }
+
+  .card{ background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow); }
+  .panel{ padding:16px; }
+
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:720px){ .grid{ grid-template-columns:1fr; } }
+
+  .field{ grid-column:1 / -1; }
+  .label{ display:block;font-weight:950;margin:8px 0 6px;color:#111827;font-size:13px; }
+  .input, .textarea{
+    width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);outline:none;font-weight:700;
+  }
+  .textarea{ font-weight:600; }
+  .input:focus, .textarea:focus{ border-color:rgba(0,86,179,0.35); box-shadow:0 0 0 4px rgba(0,86,179,0.10); }
+  .disabled{ background:#f9fafb;color:#6b7280; }
+
+  .help{ display:block;margin-top:6px;color:var(--muted);font-size:12px;line-height:1.35; }
+
+  .btn-primary{
+    width:100%;margin-top:14px;padding:12px 14px;border-radius:999px;border:none;
+    background:linear-gradient(90deg,var(--fagni-orange),var(--fagni-blue));
+    color:#fff;font-weight:950;cursor:pointer;
+    transition: transform .12s ease, opacity .12s ease;
+  }
+  .btn-primary:active{ transform: translateY(1px); }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container" style="max-width:720px;margin:0 auto;">
+<div class="page">
+
   <div class="page-header">
-    <div class="page-header__left">
+    <div>
       <h1 class="page-title">Nouvelle commande</h1>
-      <p class="page-subtitle">On crée une demande rapide, puis l’équipe s’occupe du reste.</p>
+      <p class="page-subtitle">Décris ta demande rapidement, l’équipe s’occupe du reste (V1).</p>
     </div>
-    <div class="page-header__right">
-      <a class="btn btn--ghost" href="{% url 'orders:client_home' %}">← Retour</a>
+    <div class="actions">
+      <a class="btn btn-ghost" href="{% url 'orders:client_home' %}">← Retour</a>
     </div>
   </div>
 
-  <div class="card" style="padding:16px;">
+  <div class="card panel">
     {% if error %}
-      <div class="alert alert-danger">{{ error }}</div>
+      <div class="alert alert-danger" style="margin-bottom:10px;">{{ error }}</div>
     {% endif %}
 
     <form method="post">
       {% csrf_token %}
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div style="grid-column:1 / -1;">
-          <label style="display:block;font-weight:700;margin:8px 0 6px;">Téléphone</label>
-          <input value="{{ phone }}" disabled
-                 style="width:100%;padding:12px;border-radius:12px;border:1px solid #e5e7eb;background:#f9fafb;" />
+      <div class="grid">
+        <div class="field">
+          <label class="label">Téléphone</label>
+          <input value="{{ phone }}" disabled class="input disabled" />
+          <small class="help">Ce numéro sert à retrouver tes commandes.</small>
         </div>
 
-        <div style="grid-column:1 / -1;">
-          <label style="display:block;font-weight:700;margin:8px 0 6px;">Nom</label>
-          <input name="name" value="{{ name_init }}" placeholder="Ton nom"
-                 style="width:100%;padding:12px;border-radius:12px;border:1px solid #e5e7eb;" />
+        <div class="field">
+          <label class="label">Nom</label>
+          <input name="name" value="{{ name_init }}" placeholder="Ton nom" class="input" autocomplete="name" />
         </div>
 
-        <div style="grid-column:1 / -1;">
-          <label style="display:block;font-weight:700;margin:8px 0 6px;">Adresse de collecte / livraison</label>
-          <input name="address" value="{{ address_init }}" placeholder="Ex : Cocody Angré 8ème tranche..."
-                 style="width:100%;padding:12px;border-radius:12px;border:1px solid #e5e7eb;" />
-          <small style="display:block;margin-top:6px;color:#6b7280;">
-            On utilisera cette adresse comme point de collecte et de livraison (V1).
-          </small>
+        <div class="field">
+          <label class="label">Adresse de collecte / livraison</label>
+          <input name="address" value="{{ address_init }}" placeholder="Ex : Cocody Angré 8ème tranche..." class="input" autocomplete="street-address" />
+          <small class="help">On utilisera cette adresse comme point de collecte et de livraison (V1).</small>
         </div>
 
-        <div style="grid-column:1 / -1;">
-          <label style="display:block;font-weight:700;margin:8px 0 6px;">Détails / Notes</label>
-          <textarea name="notes" rows="4" placeholder="Ex : 2 pantalons, 5 chemises, urgent, etc."
-                    style="width:100%;padding:12px;border-radius:12px;border:1px solid #e5e7eb;"></textarea>
+        <div class="field">
+          <label class="label">Détails / Notes</label>
+          <textarea name="notes" rows="4" placeholder="Ex : 2 pantalons, 5 chemises, urgent, etc." class="textarea"></textarea>
+          <small class="help">Tu peux préciser : quantité, urgence, consignes, etc.</small>
         </div>
       </div>
 
-      <button type="submit"
-              style="margin-top:14px;width:100%;padding:12px 14px;border-radius:999px;border:none;background:#f97316;color:#111827;font-weight:800;">
-        Créer la commande →
-      </button>
+      <div class="field">
+        <label class="label">Estimation (kg)</label>
+        <input name="estimated_kg" type="number" step="0.5" min="0" value="5" class="input" />
+        <small class="help">Estimation rapide. Le montant final sera ajusté au pesage.</small>
+      </div>
+
+      <button type="submit" class="btn-primary">Créer la commande →</button>
     </form>
   </div>
+
 </div>
 {% endblock %}

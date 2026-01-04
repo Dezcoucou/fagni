@@ -1,39 +1,81 @@
 {# orders/_totals_block.html #}
 
 <div class="mt-4 border-t border-gray-200 pt-3 text-sm">
+
+  {% if finance %}
     <div class="flex justify-between">
-        <span class="font-medium">Total prestation :</span>
-        <span id="total_prestation">
-            {{ order.total_client_ttc|default:0 }} FCFA
-        </span>
+      <span class="font-medium">Sous-total prestations (HT) :</span>
+      <span id="prestation_total_display">
+        {{ finance.prestation_total|default:0|floatformat:0 }} FCFA
+      </span>
     </div>
 
     <div class="flex justify-between mt-1">
-        <span class="font-medium">Service FAGNI (5% min 500 FCFA) :</span>
-        <span id="service_fee_display">
-            {{ order.service_fee|default:0 }} FCFA
-        </span>
+      <span class="font-medium">Service FAGNI (HT) :</span>
+      <span id="service_fee_display">
+        {{ finance.service_fee_ht|default:0|floatformat:0 }} FCFA
+      </span>
     </div>
 
     <div class="flex justify-between mt-1">
-        <span class="font-medium">Frais de livraison (estimation front) :</span>
-        <span id="delivery_fee_display">
-            {{ order.delivery_fee|default:0 }} FCFA
-        </span>
+      <span class="font-medium">Livraison facturée au client :</span>
+      <span id="delivery_fee_display">
+        {{ finance.delivery_fee_client|default:0|floatformat:0 }} FCFA
+      </span>
+    </div>
+
+    <div class="flex justify-between mt-1">
+      <span class="font-medium">TVA FAGNI :</span>
+      <span id="vat_fagni_display">
+        {{ finance.vat_fagni|default:0|floatformat:0 }} FCFA
+      </span>
     </div>
 
     <div class="flex justify-between mt-2">
-        <span class="font-semibold text-orange-600">Total global estimé :</span>
-        <span id="total_global_display" class="font-semibold text-orange-600">
-            {{ order.grand_total|default:0 }} FCFA
-        </span>
+      <span class="font-semibold text-orange-600">Total TTC client :</span>
+      <span id="total_global_display" class="font-semibold text-orange-600">
+        {{ finance.total_ttc_client|default:0|floatformat:0 }} FCFA
+      </span>
     </div>
 
-    <p class="text-xs text-gray-500 mt-2">
-        * Transport (estimation front) :
-        min <strong>{{ delivery_min_fee|default:0 }} FCFA</strong>,
-        environ {{ delivery_price_per_km|default:0 }} FCFA / km AR
-        (+ fixe {{ delivery_fixed_fee|default:0 }} FCFA).<br>
-        Le montant officiel est recalculé côté serveur selon la distance réelle client ↔ blanchisserie.
-    </p>
+    {% if finance.express_surcharge and finance.express_surcharge > 0 %}
+      <p class="text-xs text-gray-500 mt-2">
+        * Supplément express : {{ finance.express_surcharge|floatformat:0 }} FCFA
+      </p>
+    {% endif %}
+
+  {% else %}
+    {# fallback legacy si finance pas fourni #}
+    <div class="flex justify-between">
+      <span class="font-medium">Sous-total prestations (HT) :</span>
+      <span id="prestation_total_display">
+        {{ order.prestation_total|default:0|floatformat:0 }} FCFA
+      </span>
+    </div>
+
+    <div class="flex justify-between mt-1">
+      <span class="font-medium">Service FAGNI (HT) :</span>
+      <span id="service_fee_display">
+        {{ order.service_fee|default:0|floatformat:0 }} FCFA
+      </span>
+    </div>
+
+    <div class="flex justify-between mt-1">
+      <span class="font-medium">Livraison facturée au client :</span>
+      <span id="delivery_fee_display">
+        {{ order.delivery_fee|default:0|floatformat:0 }} FCFA
+      </span>
+    </div>
+
+    <div class="flex justify-between mt-2">
+      <span class="font-semibold text-orange-600">Total TTC client :</span>
+      <span id="total_global_display" class="font-semibold text-orange-600">
+        {{ order.total_client_ttc|default:0|floatformat:0 }} FCFA
+      </span>
+    </div>
+  {% endif %}
+
+  <p class="text-xs text-gray-500 mt-2">
+    * Le montant officiel est recalculé côté serveur (distance réelle client ↔ blanchisserie, règles de pricing).
+  </p>
 </div>

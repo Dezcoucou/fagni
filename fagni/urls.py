@@ -5,7 +5,7 @@ from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.views.generic import RedirectView
 from django.http import HttpResponse
-
+from django.contrib.staticfiles.storage import staticfiles_storage
 
 def chrome_devtools_wellknown(_request):
     return HttpResponse(status=204)
@@ -54,6 +54,8 @@ urlpatterns = [
     path("wallets/", include("wallets.urls")),
 
     path(".well-known/appspecific/com.chrome.devtools.json", chrome_devtools_wellknown),
+
+    path("favicon.ico", RedirectView.as_view(url=staticfiles_storage.url("favicon.ico"), permanent=False)),
 ]
 
 # Fichiers médias en dev

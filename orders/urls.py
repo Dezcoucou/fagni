@@ -15,6 +15,9 @@ urlpatterns = [
     path("<int:order_id>/edit/", views.update, name="update"),
     path("<int:order_id>/delete/", views.delete, name="delete"),
 
+    # ✅ Encaissement (Back-office)
+    path("<int:order_id>/pay/", views.order_mark_paid, name="order_mark_paid"),
+
     # Tableau OPS (collecte / lavage / livraison)
     path("ops-dashboard/", views.ops_dashboard, name="ops_dashboard"),
     path("ops-dashboard/<int:order_id>/<str:action>/", views.ops_update_step, name="ops_update_step"),
@@ -45,6 +48,11 @@ urlpatterns = [
     path("client/new/", views.client_new_order, name="client_new_order"),
     path("client/orders/<int:order_id>/", views.client_order_detail, name="client_order_detail"),
     path("client/orders/<int:order_id>/live/", views.client_order_live_status, name="client_order_live"),
+
+    # --- Items (lignes de commande) côté client ---
+    path("client/orders/<int:order_id>/items/new/", views.client_order_item_new, name="client_order_item_new"),
+    path("client/orders/<int:order_id>/items/<int:item_id>/edit/", views.client_order_item_edit, name="client_order_item_edit"),
+    path("client/orders/<int:order_id>/items/<int:item_id>/delete/", views.client_order_item_delete, name="client_order_item_delete"),
 
     # Tickets PDF (A4 + thermique)
     path("<int:order_id>/ticket/", views.order_ticket_pdf, name="order_ticket_pdf"),

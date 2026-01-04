@@ -117,7 +117,7 @@ class WithdrawalRequestAdmin(admin.ModelAdmin):
             amount=obj.amount,
             type="payout",
             direction="out",
-            description__icontains=f"Retrait {obj.id}",
+        description__icontains=f"Retrait #{obj.id}",
         ).exists()
 
         if existing_tx:
@@ -148,13 +148,15 @@ class WithdrawalRequestAdmin(admin.ModelAdmin):
             wallet.save(update_fields=["balance", "updated_at"])
 
             # 2) Transaction wallet
-            WalletTransaction.objects.create(
+            WalletTransaction.create_tx(
                 wallet=wallet,
                 order=None,
+                leg=None,
                 type="payout",
                 direction="out",
                 amount=amount_dec,
-                description=f"Retrait {obj.id} livreur {wallet.delivery_partner or wallet}",
+                description=f"Retrait #{obj.id} – livreur {wallet.delivery_partner or wallet}",
+                allow_orphan=True,
             )
 
         messages.success(

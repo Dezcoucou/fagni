@@ -13,6 +13,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'changeme-dev-key')
 DEBUG = True  # ⚠️ à mettre à False en prod
 
+CLIENT_SESSION_KEY = "fagni_client_phone"
+
 ADMINS = [("Admin", "admin@example.com")]
 
 import os

@@ -26,11 +26,16 @@ def compute_order_financials(order) -> Dict[str, Any]:
     base = compute_order_amounts(order)
 
     prestation_total = base["subtotal"]
-    delivery_fee_client = base["delivery_fee_client"]
+    delivery_fee_client = base["delivery_fee_client"]          # ✅ transport facturé au client (hors express)
     delivery_cost_driver = base["delivery_cost_driver"]
     service_fee_ht = base["service_fee_ht"]
-    express_surcharge = base["express_surcharge"]
-    express_for_client = base["express_for_client"]
+
+    # EXPRESS :
+    # - express_surcharge : surcharge technique / interne (si ton moteur la calcule)
+    # - express_for_client : montant réellement facturé au client pour l’option express
+    express_surcharge = base.get("express_surcharge", Decimal("0"))
+    express_for_client = base.get("express_for_client", Decimal("0"))
+
     commission_laundry_ht = base["commission_laundry_ht"]
     commission_delivery_ht = base["commission_delivery_ht"]
     margin_delivery = base["margin_delivery"]
@@ -48,7 +53,7 @@ def compute_order_financials(order) -> Dict[str, Any]:
         delivery_fee_client = delivery_cost_driver
         margin_delivery = Decimal("0")
 
-    # Recalcul revenu FAGNI HT (source-of-truth) = marge livraison + service
+    # Revenu FAGNI HT (source-of-truth) = marge livraison + service
     fagni_revenue_ht = (margin_delivery + service_fee_ht).quantize(
         Decimal("1"), rounding=ROUND_HALF_UP
     )
@@ -62,6 +67,7 @@ def compute_order_financials(order) -> Dict[str, Any]:
         Decimal("1"), rounding=ROUND_HALF_UP
     )
 
+    # ✅ Total TTC client = prestations + transport + service + express + TVA FAGNI
     total_client_ttc = (
         prestation_total
         + delivery_fee_client
@@ -72,15 +78,31 @@ def compute_order_financials(order) -> Dict[str, Any]:
 
     return {
         "prestation_total": prestation_total,
+
+        # Livraison (client + driver)
         "delivery_fee_client": delivery_fee_client,
         "delivery_cost_driver": delivery_cost_driver,
+
+        # Service FAGNI
         "service_fee_ht": service_fee_ht,
-        "express_surcharge": express_surcharge,
-        "express_for_client": express_for_client,
+
+        # Express (on renvoie les 2 infos)
+        "express_surcharge": express_surcharge,              # interne / technique (si utilisé ailleurs)
+        "express_for_client": express_for_client,            # ✅ montant facturé au client
+        "express_extra_fee_client": express_for_client,      # ✅ alias explicite (optionnel)
+
+        # Commissions + marge
         "commission_laundry_ht": commission_laundry_ht,
         "commission_delivery_ht": commission_delivery_ht,
         "margin_delivery": margin_delivery,
+
+        # Revenu + TVA
         "fagni_revenue_ht": fagni_revenue_ht,
         "vat_fagni": vat_fagni,
+
+        # ✅ clé officielle (à utiliser partout)
+        "total_client_ttc": total_client_ttc,
+
+        # ✅ compat legacy
         "total_ttc_client": total_client_ttc,
     }

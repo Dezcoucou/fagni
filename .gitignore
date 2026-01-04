@@ -99,3 +99,6 @@ missions*.xlsx
 # OS / temp
 .DS_Store
 *.log
+
+# local dev
+cookies.txt

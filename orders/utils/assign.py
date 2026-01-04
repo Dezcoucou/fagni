@@ -51,3 +51,11 @@ def auto_assign_delivery(order) -> Optional[DeliveryPartner]:
         order.save(update_fields=["delivery_partner_unassigned_reason"])
 
     return None
+
+
+def get_active_drivers():
+    """
+    Liste des livreurs actifs pour les écrans legacy (create, etc.)
+    Retourne un QuerySet de DeliveryPartner.
+    """
+    return DeliveryPartner.objects.filter(is_active=True).order_by("name")

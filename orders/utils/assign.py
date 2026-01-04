@@ -39,13 +39,21 @@ def auto_assign_delivery(order) -> Optional[DeliveryPartner]:
     et sauvegarde si trouvé.
     """
     dp, reason = pick_best_driver(order)
+
+    # --- si on a trouvé un livreur ---
     if dp:
         order.delivery_partner = dp
-        order.delivery_partner_unassigned_reason = None
-        order.save(update_fields=["delivery_partner", "delivery_partner_unassigned_reason"])
+
+        # champ optionnel (pas présent partout)
+        if hasattr(order, "delivery_partner_unassigned_reason"):
+            order.delivery_partner_unassigned_reason = None
+            order.save(update_fields=["delivery_partner", "delivery_partner_unassigned_reason"])
+        else:
+            order.save(update_fields=["delivery_partner"])
+
         return dp
 
-    # si aucun dp, on stocke la raison si le champ existe (utile debug)
+    # --- sinon, on stocke la raison si le champ existe (utile debug) ---
     if hasattr(order, "delivery_partner_unassigned_reason"):
         order.delivery_partner_unassigned_reason = reason or "Aucun livreur éligible."
         order.save(update_fields=["delivery_partner_unassigned_reason"])

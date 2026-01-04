@@ -7,12 +7,27 @@ def create_default_users(apps, schema_editor):
     if getattr(settings, "TESTING", False):
         return
 
+    # Hash password compatible même si le User n'a pas set_password()
+    from django.contrib.auth.hashers import make_password
+
     # Récupère le User model de manière sûre en migration
     UserModelLabel = settings.AUTH_USER_MODEL  # ex: "auth.User" ou "accounts.CustomUser"
     app_label, model_name = UserModelLabel.split(".")
     User = apps.get_model(app_label, model_name)
 
     DeliveryPartner = apps.get_model("partners", "DeliveryPartner")
+
+    def _set_password_compat(user, raw_password: str):
+        """
+        Compatible avec:
+        - Django User (a set_password)
+        - Custom user minimal (pas set_password)
+        """
+        if hasattr(user, "set_password"):
+            user.set_password(raw_password)
+        else:
+            # suppose que le modèle a un champ "password"
+            setattr(user, "password", make_password(raw_password))
 
     # ========= ADMIN =========
     admin_email = "admin@fagni.app"
@@ -31,7 +46,7 @@ def create_default_users(apps, schema_editor):
     admin.is_active = True
     admin.is_staff = True
     admin.is_superuser = True
-    admin.set_password(admin_password)
+    _set_password_compat(admin, admin_password)
     admin.save()
 
     # ========= LIVREUR (USER) =========
@@ -47,7 +62,7 @@ def create_default_users(apps, schema_editor):
     )
     driver_user.email = driver_email
     driver_user.is_active = True
-    driver_user.set_password(driver_password)
+    _set_password_compat(driver_user, driver_password)
     driver_user.save()
 
     # ========= DeliveryPartner lié au livreur =========

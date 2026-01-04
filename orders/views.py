@@ -3241,11 +3241,13 @@ def create(request):
 
     if driver:
         order.delivery_partner = driver
-        order.delivery_partner_unassigned_reason = None
+        if hasattr(order, "delivery_partner_unassigned_reason"):
+            order.delivery_partner_unassigned_reason = None
     else:
-        order.delivery_partner_unassigned_reason = (
-            reason or "Aucun livreur disponible au moment de la commande."
-        )
+        if hasattr(order, "delivery_partner_unassigned_reason"):
+            order.delivery_partner_unassigned_reason = (
+                reason or "Aucun livreur disponible au moment de la commande."
+            )
 
     # 4) Calcul automatique des frais de livraison (après assign/geo)
     try:
@@ -3257,7 +3259,10 @@ def create(request):
     order.delivery_fee = delivery_fee
 
     # On persiste ces infos avant la création des items
-    order.save(update_fields=["laundry_partner", "delivery_partner", "delivery_partner_unassigned_reason", "delivery_fee"])
+    update_fields = ["laundry_partner", "delivery_partner", "delivery_fee"]
+    if hasattr(order, "delivery_partner_unassigned_reason"):
+        update_fields.append("delivery_partner_unassigned_reason")
+    order.save(update_fields=update_fields)
 
     # 9) Lignes de commande (PRIX VERROUILLÉS CÔTÉ SERVEUR)
     service_ids = request.POST.getlist("service_id[]")

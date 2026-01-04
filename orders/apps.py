@@ -36,3 +36,6 @@ class OrdersConfig(AppConfig):
 
         # On connecte le signal après migrations
         post_migrate.connect(ensure_default_superuser, sender=self)
+
+        # Brancher les signaux (DeliveryLeg -> sync Order.status)
+        from . import signals  # noqa: F401

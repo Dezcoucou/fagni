@@ -1,8 +1,9 @@
+from __future__ import annotations
+from functools import wraps
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from datetime import datetime, timedelta, time
 from django.template.loader import render_to_string
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-
 from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.conf import settings
@@ -27,9 +28,10 @@ from wallets.models import WalletTransaction
 from wallets.services import (
     get_or_create_wallet_for_delivery_partner,
     credit_wallet,
+    distribute_order_revenues,
 )
 from django.db.models.functions import Coalesce, Cast, TruncDate
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from django.urls import reverse
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
@@ -58,14 +60,12 @@ from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-from django.shortcuts import redirect
-
 from weasyprint import HTML
 import uuid
 import csv
+import base64
 import json
 import re
-from django.shortcuts import redirect
 
 
 DEC12 = DecimalField(max_digits=12, decimal_places=2)
@@ -73,10 +73,163 @@ DEC = DecimalField(max_digits=12, decimal_places=2)
 DECIMAL_ZERO = Decimal("0")
 
 
-# ============================================================
-# CLIENT (mini-app) – session key
-# ============================================================
-CLIENT_SESSION_KEY = "client_phone"
+# =========================
+#  Helpers AJAX / Client auth
+# =========================
+
+CLIENT_PHONE_COOKIE = "client_phone"
+
+
+def _is_json_request(request) -> bool:
+    # AJAX (fetch) + Accept JSON
+    xrw = (request.headers.get("X-Requested-With") or "").lower()
+    accept = (request.headers.get("Accept") or "").lower()
+    return xrw == "xmlhttprequest" or "application/json" in accept
+
+
+def _client_phone(request) -> str | None:
+    """
+    Retourne le téléphone client "authentifié" côté app client.
+    Stratégie (simple) : cookie HTTPOnly.
+    """
+    phone = request.COOKIES.get(CLIENT_PHONE_COOKIE)
+    if phone:
+        phone = phone.strip()
+    return phone or None
+
+
+def client_login_required(view_func):
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        if not _client_phone(request):
+            # ✅ IMPORTANT: pour les appels JS, JSON 401 (pas redirect HTML)
+            if _is_json_request(request):
+                return JsonResponse({"ok": False, "error": "not_authenticated"}, status=401)
+            return redirect("orders:client_login")
+        return view_func(request, *args, **kwargs)
+    return _wrapped
+# Aliases compat (anciens noms)
+client_required = client_login_required
+_client_required = client_login_required
+
+
+
+# =========================
+#  Login "client" (par téléphone)
+# =========================
+@require_http_methods(["GET", "POST"])
+def client_login(request):
+    """
+    Login client minimal: on saisit un téléphone => pose cookie client_phone.
+    (Tu peux durcir plus tard: OTP, code SMS, etc.)
+    """
+    if request.method == "GET":
+        return render(request, "orders/client_login.html", {"ok": True})
+
+
+    phone = (request.POST.get("phone") or "").strip()
+    if not phone:
+        # en JSON si AJAX
+        if _is_json_request(request):
+            return JsonResponse({"ok": False, "error": "missing_phone"}, status=400)
+        return render(request, "orders/client_login.html", {"ok": False, "error": "missing_phone"})
+
+    resp = redirect("orders:client_home")  # adapte si tu as un autre nom de route
+    # cookie 7 jours, HTTPOnly (safe), SameSite Lax
+    resp.set_cookie(
+        CLIENT_PHONE_COOKIE,
+        phone,
+        max_age=7 * 24 * 3600,
+        httponly=True,
+        samesite="Lax",
+    )
+    return resp
+
+
+@require_http_methods(["POST"])
+def client_logout(request):
+    resp = redirect("orders:client_login")
+    resp.delete_cookie(CLIENT_PHONE_COOKIE)
+    return resp
+
+
+# =========================
+#  LIVE endpoint (exemple)
+# =========================
+@client_login_required
+def client_order_live_status(request, order_id: int):
+    """
+    Endpoint JSON live pour le suivi commande client.
+    Règle d'accès: le cookie client_phone doit matcher le customer.phone (ou autre logique).
+    """
+    from orders.models import Order
+
+    phone = _client_phone(request)
+
+    o = (
+        Order.objects
+        .select_related("customer")
+        .prefetch_related("items", "legs")
+        .filter(pk=order_id)
+        .first()
+    )
+    if not o:
+        return JsonResponse({"ok": False, "error": "not_found"}, status=404)
+
+    customer_phone = ((getattr(o.customer, "phone", "") or "")).strip()
+    if not customer_phone or not phone or customer_phone != phone:
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+
+    items = []
+    for it in o.items.all():
+        qty = float(it.quantity or 0)
+        price = float(it.unit_price or 0)
+        items.append({
+            "id": it.id,
+            "designation": it.designation,
+            "quantity": qty,
+            "unit_price": price,
+            "total": float(getattr(it, "line_total", qty * price)),
+        })
+
+    legs = []
+    for leg in o.legs.all().order_by("id"):
+        legs.append({
+            "id": leg.id,
+            "leg_type": leg.leg_type,
+            "status": leg.status,
+            "driver_amount": float(leg.driver_amount or 0),
+            "driver_id": leg.driver_id,
+        })
+
+    # ✅ Source unique de vérité pour les montants
+    pricing = _compute_order_pricing(o)
+
+    amounts = {
+        "prestation_total": float(pricing["items_total"]),
+        "service_fee": float(pricing["service_fee"]),
+        "delivery_fee": float(pricing["delivery_fee"]),
+        "express_extra_fee": float(pricing.get("express_extra_fee", 0)),
+        "vat_fagni": float(pricing["vat_fagni"]),
+        "total_ttc": float(pricing["total_client"]),
+    }
+
+    return JsonResponse({
+        "ok": True,
+        "order": {
+            "id": o.id,
+            "code": o.code,
+            "status": o.status,
+            "payment_status": o.payment_status,
+            "items": items,
+            "pickup_time": o.pickup_time.isoformat() if o.pickup_time else None,
+            "wash_complete_time": o.wash_complete_time.isoformat() if o.wash_complete_time else None,
+            "delivered_time": o.delivered_time.isoformat() if o.delivered_time else None,
+            "express_extra_fee": float(pricing.get("express_extra_fee", 0)),
+        },
+        "amounts": amounts,
+        "legs": legs,
+    })
 
 
 def _wallet_net_expr():
@@ -126,6 +279,29 @@ def get_invoice_settings_clean():
     except Exception:
         return None
 
+
+def _qr_png_base64(data: str) -> str:
+    """
+    Génère un QR code PNG et renvoie le base64 (sans préfixe data:).
+    """
+    try:
+        import qrcode
+    except Exception:
+        return ""
+
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=6,
+        border=2,
+    )
+    qr.add_data(data or "")
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 
 def generate_order_code():
@@ -859,8 +1035,8 @@ def ops_update_step(request, order_id, action):
     # 3) (optionnel) sync legs si besoin (après recalcul)
     # ------------------------------------------------------------
     try:
-        if order.delivery_partner and (order.delivery_fee or 0) > 0 and not order.legs.exists():
-            from orders.models import sync_delivery_legs_for_order
+        from orders.models import DeliveryLeg, sync_delivery_legs_for_order
+        if not DeliveryLeg.objects.filter(order=order).exclude(status="canceled").exists():
             sync_delivery_legs_for_order(order)
     except Exception:
         pass
@@ -920,6 +1096,96 @@ def ops_update_step(request, order_id, action):
 
     messages.success(request, label)
     return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}")
+
+
+@login_required
+@require_POST
+def order_mark_paid(request, order_id):
+    """
+    ✅ Encaisser (Back-office)
+    - Marque la commande payée
+    - Aligne amount_paid sur la source unique (_build_invoice_context)
+    - Verrouille (via status paiement + UI) ; évite double encaissement
+    - Distribue revenus : blanchisserie + wallet interne (distribute_order_revenues)
+    - Déclenche payouts livreur UNIQUEMENT pour les legs déjà done (anti-doublon par leg)
+    - Met FNE en pending (si activée / pas déjà envoyée)
+    """
+
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Accès refusé.")
+
+    order = get_object_or_404(
+        Order.objects.select_related("customer", "laundry_partner", "delivery_partner"),
+        pk=order_id
+    )
+
+    # Déjà payée => rien à faire
+    if getattr(order, "payment_status", None) == "paid":
+        messages.info(request, "Commande déjà payée.")
+        return redirect("orders:detail", order_id=order.id)
+
+    # Source unique montants (canon)
+    ctx = _build_invoice_context(order)
+    total_ttc_client = ctx.get("total_ttc_client") or 0
+
+    # Saisie optionnelle
+    method = (request.POST.get("payment_method") or "").strip() or None
+    ref = (request.POST.get("payment_reference") or "").strip() or None
+
+    # 1) Marquer payé
+    order.payment_status = "paid"
+    try:
+        # total_ttc_client peut être Decimal
+        order.amount_paid = total_ttc_client
+    except Exception:
+        pass
+    order.payment_date = timezone.now()
+
+    if method is not None:
+        order.payment_method = method
+    if ref is not None:
+        order.payment_reference = ref
+
+    # 2) Facture / numéros / financials (si ton update_financials gère invoice_number)
+    try:
+        order.update_financials(save=True)
+    except Exception:
+        # au pire, on sauvegarde quand même le paiement
+        order.save()
+
+    # 3) FNE : passer en pending si activée (et pas déjà "sent/accepted/rejected/error")
+    try:
+        current_fne = getattr(order, "fne_status", None) or "disabled"
+        if current_fne not in ("disabled", "sent", "accepted", "rejected", "error"):
+            order.fne_status = "pending"
+            order.save(update_fields=["fne_status", "updated_at"])
+    except Exception:
+        pass
+
+    # 4) Distribution des revenus (blanchisserie + wallet interne)
+    #    (anti-doublon via order.wallets_distributed + contraintes uniques côté tx)
+    try:
+        distribute_order_revenues(order, recompute=True, force=False)
+    except Exception as e:
+        # On ne bloque pas l'encaissement si distribution échoue, mais on le signale
+        messages.warning(request, f"Paiement OK, mais distribution wallets incomplète : {e}")
+
+    # 5) Payouts livreur : UNIQUEMENT legs déjà done (si le paiement arrive après)
+    try:
+        done_legs = DeliveryLeg.objects.filter(order=order, status="done").select_related("driver")
+        count = 0
+        for leg in done_legs:
+            tx = trigger_driver_payout_for_leg(leg)
+            if tx:
+                count += 1
+        if count:
+            messages.success(request, f"Paiement OK. Payout livreur déclenché sur {count} jambe(s) terminée(s).")
+        else:
+            messages.success(request, "Paiement OK. Aucun payout livreur à déclencher (ou déjà payé).")
+    except Exception as e:
+        messages.warning(request, f"Paiement OK, mais payout livreur non déclenché : {e}")
+
+    return redirect("orders:detail", order_id=order.id)
 
 
 @login_required
@@ -1132,12 +1398,11 @@ def orders_dashboard(request):
 @login_required
 def export_finance_xlsx(request):
     """
-    Export Excel du dashboard financier FAGNI :
-    - Reprend les mêmes filtres que finance_dashboard
+    Export Excel du dashboard financier – SOURCE DE VÉRITÉ :
+    compute_order_amounts() + TVA sur fagni_revenue_ht.
     - Onglet 1 : Synthèse
-    - Onglet 2 : Détail des commandes
+    - Onglet 2 : Détail (mêmes colonnes que dashboard)
     """
-
     date_from = request.GET.get("date_from") or ""
     date_to = request.GET.get("date_to") or ""
     status_filter = request.GET.get("status") or "all"   # paid / partial / unpaid / all
@@ -1160,39 +1425,19 @@ def export_finance_xlsx(request):
         if dt:
             qs = qs.filter(created_at__date__lte=dt)
 
-    # On limite pour éviter un fichier énorme
     raw_orders = list(qs[:500])
 
-    def d(val):
-        """Helper décimal safe."""
-        if isinstance(val, Decimal):
-            return val
-        if val in (None, "", 0):
-            return Decimal("0")
+    cfg = get_pricing_settings()
+    vat_rate = _get_vat_rate_percent(cfg)
+
+    def q(x):
         try:
-            return Decimal(str(val))
+            return _q(x)
         except Exception:
-            return Decimal("0")
-
-    # Enrichissement Python (on évite ici les agrégations mixtes)
-    enriched_orders = []
-    for o in raw_orders:
-        base = d(getattr(o, "total", None))
-        service = d(getattr(o, "service_fee", None))
-        delivery = d(getattr(o, "delivery_fee", None))
-        logi_margin = d(getattr(o, "logistic_margin", None))
-
-        paid = d(getattr(o, "amount_paid", None))
-        due = d(getattr(o, "amount_due", None))
-
-        o.base_total = base
-        o.total_global_client = base + service + delivery
-        o.margin_fagni = service + logi_margin
-        o.paid = paid
-        o.due = due
-        o.is_fully_paid = (due <= 0)
-
-        enriched_orders.append(o)
+            try:
+                return Decimal(str(x))
+            except Exception:
+                return Decimal("0")
 
     # Filtre montant mini
     try:
@@ -1200,44 +1445,109 @@ def export_finance_xlsx(request):
     except Exception:
         min_amount = Decimal("0")
 
-    filtered_orders = []
-    for o in enriched_orders:
-        if min_amount > 0 and o.total_global_client < min_amount:
-            continue
-
-        if status_filter == "paid":
-            if not o.is_fully_paid:
-                continue
-        elif status_filter == "partial":
-            if not (o.paid > 0 and o.due > 0):
-                continue
-        elif status_filter == "unpaid":
-            if not (o.paid == 0 and o.due > 0):
-                continue
-
-        filtered_orders.append(o)
-
-    # Totaux
-    total_orders = len(filtered_orders)
+    rows = []
+    total_ca = Decimal("0")
     total_prestations = Decimal("0")
     total_service = Decimal("0")
     total_delivery = Decimal("0")
+    total_express = Decimal("0")
+    total_vat_fagni = Decimal("0")
+    total_fagni_ttc = Decimal("0")
     total_logistic_margin = Decimal("0")
-    total_paid = Decimal("0")
-    total_due = Decimal("0")
+    total_laundry = Decimal("0")
+    total_driver = Decimal("0")
 
-    for o in filtered_orders:
-        total_prestations += d(o.base_total)
-        total_service += d(o.service_fee)
-        total_delivery += d(o.delivery_fee)
-        total_logistic_margin += d(getattr(o, "logistic_margin", None))
-        total_paid += d(o.paid)
-        total_due += d(o.due)
+    for o in raw_orders:
+        amounts = compute_order_amounts(o)
 
-    total_margin_fagni = total_service + total_logistic_margin
+        subtotal = q(amounts.get("subtotal", 0))
+        service_fee_ht = q(amounts.get("service_fee_ht", 0))
+        delivery_fee_client = q(amounts.get("delivery_fee_client", 0))
+        express = q(
+            amounts.get("express_for_client", 0)
+            or amounts.get("express_extra_fee_client", 0)
+            or amounts.get("express_fee_client", 0)
+            or getattr(o, "express_extra_fee", 0)
+            or 0
+        )
+
+        fagni_revenue_ht = q(amounts.get("fagni_revenue_ht", 0))
+        vat_fagni = q((fagni_revenue_ht * q(vat_rate)) / Decimal("100"))
+
+        total_ht_client = q(subtotal + service_fee_ht + delivery_fee_client + express)
+        total_ttc_client = q(total_ht_client + vat_fagni)
+
+        logistic_margin = q(
+            amounts.get("logistic_margin", 0)
+            or getattr(o, "logistic_margin", 0)
+            or 0
+        )
+        fagni_ttc = q(fagni_revenue_ht + vat_fagni)
+
+        amount_laundry = q(
+            amounts.get("amount_laundry_partner", 0)
+            or getattr(o, "amount_laundry_partner", 0)
+            or 0
+        )
+        amount_driver = q(
+            amounts.get("amount_driver_partner", 0)
+            or getattr(o, "amount_driver_partner", 0)
+            or amounts.get("driver_income", 0)
+            or getattr(o, "driver_logistic_cost", 0)
+            or 0
+        )
+
+        # filtres statut paiement "export"
+        paid = q(getattr(o, "amount_paid", 0))
+        due = q(getattr(o, "amount_due", 0))
+        is_fully_paid = (due <= 0)
+
+        if status_filter == "paid" and not is_fully_paid:
+            continue
+        if status_filter == "partial" and not (paid > 0 and due > 0):
+            continue
+        if status_filter == "unpaid" and not (paid == 0 and due > 0):
+            continue
+
+        if min_amount > 0 and total_ttc_client < min_amount:
+            continue
+
+        rows.append({
+            "date": o.created_at,
+            "code": o.code or str(o.id),
+            "client": (o.customer.name if o.customer else ""),
+            "laundry": (o.laundry_partner.name if o.laundry_partner else ""),
+            "payment_status": o.payment_status or "",
+            "total_client": total_ttc_client,
+            "prestations": subtotal,
+            "service_fee": service_fee_ht,
+            "delivery": delivery_fee_client,
+            "express": express,
+            "vat_fagni": vat_fagni,
+            "fagni_ttc": fagni_ttc,
+            "logistic_margin": logistic_margin,
+            "amount_laundry": amount_laundry,
+            "amount_driver": amount_driver,
+            "partners_total": q(amount_laundry + amount_driver),
+            "paid": paid,
+            "due": due,
+        })
+
+        total_ca += total_ttc_client
+        total_prestations += subtotal
+        total_service += service_fee_ht
+        total_delivery += delivery_fee_client
+        total_express += express
+        total_vat_fagni += vat_fagni
+        total_fagni_ttc += fagni_ttc
+        total_logistic_margin += logistic_margin
+        total_laundry += amount_laundry
+        total_driver += amount_driver
 
     # ---------- Excel ----------
     wb = Workbook()
+    ws1 = wb.active
+    ws1.title = "Synthèse"
 
     title_font = Font(size=16, bold=True, color="FFFFFF")
     header_font = Font(bold=True, color="FFFFFF")
@@ -1250,178 +1560,101 @@ def export_finance_xlsx(request):
         top=Side(style="thin", color="DDDDDD"),
         bottom=Side(style="thin", color="DDDDDD"),
     )
-    center = Alignment(horizontal="center", vertical="center")
     right = Alignment(horizontal="right", vertical="center")
     left = Alignment(horizontal="left", vertical="center")
-    wrap = Alignment(wrap_text=True, vertical="top")
 
-    # --- Onglet 1 : Synthèse ---
-    ws1 = wb.active
-    ws1.title = "Synthèse"
-
+    # Titre
+    ws1["A1"] = "FAGNI – Dashboard financier (export)"
+    ws1["A1"].font = title_font
+    ws1["A1"].fill = header_fill
     ws1.merge_cells("A1:D1")
-    cell_title = ws1["A1"]
-    cell_title.value = "FAGNI – Dashboard financier (export)"
-    cell_title.font = title_font
-    cell_title.fill = header_fill
-    cell_title.alignment = center
 
-    ws1["A3"] = "Généré le"
-    ws1["A3"].font = label_font
-    ws1["B3"] = timezone.localtime().strftime("%d/%m/%Y %H:%M")
+    ws1["A2"] = "Période"
+    ws1["A2"].font = label_font
+    ws1["B2"] = f"{date_from or '—'} → {date_to or '—'}"
 
-    ws1["A4"] = "Période"
-    ws1["A4"].font = label_font
-    if date_from or date_to:
-        txt_period = ""
-        if date_from:
-            txt_period += f"du {date_from} "
-        if date_to:
-            txt_period += f"au {date_to}"
-    else:
-        txt_period = "Toutes les dates"
-    ws1["B4"] = txt_period
+    ws1["A4"] = "KPI"
+    ws1["A4"].font = header_font
+    ws1["A4"].fill = section_fill
+    ws1.merge_cells("A4:D4")
 
-    ws1["A5"] = "Filtre statut financier"
-    ws1["A5"].font = label_font
-    if status_filter == "paid":
-        ws1["B5"] = "Soldées"
-    elif status_filter == "partial":
-        ws1["B5"] = "Partiellement payées"
-    elif status_filter == "unpaid":
-        ws1["B5"] = "Non payées"
-    else:
-        ws1["B5"] = "Toutes"
-
-    ws1["A6"] = "Montant min. (total client)"
-    ws1["A6"].font = label_font
-    ws1["B6"] = f"{min_amount_input or '0'} FCFA"
-
-    ws1.merge_cells("A8:D8")
-    cell_sec = ws1["A8"]
-    cell_sec.value = "Synthèse des montants (après filtres)"
-    cell_sec.font = Font(bold=True, color="FFFFFF")
-    cell_sec.fill = section_fill
-    cell_sec.alignment = left
-
-    rows_totaux = [
-        ("Nombre de commandes", total_orders),
-        ("Total prestations (TTC)", f"{total_prestations} FCFA"),
-        ("Service FAGNI (global)", f"{total_service} FCFA"),
-        ("Livraison facturée", f"{total_delivery} FCFA"),
-        ("Marge logistique", f"{total_logistic_margin} FCFA"),
-        ("Marge FAGNI (Service + Logistique)", f"{total_margin_fagni} FCFA"),
-        ("Montant encaissé", f"{total_paid} FCFA"),
-        ("Montant dû", f"{total_due} FCFA"),
+    kpis = [
+        ("Nb commandes", len(rows)),
+        ("CA total client (TTC)", total_ca),
+        ("Prestations (HT)", total_prestations),
+        ("Service fee (HT)", total_service),
+        ("Livraison client", total_delivery),
+        ("Express", total_express),
+        ("TVA FAGNI", total_vat_fagni),
+        ("Revenu FAGNI (TTC)", total_fagni_ttc),
+        ("Marge logistique", total_logistic_margin),
+        ("Montant blanchisserie", total_laundry),
+        ("Montant livreur", total_driver),
+        ("Total partenaires", total_laundry + total_driver),
     ]
 
-    start_row = 10
-    for idx, (label, value) in enumerate(rows_totaux):
-        r = start_row + idx
+    r = 5
+    for label, val in kpis:
         ws1[f"A{r}"] = label
         ws1[f"A{r}"].font = label_font
-        ws1[f"B{r}"] = value
+        ws1[f"B{r}"] = float(val) if isinstance(val, Decimal) else val
+        ws1[f"B{r}"].alignment = right
+        r += 1
 
-    ws1.column_dimensions["A"].width = 40
-    ws1.column_dimensions["B"].width = 35
+    ws1.column_dimensions["A"].width = 28
+    ws1.column_dimensions["B"].width = 22
 
-    # --- Onglet 2 : Commandes ---
-    ws2 = wb.create_sheet(title="Commandes")
-
+    # Onglet détail
+    ws2 = wb.create_sheet("Commandes")
     headers = [
-        "Code",
-        "Date création",
-        "Statut commande",
-        "Client",
-        "Téléphone",
-        "Adresse",
-        "Total prestations TTC",
-        "Service FAGNI",
-        "Livraison",
-        "Total global client",
-        "Montant payé",
-        "Montant dû",
-        "Statut financier",
-        "Marge FAGNI",
-        "Blanchisserie",
-        "Livreur",
-        "Distance AR (km)",
-        "Marge logistique",
+        "Date", "Code", "Client", "Blanchisserie", "Paiement",
+        "Total client TTC", "Prestations HT", "Service fee HT", "Livraison", "Express",
+        "TVA FAGNI", "FAGNI TTC", "Marge logistique",
+        "Montant blanchisserie", "Montant livreur", "Total partenaires",
+        "Payé", "Reste dû",
     ]
-
-    for col_idx, head in enumerate(headers, start=1):
-        cell = ws2.cell(row=1, column=col_idx, value=head)
+    ws2.append(headers)
+    for c in range(1, len(headers) + 1):
+        cell = ws2.cell(row=1, column=c)
         cell.font = header_font
         cell.fill = header_fill
-        cell.alignment = center
         cell.border = thin_border
 
-    row_idx = 2
-    for o in filtered_orders:
-        if o.is_fully_paid:
-            f_status = "Soldée"
-        elif o.due > 0 and o.paid > 0:
-            f_status = "Partiellement payée"
-        elif o.due > 0:
-            f_status = "Non payée"
-        else:
-            f_status = ""
+    for row in rows:
+        ws2.append([
+            row["date"].strftime("%d/%m/%Y %H:%M") if row["date"] else "",
+            row["code"],
+            row["client"],
+            row["laundry"],
+            row["payment_status"],
+            float(row["total_client"]),
+            float(row["prestations"]),
+            float(row["service_fee"]),
+            float(row["delivery"]),
+            float(row["express"]),
+            float(row["vat_fagni"]),
+            float(row["fagni_ttc"]),
+            float(row["logistic_margin"]),
+            float(row["amount_laundry"]),
+            float(row["amount_driver"]),
+            float(row["partners_total"]),
+            float(row["paid"]),
+            float(row["due"]),
+        ])
 
-        row_vals = [
-            o.code or o.id,
-            o.created_at.strftime("%d/%m/%Y %H:%M") if o.created_at else "",
-            o.get_status_display(),
-            o.customer.name if o.customer else "",
-            o.customer.phone if o.customer else "",
-            o.customer.address if o.customer else "",
-            float(o.base_total),
-            float(d(o.service_fee)),
-            float(d(o.delivery_fee)),
-            float(o.total_global_client),
-            float(o.paid),
-            float(o.due),
-            f_status,
-            float(o.margin_fagni),
-            o.laundry_partner.name if o.laundry_partner else "",
-            o.delivery_partner.name if o.delivery_partner else "",
-            float(d(getattr(o, "distance_km", None))),
-            float(d(getattr(o, "logistic_margin", None))),
-        ]
+    # tailles
+    widths = [18, 14, 22, 22, 12, 16, 14, 14, 12, 12, 12, 12, 14, 18, 14, 16, 12, 12]
+    for i, w in enumerate(widths, start=1):
+        ws2.column_dimensions[get_column_letter(i)].width = w
 
-        for col_idx, val in enumerate(row_vals, start=1):
-            cell = ws2.cell(row=row_idx, column=col_idx, value=val)
-            cell.border = thin_border
-            if col_idx in (7, 8, 9, 10, 11, 12, 14, 18):
-                cell.alignment = right
-                cell.number_format = "#,##0"
-            elif col_idx == 17:
-                cell.alignment = right
-                cell.number_format = "0.0"
-            elif col_idx in (4, 5, 6, 13, 15, 16):
-                cell.alignment = wrap
-            else:
-                cell.alignment = left
-
-        row_idx += 1
-
-    widths = [14, 18, 16, 20, 16, 30, 16, 14, 14, 18, 14, 14, 18, 16, 20, 20, 14, 16]
-    for col_idx, w in enumerate(widths, start=1):
-        ws2.column_dimensions[chr(64 + col_idx)].width = w
-
-    ws2.auto_filter.ref = ws2.dimensions
-
-    output = BytesIO()
-    wb.save(output)
-    output.seek(0)
-
-    filename = f"fagni_finance_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    # response
     response = HttpResponse(
-        output.getvalue(),
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+    filename = "FAGNI_finance_dashboard.xlsx"
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    wb.save(response)
     return response
-
 
 
 def _safe_dec(value):
@@ -1526,21 +1759,22 @@ def _compute_order_pricing(order):
     if items_total <= 0:
         items_total = _dec_or_zero(getattr(order, "prestation_total", 0))
 
-    # 2) Frais connu directement sur la commande
     service_fee = _dec_or_zero(getattr(order, "service_fee", 0))
     delivery_fee = _dec_or_zero(getattr(order, "delivery_fee", 0))
     vat_fagni = _dec_or_zero(getattr(order, "vat_fagni", 0))
-    total_client_ttc = _dec_or_zero(getattr(order, "total_client_ttc", 0))
-    total_field = _dec_or_zero(getattr(order, "total", 0))
+    express_extra_fee = _dec_or_zero(getattr(order, "express_extra_fee", 0))
 
-    # 3) Total TTC client (priorité à total_client_ttc si > 0)
-    if total_client_ttc > 0:
-        total_client = total_client_ttc
-    elif total_field > 0:
-        total_client = total_field
+    # total calculé canonique
+    computed_total = items_total + service_fee + delivery_fee + vat_fagni + express_extra_fee
+
+    # total stocké DB (peut être faux)
+    stored_total = _dec_or_zero(getattr(order, "total_client_ttc", 0))
+
+    # ✅ DB utilisée seulement si cohérente (±1 FCFA)
+    if stored_total > 0 and abs(stored_total - computed_total) <= Decimal("1"):
+        total_client = stored_total
     else:
-        # Reconstruction douce : prestations + frais + TVA FAGNI
-        total_client = items_total + service_fee + delivery_fee + vat_fagni
+        total_client = computed_total
 
     # 4) Revenu livreur
     driver_income = _dec_or_zero(getattr(order, "amount_driver_partner", None))
@@ -1572,6 +1806,7 @@ def _compute_order_pricing(order):
         "total_client": total_client,
         "driver_income": driver_income,
         "vat_fagni": vat_fagni,
+        "express_extra_fee": express_extra_fee,
         "fagni_revenue_ht": fagni_revenue_ht,
         "fagni_revenue_ttc": fagni_revenue_ttc,
         "laundry_amount": laundry_amount,
@@ -1680,75 +1915,120 @@ def _order_driver_income(order, delivery_fee=None):
 @login_required
 def finance_dashboard(request):
     """
-    Dashboard financier FAGNI :
-    - CA client
-    - Montants à verser aux partenaires (blanchisserie + livreur)
-    - Revenu FAGNI (TTC)
-    - Marge logistique
-    - Service fee total FAGNI
+    Dashboard financier FAGNI – Source de vérité :
+    - compute_order_amounts() + TVA sur fagni_revenue_ht
+    - évite les agrégations DB incohérentes (total_client_ttc / total / etc.)
     """
     payment_filter = request.GET.get("payment", "all")
-    qs = Order.objects.all()
+
+    qs = (
+        Order.objects
+        .select_related("customer", "laundry_partner", "delivery_partner")
+        .order_by("-created_at")
+    )
 
     if payment_filter == "paid":
         qs = qs.filter(payment_status="paid")
     elif payment_filter == "unpaid":
         qs = qs.exclude(payment_status="paid")
 
-    DEC = DecimalField(max_digits=12, decimal_places=2)
+    # on limite l'affichage, mais les KPI doivent être calculés sur un volume raisonnable
+    # (tu peux monter à 500 si besoin)
+    orders = list(qs[:500])
 
-    qs = qs.annotate(
-        total_client_expr=Coalesce(
-            Cast(F("total_client_ttc"), DEC),
-            Cast(F("prestation_total"), DEC),
-            Cast(F("total"), DEC),
-            Value(0, output_field=DEC),
-        ),
-        amount_laundry_safe=Coalesce(
-            Cast(F("amount_laundry_partner"), DEC),
-            Value(0, output_field=DEC),
-        ),
-        amount_driver_safe=Coalesce(
-            Cast(F("amount_driver_partner"), DEC),
-            Value(0, output_field=DEC),
-        ),
-        fagni_revenue_ttc_safe=(
-            Coalesce(Cast(F("fagni_revenue_ht"), DEC), Value(0, output_field=DEC))
-            + Coalesce(Cast(F("vat_fagni"), DEC), Value(0, output_field=DEC))
-        ),
-        logistic_margin_safe=Coalesce(
-            Cast(F("logistic_margin"), DEC),
-            Value(0, output_field=DEC),
-        ),
-        service_fee_safe=Coalesce(
-            Cast(F("service_fee"), DEC),
-            Value(0, output_field=DEC),
-        ),
-    ).annotate(
-        partners_expr=Cast(F("amount_laundry_safe") + F("amount_driver_safe"), DEC)
-    )
+    cfg = get_pricing_settings()
+    vat_rate = _get_vat_rate_percent(cfg)
 
-    agg = qs.aggregate(
-        ca_client_total=Coalesce(Sum("total_client_expr", output_field=DEC), Value(0, output_field=DEC)),
-        partners_laundry_total=Coalesce(Sum("amount_laundry_safe", output_field=DEC), Value(0, output_field=DEC)),
-        partners_driver_total=Coalesce(Sum("amount_driver_safe", output_field=DEC), Value(0, output_field=DEC)),
-        fagni_revenue_total=Coalesce(Sum("fagni_revenue_ttc_safe", output_field=DEC), Value(0, output_field=DEC)),
-        logistic_margin_total=Coalesce(Sum("logistic_margin_safe", output_field=DEC), Value(0, output_field=DEC)),
-        service_fee_total=Coalesce(Sum("service_fee_safe", output_field=DEC), Value(0, output_field=DEC)),
-    )
+    def q(x):
+        try:
+            return _q(x)
+        except Exception:
+            try:
+                return Decimal(str(x))
+            except Exception:
+                return Decimal("0")
 
-    order_count = qs.count()
-    ca_client_total = agg["ca_client_total"] or Decimal("0")
+    ca_client_total = Decimal("0")
+    partners_laundry_total = Decimal("0")
+    partners_driver_total = Decimal("0")
+    fagni_revenue_total = Decimal("0")      # TTC
+    logistic_margin_total = Decimal("0")
+    service_fee_total = Decimal("0")
 
+    enriched = []
+
+    for o in orders:
+        amounts = compute_order_amounts(o)
+
+        subtotal = q(amounts.get("subtotal", 0))
+        service_fee_ht = q(amounts.get("service_fee_ht", 0))
+        delivery_fee_client = q(amounts.get("delivery_fee_client", 0))
+
+        express = q(
+            amounts.get("express_for_client", 0)
+            or amounts.get("express_extra_fee_client", 0)
+            or amounts.get("express_fee_client", 0)
+            or getattr(o, "express_extra_fee", 0)
+            or 0
+        )
+
+        fagni_revenue_ht = q(amounts.get("fagni_revenue_ht", 0))
+        vat_fagni = q((fagni_revenue_ht * q(vat_rate)) / Decimal("100"))
+
+        total_ht_client = q(subtotal + service_fee_ht + delivery_fee_client + express)
+        total_ttc_client = q(total_ht_client + vat_fagni)
+
+        amount_laundry = q(
+            amounts.get("amount_laundry_partner", 0)
+            or getattr(o, "amount_laundry_partner", 0)
+            or 0
+        )
+        amount_driver = q(
+            amounts.get("amount_driver_partner", 0)
+            or getattr(o, "amount_driver_partner", 0)
+            or amounts.get("driver_income", 0)
+            or getattr(o, "driver_logistic_cost", 0)
+            or 0
+        )
+
+        logistic_margin = q(
+            amounts.get("logistic_margin", 0)
+            or getattr(o, "logistic_margin", 0)
+            or 0
+        )
+
+        fagni_revenue_ttc = q(fagni_revenue_ht + vat_fagni)
+        partners_total = q(amount_laundry + amount_driver)
+
+        # stocke sur l'objet pour le template
+        o.fin_total_client = total_ttc_client
+        o.fin_subtotal = subtotal
+        o.fin_service_fee = service_fee_ht
+        o.fin_delivery_fee = delivery_fee_client
+        o.fin_express = express
+        o.fin_vat_fagni = vat_fagni
+        o.fin_fagni_ttc = fagni_revenue_ttc
+        o.fin_amount_laundry = amount_laundry
+        o.fin_amount_driver = amount_driver
+        o.fin_partners_total = partners_total
+        o.fin_logistic_margin = logistic_margin
+
+        ca_client_total += total_ttc_client
+        partners_laundry_total += amount_laundry
+        partners_driver_total += amount_driver
+        fagni_revenue_total += fagni_revenue_ttc
+        logistic_margin_total += logistic_margin
+        service_fee_total += service_fee_ht
+
+        enriched.append(o)
+
+    order_count = len(enriched)
     avg_ticket = (ca_client_total / Decimal(order_count)).quantize(Decimal("0.01")) if order_count else Decimal("0.00")
-
-    partners_laundry_total = agg["partners_laundry_total"] or Decimal("0")
-    partners_driver_total = agg["partners_driver_total"] or Decimal("0")
     partners_total = partners_laundry_total + partners_driver_total
 
     context = {
         "payment_filter": payment_filter,
-        "orders": qs.order_by("-created_at")[:50],
+        "orders": enriched[:50],  # affichage seulement
 
         "ca_client_total": ca_client_total,
         "order_count": order_count,
@@ -1758,9 +2038,11 @@ def finance_dashboard(request):
         "partners_laundry_total": partners_laundry_total,
         "partners_driver_total": partners_driver_total,
 
-        "fagni_revenue_total": agg["fagni_revenue_total"],
-        "logistic_margin_total": agg["logistic_margin_total"],
-        "service_fee_total": agg["service_fee_total"],
+        "fagni_revenue_total": fagni_revenue_total,
+        "logistic_margin_total": logistic_margin_total,
+        "service_fee_total": service_fee_total,
+
+        "vat_rate": vat_rate,  # utile si tu veux l’afficher
     }
 
     return render(request, "orders/finance_dashboard.html", context)
@@ -2931,36 +3213,40 @@ def create(request):
 
     order.save()
 
-    # ---------------------------------------------------------
-    # Création / garantie des tronçons logistiques (DeliveryLeg)
-    # ---------------------------------------------------------
-    try:
-        ensure_delivery_legs_for_order(order)
-    except Exception as e:
-        # On loggue, mais on ne bloque pas la création de la commande
-        print("Erreur ensure_delivery_legs_for_order:", e)
-
+    # 1) Géocodage (avant assignation)
     ensure_order_geocoded(order, save=True)
 
-    # 6) Assignation automatique d’une blanchisserie
-    laundry = assign_best_laundry(customer)
+    # 2) Assignation automatique d’une blanchisserie (si autorisée) + raison
+    try:
+        from orders.assignment import pick_best_laundry
+        laundry, laundry_reason = pick_best_laundry(order)
+    except Exception:
+        laundry, laundry_reason = None, None
+
     if laundry:
         order.laundry_partner = laundry
+        # si tu as un champ reason côté Order un jour, tu pourras le stocker ici
+    else:
+        # optionnel : si tu as un champ sur Order du genre laundry_partner_unassigned_reason
+        # order.laundry_partner_unassigned_reason = laundry_reason
+        pass
 
-    # 7) Assignation automatique d’un livreur
-    driver = assign_best_driver(customer.latitude, customer.longitude)
-
-    # Fallback si pas de coords (ou si aucun livreur géolocalisé)
-    if not driver:
-        driver = DeliveryPartner.objects.filter(is_active=True).order_by("id").first()
+    # 3) Assignation automatique d’un livreur (si autorisée) + raison
+    try:
+        from orders.assignment import pick_best_driver
+        driver, reason = pick_best_driver(order)
+    except Exception:
+        driver, reason = None, None
 
     if driver:
         order.delivery_partner = driver
         order.delivery_partner_unassigned_reason = None
     else:
-        order.delivery_partner_unassigned_reason = "Aucun livreur disponible au moment de la commande."
+        order.delivery_partner_unassigned_reason = (
+            reason or "Aucun livreur disponible au moment de la commande."
+        )
 
-    # 8) Calcul automatique des frais de livraison
+    # 4) Calcul automatique des frais de livraison (après assign/geo)
     try:
         delivery_fee = order.compute_delivery_fee()
     except Exception:
@@ -2968,6 +3254,9 @@ def create(request):
         delivery_fee = Decimal(str(logi.get("client_min_fee", 1000)))
 
     order.delivery_fee = delivery_fee
+
+    # On persiste ces infos avant la création des items
+    order.save(update_fields=["laundry_partner", "delivery_partner", "delivery_partner_unassigned_reason", "delivery_fee"])
 
     # 9) Lignes de commande (PRIX VERROUILLÉS CÔTÉ SERVEUR)
     service_ids = request.POST.getlist("service_id[]")
@@ -3040,144 +3329,95 @@ def create(request):
         context["error"] = "Ajoute au moins une ligne de prestation à la commande."
         return render(request, "orders/create.html", context)
 
-    # 10) Recalcul financier complet (moteur unique)
-    order.update_financials(save=False)  # utilise compute_order_financials() + express
-    order.recompute_distances_from_positions()
-    order.save()
+    # 10) Recalcul financier complet (moteur unique) + distances + legs
+    try:
+        # ✅ on persiste les montants calculés (express, TVA, parts partenaires, etc.)
+        order.update_financials(save=True)
+    except Exception as e:
+        print("Erreur update_financials:", e)
+
+    try:
+        # distances (si ta méthode existe)
+        order.recompute_distances_from_positions()
+    except Exception as e:
+        print("Erreur recompute_distances_from_positions:", e)
+
+    try:
+        from orders.models import DeliveryLeg, sync_delivery_legs_for_order
+        if not DeliveryLeg.objects.filter(order=order).exclude(status="canceled").exists():
+            sync_delivery_legs_for_order(order)
+    except Exception:
+        pass
 
     return redirect("orders:detail", order_id=order.id)
 
 
-def get_active_drivers():
-    return DeliveryPartner.objects.filter(is_active=True)
-
-
-def assign_best_driver(lat, lng):
-    """
-    Choisit le meilleur livreur actif géolocalisé.
-    Retourne None si pas de coords client ou si aucun livreur actif géolocalisé.
-    """
-    if not lat or not lng:
-        return None
-
-    drivers_geo = DeliveryPartner.objects.filter(
-        is_active=True,
-        latitude__isnull=False,
-        longitude__isnull=False,
-    )
-    if not drivers_geo.exists():
-        return None
-
-    best_driver = None
-    best_key = None  # (active_orders_count, distance_km)
-
-    for d in drivers_geo:
-        dist = haversine_distance_km(lat, lng, d.latitude, d.longitude)
-        if dist is None:
-            continue
-
-        active_orders = d.orders.exclude(status__in=["done", "canceled"]).count()
-        key = (active_orders, dist)
-
-        if best_key is None or key < best_key:
-            best_key = key
-            best_driver = d
-
-    return best_driver
-
-
-def assign_best_laundry(customer):
-    """
-    Assigne automatiquement la blanchisserie 'intelligente' :
-
-    - On utilise la position du client.
-    - On filtre les blanchisseries actives avec coordonnées.
-    - On calcule la distance client ↔ blanchisserie.
-    - On regarde la charge de travail (nb de commandes non terminées).
-    - On choisit d'abord celle qui a le moins de commandes actives,
-      puis la plus proche.
-    """
-    if not customer or not customer.latitude or not customer.longitude:
-        return None
-
-    origin_lat = customer.latitude
-    origin_lng = customer.longitude
-
-    laundries = LaundryPartner.objects.filter(
-        is_active=True,
-        latitude__isnull=False,
-        longitude__isnull=False,
-    )
-
-    if not laundries.exists():
-        return None
-
-    best_laundry = None
-    best_key = None  # (nb_commandes_actives, distance_km)
-
-    for laundry in laundries:
-        dest_lat = getattr(laundry, "latitude", None)
-        dest_lng = getattr(laundry, "longitude", None)
-        if not dest_lat or not dest_lng:
-            continue
-
-        dist = haversine_distance_km(origin_lat, origin_lng, dest_lat, dest_lng)
-        if dist is None:
-            continue
-
-        active_orders = laundry.orders.exclude(status__in=["done", "canceled"]).count()
-        current_key = (active_orders, dist)
-
-        if best_key is None or current_key < best_key:
-            best_key = current_key
-            best_laundry = laundry
-
-    return best_laundry
-
-
 def build_order_finance_context(order):
     """
-    Construit le contexte financier FAGNI pour l'écran de détail commande,
-    en s'appuyant sur le moteur compute_order_financials(order).
-
-    Retourne un dict utilisé par le template detail.html pour afficher :
-    - Sous-total prestations
-    - Service FAGNI
-    - Frais de livraison client
-    - TVA FAGNI
-    - Total TTC client
-    - Montant dû blanchisserie / livreur
-    - Total partenaires
-    - Revenu FAGNI
-    - Marge logistique / livraison
+    Contexte financier "source de vérité" pour l'écran détail commande.
+    Aligne detail.html, tickets, et dashboard sur compute_order_amounts().
     """
-    from .finance import compute_order_financials
+    cfg = get_pricing_settings()
+    amounts = compute_order_amounts(order)
 
+    vat_rate = _get_vat_rate_percent(cfg)
 
-    data = compute_order_financials(order)
+    def q(x):
+        try:
+            return _q(x)
+        except Exception:
+            try:
+                return Decimal(str(x))
+            except Exception:
+                return Decimal("0")
 
-    # Sécurisation des valeurs (par défaut 0)
-    prestation_total = data.get("prestation_total", Decimal("0"))
-    service_fee_ht = data.get("service_fee_ht", Decimal("0"))
-    delivery_fee_client = data.get("delivery_fee_client", Decimal("0"))
-    vat_fagni = data.get("vat_fagni", Decimal("0"))
-    total_ttc_client = data.get("total_ttc_client", Decimal("0"))
+    prestation_total = q(amounts.get("subtotal", 0))
+    service_fee_ht = q(amounts.get("service_fee_ht", 0))
+    delivery_fee_client = q(amounts.get("delivery_fee_client", 0))
 
-    amount_laundry = data.get("commission_laundry_ht", Decimal("0"))
-    amount_driver = data.get("commission_delivery_ht", Decimal("0"))
-    partners_total = amount_laundry + amount_driver
+    express_surcharge = q(
+        amounts.get("express_for_client", 0)
+        or amounts.get("express_extra_fee_client", 0)
+        or amounts.get("express_fee_client", 0)
+        or getattr(order, "express_extra_fee", 0)
+        or 0
+    )
 
-    fagni_revenue_ht = data.get("fagni_revenue_ht", Decimal("0"))
-    margin_delivery = data.get("margin_delivery", Decimal("0"))
-    express_surcharge = data.get("express_surcharge", Decimal("0"))
+    fagni_revenue_ht = q(amounts.get("fagni_revenue_ht", 0))
+    vat_fagni = q((fagni_revenue_ht * q(vat_rate)) / Decimal("100"))
+
+    total_ht_client = q(prestation_total + service_fee_ht + delivery_fee_client + express_surcharge)
+    total_ttc_client = q(total_ht_client + vat_fagni)
+
+    amount_laundry = q(
+        amounts.get("amount_laundry_partner", 0)
+        or getattr(order, "amount_laundry_partner", 0)
+        or 0
+    )
+    amount_driver = q(
+        amounts.get("amount_driver_partner", 0)
+        or getattr(order, "amount_driver_partner", 0)
+        or amounts.get("driver_income", 0)
+        or getattr(order, "driver_logistic_cost", 0)
+        or 0
+    )
+
+    partners_total = q(amount_laundry + amount_driver)
+
+    margin_delivery = q(
+        amounts.get("logistic_margin", 0)
+        or getattr(order, "logistic_margin", 0)
+        or 0
+    )
 
     return {
         "order": order,
 
-        # Montants "client"
+        # Montants client
         "prestation_total": prestation_total,
         "service_fee_ht": service_fee_ht,
         "delivery_fee_client": delivery_fee_client,
+        "express_surcharge": express_surcharge,
         "vat_fagni": vat_fagni,
         "total_ttc_client": total_ttc_client,
 
@@ -3189,7 +3429,6 @@ def build_order_finance_context(order):
         # FAGNI
         "fagni_revenue_ht": fagni_revenue_ht,
         "margin_delivery": margin_delivery,
-        "express_surcharge": express_surcharge,
     }
 
 
@@ -3297,6 +3536,10 @@ def detail(request, order_id):
         "financial_data": data,  # si un jour tu veux exploiter directement le dict
     }
 
+    ctx_amounts = _build_invoice_context(order)
+    context.update(ctx_amounts)  # ajoute amounts + express_for_client etc.
+    context["express_client"] = (ctx_amounts.get("amounts") or {}).get("express_for_client", 0)
+
     return render(request, "orders/detail.html", context)
 
 
@@ -3304,8 +3547,12 @@ def detail(request, order_id):
 # Helpers Client (session phone)
 # -------------------------------------------------------------------
 
-# Assure-toi que CLIENT_SESSION_KEY existe déjà plus haut dans ton fichier.
-# Exemple (si besoin) : CLIENT_SESSION_KEY = "client_phone"
+# Clé session canonique (1 seule vérité)
+DEFAULT_CLIENT_SESSION_KEY = "fagni_client_phone"
+
+def _client_session_key() -> str:
+    # Permet override via settings.py si tu veux
+    return getattr(settings, "CLIENT_SESSION_KEY", DEFAULT_CLIENT_SESSION_KEY)
 
 def _normalize_phone(raw: str) -> str:
     """
@@ -3325,61 +3572,6 @@ def _normalize_phone(raw: str) -> str:
     return digits
 
 
-def _client_phone(request) -> str:
-    p = request.session.get(CLIENT_SESSION_KEY) or ""
-    p = _normalize_phone(p)
-    return p
-
-
-def _client_required(view_func):
-    def _wrapped(request, *args, **kwargs):
-        if not _client_phone(request):
-            return redirect("orders:client_login")
-        return view_func(request, *args, **kwargs)
-    return _wrapped
-
-
-# -------------------------------------------------------------------
-# Auth client (ultra simple)
-# -------------------------------------------------------------------
-
-@require_http_methods(["GET", "POST"])
-def client_login(request):
-    """
-    Login ultra simple : téléphone -> session.
-    """
-    error = None
-    phone = ""
-
-    if request.method == "POST":
-        phone_in = (request.POST.get("phone") or "").strip()
-        phone = _normalize_phone(phone_in)
-
-        if not phone:
-            error = "Merci de renseigner ton numéro."
-        else:
-            request.session[CLIENT_SESSION_KEY] = _normalize_phone(phone)
-            request.session.modified = True
-            return redirect("orders:client_home")
-
-    # si déjà connecté, go home
-    if _client_phone(request):
-        return redirect("orders:client_home")
-
-    return render(request, "orders/client_login.html", {
-        "error": error,
-        "phone": phone,
-        "name": "",
-        "address": "",
-    })
-
-
-def client_logout(request):
-    request.session.pop(CLIENT_SESSION_KEY, None)
-    request.session.modified = True
-    return redirect("orders:client_login")
-
-
 # -------------------------------------------------------------------
 # Home client (LISTE)  ✅ FIX: on filtre par phone (pas par customer_id)
 # + UI: total client + paiement (safe fallbacks)
@@ -3396,7 +3588,7 @@ def client_home(request):
     from django.db.models import Sum, F, Value, DecimalField
     from django.db.models.functions import Coalesce, Cast
 
-    phone = request.session.get("client_phone") or request.session.get("phone")
+    phone = _client_phone(request)
     if not phone:
         return redirect("orders:client_login")
 
@@ -3423,12 +3615,9 @@ def client_home(request):
             .order_by("-created_at")
             .annotate(items_total=items_sum)
             .annotate(
-                total_client_display=Coalesce(
-                    F("total_client_ttc"),
-                    F("total"),
-                    F("items_total"),
-                    Value(0, output_field=DEC12),
-                    output_field=DEC12,
+                total_client_display=Value(
+                    0,
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
                 )
             )
         )
@@ -3475,12 +3664,19 @@ def client_home(request):
     show_left_ellipsis = start > 2
     show_right_ellipsis = end < (last - 1)
 
+    # --- post-traitement : total_client_display canonique pour la page ---
+    orders_page = list(page_obj.object_list)
+    for o in orders_page:
+        pricing = _compute_order_pricing(o)
+        o.total_client_display = pricing["total_client"]
+        o.express_extra_fee = pricing.get("express_extra_fee", Decimal("0"))
+
     ctx = {
         "phone": phone,
         "customer": customer,
 
         # liste paginée
-        "orders": page_obj.object_list,
+        "orders": orders_page,
 
         # pagination
         "page_obj": page_obj,
@@ -3506,7 +3702,7 @@ def client_home(request):
 # -------------------------------------------------------------------
 
 @require_http_methods(["GET", "POST"])
-@_client_required
+@client_required
 def client_new_order(request):
     """
     Création Client V1 (rapide) :
@@ -3551,6 +3747,46 @@ def client_new_order(request):
                 delivery_address=address,
             )
 
+            from orders.models import DeliveryLeg
+
+            DeliveryLeg.objects.get_or_create(order=order, leg_type="pickup", defaults={"status":"pending"})
+            DeliveryLeg.objects.get_or_create(order=order, leg_type="return", defaults={"status":"pending"})
+
+            # ----------------------------------------------------------------
+            # V1: crée au moins 1 ligne OrderItem (estimation au kg)
+            # ----------------------------------------------------------------
+            try:
+                from decimal import Decimal
+                from django.conf import settings
+
+                estimated_kg = (request.POST.get("estimated_kg") or "").strip()
+                try:
+                    qty = Decimal(estimated_kg) if estimated_kg else Decimal("5")
+                except Exception:
+                    qty = Decimal("5")
+
+                price_per_kg = getattr(settings, "FAGNI_DEFAULT_PRICE_PER_KG", 1500)
+                try:
+                    unit_price = Decimal(str(price_per_kg))
+                except Exception:
+                    unit_price = Decimal("1500")
+
+                # total ligne
+                line_total = (qty * unit_price)
+
+                # ⚠️ service: on met None si nullable; sinon on prendra un service par défaut (étape A)
+                OrderItem.objects.create(
+                    order=order,
+                    service=None,
+                    designation="Linge (estimation au kg)",
+                    quantity=qty,
+                    unit_price=unit_price,
+                    total=line_total,
+                )
+            except Exception:
+                # on ne bloque pas la commande si item échoue
+                pass
+
             try:
                 order.update_financials(save=True)
             except Exception:
@@ -3580,29 +3816,22 @@ def _to_dec(v) -> Decimal:
 
 def _client_order_amounts(order: Order) -> dict:
     """
-    Fallback robuste (aligné sur le moteur) :
-    total_ttc = order.total_client_ttc si > 0, sinon (prestation_total + service_fee + delivery_fee + vat_fagni)
+    Montants côté client = proxy vers le moteur canonique (_compute_order_pricing).
+
+    Objectif: 1 seule source de vérité pour éviter toute divergence.
     """
-    prestation_total = _to_dec(getattr(order, "prestation_total", None))
-    service_fee = _to_dec(getattr(order, "service_fee", None))
-    delivery_fee = _to_dec(getattr(order, "delivery_fee", None))
-    vat_fagni = _to_dec(getattr(order, "vat_fagni", None))
+    pricing = _compute_order_pricing(order)
 
-    # champ "total client" selon ton modèle
-    total_ttc = getattr(order, "total_client_ttc", None)
-    if total_ttc is None:
-        total_ttc = getattr(order, "total_client_ttc_amount", None)  # au cas où
-    total_ttc = _to_dec(total_ttc)
-
-    if total_ttc <= 0:
-        total_ttc = prestation_total + service_fee + delivery_fee + vat_fagni
+    # prestation_total côté client = items_total (plus fiable que prestation_total si data legacy)
+    prestation_total = pricing.get("items_total", Decimal("0"))
 
     return {
         "prestation_total": prestation_total,
-        "service_fee": service_fee,
-        "delivery_fee": delivery_fee,
-        "vat_fagni": vat_fagni,
-        "total_ttc": total_ttc,
+        "service_fee": pricing.get("service_fee", Decimal("0")),
+        "delivery_fee": pricing.get("delivery_fee", Decimal("0")),
+        "express_extra_fee": pricing.get("express_extra_fee", Decimal("0")),
+        "vat_fagni": pricing.get("vat_fagni", Decimal("0")),
+        "total_ttc": pricing.get("total_client", Decimal("0")),
     }
 
 
@@ -3635,7 +3864,7 @@ def _client_order_timeline(order: Order) -> list:
 # Détail client ✅ FIX: sécurisation par phone, pas customer_id
 # -------------------------------------------------------------------
 
-@_client_required
+@client_required
 def client_order_detail(request, order_id):
     """
     Détail côté client : statut + timeline + legs + paiement/montants.
@@ -3671,11 +3900,14 @@ def client_order_detail(request, order_id):
     # timeline
     timeline = _client_order_timeline(order)
 
+    items = order.items.all().order_by("id")
+
     return render(request, "orders/client_order_detail.html", {
         "phone": phone,
         "customer": customer,
         "order": order,
         "legs": legs,
+        "items": items,
 
         "amounts": amounts,
         "payment_status": payment_status,
@@ -3684,74 +3916,184 @@ def client_order_detail(request, order_id):
 
 
 # -------------------------------------------------------------------
-# Live JSON client ✅ FIX: sécurisation par phone
+# Items client (CRUD minimal) ✅ sécurisés par phone session
 # -------------------------------------------------------------------
 
-@require_GET
-@_client_required
-def client_order_live_status(request, order_id):
-    """
-    Live JSON côté client (polling) : statut commande + legs + paiement + timeline + montants.
-    Sécurisé : seulement si commande du client.
-    """
+@require_http_methods(["GET", "POST"])
+@client_required
+def client_order_item_new(request, order_id):
     phone = _client_phone(request)
-    customer = Customer.objects.filter(phone=phone).order_by("-id").first()
-    if not customer:
-        return JsonResponse({"ok": False, "error": "not_authenticated"}, status=401)
 
     order = (
         Order.objects
-        .select_related("customer", "laundry_partner", "delivery_partner")
+        .select_related("customer")
         .filter(pk=order_id, customer__phone=phone)
         .first()
     )
     if not order:
-        return JsonResponse({"ok": False, "error": "not_found"}, status=404)
+        return redirect("orders:client_home")
 
-    legs = []
-    for l in DeliveryLeg.objects.filter(order=order).order_by("id"):
-        legs.append({
-            "id": l.id,
-            "leg_type": l.leg_type,
-            "status": l.status,
-            "driver_amount": float(l.driver_amount or 0),
-            "driver_id": l.driver_id,
-        })
+    error = None
 
-    amounts = _client_order_amounts(order)
-    timeline = _client_order_timeline(order)
+    if request.method == "POST":
+        from decimal import Decimal
 
-    data = {
-        "ok": True,
-        "order": {
-            "id": order.id,
-            "code": getattr(order, "code", "") or "",
-            "status": order.status,
-            "payment_status": getattr(order, "payment_status", None),
+        designation = (request.POST.get("designation") or "").strip()
+        quantity_raw = (request.POST.get("quantity") or "").strip()
+        unit_price_raw = (request.POST.get("unit_price") or "").strip()
 
-            "pickup_time": getattr(order, "pickup_time", None),
-            "wash_complete_time": getattr(order, "wash_complete_time", None),
-            "delivered_time": getattr(order, "delivered_time", None),
-        },
-        "amounts": {
-            "prestation_total": float(amounts.get("prestation_total") or 0),
-            "service_fee": float(amounts.get("service_fee") or 0),
-            "delivery_fee": float(amounts.get("delivery_fee") or 0),
-            "vat_fagni": float(amounts.get("vat_fagni") or 0),
-            "total_ttc": float(amounts.get("total_ttc") or 0),
-        },
-        "timeline": [
-            {
-                "key": t.get("key"),
-                "label": t.get("label"),
-                "done": bool(t.get("done")),
-                "ts": (t.get("ts").isoformat() if t.get("ts") else None),
-            }
-            for t in (timeline or [])
-        ],
+        if not designation:
+            error = "Merci de renseigner la désignation."
+        else:
+            try:
+                qty = Decimal(str(quantity_raw).replace(",", "."))
+            except Exception:
+                qty = Decimal("0")
+            try:
+                up = Decimal(str(unit_price_raw).replace(",", "."))
+            except Exception:
+                up = Decimal("0")
 
-    }
-    return JsonResponse(data)
+            if qty <= 0:
+                error = "Quantité invalide."
+            elif up < 0:
+                error = "Prix unitaire invalide."
+            else:
+                line_total = qty * up
+
+                # service nullable => None OK
+                from orders.models import OrderItem
+                OrderItem.objects.create(
+                    order=order,
+                    service=None,
+                    designation=designation,
+                    quantity=qty,
+                    unit_price=up,
+                    total=line_total,
+                )
+
+                try:
+                    order.update_financials(save=True)
+                except Exception:
+                    pass
+
+                return redirect("orders:client_order_detail", order_id=order.id)
+
+    return render(request, "orders/client_order_item_form.html", {
+        "order": order,
+        "mode": "new",
+        "error": error,
+        "designation": "",
+        "quantity": "",
+        "unit_price": "",
+    })
+
+
+@require_http_methods(["GET", "POST"])
+@client_required
+def client_order_item_edit(request, order_id, item_id):
+    phone = _client_phone(request)
+
+    order = (
+        Order.objects
+        .select_related("customer")
+        .filter(pk=order_id, customer__phone=phone)
+        .first()
+    )
+    if not order:
+        return redirect("orders:client_home")
+
+    from orders.models import OrderItem
+    item = (
+        OrderItem.objects
+        .filter(pk=item_id, order=order)
+        .first()
+    )
+    if not item:
+        return redirect("orders:client_order_detail", order_id=order.id)
+
+    error = None
+
+    if request.method == "POST":
+        from decimal import Decimal
+
+        designation = (request.POST.get("designation") or "").strip()
+        quantity_raw = (request.POST.get("quantity") or "").strip()
+        unit_price_raw = (request.POST.get("unit_price") or "").strip()
+
+        if not designation:
+            error = "Merci de renseigner la désignation."
+        else:
+            try:
+                qty = Decimal(str(quantity_raw).replace(",", "."))
+            except Exception:
+                qty = Decimal("0")
+            try:
+                up = Decimal(str(unit_price_raw).replace(",", "."))
+            except Exception:
+                up = Decimal("0")
+
+            if qty <= 0:
+                error = "Quantité invalide."
+            elif up < 0:
+                error = "Prix unitaire invalide."
+            else:
+                item.designation = designation
+                item.quantity = qty
+                item.unit_price = up
+                item.total = qty * up
+                item.save(update_fields=["designation", "quantity", "unit_price", "total"])
+
+                try:
+                    order.update_financials(save=True)
+                except Exception:
+                    pass
+
+                return redirect("orders:client_order_detail", order_id=order.id)
+
+    return render(request, "orders/client_order_item_form.html", {
+        "order": order,
+        "mode": "edit",
+        "item": item,
+        "error": error,
+        "designation": item.designation or "",
+        "quantity": item.quantity if item.quantity is not None else "",
+        "unit_price": item.unit_price if item.unit_price is not None else "",
+    })
+
+
+@require_http_methods(["GET", "POST"])
+@client_required
+def client_order_item_delete(request, order_id, item_id):
+    phone = _client_phone(request)
+
+    order = (
+        Order.objects
+        .select_related("customer")
+        .filter(pk=order_id, customer__phone=phone)
+        .first()
+    )
+    if not order:
+        return redirect("orders:client_home")
+
+    from orders.models import OrderItem
+    item = OrderItem.objects.filter(pk=item_id, order=order).first()
+    if not item:
+        return redirect("orders:client_order_detail", order_id=order.id)
+
+    if request.method == "POST":
+        item.delete()
+        try:
+            order.update_financials(save=True)
+        except Exception:
+            pass
+        return redirect("orders:client_order_detail", order_id=order.id)
+
+    return render(request, "orders/client_order_item_form.html", {
+        "order": order,
+        "mode": "delete",
+        "item": item,
+    })
 
 
 # -------------------------------------------------------------------
@@ -3808,6 +4150,9 @@ def update_status(request, order_id):
     order.status = new_status
     order.update_financials(save=True)  # ✅ moteur unique compute_order_financials + sauvegarde
 
+    from orders.models import sync_legs_status_from_order
+    sync_legs_status_from_order(order, save=True)
+
     OrderStatusHistory.objects.create(
         order=order,
         previous_status=old_status,
@@ -3846,65 +4191,73 @@ def _get_vat_rate_percent(cfg) -> Decimal:
 
 
 def _build_invoice_context(order):
+    """
+    Contexte canonique facturation/tickets.
+    Source de vérité = _compute_order_pricing(order) (inclut Express).
+    On garde compute_order_amounts(order) pour compat / infos secondaires.
+    """
     cfg = get_pricing_settings()
+
+    # Compat / autres besoins (peut servir ailleurs)
     amounts = compute_order_amounts(order)
+
+    # Source de vérité montants (verrouillage)
+    pricing = _compute_order_pricing(order)
 
     vat_rate = _get_vat_rate_percent(cfg)
 
-    # Total HT client = prestations + livraison + express (si facturé client) + service FAGNI
-    total_ht_client = _q(
-        _q(amounts.get("subtotal", 0))
-        + _q(amounts.get("delivery_fee_client", 0))
-        + _q(amounts.get("express_for_client", 0))
-        + _q(amounts.get("service_fee_ht", 0))
-    )
+    prestations_amount = _q(pricing.get("items_total", 0))
+    delivery_amount    = _q(pricing.get("delivery_fee", 0))
+    service_amount     = _q(pricing.get("service_fee", 0))
+    express_amount     = _q(pricing.get("express_extra_fee", 0))
+    vat_amount         = _q(pricing.get("vat_fagni", 0))
 
-    # TVA calculée sur revenus FAGNI (HT)
-    fagni_revenue_ht = _q(amounts.get("fagni_revenue_ht", 0))
-    vat_amount = _q((fagni_revenue_ht * vat_rate) / Decimal("100"))
+    # HT client = prestations + livraison + service + express (sans TVA)
+    total_ht_client = _q(prestations_amount + delivery_amount + service_amount + express_amount)
 
-    total_ttc_client = _q(total_ht_client + vat_amount)
+    # TTC client = total canonique (inclut TVA)
+    total_ttc_client = _q(pricing.get("total_client", 0))
 
-    # Compat anciennes variables (si d'autres templates les utilisent)
+    # Compat anciennes variables
     base_ht = total_ht_client
     grand_total = total_ttc_client
 
+    # ✅ exposer "express_client" pour les templates existants
+    express_client = express_amount
+
+    # (Optionnel mais utile partout) : lignes standardisées
+    invoice_lines = {
+        "prestations": prestations_amount,
+        "delivery": delivery_amount,
+        "service": service_amount,
+        "express": express_amount,
+        "vat": vat_amount,
+        "total_ht": total_ht_client,
+        "total_ttc": total_ttc_client,
+    }
+
     return {
         "cfg": cfg,
-        "amounts": amounts,
+        "amounts": amounts,          # compat existant
+        "pricing": pricing,          # debug/ops si besoin
+        "invoice_lines": invoice_lines,
+
+        # Champs canon
+        "prestations_amount": prestations_amount,
+        "delivery_amount": delivery_amount,
+        "service_amount": service_amount,
+        "express_amount": express_amount,
         "vat_rate": vat_rate,
         "vat_amount": vat_amount,
         "total_ht_client": total_ht_client,
         "total_ttc_client": total_ttc_client,
+
+        # Compat historique
+        "express_client": express_client,
         "base_ht": base_ht,
         "tva_amount": vat_amount,
         "grand_total": grand_total,
     }
-
-
-@login_required
-def order_ticket_pdf(request, order_id):
-    order = (
-        Order.objects
-        .select_related("customer", "laundry_partner", "delivery_partner")
-        .prefetch_related("items__service", "items__photos")
-        .filter(pk=order_id)
-        .first()
-    )
-    if not order:
-        messages.error(request, f"Commande introuvable (ID={order_id}).")
-        return redirect("orders:list")
-
-    items = order.items.all()
-    detail_url = request.build_absolute_uri(reverse("orders:detail", args=[order.id]))
-    context = {
-        "order": order,
-        "items": items,
-        "qr_data": detail_url,
-        **_build_invoice_context(order),
-        "invoice_settings": get_invoice_settings_clean(),
-    }
-    return render(request, "orders/ticket_pdf.html", context)
 
 
 @login_required
@@ -3956,11 +4309,124 @@ def order_invoice_pdf(request, order_id):
     return response
 
 
+from decimal import Decimal
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.shortcuts import redirect, render
+from django.urls import reverse
+
+# ... (le reste de tes imports déjà présents)
+
+def _dec(v):
+    try:
+        if v in (None, "", False):
+            return Decimal("0")
+        if isinstance(v, Decimal):
+            return v
+        return Decimal(str(v))
+    except Exception:
+        return Decimal("0")
+
+
+def _enrich_items_for_ticket(items_qs):
+    """
+    Ajoute sur chaque item (sans toucher aux champs DB ni aux @property) :
+      - ticket_total : total sûr (item.total si >0 sinon quantity*unit_price sinon line_total)
+      - ticket_name  : designation sûre (designation > service.name > "—")
+    """
+    items = list(items_qs)
+
+    for it in items:
+        # --- Total robuste ---
+        total_db = _dec(getattr(it, "total", None))
+
+        if total_db > 0:
+            total = total_db
+        else:
+            q = _dec(getattr(it, "quantity", 0))
+            pu = _dec(getattr(it, "unit_price", 0))
+            total_calc = q * pu
+
+            # fallback ultime : la @property line_total (lecture seule)
+            if total_calc <= 0:
+                try:
+                    total_calc = _dec(getattr(it, "line_total", 0))
+                except Exception:
+                    total_calc = Decimal("0")
+
+            total = total_calc
+
+        # ⚠️ Ne pas faire it.line_total = ...
+        setattr(it, "ticket_total", total)
+
+        # --- Nom robuste ---
+        name = getattr(it, "designation", None)
+        if not name:
+            svc = getattr(it, "service", None)
+            name = getattr(svc, "name", None) if svc else None
+
+        setattr(it, "ticket_name", name or "—")
+
+    return items
+
+
+@login_required
+def order_ticket_pdf(request, order_id):
+    order = (
+        Order.objects
+        .select_related("customer", "laundry_partner", "delivery_partner")
+        .prefetch_related("items__service", "items__photos")
+        .filter(pk=order_id)
+        .first()
+    )
+    if not order:
+        messages.error(request, f"Commande introuvable (ID={order_id}).")
+        return redirect("orders:list")
+
+    items = _enrich_items_for_ticket(order.items.all())
+
+    detail_url = request.build_absolute_uri(reverse("orders:detail", args=[order.id]))
+    qr_b64 = _qr_png_base64(detail_url)
+
+    # Montants harmonisés pour template
+    ctx = _build_invoice_context(order)
+    amounts = ctx.get("amounts") or {}
+    prestations_amount = _dec(amounts.get("subtotal", 0))
+    delivery_amount = _dec(amounts.get("delivery_fee_client", 0))
+    service_amount = _dec(amounts.get("service_fee_ht", 0))
+    express_amount = _dec(ctx.get("express_client", 0))  # déjà normalisé
+    vat_amount = _dec(ctx.get("vat_amount", 0))
+    total_ttc_client = _dec(ctx.get("total_ttc_client", 0))
+
+    context = {
+        "order": order,
+        "items": items,
+
+        # QR
+        "qr_data": detail_url,
+        "qr_b64": qr_b64,
+
+        # Contexte facture/pricing existant
+        **ctx,
+        "invoice_settings": get_invoice_settings_clean(),
+
+        # ✅ variables harmonisées (A4 + thermique)
+        "prestations_amount": prestations_amount,
+        "delivery_amount": delivery_amount,
+        "service_amount": service_amount,
+        "express_amount": express_amount,
+        "vat_amount": vat_amount,
+        "total_ttc_client": total_ttc_client,
+    }
+    return render(request, "orders/ticket_pdf.html", context)
+
+
 @login_required
 def order_ticket_thermal_pdf(request, order_id):
     """
     Ticket thermique (80mm).
-    Source de vérité = compute_order_amounts(order) (pricing.py).
+    Source de vérité montants = _build_invoice_context(order) (compute_order_amounts)
+    Lignes = line_total calculé ici pour éviter tout écart template/model.
     """
     order = (
         Order.objects
@@ -3972,33 +4438,51 @@ def order_ticket_thermal_pdf(request, order_id):
     if not order:
         return redirect("orders:list")
 
-    items = order.items.all()
+    items = _enrich_items_for_ticket(order.items.all())
 
-    ctx_amounts = _build_invoice_context(order)
+    ctx = _build_invoice_context(order)
+    amounts = ctx.get("amounts") or {}
 
     invoice_settings = get_invoice_settings_clean()
     if invoice_settings:
-        ctx_amounts["invoice_settings"] = invoice_settings
+        ctx["invoice_settings"] = invoice_settings
 
-    # Total à mettre dans le QR (priorité : total_ttc_client sinon grand_total)
-    qr_total = ctx_amounts.get("total_ttc_client") or ctx_amounts.get("grand_total") or Decimal("0")
+    prestations_amount = _dec(amounts.get("subtotal", 0))
+    delivery_amount = _dec(amounts.get("delivery_fee_client", 0))
+    service_amount = _dec(amounts.get("service_fee_ht", 0))
+    express_amount = _dec(ctx.get("express_client", 0))
+    vat_amount = _dec(ctx.get("vat_amount", 0))
+    total_ttc_client = _dec(ctx.get("total_ttc_client", 0))
 
+    # QR total
+    qr_total = total_ttc_client
     customer_phone = ""
     if getattr(order, "customer", None) and getattr(order.customer, "phone", None):
         customer_phone = order.customer.phone
 
     try:
-        qr_total = int(Decimal(qr_total))
+        qr_total_int = int(_dec(qr_total))
     except Exception:
-        qr_total = 0
+        qr_total_int = 0
 
-    qr_data = f"CMD:{order.code}|TEL:{customer_phone}|TOTAL:{qr_total}"
+    qr_data = f"CMD:{order.code}|TEL:{customer_phone}|TOTAL:{qr_total_int}"
+    qr_b64 = _qr_png_base64(qr_data)
 
     context = {
         "order": order,
         "items": items,
         "qr_data": qr_data,
-        **ctx_amounts,
+        "qr_b64": qr_b64,
+
+        **ctx,
+
+        # ✅ variables harmonisées
+        "prestations_amount": prestations_amount,
+        "delivery_amount": delivery_amount,
+        "service_amount": service_amount,
+        "express_amount": express_amount,
+        "vat_amount": vat_amount,
+        "total_ttc_client": total_ttc_client,
     }
     return render(request, "orders/ticket_thermal_pdf.html", context)
 
@@ -4815,6 +5299,18 @@ def normalize_order_legs(order, driver=None):
         * OK    => return actif pending -> assigned
     - Ne touche JAMAIS aux legs done/canceled (historique)
     """
+
+    STATUS_RANK = {"pending": 1, "assigned": 2, "in_progress": 3, "done": 4, "canceled": 0}
+
+    def _advance_status_only(current: str, target: str) -> str:
+        c = (current or "pending").lower()
+        t = (target or "pending").lower()
+        # canceled/done ne bougent plus
+        if c in ("canceled", "done"):
+            return c
+        # on n’accepte que si ça avance
+        return t if STATUS_RANK.get(t, 1) > STATUS_RANK.get(c, 1) else c
+
     from django.db import transaction
 
     from orders.models import DeliveryLeg
@@ -4863,176 +5359,143 @@ def normalize_order_legs(order, driver=None):
             )
 
             if wash_ready:
+                # ✅ upgrade only
                 qs_return.filter(status="pending").update(status="assigned")
             else:
-                qs_return.filter(status__in=["assigned", "in_progress"]).update(status="pending")
+                # ✅ ne JAMAIS rétrograder (sinon ça casse les tests + l’état réel côté livreur)
+                # (on bloque juste l'auto-upgrade tant que wash_complete_time est NULL)
+                pass
+
 
 def ensure_default_driver_legs(order, driver):
     """
-    Option B — 2 legs dès le départ (par driver) + verrouillage anti-doublons.
-
-    - Normalise d'abord les legs pour éviter multi-drivers / multi-legs actifs
-    - Complète les legs manquants (pickup/return) si nécessaire
-    - Ne touche pas aux legs DONE/CANCELED
-    - Statut du return dépend de wash_complete_time :
-        * wash NULL  => return = pending (si pas done/canceled)
-        * wash OK    => return = assigned (si pending)
-    - Statut pickup peut être aligné sur dropoff_time (si dropoff déjà fait => pickup done)
+    SAFE helper pour la vue livreur :
+    - normalise les legs (anti-doublons, 1 driver actif)
+    - ne fait un sync "models" QUE si aucun leg actif n'existe (legacy)
+    - si un type manque (pickup/return), crée UNIQUEMENT le leg manquant
+      sans toucher aux statuts déjà en cours.
     """
-    from decimal import Decimal, InvalidOperation
+    from decimal import Decimal, ROUND_HALF_UP
     from orders.models import DeliveryLeg
 
     if not order or not driver:
         return DeliveryLeg.objects.none()
 
     # 🔒 0) Normalisation globale (évite doublons et multi-drivers actifs)
-    normalize_order_legs(order, driver=driver)
+    try:
+        normalize_order_legs(order, driver=driver)
+    except Exception:
+        pass
 
-    # 🔒 Garde-fou : on ne gère que le driver assigné si commande assignée
+    # 🔒 Garde-fou : si commande assignée, on ne gère que le driver assigné
     assigned = getattr(order, "delivery_partner", None)
     if assigned and str(getattr(driver, "id", "")) != str(getattr(assigned, "id", "")):
-        return DeliveryLeg.objects.filter(order=order, driver=driver).order_by("id")
+        return DeliveryLeg.objects.filter(order=order, driver=driver).exclude(status="canceled").order_by("id")
 
-    qs = DeliveryLeg.objects.filter(order=order, driver=driver).order_by("id")
+    # Legs actuels (actifs)
+    qs = DeliveryLeg.objects.filter(order=order, driver=driver).exclude(status="canceled").order_by("id")
 
-    wash_ready = bool(getattr(order, "wash_complete_time", None))
-    has_dropoff = bool(getattr(order, "dropoff_time", None))
+    # ✅ Legacy : si aucun leg actif du tout, on peut resync via models
+    if not qs.exists():
+        try:
+            from orders.models import sync_delivery_legs_for_order
+            sync_delivery_legs_for_order(order)
+        except Exception:
+            pass
+        qs = DeliveryLeg.objects.filter(order=order, driver=driver).exclude(status="canceled").order_by("id")
 
-    # Si order déjà done/canceled : on complète seulement legs manquants, sans recalcul destructif
-    if getattr(order, "status", None) in {"done", "canceled"}:
-        if not qs.filter(leg_type="pickup").exists():
+    # Helper arrondi FCFA
+    def _round_fcfa(v):
+        if v is None:
+            return Decimal("0")
+        if not isinstance(v, Decimal):
+            v = Decimal(str(v))
+        return v.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
+    # Si un type manque, on crée uniquement le leg manquant (sans resync global)
+    have_pickup = qs.filter(leg_type="pickup").exists()
+    have_return = qs.filter(leg_type="return").exists()
+
+    # Base status
+    if getattr(order, "status", None) == "done":
+        base_pickup = "done"
+        base_return = "done"
+    elif getattr(order, "status", None) == "in_progress":
+        base_pickup = "assigned"
+        # return ne peut être assigned que si linge prêt
+        base_return = "assigned" if getattr(order, "wash_complete_time", None) else "pending"
+    else:
+        base_pickup = "pending"
+        base_return = "pending"
+
+    # Données financières (split 50/50) — fallback 0
+    delivery_fee = Decimal(str(getattr(order, "delivery_fee", 0) or 0))
+    driver_total = Decimal(str(getattr(order, "amount_driver_partner", 0) or 0))
+    margin_total = Decimal(str(getattr(order, "logistic_margin", 0) or 0))
+
+    client_share_1 = _round_fcfa(delivery_fee / 2)
+    client_share_2 = _round_fcfa(delivery_fee - client_share_1)
+
+    driver_share_1 = _round_fcfa(driver_total / 2)
+    driver_share_2 = _round_fcfa(driver_total - driver_share_1)
+
+    margin_share_1 = _round_fcfa(margin_total / 2)
+    margin_share_2 = _round_fcfa(margin_total - margin_share_1)
+
+    # Distance (si connue)
+    distance_total = getattr(order, "distance_km", None) or getattr(order, "distance_km_total", None) or 0
+    try:
+        distance_total = Decimal(str(distance_total or 0))
+    except Exception:
+        distance_total = Decimal("0")
+    distance_one_way = None
+    if distance_total > 0:
+        distance_one_way = (distance_total / Decimal("2")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    # Création du leg manquant seulement
+    try:
+        if not have_pickup:
             DeliveryLeg.objects.create(
                 order=order,
                 driver=driver,
                 leg_type="pickup",
-                distance_km=float(getattr(order, "distance_km_pickup", None) or 0),
-                driver_amount=0,
-                status="done" if getattr(order, "dropoff_time", None) else "assigned",
+                status=base_pickup,
+                distance_km=float(distance_one_way) if distance_one_way is not None else None,
+                client_fee_share=client_share_1,
+                driver_amount=driver_share_1,
+                fagni_margin=margin_share_1,
             )
-        if not qs.filter(leg_type="return").exists():
+
+        if not have_return:
             DeliveryLeg.objects.create(
                 order=order,
                 driver=driver,
                 leg_type="return",
-                distance_km=float(getattr(order, "distance_km_delivery", None) or 0),
-                driver_amount=0,
-                status="done" if getattr(order, "wash_complete_time", None) else "pending",
+                status=base_return,
+                distance_km=float(distance_one_way) if distance_one_way is not None else None,
+                client_fee_share=client_share_2,
+                driver_amount=driver_share_2,
+                fagni_margin=margin_share_2,
             )
-        # re-normalise (au cas où)
-        normalize_order_legs(order, driver=driver)
-        return DeliveryLeg.objects.filter(order=order, driver=driver).order_by("id")
-
-    # 0) Sync statut RETURN si existe déjà (sur return actif uniquement)
-    qs_return = qs.filter(leg_type="return").exclude(status__in=["done", "canceled"]).order_by("-id")
-    if qs_return.exists():
-        r = qs_return.first()
-        if wash_ready and r.status == "pending":
-            DeliveryLeg.objects.filter(pk=r.pk).update(status="assigned")
-        elif (not wash_ready) and r.status in {"assigned", "in_progress"}:
-            DeliveryLeg.objects.filter(pk=r.pk).update(status="pending")
-
-    # 1) Distances
-    total_distance = (
-        getattr(order, "distance_km_total", None)
-        or getattr(order, "distance_km", None)
-        or 0
-    )
-    pickup_distance = getattr(order, "distance_km_pickup", None)
-    delivery_distance = getattr(order, "distance_km_delivery", None)
-
-    if pickup_distance is not None and delivery_distance is not None:
+    except Exception:
         pass
-    elif pickup_distance is not None and delivery_distance is None:
-        if total_distance and pickup_distance <= total_distance:
-            delivery_distance = max(total_distance - pickup_distance, 0)
-        else:
-            delivery_distance = pickup_distance
-    elif delivery_distance is not None and pickup_distance is None:
-        if total_distance and delivery_distance <= total_distance:
-            pickup_distance = max(total_distance - delivery_distance, 0)
-        else:
-            pickup_distance = delivery_distance
-    else:
-        if total_distance:
-            pickup_distance = total_distance / 2
-            delivery_distance = total_distance / 2
-        else:
-            pickup_distance = 0
-            delivery_distance = 0
+
+    # Re-load + ajuste return selon wash_complete_time (sans toucher done/canceled)
+    qs = DeliveryLeg.objects.filter(order=order, driver=driver).exclude(status="canceled").order_by("id")
 
     try:
-        pickup_distance_dec = Decimal(str(pickup_distance or 0))
-        delivery_distance_dec = Decimal(str(delivery_distance or 0))
-    except (InvalidOperation, TypeError, ValueError):
-        pickup_distance_dec = Decimal("0")
-        delivery_distance_dec = Decimal("0")
+        wash_ready = bool(getattr(order, "wash_complete_time", None))
+        r = qs.filter(leg_type="return").exclude(status__in=["done", "canceled"]).order_by("-id").first()
+        if r:
+            if wash_ready and r.status == "pending":
+                DeliveryLeg.objects.filter(pk=r.pk).update(status="assigned")
+            elif (not wash_ready) and r.status in {"assigned", "in_progress"}:
+                DeliveryLeg.objects.filter(pk=r.pk).update(status="pending")
+        qs = DeliveryLeg.objects.filter(order=order, driver=driver).exclude(status="canceled").order_by("id")
+    except Exception:
+        pass
 
-    # 2) Montant total driver à répartir
-    total_amount = getattr(order, "amount_driver_partner", None)
-    if not total_amount:
-        total_amount = (
-            getattr(order, "driver_logistic_cost", None)
-            or getattr(order, "delivery_fee", None)
-            or getattr(order, "delivery_cost_driver", None)
-            or 0
-        )
-
-    if (not total_amount or float(total_amount) <= 0) and hasattr(order, "compute_totals"):
-        try:
-            totals = order.compute_totals(save=False) or {}
-            total_amount = (
-                totals.get("amount_driver_partner")
-                or totals.get("driver_amount")
-                or totals.get("driver_logistic_cost")
-                or totals.get("delivery_cost_driver")
-                or 0
-            )
-        except Exception:
-            total_amount = 0
-
-    try:
-        total_amount_dec = Decimal(str(total_amount or 0))
-    except (InvalidOperation, TypeError, ValueError):
-        total_amount_dec = Decimal("0")
-
-    dist_sum = pickup_distance_dec + delivery_distance_dec
-    if dist_sum > 0 and total_amount_dec > 0:
-        ratio_pickup = pickup_distance_dec / dist_sum
-        pickup_amount_dec = (total_amount_dec * ratio_pickup)
-        pickup_amount = int(pickup_amount_dec.quantize(Decimal("1")))
-        return_amount = int(total_amount_dec) - pickup_amount
-    else:
-        pickup_amount = int(total_amount_dec / 2) if total_amount_dec > 0 else 0
-        return_amount = int(total_amount_dec) - pickup_amount if total_amount_dec > 0 else 0
-
-    # 3) Créer pickup si manquant
-    if not qs.filter(leg_type="pickup").exists():
-        pickup_status = "done" if has_dropoff else "assigned"
-        DeliveryLeg.objects.create(
-            order=order,
-            driver=driver,
-            leg_type="pickup",
-            distance_km=float(pickup_distance_dec),
-            driver_amount=int(pickup_amount or 0),
-            status=pickup_status,
-        )
-
-    # 4) Créer return si manquant
-    if not qs.filter(leg_type="return").exists():
-        return_status = "assigned" if wash_ready else "pending"
-        DeliveryLeg.objects.create(
-            order=order,
-            driver=driver,
-            leg_type="return",
-            distance_km=float(delivery_distance_dec),
-            driver_amount=int(return_amount or 0),
-            status=return_status,
-        )
-
-    # 5) Normalisation finale (garantit 1 pickup + 1 return actifs max)
-    normalize_order_legs(order, driver=driver)
-
-    return DeliveryLeg.objects.filter(order=order, driver=driver).order_by("id")
+    return qs
 
 
 @login_required
@@ -5109,26 +5572,25 @@ def driver_order_detail(request, order_id):
 
     if driver is not None:
 
-      # 0) Auto-heal: s'assurer que la commande a des legs
-      #    (utile si la commande a été créée avant le backfill / ou si OPS n'a jamais ouvert)
+        # ✅ SAFE : ne jamais resync pendant une course si des legs existent déjà
+        # (sinon ça peut réécrire assigned/in_progress -> pending)
         try:
-            has_driver = bool(order.delivery_partner_id)
-            delivery_fee = getattr(order, "delivery_fee", None) or Decimal("0")
-            total_client = getattr(order, "total_client_ttc", None) or getattr(order, "total", None) or Decimal("0")
-            if has_driver and delivery_fee > 0 and total_client > 0:
-                if not DeliveryLeg.objects.filter(order=order, driver=driver).exists():
-                    # crée pickup + return de façon cohérente (Option 1)
-                    ensure_default_driver_legs(order, driver)
+            if not DeliveryLeg.objects.filter(order=order).exclude(status="canceled").exists():
+                from orders.models import sync_delivery_legs_for_order
+                sync_delivery_legs_for_order(order)
         except Exception:
             pass
 
-        # 1) On charge les legs (ils existent maintenant)
-        driver_legs_qs = DeliveryLeg.objects.filter(order=order, driver=driver).order_by("id")
+        # 🔒 Normalisation légère (anti-doublons / return pending si wash pas prêt)
+        try:
+            normalize_order_legs(order, driver=driver)
+        except Exception:
+            pass
 
-        # 2) On s’assure qu’il y a au moins des legs pour (order, driver)
-        driver_legs_qs = ensure_default_driver_legs(order, driver)
+        # 1) On charge les legs (pour le driver de la vue)
+        driver_legs_qs = DeliveryLeg.objects.filter(order=order, driver=driver).exclude(status="canceled").order_by("id")
 
-        # 3) Agrégats distance / montant (propre)
+        # 2) Agrégats distance / montant (propre)
         #    - distance : somme de toutes les jambes (info logistique)
         #    - montant payé : uniquement les jambes DONE (logique métier Cas B)
         legs_agg_all = driver_legs_qs.aggregate(
@@ -5143,7 +5605,7 @@ def driver_order_detail(request, order_id):
         )
         driver_leg_amount_done = legs_agg_done["total_amount"] or Decimal("0")
 
-        # 4) Fallbacks legacy (très anciennes commandes sans legs)
+        # 3) Fallbacks legacy (très anciennes commandes sans legs)
         if (driver_leg_distance == 0) and getattr(order, "distance_km_total", None):
             try:
                 driver_leg_distance = Decimal(str(order.distance_km_total))
@@ -5160,7 +5622,7 @@ def driver_order_detail(request, order_id):
                 except Exception:
                     driver_leg_amount_done = Decimal("0")
 
-        # 5) Libellé type de mission à partir des leg_type
+        # 4) Libellé type de mission à partir des leg_type
         leg_types = list(driver_legs_qs.values_list("leg_type", flat=True).distinct())
         if not leg_types:
             driver_mission_type_label = "Mission unique (A/R ou globale)"
@@ -5177,7 +5639,7 @@ def driver_order_detail(request, order_id):
         else:
             driver_mission_type_label = "Collecte + livraison (tronçons multiples)"
 
-        # 6) Wallet livreur
+        # 5) Wallet livreur
         try:
             driver_wallet = get_or_create_wallet_for_delivery_partner(driver)
 
@@ -5491,14 +5953,17 @@ def driver_app_data(request):
 
     # ==========================================================
     # ✅ INCOME SOURCE-OF-TRUTH: WalletTransaction net par commande
+    #    priorité: tx liées à un leg
+    #    fallback: tx order-level (leg NULL) sur wallet driver
     # ==========================================================
     order_ids = list(qs.values_list("id", flat=True))
 
-    tx_qs = WalletTransaction.objects.filter(
+    base_tx = WalletTransaction.objects.filter(
         order_id__in=order_ids,
-        leg__isnull=False,
         type__in=["payout", "adjustment"],
+        wallet__owner_type="driver",                 # ✅ IMPORTANT: uniquement wallets livreurs
     )
+    base_tx = base_tx.filter(wallet__delivery_partner__isnull=False)
 
     driver_target_id = None
     if not user.is_staff and connected_driver:
@@ -5510,10 +5975,26 @@ def driver_app_data(request):
             driver_target_id = None
 
     if driver_target_id:
-        tx_qs = tx_qs.filter(wallet__delivery_partner_id=driver_target_id)
+        base_tx = base_tx.filter(wallet__delivery_partner_id=driver_target_id)
 
-    income_rows = tx_qs.values("order_id").annotate(net=_wallet_net_expr())
-    income_by_order_id = {r["order_id"]: (r["net"] or Decimal("0")) for r in income_rows}
+    # 1) priorité: legs-level
+    income_rows_legs = (
+        base_tx.filter(leg__isnull=False)
+        .values("order_id")
+        .annotate(net=_wallet_net_expr())
+    )
+    income_by_order_id = {r["order_id"]: (r["net"] or Decimal("0")) for r in income_rows_legs}
+
+    # 2) fallback: order-level (leg NULL) uniquement si pas déjà présent
+    missing_ids = [oid for oid in order_ids if oid not in income_by_order_id]
+    if missing_ids:
+        income_rows_order = (
+            base_tx.filter(order_id__in=missing_ids, leg__isnull=True)
+            .values("order_id")
+            .annotate(net=_wallet_net_expr())
+        )
+        for r in income_rows_order:
+            income_by_order_id[r["order_id"]] = (r["net"] or Decimal("0"))
 
     def _safe_float(x):
         try:
@@ -5524,8 +6005,8 @@ def driver_app_data(request):
     def compute_status_from_legs(order):
         """
         Source de vérité UI:
-          - si un leg in_progress => in_progress
-          - sinon si un leg pending/assigned => pending
+          - si un leg in_progress OU assigned => in_progress
+          - sinon si un leg pending => pending
           - sinon si tous done => done
           - sinon fallback: order.status
         """
@@ -5535,12 +6016,18 @@ def driver_app_data(request):
 
         st = [str(l.status or "").lower() for l in legs]
 
-        if any(s == "in_progress" for s in st):
+        # ✅ assigned = course démarrée côté UI
+        if any(s in ("in_progress", "assigned") for s in st):
             return "in_progress"
-        if any(s in ("pending", "assigned") for s in st):
+
+        if any(s == "pending" for s in st):
             return "pending"
-        if all(s == "done" for s in st):
+
+        # si tous les legs actifs sont done (on tolère canceled)
+        active = [s for s in st if s != "canceled"]
+        if active and all(s == "done" for s in active):
             return "done"
+
         return order.status
 
     def _dec0(x):
@@ -5624,6 +6111,11 @@ def driver_app_data(request):
         income_paid = income_by_order_id.get(order.id, Decimal("0")) or Decimal("0")
         income_potential = _order_driver_potential_from_legs(order)
 
+        # ✅ revenu livreur affiché: projection = max(paid, potential)
+        # - paid = net wallet déjà crédité
+        # - potential = somme estimée (legs)
+        # => on affiche la projection la plus haute (cohérence KPI + UI)
+        # ✅ afficher TOUJOURS le payé s’il existe, même si < potentiel
         if income_paid > 0:
             income_out = _safe_float(income_paid)
         else:
@@ -5678,6 +6170,7 @@ def driver_app_data(request):
     total_distance = Decimal("0")
     total_income_paid = Decimal("0")
     total_income_potential = Decimal("0")
+    total_income_display = Decimal("0")  # ✅ cohérent avec serialize(): paid si dispo sinon potential
 
     for o in orders_all:
         cs = compute_status_from_legs(o)
@@ -5689,6 +6182,9 @@ def driver_app_data(request):
 
         pot = _order_driver_potential_from_legs(o)
         total_income_potential += pot
+
+        # ✅ règle identique à serialize(): projection = max(paid, potential)
+        total_income_display += max(paid, pot)
 
         if cs == "pending":
             pending_count += 1
@@ -5702,9 +6198,6 @@ def driver_app_data(request):
             done_count += 1
             if len(orders_done_list) < 60:
                 orders_done_list.append(serialize(o, cs))
-
-    # ✅ affichage KPI gains: on affiche le plus grand (paid vs potential)
-    total_income_display = max(total_income_paid, total_income_potential)
 
     return JsonResponse({
         "pending": pending_count,
@@ -5722,7 +6215,7 @@ def driver_app_data(request):
         "total_driver_income": float(total_income_paid),
 
         "source_distance": "distance_km_total",
-        "source_income": "driver_income_display(paid_wallet_else_potential_legs)",
+        "source_income": "total_driver_income_display=sum(max(paid_wallet, potential_legs)) • cards=paid_else_potential",
         "server_time": localtime().strftime("%H:%M:%S"),
 
         "orders_pending": orders_pending_list,
@@ -7457,10 +7950,13 @@ def ensure_delivery_legs_for_order(order):
     total_client = getattr(order, "total_client_ttc", None)
     if total_client is None:
         total_client = getattr(order, "total", None)
+
     try:
-        total_client_dec = Decimal(str(total_client or 0))
-    except (InvalidOperation, TypeError, ValueError):
-        total_client_dec = Decimal("0")
+        from orders.models import DeliveryLeg, sync_delivery_legs_for_order
+        if not DeliveryLeg.objects.filter(order=order).exclude(status="canceled").exists():
+            sync_delivery_legs_for_order(order)
+    except Exception:
+        pass
 
     if (not has_items) or total_client_dec <= 0:
         return existing_legs
@@ -7544,36 +8040,19 @@ def ensure_delivery_legs_for_order(order):
         pickup_amount = int(total_amount_dec / 2) if total_amount_dec > 0 else 0
         delivery_amount = int(total_amount_dec) - pickup_amount if total_amount_dec > 0 else 0
 
-    pickup_status = "assigned"
-    return_status = "assigned" if getattr(order, "wash_complete_time", None) else "pending"
+    # ✅ Source unique : création/normalisation legs dans models (anti-doublons)
+    try:
+        from orders.models import sync_delivery_legs_for_order
+        sync_delivery_legs_for_order(order)
+    except Exception:
+        pass
 
-    DeliveryLeg.objects.create(
-        order=order,
-        driver=driver,
-        leg_type="pickup",
-        status=pickup_status,
-        distance_km=float(pickup_distance_dec),
-        driver_amount=int(pickup_amount or 0),
-        client_fee_share=0,
-        fagni_margin=0,
-        started_at=None,
-        finished_at=None,
+    return (
+        DeliveryLeg.objects
+        .filter(order=order, driver=driver)
+        .exclude(status="canceled")
+        .order_by("id")
     )
-
-    DeliveryLeg.objects.create(
-        order=order,
-        driver=driver,
-        leg_type="return",
-        status=return_status,
-        distance_km=float(delivery_distance_dec),
-        driver_amount=int(delivery_amount or 0),
-        client_fee_share=0,
-        fagni_margin=0,
-        started_at=None,
-        finished_at=None,
-    )
-
-    return DeliveryLeg.objects.filter(order=order)
 
 
 def update_leg_status(leg, action, user=None):
@@ -7604,7 +8083,7 @@ def update_leg_status(leg, action, user=None):
     action = (action or "").lower().strip()
 
     # 🔒 Garde-fou métier : le "return/delivery" ne démarre pas tant que le linge n'est pas prêt
-    if getattr(leg, "leg_type", None) in {"return", "delivery"}:
+    if getattr(leg, "leg_type", None) == "return":
         if getattr(leg, "status", None) not in {"done", "canceled"}:
             if not getattr(getattr(leg, "order", None), "wash_complete_time", None):
                 if action in {"accept", "start", "finish"}:
@@ -7689,73 +8168,79 @@ def update_leg_status(leg, action, user=None):
     try:
         order = getattr(leg, "order", None)
         if order:
-            # 1) Si return/delivery terminé, s'assurer que wash_complete_time existe
-            if getattr(leg, "leg_type", None) in {"return", "delivery"} and leg.status == "done":
+            from orders.models import sync_order_status_from_legs
+            sync_order_status_from_legs(order, save=True)
+
+            # 1) Si return terminé, s'assurer que wash_complete_time existe
+            if getattr(leg, "leg_type", None) == "return" and leg.status == "done":
                 if not getattr(order, "wash_complete_time", None):
                     order.wash_complete_time = leg.finished_at or timezone.now()
                     order.save(update_fields=["wash_complete_time"])
 
-            # 2) Si pickup + return = done pour le driver assigné => commande done
-            assigned_driver = getattr(order, "delivery_partner", None)
-            if assigned_driver and getattr(leg, "driver_id", None) == getattr(assigned_driver, "id", None):
-                legs = DeliveryLeg.objects.filter(order=order, driver=assigned_driver)
-                pickup_done = legs.filter(leg_type="pickup", status="done").exists()
-                return_done = legs.filter(leg_type="return", status="done").exists()
-
-                if pickup_done and return_done and getattr(order, "status", None) not in {"done", "canceled"}:
-                    order.status = "done"
-                    order.save(update_fields=["status"])
-
-            # 3) Payout par leg quand leg passe done (idempotent)
+            # 2) Payout + reconcile UNIQUEMENT si commande payée (évite paiements fantômes)
             try:
                 if leg.status == "done":
-                    _trigger_driver_payout_for_leg(leg)
+                    if getattr(order, "payment_status", "unpaid") == "paid":
+                        _trigger_driver_payout_for_leg(leg)
 
-                    # ✅ RECONCILE: si payouts existants != driver_amount => adjustment correctif
-                    from decimal import Decimal
-                    from django.db.models import Sum
-                    from wallets.models import WalletTransaction
-                    from wallets.services import credit_wallet, debit_wallet, get_or_create_wallet_for_delivery_partner
+                        # ✅ RECONCILE: si payouts existants != driver_amount => adjustment correctif
+                        from decimal import Decimal
+                        from django.db.models import Sum
+                        from wallets.models import WalletTransaction
+                        from wallets.services import (
+                            credit_wallet,
+                            debit_wallet,
+                            get_or_create_wallet_for_delivery_partner,
+                        )
 
-                    target = Decimal(str(leg.driver_amount or 0))
-                    paid_in = WalletTransaction.objects.filter(
-                        leg=leg, type="payout", direction="in"
-                    ).aggregate(s=Sum("amount"))["s"] or Decimal("0")
+                        target = Decimal(str(leg.driver_amount or 0))
 
-                    adj_in = WalletTransaction.objects.filter(
-                        leg=leg, type="adjustment", direction="in"
-                    ).aggregate(s=Sum("amount"))["s"] or Decimal("0")
+                        paid_in = (
+                            WalletTransaction.objects.filter(leg=leg, type="payout", direction="in")
+                            .aggregate(s=Sum("amount"))["s"]
+                            or Decimal("0")
+                        )
+                        adj_in = (
+                            WalletTransaction.objects.filter(leg=leg, type="adjustment", direction="in")
+                            .aggregate(s=Sum("amount"))["s"]
+                            or Decimal("0")
+                        )
+                        adj_out = (
+                            WalletTransaction.objects.filter(leg=leg, type="adjustment", direction="out")
+                            .aggregate(s=Sum("amount"))["s"]
+                            or Decimal("0")
+                        )
 
-                    adj_out = WalletTransaction.objects.filter(
-                        leg=leg, type="adjustment", direction="out"
-                    ).aggregate(s=Sum("amount"))["s"] or Decimal("0")
+                        net = Decimal(str(paid_in)) + Decimal(str(adj_in)) - Decimal(str(adj_out))
+                        diff = target - net
 
-                    net = Decimal(str(paid_in)) + Decimal(str(adj_in)) - Decimal(str(adj_out))
-                    diff = target - net
-
-                    if diff != 0:
-                        wallet = get_or_create_wallet_for_delivery_partner(leg.driver)
-                        if diff > 0:
-                            credit_wallet(
-                                wallet,
-                                diff,
-                                label=f"Correction payout leg #{leg.id} (diff +)",
-                                order=leg.order,
-                                leg=leg,
-                                tx_type="adjustment",
-                            )
-                        else:
-                            debit_wallet(
-                                wallet,
-                                -diff,
-                                label=f"Correction payout leg #{leg.id} (diff -)",
-                                order=leg.order,
-                                leg=leg,
-                                tx_type="adjustment",
-                            )
+                        if diff != 0:
+                            wallet = get_or_create_wallet_for_delivery_partner(leg.driver)
+                            if diff > 0:
+                                credit_wallet(
+                                    wallet,
+                                    diff,
+                                    label=f"Correction payout leg #{leg.id} (diff +)",
+                                    order=order,
+                                    leg=leg,
+                                    tx_type="adjustment",
+                                )
+                            else:
+                                debit_wallet(
+                                    wallet,
+                                    -diff,
+                                    label=f"Correction payout leg #{leg.id} (diff -)",
+                                    order=order,
+                                    leg=leg,
+                                    tx_type="adjustment",
+                                )
             except Exception as e:
                 import logging
-                logging.getLogger(__name__).exception("Driver payout failed for leg #%s: %s", getattr(leg,'id',None), e)
+                logging.getLogger(__name__).exception(
+                    "Driver payout failed for leg #%s: %s",
+                    getattr(leg, "id", None),
+                    e,
+                )
 
     except Exception:
         pass
@@ -7769,62 +8254,10 @@ def update_leg_status(leg, action, user=None):
     return True, f"Statut mis à jour : {old_status} → {leg.status}"
 
 
-def _trigger_driver_payout_for_leg(leg: DeliveryLeg):
-    """
-    Payout livreur PAR LEG, idempotent.
+from orders.service_layer.payouts import trigger_driver_payout_for_leg
 
-    - Crée 1 tx payout "in" par leg (WalletTransaction.leg = leg)
-    - Ne paie JAMAIS si la commande n'est pas payée.
-    - Idempotent: si payout existe déjà pour ce leg => ne rien refaire
-    """
-    from decimal import Decimal
-    from django.db import transaction
-    from wallets.models import WalletTransaction
-    from wallets.services import get_or_create_wallet_for_delivery_partner, credit_wallet
-
-    order = getattr(leg, "order", None)
-    if not order:
-        return None
-
-    if getattr(order, "payment_status", "unpaid") != "paid":
-        return None
-
-    if getattr(leg, "status", None) != "done":
-        return None
-
-    driver = getattr(leg, "driver", None) or getattr(order, "delivery_partner", None)
-    if not driver:
-        return None
-
-    amount = Decimal(str(getattr(leg, "driver_amount", 0) or 0))
-    if amount <= 0:
-        return None
-
-    with transaction.atomic():
-        wallet = get_or_create_wallet_for_delivery_partner(driver)
-
-        # ✅ Idempotence: déjà payé pour CE leg
-        already = WalletTransaction.objects.filter(
-            leg=leg,
-            type="payout",
-            direction="in",
-        ).first()
-        if already:
-            return already
-
-        # lock wallet (sécurité concurrency)
-        wallet = wallet.__class__.objects.select_for_update().get(pk=wallet.pk)
-
-        # ✅ credit_wallet() prend "label" (WalletTransaction stocke ça dans .description)
-        tx = credit_wallet(
-            wallet,
-            amount,
-            label=f"Commande {getattr(order, 'code', order.id)} – payout leg #{leg.id} ({getattr(leg, 'leg_type', '')})",
-            order=order,
-            leg=leg,
-            tx_type="payout",
-        )
-        return tx
+def _trigger_driver_payout_for_leg(leg):
+    return trigger_driver_payout_for_leg(leg)
 
 
 def _redirect_back(request, fallback_name, **kwargs):

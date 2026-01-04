@@ -7,9 +7,9 @@
 
 :root {
     /* Couleurs brand */
-    --fagni-orange: #FF7A00;
-    --fagni-blue: #003366;
-    --fagni-blue-dark: #001E3C;
+    --fagni-orange: #FE6F00;     /* logo */
+    --fagni-blue: #0060FE;       /* logo */
+    --fagni-blue-dark: #0B121A;  /* noir profond / texte */
 
     /* Fond & surfaces */
     --fagni-bg: #F5F6FA;
@@ -49,8 +49,7 @@
     --fagni-shadow-soft: 0 4px 10px rgba(15, 23, 42, 0.06);
 
     /* Header gradient */
-    --fagni-header-gradient: linear-gradient(90deg, #FF7A00, #003366);
-}
+    --fagni-header-gradient: linear-gradient(90deg, #0060FE, #FE6F00);}
 
 /* --------- 2. BASE LAYOUT GÉNÉRAL --------- */
 
@@ -185,6 +184,18 @@ body {
     background: #e86e00;
     border-color: #e86e00;
 }
+
+/* Bouton brand (logo gradient) */
+.btn-brand{
+  background: var(--fagni-header-gradient);
+  border: 0;
+  color:#fff;
+  box-shadow: 0 10px 24px rgba(0, 96, 254, 0.18), 0 10px 24px rgba(254, 111, 0, 0.14);
+}
+.btn-brand:hover{
+  filter: brightness(0.98);
+}
+
 
 .btn-secondary {
     background: #ffffff;

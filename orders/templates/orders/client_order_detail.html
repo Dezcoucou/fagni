@@ -1,91 +1,871 @@
 {% extends "base.html" %}
+{% load money_filters %}
+
+{% block title %}Commande {{ order.code|default:order.id }} – Client FAGNI{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root{
+    --fagni-orange:#ff7a00;
+    --fagni-blue:#0056b3;
+
+    --bg:#ffffff;
+    --text:#0f172a;
+    --muted:#64748b;
+
+    --line:#e5e7eb;
+    --shadow: 0 1px 4px rgba(15,23,42,0.06);
+    --shadow2: 0 12px 34px rgba(15,23,42,0.12);
+  }
+
+  .page{ max-width:980px;margin:0 auto 28px;padding:14px 10px 24px; }
+
+  .page-header{ display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px; }
+  @media (max-width:860px){ .page-header{ flex-direction:column;align-items:stretch; } }
+
+  .page-title{ font-size:20px;font-weight:950;color:var(--text);margin:0;letter-spacing:-0.2px; }
+  .page-subtitle{ margin:4px 0 0;font-size:13px;color:var(--muted);line-height:1.35; }
+
+  .actions{ display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end; }
+  @media (max-width:860px){ .actions{ justify-content:flex-start; } }
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;padding:9px 14px;border-radius:999px;
+    font-size:13px;font-weight:950;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap;
+    transition: transform .12s ease, opacity .12s ease, background .12s ease, border-color .12s ease;
+  }
+  .btn:active{ transform: translateY(1px); }
+  .btn-ghost{ background:#fff;color:#334155;border:1px solid var(--line); }
+  .btn-ghost:hover{ background:#f9fafb; }
+
+  .card{ background:var(--bg);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow); }
+  .panel{ padding:14px; }
+
+  .row{ display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap; }
+  .meta{ color:#6b7280;font-size:12px;margin-top:3px; }
+
+  .pill{
+    display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:950;
+    border:1px solid transparent;white-space:nowrap;
+  }
+  .pill .dot{ width:7px;height:7px;border-radius:999px;display:inline-block; }
+
+  .st-pending{ background:#fffbeb;color:#92400e;border-color:#fde68a; }
+  .st-pending .dot{ background:#f59e0b; }
+
+  .st-in-progress{ background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe; }
+  .st-in-progress .dot{ background:#2563eb; }
+
+  .st-done{ background:#ecfdf3;color:#166534;border-color:#bbf7d0; }
+  .st-done .dot{ background:#16a34a; }
+
+  .st-canceled{ background:#fef2f2;color:#991b1b;border-color:#fecaca; }
+  .st-canceled .dot{ background:#ef4444; }
+
+  .st-other{ background:#f3f4f6;color:#374151;border-color:#e5e7eb; }
+  .st-other .dot{ background:#6b7280; }
+
+  .st-express{
+    background: rgba(255,122,0,0.14);
+    color: #9a3412;
+    border-color: rgba(255,122,0,0.45);
+  }
+  .st-express .dot{ background:#ff7a00; }
+
+  .addrBox{ min-width:260px;max-width:520px; }
+  .addrLabel{ color:#6b7280;font-size:12px; }
+  .addrValue{ font-weight:800;color:#111827;margin-top:2px; }
+
+  .notes{ margin-top:10px;color:#374151; }
+  .notesLabel{ color:#6b7280;font-size:12px; }
+  .notesValue{ margin-top:2px; }
+
+  .section-title{ margin:0 0 10px;font-size:14px;font-weight:950;color:#111827; }
+
+  .liveHint{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-size:12px;
+    color:#64748b;
+    margin-top:6px;
+    flex-wrap:wrap;
+  }
+  .liveBadge{
+    display:inline-flex;align-items:center;gap:8px;
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:6px 10px;
+    background:#fff;
+  }
+  .liveDot{
+    width:8px;height:8px;border-radius:999px;background:#22c55e;
+    box-shadow:0 0 0 4px rgba(34,197,94,0.12);
+  }
+  .liveDot.off{
+    background:#94a3b8;
+    box-shadow:0 0 0 4px rgba(148,163,184,0.14);
+  }
+
+  .phasePill{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:6px 10px;border-radius:999px;border:1px solid var(--line);
+    font-size:12px;font-weight:950;background:#fff;color:#0f172a;
+  }
+  .phaseDot{ width:7px;height:7px;border-radius:999px;background:#94a3b8; }
+  .phasePill.on .phaseDot{ background:var(--fagni-blue); }
+
+  .grid2{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:12px;
+  }
+  @media (max-width:860px){
+    .grid2{ grid-template-columns: 1fr; }
+  }
+
+  .kv{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    padding:9px 0;
+    border-bottom:1px dashed #eef2f7;
+  }
+  .kv:last-child{ border-bottom:none; }
+  .k{ color:#64748b; font-size:12px; font-weight:700; }
+  .v{ color:#0f172a; font-weight:950; }
+
+  .payPill{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:6px 10px;border-radius:999px;border:1px solid var(--line);
+    font-size:12px;font-weight:950;
+    background:#fff;
+  }
+  .payDot{ width:7px;height:7px;border-radius:999px;background:#94a3b8; }
+  .pay-ok{ background:#ecfdf3;border-color:#bbf7d0;color:#166534; }
+  .pay-ok .payDot{ background:#22c55e; }
+  .pay-wait{ background:#fffbeb;border-color:#fde68a;color:#92400e; }
+  .pay-wait .payDot{ background:#f59e0b; }
+  .pay-bad{ background:#fef2f2;border-color:#fecaca;color:#991b1b; }
+  .pay-bad .payDot{ background:#ef4444; }
+
+  .estBox{
+    margin-top:10px;
+    padding:10px 12px;
+    border-radius:14px;
+    border:1px dashed rgba(255,122,0,0.45);
+    background:rgba(255,122,0,0.08);
+    color:#7c2d12;
+    font-size:12px;
+    line-height:1.35;
+  }
+  .estTitle{ font-weight:950; display:flex; align-items:center; gap:8px; }
+  .estDot{ width:8px;height:8px;border-radius:999px;background:#ff7a00; box-shadow:0 0 0 4px rgba(255,122,0,0.12); }
+
+  .timeline{ display:grid; gap:8px; }
+  .tstep{
+    display:flex;align-items:flex-start;gap:10px;
+    padding:10px;border-radius:14px;border:1px solid var(--line);background:#fff;
+    box-shadow:0 1px 3px rgba(15,23,42,0.05);
+  }
+  .ticon{
+    width:22px;height:22px;border-radius:999px;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:950;font-size:12px;
+    background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;
+    flex:0 0 auto;
+  }
+  .ticon.done{
+    background:#ecfdf3;color:#166534;border-color:#bbf7d0;
+  }
+  .tmain{ flex:1; }
+  .tlabel{ font-weight:950;color:#111827; }
+  .tts{ margin-top:2px;color:#64748b;font-size:12px; }
+
+  .legsGrid{ display:grid; gap:8px; }
+  .legCard{
+    padding:10px;border-radius:14px;border:1px solid var(--line);background:#fff;
+    box-shadow:0 1px 3px rgba(15,23,42,0.05);
+  }
+  .legTop{ display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start; }
+  .legTitle{ font-weight:950;color:#111827; }
+  .legId{ color:#6b7280;font-size:12px; }
+  .muted{ color:#6b7280; }
+
+  /* micro-animations premium */
+  .pulse{ animation: pulse 520ms ease; }
+  @keyframes pulse{
+    0%{ transform: translateY(0); filter: brightness(1); }
+    35%{ transform: translateY(-1px); filter: brightness(1.05); }
+    100%{ transform: translateY(0); filter: brightness(1); }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container" style="max-width:900px;margin:0 auto;">
+<div class="page">
+
   <div class="page-header">
-    <div class="page-header__left">
+    <div>
       <h1 class="page-title">Commande {{ order.code|default:order.id }}</h1>
       <p class="page-subtitle">Suivi en temps réel (refresh automatique).</p>
+
+      <div class="liveHint">
+        <span class="liveBadge">
+          <span class="liveDot" id="liveDot"></span>
+          <span id="liveTxt">Synchronisation…</span>
+          <span class="muted">•</span>
+          <span class="muted">Dernière sync :</span>
+          <span id="lastSync">—</span>
+        </span>
+
+        <span id="phasePill" class="phasePill">
+          <span class="phaseDot"></span>
+          <span id="phaseTxt">Phase —</span>
+        </span>
+      </div>
     </div>
-    <div class="page-header__right" style="display:flex;gap:10px;flex-wrap:wrap;">
-      <a class="btn btn--ghost" href="{% url 'orders:client_home' %}">← Mes commandes</a>
-      <a class="btn btn--ghost" href="{% url 'orders:client_logout' %}">Déconnexion</a>
+
+    <div class="actions">
+      <a class="btn btn-ghost" href="{% url 'orders:client_home' %}">← Mes commandes</a>
+      <a class="btn btn-ghost" href="{% url 'orders:client_logout' %}">Déconnexion</a>
     </div>
   </div>
 
-  <div class="card" style="padding:14px;">
-    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-      <div>
-        <div style="font-weight:800;">Statut : <span id="orderStatus">{{ order.status }}</span></div>
-        <div style="color:#6b7280;font-size:12px;">Créée le {{ order.created_at|date:"d/m/Y H:i" }}</div>
+  <div class="grid2">
+    <!-- STATUT + ADRESSE -->
+    <div class="card panel">
+      <div class="row">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div style="font-weight:950;">Statut :</div>
+
+            <span id="orderStatusPill" class="pill st-other">
+              <span class="dot"></span>
+              <span id="orderStatus">{{ order.status }}</span>
+            </span>
+
+            {# Badge express (visible si >0) #}
+            <span id="expressPill"
+                  class="pill st-express"
+                  {% if not amounts.express_extra_fee or amounts.express_extra_fee|floatformat:0 == "0" %}style="display:none;"{% endif %}>
+              <span class="dot"></span>⚡ Express
+            </span>
+          </div>
+
+          <div class="meta">Créée le {{ order.created_at|date:"d/m/Y H:i" }}</div>
+        </div>
+
+        <div class="addrBox">
+          <div class="addrLabel">Adresse</div>
+          <div class="addrValue">📍 {{ order.pickup_address|default:order.customer.address|default:"—" }}</div>
+        </div>
       </div>
-      <div style="min-width:260px;">
-        <div style="color:#6b7280;font-size:12px;">Adresse</div>
-        <div style="font-weight:600;">{{ order.pickup_address|default:order.customer.address|default:"—" }}</div>
+
+      {% if order.notes %}
+        <div class="notes">
+          <div class="notesLabel">Notes</div>
+          <div class="notesValue">{{ order.notes }}</div>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- PAIEMENT + MONTANTS -->
+    <div class="card panel">
+      <div class="row" style="align-items:center;">
+        <div>
+          <div class="section-title" style="margin:0;">Paiement</div>
+          <div class="meta">Montant estimé (V1) + statut de paiement.</div>
+        </div>
+
+        <span id="payPill" class="payPill">
+          <span class="payDot"></span>
+          <span id="payTxt">
+            {% if amounts.total_ttc|default:0|floatformat:0 == "0" %}
+              En attente
+            {% else %}
+              {{ payment_status|default:"non renseigné" }}
+            {% endif %}
+          </span>
+        </span>
+      </div>
+
+      <div style="margin-top:10px;">
+        <div class="kv"><div class="k">Prestations</div><div class="v" id="amtPrest">{{ amounts.prestation_total|fcfa }}</div></div>
+        <div class="kv"><div class="k">Frais de livraison</div><div class="v" id="amtDeliv">{{ amounts.delivery_fee|fcfa }}</div></div>
+        <div class="kv"><div class="k">Service FAGNI</div><div class="v" id="amtFee">{{ amounts.service_fee|fcfa }}</div></div>
+        <div class="kv"><div class="k">TVA (FAGNI)</div><div class="v" id="amtVat">{{ amounts.vat_fagni|default:0|fcfa }}</div></div>
+
+        {# Ligne express (visible si >0) #}
+        <div class="kv" id="rowExpress" {% if not amounts.express_extra_fee or amounts.express_extra_fee|floatformat:0 == "0" %}style="display:none;"{% endif %}>
+          <div class="k">⚡ Express</div>
+          <div class="v" id="amtExpress">{{ amounts.express_extra_fee|default:0|fcfa }}</div>
+        </div>
+
+        <div class="kv"><div class="k">Total client</div><div class="v" id="amtTotal">{{ amounts.total_ttc|fcfa }}</div></div>
+
+        <div class="meta">NB : les montants peuvent évoluer si la livraison change (distance/express).</div>
+
+        {% if order.status == "pending" or order.status == "in_progress" %}
+          {% with prest=amounts.prestation_total|default:0 %}
+            {% with prest0=prest|floatformat:0 %}
+              {% if prest0 == "0" %}
+                <div class="estBox" id="estBox">
+                  <div class="estTitle"><span class="estDot"></span>Estimation en cours</div>
+                  Le montant final sera confirmé après collecte / pesée, puis ajusté selon la distance (livraison).
+                </div>
+              {% endif %}
+            {% endwith %}
+          {% endwith %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- PRESTATIONS / ITEMS (UNIQUE) -->
+  <div class="card panel" style="margin-top:12px;">
+    <div class="row" style="align-items:center;">
+      <h3 class="section-title" style="margin:0;">Prestations</h3>
+      <div class="actions">
+        <a class="btn btn-ghost" href="{% url 'orders:client_order_item_new' order.id %}">➕ Ajouter</a>
       </div>
     </div>
 
-    {% if order.notes %}
-      <div style="margin-top:10px;color:#374151;">
-        <div style="color:#6b7280;font-size:12px;">Notes</div>
-        <div>{{ order.notes }}</div>
-      </div>
-    {% endif %}
+    <!-- Zone affichée au chargement (Django) puis remplacée en LIVE par JS -->
+    <div id="itemsBox" style="margin-top:10px;">
+      {% if items %}
+        <div style="border:1px solid var(--line); border-radius:14px; overflow:hidden;">
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:0;background:#f8fafc;border-bottom:1px solid var(--line);padding:10px;font-weight:950;font-size:12px;color:#334155;">
+            <div>Désignation</div><div>Qté</div><div>PU</div><div>Total</div>
+          </div>
+
+          {% for it in items %}
+            <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:0;padding:10px;border-bottom:1px solid #eef2f7;align-items:center;">
+              <div style="font-weight:900;color:#0f172a;">
+                {{ it.designation|default:"—" }}
+                <div class="meta" style="margin-top:3px;">
+                  <a class="btn btn-ghost" style="padding:6px 10px;font-size:12px;" href="{% url 'orders:client_order_item_edit' order.id it.id %}">Modifier</a>
+                  <a class="btn btn-ghost" style="padding:6px 10px;font-size:12px;border-color:#fecaca;color:#991b1b;" href="{% url 'orders:client_order_item_delete' order.id it.id %}">Supprimer</a>
+                </div>
+              </div>
+              <div style="font-weight:900;">{{ it.quantity }}</div>
+              <div style="font-weight:900;">{{ it.unit_price|fcfa }}</div>
+              <div style="font-weight:950;">{{ it.total|fcfa }}</div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="muted">Aucune ligne pour le moment.</div>
+      {% endif %}
+    </div>
   </div>
 
-  <div class="card" style="padding:14px;margin-top:12px;">
-    <h3 style="margin:0 0 10px;font-size:14px;font-weight:800;">Livraison (legs)</h3>
-    <div id="legsBox" style="display:grid;gap:8px;">
+  <!-- TIMELINE -->
+  <div class="card panel" style="margin-top:12px;">
+    <h3 class="section-title">Avancement</h3>
+    <div id="timelineBox" class="timeline">
+      {% for s in timeline %}
+        <div class="tstep">
+          <div class="ticon {% if s.done %}done{% endif %}">{{ forloop.counter }}</div>
+          <div class="tmain">
+            <div class="tlabel">{{ s.label }}</div>
+            <div class="tts">
+              {% if s.ts %}{{ s.ts|date:"d/m/Y H:i" }}{% else %}{% if s.done %}Confirmé{% else %}—{% endif %}{% endif %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- LEGS -->
+  <div class="card panel" style="margin-top:12px;">
+    <h3 class="section-title">Livraison (legs)</h3>
+    <div id="legsBox" class="legsGrid">
       {% if legs %}
         {% for l in legs %}
-          <div class="card" style="padding:10px;border:1px solid #e5e7eb;">
-            <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-              <div style="font-weight:700;">{{ l.leg_type }} — <span class="leg-status">{{ l.status }}</span></div>
-              <div style="color:#6b7280;font-size:12px;">#{{ l.id }}</div>
+          <div class="legCard">
+            <div class="legTop">
+              <div class="legTitle">
+                {{ l.leg_type }} — <span class="muted leg-status">{{ l.status }}</span>
+              </div>
+              <div class="legId">#{{ l.id }}</div>
+            </div>
+
+            <div class="meta" style="margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;">
+              {% if l.driver_id %}
+                <span class="phasePill"><span class="phaseDot"></span> Livreur : #{{ l.driver_id }}</span>
+              {% endif %}
+              {% if l.driver_amount and l.driver_amount|floatformat:0 != "0" %}
+                <span class="phasePill"><span class="phaseDot"></span> Montant mission : {{ l.driver_amount|fcfa }}</span>
+              {% endif %}
             </div>
           </div>
         {% endfor %}
       {% else %}
-        <div style="color:#6b7280;">Pas encore de mission de livraison affichée.</div>
+        <div class="muted">Pas encore de mission de livraison affichée.</div>
       {% endif %}
     </div>
   </div>
+
 </div>
 
 <script>
 (function(){
   const liveUrl = "{% url 'orders:client_order_live' order.id %}";
-  const orderStatusEl = document.getElementById("orderStatus");
+  const orderId = {{ order.id|default:0 }};
+
+  const statusTextEl = document.getElementById("orderStatus");
+  const statusPillEl = document.getElementById("orderStatusPill");
+
   const legsBox = document.getElementById("legsBox");
+  const itemsBox = document.getElementById("itemsBox");
+
+  const liveDot = document.getElementById("liveDot");
+  const liveTxt = document.getElementById("liveTxt");
+  const lastSync = document.getElementById("lastSync");
+
+  const payTxt = document.getElementById("payTxt");
+  const payPill = document.getElementById("payPill");
+
+  const phasePill = document.getElementById("phasePill");
+  const phaseTxt  = document.getElementById("phaseTxt");
+
+  const amtPrest = document.getElementById("amtPrest");
+  const amtDeliv = document.getElementById("amtDeliv");
+  const amtFee = document.getElementById("amtFee");
+  const amtVat = document.getElementById("amtVat");
+  const amtTotal = document.getElementById("amtTotal");
+
+  const rowExpress = document.getElementById("rowExpress");
+  const amtExpress = document.getElementById("amtExpress");
+  const expressPill = document.getElementById("expressPill");
+
+  const timelineBox = document.getElementById("timelineBox");
+  let estBox = document.getElementById("estBox");
+
+  const refreshMs = 7000;
+  let busy = false;
+  let timer = null;
+
+  function escapeHtml(s){
+    return String(s ?? "").replace(/[&<>"'`=\/]/g, function (c) {
+      return ({
+        "&":"&amp;",
+        "<":"&lt;",
+        ">":"&gt;",
+        '"':"&quot;",
+        "'":"&#39;",
+        "`":"&#x60;",
+        "=":"&#x3D;",
+        "/":"&#x2F;"
+      })[c];
+    });
+  }
+
+  function nowLabel(){
+    const d = new Date();
+    return d.toLocaleString("fr-FR", {year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
+  }
+
+  function setLive(ok, msg){
+    if(liveDot) liveDot.classList.toggle("off", !ok);
+    if(liveTxt) liveTxt.textContent = msg || (ok ? "Connecté" : "Hors ligne");
+    if(lastSync && ok) lastSync.textContent = nowLabel();
+  }
+
+  function statusToPill(status){
+    const s = String(status || "").toLowerCase();
+    if(s === "pending") return {cls:"st-pending", label:"En attente"};
+    if(s === "in_progress") return {cls:"st-in-progress", label:"En cours"};
+    if(s === "done") return {cls:"st-done", label:"Terminée"};
+    if(s === "canceled") return {cls:"st-canceled", label:"Annulée"};
+    return {cls:"st-other", label: status || "—"};
+  }
+
+  function setStatus(statusRaw){
+    const s = statusToPill(statusRaw);
+    if(statusTextEl) statusTextEl.textContent = s.label;
+    if(statusPillEl){
+      statusPillEl.classList.remove("st-pending","st-in-progress","st-done","st-canceled","st-other");
+      statusPillEl.classList.add(s.cls);
+    }
+  }
+
+  function paymentLabel(ps){
+    const s = String(ps || "").toLowerCase();
+    if(s.includes("paid") || s.includes("paye") || s.includes("payé")) return {cls:"pay-ok", label:"Payé"};
+    if(s.includes("pending") || s.includes("attente") || s.includes("unpaid")) return {cls:"pay-wait", label:"En attente"};
+    if(s.includes("failed") || s.includes("echec") || s.includes("échoué")) return {cls:"pay-bad", label:"Échec"};
+    if(!ps) return {cls:"", label:"non renseigné"};
+    return {cls:"", label: ps};
+  }
+
+  function setPayment(ps){
+    const p = paymentLabel(ps);
+    if(payTxt) payTxt.textContent = p.label;
+    if(payPill){
+      payPill.classList.remove("pay-ok","pay-wait","pay-bad");
+      if(p.cls) payPill.classList.add(p.cls);
+    }
+  }
+
+  function formatMoney(n){
+    try{
+      const x = Number(String(n ?? "0").replace(",", "."));
+      if(!isFinite(x)) return "0 FCFA";
+      return x.toLocaleString("fr-FR", {maximumFractionDigits:0}) + " FCFA";
+    }catch(e){
+      return "0 FCFA";
+    }
+  }
+
+  function pulse(el){
+    if(!el) return;
+    el.classList.remove("pulse");
+    void el.offsetWidth;
+    el.classList.add("pulse");
+  }
+
+  function setExpress(amounts){
+    const ex = Number(amounts?.express_extra_fee || 0);
+
+    // badge en haut
+    if(expressPill){
+      expressPill.style.display = (ex > 0) ? "inline-flex" : "none";
+    }
+
+    // ligne dans les montants
+    if(rowExpress){
+      rowExpress.style.display = (ex > 0) ? "" : "none";
+    }
+    if(amtExpress){
+      const v = formatMoney(ex);
+      if(amtExpress.textContent !== v){
+        amtExpress.textContent = v;
+        pulse(amtExpress);
+      }
+    }
+  }
+
+  function legTypeLabel(t){
+    const s = String(t || "").toLowerCase();
+    if(s.includes("pickup") || s.includes("collect")) return "Collecte";
+    if(s.includes("drop") || s.includes("deliver")) return "Livraison";
+    if(s.includes("return")) return "Retour";
+    if(s.includes("to_laundry") || s.includes("laundry")) return "Vers laverie";
+    return t || "Mission";
+  }
+
+  function legStatusLabel(st){
+    const s = String(st || "").toLowerCase();
+    if(s === "pending") return "En attente";
+    if(s === "assigned") return "Assignée";
+    if(s === "in_progress") return "En cours";
+    if(s === "done") return "Terminée";
+    if(s === "canceled") return "Annulée";
+    return st || "—";
+  }
 
   function renderLegs(legs){
+    if(!legsBox) return;
     if(!legs || !legs.length){
-      legsBox.innerHTML = '<div style="color:#6b7280;">Pas encore de mission de livraison affichée.</div>';
+      legsBox.innerHTML = '<div class="muted">Pas encore de mission de livraison affichée.</div>';
       return;
     }
-    legsBox.innerHTML = legs.map(l => `
-      <div class="card" style="padding:10px;border:1px solid #e5e7eb;">
-        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-          <div style="font-weight:700;">${l.leg_type} — <span class="leg-status">${l.status}</span></div>
-          <div style="color:#6b7280;font-size:12px;">#${l.id}</div>
+
+    legsBox.innerHTML = legs.map(l => {
+      const typ = escapeHtml(legTypeLabel(l.leg_type));
+      const st  = escapeHtml(legStatusLabel(l.status));
+      const id  = escapeHtml(l.id);
+
+      const driverId = (l.driver_id !== null && l.driver_id !== undefined && String(l.driver_id).trim() !== "")
+        ? escapeHtml(l.driver_id)
+        : "";
+
+      const amt = Number(String(l.driver_amount ?? "0").replace(",", "."));
+      const amtTxt = (isFinite(amt) && amt > 0) ? formatMoney(amt) : "";
+
+      const extraBits = [];
+      if(driverId) extraBits.push(`<span class="phasePill"><span class="phaseDot"></span> Livreur : #${driverId}</span>`);
+      if(amtTxt)   extraBits.push(`<span class="phasePill"><span class="phaseDot"></span> Montant mission : ${amtTxt}</span>`);
+
+      return `
+        <div class="legCard">
+          <div class="legTop">
+            <div class="legTitle">${typ} — <span class="muted leg-status">${st}</span></div>
+            <div class="legId">#${id}</div>
+          </div>
+          ${extraBits.length ? `<div class="meta" style="margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;">${extraBits.join("")}</div>` : ``}
         </div>
+      `;
+    }).join("");
+  }
+
+  function renderItems(items){
+    if(!itemsBox) return;
+
+    if(!items || !items.length){
+      itemsBox.innerHTML = '<div class="muted">Aucune ligne pour le moment.</div>';
+      return;
+    }
+
+    itemsBox.innerHTML = `
+      <div style="border:1px solid var(--line); border-radius:14px; overflow:hidden;">
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:0;background:#f8fafc;border-bottom:1px solid var(--line);padding:10px;font-weight:950;font-size:12px;color:#334155;">
+          <div>Désignation</div><div>Qté</div><div>PU</div><div>Total</div>
+        </div>
+
+        ${items.map(it => {
+          const id = escapeHtml(it.id);
+          const d  = escapeHtml(it.designation || "—");
+          const q  = escapeHtml(it.quantity ?? 0);
+          const up = formatMoney(it.unit_price ?? 0);
+          const tt = formatMoney(it.total ?? 0);
+
+          const editUrl = `/orders/client/orders/${orderId}/items/${id}/edit/`;
+          const delUrl  = `/orders/client/orders/${orderId}/items/${id}/delete/`;
+
+          return `
+            <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:0;padding:10px;border-bottom:1px solid #eef2f7;align-items:center;">
+              <div style="font-weight:900;color:#0f172a;">
+                ${d}
+                <div class="meta" style="margin-top:3px;">
+                  <a class="btn btn-ghost" style="padding:6px 10px;font-size:12px;" href="${editUrl}">Modifier</a>
+                  <a class="btn btn-ghost" style="padding:6px 10px;font-size:12px;border-color:#fecaca;color:#991b1b;" href="${delUrl}">Supprimer</a>
+                </div>
+              </div>
+              <div style="font-weight:900;">${q}</div>
+              <div style="font-weight:900;">${up}</div>
+              <div style="font-weight:950;">${tt}</div>
+            </div>
+          `;
+        }).join("")}
       </div>
-    `).join("");
+    `;
+  }
+
+  function setAmounts(a){
+    if(!a) return;
+
+    const next = {
+      prest: formatMoney(a.prestation_total),
+      deliv: formatMoney(a.delivery_fee),
+      fee: formatMoney(a.service_fee),
+      vat: formatMoney(a.vat_fagni),
+      total: formatMoney(a.total_ttc),
+    };
+
+    if(amtPrest && amtPrest.textContent !== next.prest){ amtPrest.textContent = next.prest; pulse(amtPrest); }
+    if(amtDeliv && amtDeliv.textContent !== next.deliv){ amtDeliv.textContent = next.deliv; pulse(amtDeliv); }
+    if(amtFee && amtFee.textContent !== next.fee){ amtFee.textContent = next.fee; pulse(amtFee); }
+    if(amtVat && amtVat.textContent !== next.vat){ amtVat.textContent = next.vat; pulse(amtVat); }
+    if(amtTotal && amtTotal.textContent !== next.total){ amtTotal.textContent = next.total; pulse(amtTotal); }
+
+    // Express (badge + ligne + montant)
+    setExpress(a);
+  }
+
+  function formatDate(iso){
+    try{
+      const d = new Date(iso);
+      if(isNaN(d.getTime())) return String(iso || "—");
+      return d.toLocaleString("fr-FR", {
+        year:"numeric", month:"2-digit", day:"2-digit",
+        hour:"2-digit", minute:"2-digit"
+      });
+    }catch(e){
+      return String(iso || "—");
+    }
+  }
+
+  function renderTimeline(tl){
+    if(!timelineBox) return;
+    if(!tl || !tl.length) return;
+
+    timelineBox.innerHTML = tl.map((s, idx) => {
+      const done = !!s.done;
+      const label = escapeHtml(s.label || "");
+      const ts = s.ts ? escapeHtml(formatDate(s.ts)) : (done ? "Confirmé" : "—");
+      return `
+        <div class="tstep">
+          <div class="ticon ${done ? "done" : ""}">${idx+1}</div>
+          <div class="tmain">
+            <div class="tlabel">${label}</div>
+            <div class="tts">${ts}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function isTerminalStatus(st){
+    const s = String(st || "").toLowerCase();
+    return (s === "done" || s === "canceled");
+  }
+
+  function isActiveStatus(st){
+    const s = String(st || "").toLowerCase();
+    return (s === "pending" || s === "in_progress");
+  }
+
+  function parseTotal(a){
+    try{
+      const v = a?.total_ttc ?? 0;
+      const n = Number(String(v).replace(",", "."));
+      return isFinite(n) ? n : 0;
+    }catch(e){
+      return 0;
+    }
+  }
+
+  function updateEstimationBox(active, totalIsZero){
+    const shouldShow = !!active && !!totalIsZero;
+    estBox = document.getElementById("estBox");
+    if(shouldShow){
+      if(estBox) estBox.style.display = "";
+    }else{
+      if(estBox) estBox.style.display = "none";
+    }
+  }
+
+  function computePhase(timeline){
+    const map = {};
+    (timeline || []).forEach(s => { map[String(s.key||"")] = !!s.done; });
+
+    if(map["delivered"]) return "Livraison terminée";
+    if(map["wash"]) return "Laverie (lavage terminé)";
+    if(map["pickup"]) return "Collecte effectuée";
+    return "Commande créée";
+  }
+
+  function setPhase(tl){
+    if(!phaseTxt || !phasePill) return;
+    const ph = computePhase(tl);
+    phaseTxt.textContent = ph;
+    phasePill.classList.add("on");
   }
 
   async function tick(){
+    if(busy) return;
+    busy = true;
+
     try{
-      const r = await fetch(liveUrl, {credentials:"same-origin"});
-      const data = await r.json();
-      if(!data.ok) return;
-      if(data.order && data.order.status){
-        orderStatusEl.textContent = data.order.status;
+      setLive(true, "Synchronisation…");
+
+      const res = await fetch(liveUrl, {
+        method: "GET",
+        credentials: "same-origin",
+        headers: {"X-Requested-With":"XMLHttpRequest","Accept":"application/json"},
+        cache: "no-store"
+      });
+
+      // Auth / droits
+      if(res.status === 401 || res.status === 403){
+        setLive(false, "Session expirée (reconnecte-toi)");
+        if(legsBox){
+          legsBox.innerHTML = `
+            <div class="muted">
+              🔒 Session expirée.
+              <a href="/orders/client/" style="text-decoration:underline;">Se reconnecter</a>
+            </div>
+          `;
+        }
+        if(itemsBox){
+          itemsBox.innerHTML = `<div class="muted">Connecte-toi pour afficher les lignes.</div>`;
+        }
+        stop();
+        return;
       }
+
+      if(res.status === 404){
+        setLive(false, "Commande introuvable");
+        stop();
+        return;
+      }
+
+      // Sécurisation JSON
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
+      if(!ct.includes("application/json")){
+        setLive(false, "Erreur serveur (réponse non JSON)");
+        return;
+      }
+
+      const data = await res.json();
+      if(!data || !data.ok){
+        setLive(false, (data && data.error) ? ("Erreur: " + data.error) : "Synchronisation indisponible");
+        return;
+      }
+
+      const status = data.order?.status || "";
+      setStatus(status);
+
+      setPayment(data.order?.payment_status || "");
+
+      setAmounts(data.amounts);
+
       renderLegs(data.legs || []);
-    }catch(e){}
+      renderItems(data.order?.items || []);
+      renderTimeline(data.timeline || []);
+
+      setPhase(data.timeline || []);
+
+      const total = parseTotal(data.amounts);
+      const active = isActiveStatus(status);
+      const totalIsZero = (!total || total <= 0);
+      updateEstimationBox(active, totalIsZero);
+
+      if(active && totalIsZero){
+        setPayment("unpaid");
+      }
+
+      if(isTerminalStatus(status)){
+        setLive(true, "Terminé");
+        stop();
+        return;
+      }
+
+      setLive(true, "Connecté");
+    }catch(e){
+      setLive(false, "Hors ligne");
+    }finally{
+      busy = false;
+    }
   }
 
-  tick();
-  setInterval(tick, 4000);
+  function start(){
+    if(timer) return;
+    tick();
+    timer = setInterval(() => {
+      if(document.hidden) return;
+      tick();
+    }, refreshMs);
+  }
+
+  function stop(){
+    if(timer){
+      clearInterval(timer);
+      timer = null;
+    }
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if(!document.hidden){
+      if(!timer) start();
+      else tick();
+    }
+  });
+
+  (function initPayPill(){
+    const txt = (payTxt?.textContent || "").toLowerCase();
+    if(!payPill) return;
+    payPill.classList.remove("pay-ok","pay-wait","pay-bad");
+    if(txt.includes("pay")) payPill.classList.add("pay-ok");
+    else if(txt.includes("attente")) payPill.classList.add("pay-wait");
+    else if(txt.includes("échec") || txt.includes("echec")) payPill.classList.add("pay-bad");
+  })();
+
+  start();
 })();
 </script>
 {% endblock %}

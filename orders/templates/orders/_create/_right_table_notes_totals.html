@@ -59,8 +59,50 @@
     </div>
 </div>
 
-<div id="summaryBox" style="margin-top:10px; display:none;">
-    <h3 style="margin-top:0;font-size:14px;">Résumé des articles</h3>
-    <div id="summaryContent"></div>
+<!-- =========================================
+     LOT G — RÉCAP & VALIDATION (Step 3)
+     ========================================= -->
+<div id="summaryBox" class="card" style="margin-top:12px; display:none;">
+    <h3 class="card-title" style="margin:0 0 10px;">
+        <span class="emoji">✅</span> Récap & validation
+    </h3>
+
+    <div class="note" style="margin-top:0;">
+        Vérifie les infos ci-dessous, puis confirme la création de la commande.
+    </div>
+
+    <div class="recap-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:10px;">
+        <div class="card" style="padding:12px; border:1px solid #e5e7eb; border-radius:14px; background:#f8fafc;">
+            <div style="font-weight:900; margin-bottom:6px;">👤 Client</div>
+            <div id="recap_client" style="font-size:13px; color:#334155;">—</div>
+        </div>
+
+        <div class="card" style="padding:12px; border:1px solid #e5e7eb; border-radius:14px; background:#f8fafc;">
+            <div style="font-weight:900; margin-bottom:6px;">🧭 Parcours</div>
+            <div id="recap_timeline" style="font-size:13px; color:#334155;">—</div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:12px; padding:12px; border:1px solid #e5e7eb; border-radius:14px; background:#ffffff;">
+        <div style="font-weight:900; margin-bottom:6px;">📦 Articles</div>
+        <div id="summaryContent"></div>
+    </div>
+
+    <div class="recap-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
+        <div class="card" style="padding:12px; border:1px solid #e5e7eb; border-radius:14px; background:#f8fafc;">
+            <div style="font-weight:900; margin-bottom:6px;">💰 Totaux</div>
+            <div id="recap_totals" style="font-size:13px; color:#334155;">—</div>
+        </div>
+
+        <div class="card" style="padding:12px; border:1px solid #e5e7eb; border-radius:14px; background:#f8fafc;">
+            <div style="font-weight:900; margin-bottom:6px;">📝 Notes</div>
+            <div id="recap_notes" style="font-size:13px; color:#334155; white-space:pre-wrap;">—</div>
+        </div>
+    </div>
+
+    <div class="note" style="margin-top:12px;">
+        ⚠️ Si tu reviens modifier des infos, clique encore sur “Voir le récap” pour rafraîchir.
+    </div>
 </div>
+
 {% include "orders/_create/_right_timeline_summary.html" %}

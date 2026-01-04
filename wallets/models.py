@@ -12,6 +12,13 @@ from partners.models import LaundryPartner, DeliveryPartner, RelayPointPartner
 
 User = get_user_model()
 
+delivery_leg = models.ForeignKey(
+    "orders.DeliveryLeg",
+    on_delete=models.PROTECT,
+    null=True,
+    blank=True,
+    related_name="wallet_transactions",
+)
 
 class Wallet(models.Model):
     """
@@ -207,13 +214,15 @@ class Wallet(models.Model):
         self.balance = (self.balance + amount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         self.save(update_fields=["balance", "updated_at"])
 
-        WalletTransaction.objects.create(
+        WalletTransaction.create_tx(
             wallet=self,
             order=None,
+            leg=None,
             type="credit",
             direction="in",
             amount=amount,
-            description=description or "Crédit wallet",
+            description=description or "MANUAL: Crédit wallet",
+            allow_orphan=True,
         )
 
     def debit(self, amount: Decimal, description: str = ""):
@@ -234,13 +243,15 @@ class Wallet(models.Model):
         self.balance = (self.balance - amount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         self.save(update_fields=["balance", "updated_at"])
 
-        WalletTransaction.objects.create(
+        WalletTransaction.create_tx(
             wallet=self,
             order=None,
+            leg=None,
             type="debit",
             direction="out",
             amount=amount,
-            description=description or "Débit wallet",
+            description=description or "MANUAL: Débit wallet",
+            allow_orphan=True,
         )
 
 
@@ -321,6 +332,13 @@ class WalletTransaction(models.Model):
                 condition=models.Q(leg__isnull=False),
                 name="uniq_wtx_wallet_leg_type_dir",
             ),
+            # Anti-doublon ULTIME : 1 seule tx par (order, leg, type, direction)
+            # utile même si le wallet change (ex: driver réassigné)
+            models.UniqueConstraint(
+                fields=["order", "leg", "type", "direction"],
+                condition=models.Q(order__isnull=False) & models.Q(leg__isnull=False),
+                name="uniq_wtx_order_leg_type_dir",
+            ),
             # Anti-doublon LEGACY : 1 seule tx par (wallet, order, type, direction)
             # mais uniquement si leg est NULL (anciens usages)
             models.UniqueConstraint(
@@ -330,6 +348,51 @@ class WalletTransaction(models.Model):
             ),
         ]
 
+    @classmethod
+    def create_tx(
+        cls,
+        *,
+        wallet,
+        amount,
+        direction: str,
+        type: str,
+        order=None,
+        leg=None,
+        description: str = "",
+        allow_orphan: bool = False,
+    ):
+        """
+        Factory sécurisée pour créer une WalletTransaction.
+
+        Règle HARD:
+        - Interdit de créer une tx sans order ET sans leg
+          sauf si allow_orphan=True.
+        """
+        if amount is None:
+            raise ValueError("WalletTransaction.create_tx: amount is None")
+
+        if not isinstance(amount, Decimal):
+            amount = Decimal(str(amount))
+        amount = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        if amount <= 0:
+            return None
+
+        if (order is None) and (leg is None) and (not allow_orphan):
+            raise ValueError(
+                "WalletTransaction.create_tx: orphan tx refused (order=None and leg=None). "
+                "Use allow_orphan=True explicitly if intended."
+            )
+
+        return cls.objects.create(
+            wallet=wallet,
+            order=order,
+            leg=leg,
+            type=type,
+            direction=direction,
+            amount=amount,
+            description=description or "",
+        )
 
     def __str__(self):
         sign = "+" if self.direction == "in" else "-"
@@ -430,12 +493,15 @@ class WithdrawalRequest(models.Model):
         if not self.pk:
             return False
         needle = f"Retrait #{self.id}"
-        return WalletTransaction.objects.filter(
-            wallet=self.wallet,
+        return WalletTransaction.create_tx(
+            wallet=wallet,
+            order=None,
+            leg=None,
             type="payout",
             direction="out",
-            amount=self.amount,
-            description__icontains=needle,
+            amount=amount,
+            description=f"Retrait #{self.id} – livreur {self.delivery_partner.name}",
+            allow_orphan=True,
         ).exists()
 
     def _can_debit_wallet(self) -> bool:

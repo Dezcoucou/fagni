@@ -126,7 +126,7 @@ def credit_wallet(
     )
     wallet.save(update_fields=["balance", "updated_at"])
 
-    tx = WalletTransaction.objects.create(
+    tx = WalletTransaction.create_tx(
         wallet=wallet,
         order=order,
         leg=leg,
@@ -134,6 +134,7 @@ def credit_wallet(
         direction="in",
         amount=amount,
         description=label or "",
+        allow_orphan=False,  # interdit si order=None et leg=None
     )
     return tx
 
@@ -161,7 +162,7 @@ def debit_wallet(
     )
     wallet.save(update_fields=["balance", "updated_at"])
 
-    tx = WalletTransaction.objects.create(
+    tx = WalletTransaction.create_tx(
         wallet=wallet,
         order=order,
         leg=leg,
@@ -169,6 +170,7 @@ def debit_wallet(
         direction="out",
         amount=amount,
         description=label or "",
+        allow_orphan=False,  # interdit si order=None et leg=None
     )
     return tx
 
@@ -263,9 +265,14 @@ def distribute_order_revenues(
     else:
         txs["internal"] = None
 
-    # 5) Marquer la commande comme distribuée (post-paiement)
-    order.wallets_distributed = True
-    order.save(update_fields=["wallets_distributed"])
+    # 5) Marquer comme distribuée UNIQUEMENT si on a créé au moins 1 transaction
+    created_any = any([
+        txs.get("laundry") is not None,
+        txs.get("internal") is not None,
+    ])
+    if created_any:
+        order.wallets_distributed = True
+        order.save(update_fields=["wallets_distributed"])
 
     # 6) Retour d'info
     return {

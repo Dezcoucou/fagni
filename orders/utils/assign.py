@@ -1,84 +1,53 @@
-import math
+# orders/utils/assign.py
+"""
+Wrappers legacy (compat) vers le nouveau moteur d'assignation orders/assignment.py
+
+Objectif:
+- garder la compatibilité avec d'anciens imports: from orders.utils import auto_assign_delivery, ...
+- éviter toute logique métier ici (source unique = orders/assignment.py)
+"""
+
+from __future__ import annotations
+
+from typing import Optional
+
 from partners.models import LaundryPartner, DeliveryPartner
+from orders.assignment import pick_best_laundry, pick_best_driver, _haversine_km
 
 
 def haversine_km(lat1, lon1, lat2, lon2):
+    """Compat: expose la distance haversine en km."""
+    return _haversine_km(lat1, lon1, lat2, lon2)
+
+
+def auto_assign_laundry(order) -> Optional[LaundryPartner]:
     """
-    Distance géodésique en km (float) pour l'assignation automatique.
+    Compat: assigne une blanchisserie à la commande via pick_best_laundry(order)
+    et sauvegarde si trouvé.
     """
-    try:
-        if lat1 is None or lon1 is None or lat2 is None or lon2 is None:
-            return None
-
-        lat1 = float(lat1)
-        lon1 = float(lon1)
-        lat2 = float(lat2)
-        lon2 = float(lon2)
-    except (TypeError, ValueError):
-        return None
-
-    R = 6371.0
-    phi1 = math.radians(lat1)
-    phi2 = math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-
-    a = (math.sin(dphi / 2.0) ** 2) + (math.cos(phi1) * math.cos(phi2) * (math.sin(dlambda / 2.0) ** 2))
-    c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
-
-    return R * c
-
-
-def auto_assign_laundry(order):
-    """
-    Assigne automatiquement la blanchisserie la plus proche du client
-    (parmi les partenaires actifs avec coordonnées).
-    """
-    customer = order.customer
-    if not customer:
-        return None
-
-    clat = getattr(customer, "latitude", None)
-    clng = getattr(customer, "longitude", None)
-    if clat is None or clng is None:
-        return None
-
-    candidates = LaundryPartner.objects.filter(
-        is_active=True,
-        latitude__isnull=False,
-        longitude__isnull=False,
-    )
-
-    best_partner = None
-    best_distance = None
-
-    for lp in candidates:
-        d = haversine_km(clat, clng, lp.latitude, lp.longitude)
-        if d is None:
-            continue
-        if best_distance is None or d < best_distance:
-            best_distance = d
-            best_partner = lp
-
-    if best_partner:
-        order.laundry_partner = best_partner
+    lp, _reason = pick_best_laundry(order)
+    if lp:
+        order.laundry_partner = lp
         order.save(update_fields=["laundry_partner"])
-    return order.laundry_partner
+        return lp
+    return None
 
 
-def auto_assign_delivery(order):
+def auto_assign_delivery(order) -> Optional[DeliveryPartner]:
     """
-    Assigne un livreur par défaut.
-    (Simple : premier livreur actif, tu pourras raffiner plus tard :
-     par zone, proximité, charge, etc.)
+    Compat: assigne un livreur à la commande via pick_best_driver(order)
+    et sauvegarde si trouvé.
     """
-    if order.delivery_partner:
-        return order.delivery_partner
+    dp, reason = pick_best_driver(order)
+    if dp:
+        order.delivery_partner = dp
+        order.delivery_partner_unassigned_reason = None
+        order.save(update_fields=["delivery_partner", "delivery_partner_unassigned_reason"])
+        return dp
 
-    partner = DeliveryPartner.objects.filter(is_active=True).first()
+    # si aucun dp, on stocke la raison si le champ existe (utile debug)
+    if hasattr(order, "delivery_partner_unassigned_reason"):
+        order.delivery_partner_unassigned_reason = reason or "Aucun livreur éligible."
+        order.save(update_fields=["delivery_partner_unassigned_reason"])
 
-    if partner:
-        order.delivery_partner = partner
-        order.save(update_fields=["delivery_partner"])
-
-    return order.delivery_partner
+    return None

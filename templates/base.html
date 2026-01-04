@@ -12,21 +12,38 @@
     <link rel="manifest" href="{% static 'manifest.json' %}">
 
     <link rel="stylesheet" href="{% static 'css/fagni_theme.css' %}">
+    <link rel="stylesheet" href="{% static 'css/client_app.css' %}">
+
 
     <style>
         * { box-sizing: border-box; }
         img { max-width: 100%; display: block; }
 
-        /* TOPBAR SUPER-APP FAGNI */
+        /* TOPBAR SUPER-APP FAGNI (ULTRA PREMIUM — SANS DÉGRADÉ) */
         .fagni-topbar{
-            background: radial-gradient(circle at 0 0,#111827 0,#020617 45%,#020617 100%);
+            background:#020617; /* bleu nuit premium, sans dégradé */
             color:#f9fafb;
             padding:10px 16px;
             display:flex;
             align-items:center;
             justify-content:space-between;
             gap:12px;
+
+            position: relative;
+            overflow: hidden;
+
+            border-bottom: 1px solid rgba(255,122,0,0.22); /* orange subtil */
+            box-shadow: 0 10px 26px rgba(2,6,23,0.35);
         }
+        .fagni-topbar::after{
+            content:"";
+            position:absolute;
+            left:0; right:0; bottom:-1px;
+            height:2px;
+            background:#FF7A00; /* orange marque */
+            opacity:0.9;
+        }
+
         .fagni-topbar-left{ display:flex; align-items:center; gap:10px; }
         .fagni-logo{ display:flex; align-items:center; gap:8px; text-decoration:none; color:inherit; }
         .fagni-logo-mark{

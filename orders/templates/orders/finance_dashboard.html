@@ -8,12 +8,15 @@
     <div class="page-header__left">
         <h1 class="page-title">Dashboard financier FAGNI</h1>
         <p class="page-subtitle">
-            Vue synthèse : CA client, reversements partenaires et revenu FAGNI.
+            Source de vérité : compute_order_amounts() + TVA sur revenus FAGNI.
         </p>
     </div>
     <div class="page-header__right">
         <a href="{% url 'orders:list' %}" class="btn btn-light">
             ← Retour liste des commandes
+        </a>
+        <a href="{% url 'orders:export_finance_xlsx' %}?payment={{ payment_filter }}" class="btn btn-primary">
+            ⬇️ Export Excel
         </a>
     </div>
 </div>
@@ -36,6 +39,12 @@
                class="btn btn-sm {% if payment_filter == 'unpaid' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
                 Non payées
             </a>
+
+            {% if vat_rate %}
+                <span class="badge bg-secondary" style="margin-left:10px;">
+                    TVA FAGNI : {{ vat_rate }}%
+                </span>
+            {% endif %}
         </div>
     </div>
 
@@ -45,7 +54,7 @@
         <div class="col-12 col-md-4">
             <div class="card h-100">
                 <div class="card-body">
-                    <h2 class="h6 text-muted">CA total facturé au client</h2>
+                    <h2 class="h6 text-muted">CA total facturé au client (TTC)</h2>
                     <p class="h4 mb-1">
                         {{ ca_client_total|money }} FCFA
                     </p>
@@ -86,10 +95,10 @@
                     <p class="mb-0 text-muted small">
                         Marge logistique :
                         <strong>{{ logistic_margin_total|money }} FCFA</strong><br>
-                        Service fee total :
+                        Service fee total (HT) :
                         <strong>{{ service_fee_total|money }} FCFA</strong><br>
                         <span class="text-muted">
-                            Vérif indicative : CA client ≈ Partenaires + Revenu FAGNI
+                            Contrôle : CA client ≈ partenaires + revenu FAGNI
                         </span>
                     </p>
                 </div>
@@ -100,7 +109,7 @@
     <!-- Tableau des commandes -->
     <div class="card">
         <div class="card-body">
-            <h2 class="h5 mb-3">Dernières commandes prises en compte</h2>
+            <h2 class="h5 mb-3">Commandes (aperçu)</h2>
 
             {% if orders %}
                 <div class="table-responsive">
@@ -111,12 +120,12 @@
                             <th>Code</th>
                             <th>Client</th>
                             <th>Blanchisserie</th>
-                            <th class="text-end">Total client</th>
+                            <th class="text-end">Total client (TTC)</th>
                             <th class="text-end">Blanchisserie</th>
                             <th class="text-end">Livreur</th>
                             <th class="text-end">Partenaires</th>
-                            <th class="text-end">Service fee</th>
-                            <th class="text-end">FAGNI TTC</th>
+                            <th class="text-end">Service fee (HT)</th>
+                            <th class="text-end">FAGNI (TTC)</th>
                             <th class="text-end">Marge logistique</th>
                             <th>Paiement</th>
                         </tr>
@@ -150,27 +159,15 @@
                                         —
                                     {% endif %}
                                 </td>
-                                <td class="text-end">
-                                    {{ o.total_client_expr|money }} FCFA
-                                </td>
-                                <td class="text-end">
-                                    {{ o.amount_laundry_safe|money }} FCFA
-                                </td>
-                                <td class="text-end">
-                                    {{ o.amount_driver_safe|money }} FCFA
-                                </td>
-                                <td class="text-end">
-                                    {{ o.partners_expr|money }} FCFA
-                                </td>
-                                <td class="text-end">
-                                    {{ o.service_fee_safe|money }} FCFA
-                                </td>
-                                <td class="text-end">
-                                    {{ o.fagni_revenue_ttc_safe|money }} FCFA
-                                </td>
-                                <td class="text-end">
-                                    {{ o.logistic_margin_safe|money }} FCFA
-                                </td>
+
+                                <td class="text-end">{{ o.fin_total_client|money }} FCFA</td>
+                                <td class="text-end">{{ o.fin_amount_laundry|money }} FCFA</td>
+                                <td class="text-end">{{ o.fin_amount_driver|money }} FCFA</td>
+                                <td class="text-end">{{ o.fin_partners_total|money }} FCFA</td>
+                                <td class="text-end">{{ o.fin_service_fee|money }} FCFA</td>
+                                <td class="text-end">{{ o.fin_fagni_ttc|money }} FCFA</td>
+                                <td class="text-end">{{ o.fin_logistic_margin|money }} FCFA</td>
+
                                 <td>
                                     {% if o.payment_status == "paid" %}
                                         <span class="badge bg-success">Payée</span>

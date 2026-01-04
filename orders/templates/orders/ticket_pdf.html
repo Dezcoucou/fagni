@@ -1,63 +1,122 @@
-{% load static %}
+{% extends "base.html" %}
 {% load money_filters %}
 
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="utf-8">
-  <title>Ticket commande {{ order.code|default:order.id }}</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:20px;color:#111}
-    .wrap{max-width:820px;margin:0 auto}
-    .top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
-    .brand{font-weight:900;font-size:20px}
-    .muted{color:#6b7280;font-size:12px}
-    .card{border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-top:12px}
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:8px 6px;border-bottom:1px solid #f0f0f0;font-size:13px;vertical-align:top}
-    th{background:#f9fafb;text-align:left;font-weight:700}
-    .num{text-align:right;white-space:nowrap}
-    .tot{font-weight:900}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    @media print{body{margin:0}.card{break-inside:avoid}}
-  </style>
-</head>
-<body>
-<div class="wrap">
+{% block title %}Ticket commande {{ order.code|default:order.id }}{% endblock %}
 
-  <div class="top">
-    <div>
-      <div class="brand">FAGNI</div>
-      <div class="muted">Ticket de commande (A4)</div>
+{% block content %}
+<style>
+  .ticket-wrap{max-width:920px;margin:0 auto;padding:16px}
+  .ticket-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:12px}
+  .brand{display:flex;flex-direction:column;gap:4px}
+  .brand-title{font-size:20px;font-weight:800;letter-spacing:.3px}
+  .brand-sub{font-size:12px;color:#6b7280}
+  .qr-box{min-width:140px;text-align:right}
+  .qr-img{width:120px;height:120px;border:1px solid #e5e7eb;border-radius:10px;padding:6px;background:#fff}
+  .meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+  .meta .card{border:1px solid #e5e7eb;border-radius:12px;padding:12px;background:#fff}
+  .row{display:flex;justify-content:space-between;gap:10px}
+  .muted{color:#6b7280;font-size:12px}
+  .small{font-size:12px}
+  .badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700}
+  .b-success{background:#dcfce7;color:#166534}
+  .b-warning{background:#fef9c3;color:#854d0e}
+  .b-secondary{background:#e5e7eb;color:#111827}
+  .card{border:1px solid #e5e7eb;border-radius:12px;padding:12px;background:#fff;margin-top:12px}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  thead th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding:10px 8px;text-align:left}
+  tbody td{border-bottom:1px solid #f3f4f6;padding:10px 8px;vertical-align:top}
+  .num{text-align:right;white-space:nowrap}
+  .total-box{margin-top:10px}
+  .total-box td{border-bottom:none;padding:6px 8px}
+  .line{height:1px;background:#e5e7eb;margin:10px 0}
+  .highlight-express td{color:#b45309;font-weight:700}
+  .footer{margin-top:14px;color:#6b7280;font-size:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  @media print{
+    .ticket-wrap{padding:0}
+    .card{break-inside:avoid}
+  }
+</style>
+
+<div class="ticket-wrap">
+
+  <div class="ticket-top">
+    <div class="brand">
+      <div class="brand-title">FAGNI</div>
+      <div class="brand-sub">
+        Ticket / Facture – Commande {{ order.code|default:order.id }}
+      </div>
+
+      <div class="muted">
+        {% if invoice_settings %}
+          {{ invoice_settings.company_name|default:"—" }}
+          {% if invoice_settings.company_city %} – {{ invoice_settings.company_city }}{% endif %}
+          {% if invoice_settings.company_phone %} • {{ invoice_settings.company_phone }}{% endif %}
+        {% else %}
+          Blanchisserie & logistique
+        {% endif %}
+      </div>
     </div>
-    <div style="text-align:right">
-      <div><strong>{{ order.code|default:order.id }}</strong></div>
-      <div class="muted">Créée le {{ order.created_at|date:"d/m/Y H:i" }}</div>
-      {% if order.pickup_date %}
-        <div class="muted">Collecte : {{ order.pickup_date|date:"d/m/Y" }}</div>
+
+    <div class="qr-box">
+      {% if qr_b64 %}
+        <img class="qr-img" src="data:image/png;base64,{{ qr_b64 }}" alt="QR code">
+      {% else %}
+        <div class="muted small">QR indisponible</div>
       {% endif %}
-      {% if order.pickup_time_slot %}
-        <div class="muted">Créneau : {{ order.pickup_time_slot }}</div>
-      {% endif %}
+      <div class="muted small" style="margin-top:6px;">
+        Scan pour ouvrir le détail
+      </div>
     </div>
   </div>
 
-  <div class="card grid">
-    <div>
-      <div><strong>Client</strong></div>
-      <div>{{ order.customer.name|default:"—" }}</div>
-      <div class="muted">{{ order.customer.phone|default:"—" }}</div>
-      <div class="muted">{{ order.customer.address|default:"—" }}</div>
+  <div class="meta">
+    <div class="card">
+      <div class="row">
+        <div>
+          <div class="muted">Client</div>
+          <div style="font-weight:800;">
+            {% if order.customer %}{{ order.customer.name|default:"Client FAGNI" }}{% else %}—{% endif %}
+          </div>
+          {% if order.customer and order.customer.phone %}
+            <div class="muted">Tel : {{ order.customer.phone }}</div>
+          {% endif %}
+        </div>
+        <div style="text-align:right;">
+          <div class="muted">Date</div>
+          <div style="font-weight:800;">
+            {% if order.created_at %}{{ order.created_at|date:"d/m/Y H:i" }}{% else %}—{% endif %}
+          </div>
+          <div class="muted">Statut : {{ order.get_status_display|default:order.status }}</div>
+        </div>
+      </div>
     </div>
-    <div>
-      <div><strong>Partenaires</strong></div>
-      <div class="muted">🧺 {{ order.laundry_partner.name|default:"—" }}</div>
-      <div class="muted">🛵 {{ order.delivery_partner.name|default:"—" }}</div>
-      <div class="muted">Statut : {{ order.get_status_display|default:order.status }}</div>
-      {% if order.payment_status %}
-        <div class="muted">Paiement : {{ order.get_payment_status_display|default:order.payment_status }}</div>
-      {% endif %}
+
+    <div class="card">
+      <div class="muted">Partenaires</div>
+      <div class="row" style="margin-top:6px;">
+        <div>
+          <div class="small"><strong>Blanchisserie</strong></div>
+          <div class="muted">
+            {% if order.laundry_partner %}{{ order.laundry_partner.name }}{% else %}—{% endif %}
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="small"><strong>Livreur</strong></div>
+          <div class="muted">
+            {% if order.delivery_partner %}{{ order.delivery_partner.name }}{% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:10px;">
+        {% if order.payment_status == "paid" %}
+          <span class="badge b-success">Payée</span>
+        {% elif order.payment_status == "unpaid" %}
+          <span class="badge b-warning">Non payée</span>
+        {% else %}
+          <span class="badge b-secondary">{{ order.get_payment_status_display|default:order.payment_status }}</span>
+        {% endif %}
+      </div>
     </div>
   </div>
 
@@ -80,14 +139,26 @@
         {% for it in items %}
           <tr>
             <td>
-              <strong>{{ it.service.name|default:it.service|default:"—" }}</strong>
+              <strong>
+                {% if it.ticket_name %}
+                  {{ it.ticket_name }}
+                {% elif it.designation %}
+                  {{ it.designation }}
+                {% elif it.service %}
+                  {{ it.service.name|default:"—" }}
+                {% else %}
+                  —
+                {% endif %}
+              </strong>
               {% if it.description %}
                 <div class="muted">{{ it.description }}</div>
               {% endif %}
             </td>
             <td class="num">{{ it.quantity|default:0 }}</td>
             <td class="num">{{ it.unit_price|default:0|money }} FCFA</td>
-            <td class="num">{{ it.total_price|default:0|money }} FCFA</td>
+            <td class="num">
+              {{ it.ticket_total|default:it.total|default:it.line_total|default:0|money }} FCFA
+            </td>
           </tr>
         {% empty %}
           <tr><td colspan="4" class="muted">Aucun article.</td></tr>
@@ -97,47 +168,64 @@
   </div>
 
   <div class="card">
-    <table>
+    <div><strong>Totaux</strong></div>
+
+    <table class="total-box">
       <tbody>
         <tr>
-          <td class="muted">Sous-total prestations</td>
-          <td class="num">{{ amounts.subtotal|default:0|money }} FCFA</td>
+          <td class="muted">Prestations</td>
+          <td class="num">{{ prestations_amount|default:0|money }} FCFA</td>
         </tr>
         <tr>
-          <td class="muted">Livraison</td>
-          <td class="num">{{ amounts.delivery_fee_client|default:order.delivery_fee|default:0|money }} FCFA</td>
+          <td class="muted">Frais de livraison</td>
+          <td class="num">{{ delivery_amount|default:0|money }} FCFA</td>
         </tr>
         <tr>
-          <td class="muted">Supplément express</td>
-          <td class="num">{{ amounts.express_for_client|default:0|money }} FCFA</td>
+          <td class="muted">Service FAGNI</td>
+          <td class="num">{{ service_amount|default:0|money }} FCFA</td>
         </tr>
-        <tr>
-          <td class="muted">Service FAGNI (HT)</td>
-          <td class="num">{{ amounts.service_fee_ht|default:order.service_fee|default:0|money }} FCFA</td>
+
+        {% if express_amount and express_amount|floatformat:"0" != "0" %}
+        <tr class="highlight-express">
+          <td class="muted">⚡ Express</td>
+          <td class="num">{{ express_amount|default:0|money }} FCFA</td>
         </tr>
+        {% endif %}
+
         <tr>
-          <td class="muted">TVA ({{ vat_rate|default:0 }}%)</td>
+          <td class="muted">TVA FAGNI ({{ vat_rate|default:"—" }}%)</td>
           <td class="num">{{ vat_amount|default:0|money }} FCFA</td>
         </tr>
+
         <tr>
-          <td class="tot">Total TTC client</td>
-          <td class="num tot">{{ total_ttc_client|default:order.total_client_ttc|default:order.total|default:0|money }} FCFA</td>
+          <td style="font-weight:900;">Total TTC</td>
+          <td class="num" style="font-weight:900;">{{ total_ttc_client|default:0|money }} FCFA</td>
         </tr>
       </tbody>
     </table>
 
-    {% if order.note %}
-      <div style="margin-top:10px">
-        <div><strong>Notes / instructions</strong></div>
-        <div class="muted">{{ order.note }}</div>
+    {% if order.fne_invoice_number %}
+      <div class="line"></div>
+      <div class="muted small">
+        Facture normalisée (FNE) : <strong>{{ order.fne_invoice_number }}</strong>
       </div>
     {% endif %}
   </div>
 
-  <div class="muted" style="margin-top:10px">
-    Référence : {{ order.id }} — QR : {{ qr_data }}
+  <div class="footer">
+    <div>
+      {% if invoice_settings and invoice_settings.company_address %}
+        {{ invoice_settings.company_address }}
+      {% else %}
+        Merci pour votre confiance.
+      {% endif %}
+    </div>
+    <div class="muted">
+      {% if order.invoice_number %}
+        Facture : <strong>{{ order.invoice_number }}</strong>
+      {% endif %}
+    </div>
   </div>
 
 </div>
-</body>
-</html>
+{% endblock %}

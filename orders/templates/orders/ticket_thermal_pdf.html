@@ -1,167 +1,165 @@
-{% load static %}
 {% load money_filters %}
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <title>Ticket thermique {{ order.code }}</title>
+  <title>Ticket {{ order.code|default:order.id }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <style>
-    body { margin:0; padding:0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 11px; color:#111827; }
-    .ticket { width: 280px; margin: 0 auto; padding: 8px 8px 10px; }
-    .center { text-align:center; }
-
-    /* Classes attendues par _doc_header.html */
-    .brand { font-weight:800; font-size:16px; letter-spacing:0.12em; text-transform:uppercase; }
-    .brand span { color:#f97316; }
-    .header-logo { max-width: 140px; max-height: 50px; display:block; margin: 0 auto 4px; }
-    .header-sub { font-size:10px; color:#6b7280; margin-top:2px; }
-    .header-contact { margin-top:4px; font-size:9px; color:#6b7280; }
-    .header-note { margin-top:4px; font-size:9px; color:#6b7280; }
-
-    .line { border-top:1px dashed #d1d5db; margin:6px 0; }
-    .row { display:flex; justify-content:space-between; margin:2px 0; gap:10px; }
-    .label { font-size:10px; color:#6b7280; white-space:nowrap; }
-    .value { font-size:11px; font-weight:500; text-align:right; word-break:break-word; }
-
-    .items { margin-top:4px; }
-    .item-row { display:flex; justify-content:space-between; margin:2px 0; gap:10px; }
-    .item-left { max-width:170px; }
-    .item-name { font-size:11px; }
-    .item-meta { font-size:9px; color:#6b7280; }
-    .right { text-align:right; white-space:nowrap; }
-
-    .totals { margin-top:6px; }
-    .total-main { margin-top:4px; font-size:12px; font-weight:700; }
-
-    .qr { margin-top:6px; }
-    .qr img { width:120px; height:120px; }
-    .small { font-size:9px; color:#6b7280; }
-
-    /* Badge paiement */
-    .pay-badge {
-      display:inline-block;
-      padding:6px 14px;
-      border-radius:999px;
-      font-weight:800;
-      font-size:12px;
-      margin:6px 0 8px;
-      border:1px solid transparent;
-    }
-    .pay-badge--paid {
-      background:#dcfce7;
-      color:#166534;
-      border-color:#86efac;
-    }
-    .pay-badge--due {
-      background:#fee2e2;
-      color:#991b1b;
-      border-color:#fecaca;
-    }
-
-    /* Message métier bas */
-    .pay-note {
-      margin-top:10px;
-      padding:8px 8px;
-      border-radius:10px;
-      font-size:10px;
-      line-height:1.35;
-      border:1px dashed #d1d5db;
-      background:#f9fafb;
+    html, body { margin:0; padding:0; background:#f3f4f6; }
+    .ticket {
+      width: 80mm;
+      margin: 8px auto;
+      background:#fff;
       color:#111827;
-      text-align:center;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      border-radius: 10px;
+      box-shadow: 0 2px 18px rgba(0,0,0,.08);
+      overflow:hidden;
     }
-
-    .footer { margin-top:6px; }
-    @media print { body { margin:0; padding:0; } .ticket { margin:0; } }
+    .pad{ padding:12px; }
+    .brand { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+    .brand .name { font-weight:900; font-size:16px; letter-spacing:.2px; }
+    .brand .sub { color:#6b7280; font-size:11px; margin-top:2px; }
+    .qr { width:58px; height:58px; border:1px solid #e5e7eb; border-radius:10px; display:flex; align-items:center; justify-content:center; background:#fff; overflow:hidden; }
+    .row { display:flex; justify-content:space-between; gap:10px; font-size:12px; margin-top:6px; }
+    .label { color:#6b7280; }
+    .value { font-weight:700; text-align:right; }
+    .line { height:1px; background:#e5e7eb; margin:10px 0; }
+    .items { display:flex; flex-direction:column; gap:8px; }
+    .item-row { display:flex; justify-content:space-between; gap:10px; }
+    .item-left { flex: 1; min-width: 0; }
+    .item-name { font-weight:800; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .item-meta { color:#6b7280; font-size:11px; margin-top:2px; }
+    .right { font-weight:900; font-size:12px; white-space:nowrap; }
+    .totals .row { margin-top:6px; }
+    .express { color:#b45309; font-weight:900; }
+    .grand { font-size:14px; font-weight:900; }
+    .small { font-size:11px; color:#6b7280; }
+    .badge { display:inline-block; padding:4px 8px; border-radius:999px; font-size:11px; font-weight:900; }
+    .b-success{background:#dcfce7;color:#166534}
+    .b-warning{background:#fef9c3;color:#854d0e}
+    .b-secondary{background:#e5e7eb;color:#111827}
+    @media print {
+      html, body { background:#fff; }
+      .ticket { box-shadow:none; margin:0; border-radius:0; }
+    }
   </style>
 </head>
 <body>
-<div class="ticket">
+  <div class="ticket">
+    <div class="pad">
 
-  <div class="center">
-    {% include "orders/_doc_header.html" with default_tagline="Pressing & Livraison" %}
-  </div>
-
-  {# ✅ Badge paiement (sans ambiguïté) #}
-  <div class="center">
-    {% if order.payment_status == "paid" %}
-      <div class="pay-badge pay-badge--paid">🟢 COMMANDE PAYÉE</div>
-    {% else %}
-      <div class="pay-badge pay-badge--due">🔴 PAIEMENT À ENCAISSER</div>
-    {% endif %}
-  </div>
-
-  <div class="line"></div>
-
-  <div class="row"><div class="label">Commande</div><div class="value">{{ order.code|default:order.id }}</div></div>
-  <div class="row"><div class="label">Date</div><div class="value">{{ order.created_at|date:"d/m/Y H:i" }}</div></div>
-  <div class="row"><div class="label">Client</div><div class="value">{{ order.customer.name|default:"—" }}</div></div>
-  {% if order.customer.phone %}
-    <div class="row"><div class="label">Tel</div><div class="value">{{ order.customer.phone }}</div></div>
-  {% endif %}
-
-  <div class="line"></div>
-
-  <div class="items">
-    {% for item in items %}
-      <div class="item-row">
-        <div class="item-left">
-          <div class="item-name">{{ item.designation }}</div>
-          <div class="item-meta">{{ item.quantity }} x {{ item.unit_price|money }} FCFA</div>
+      <div class="brand">
+        <div>
+          <div class="name">FAGNI</div>
+          <div class="sub">Ticket – {{ order.code|default:order.id }}</div>
+          {% if invoice_settings and invoice_settings.company_city %}
+            <div class="sub">{{ invoice_settings.company_city }}</div>
+          {% endif %}
         </div>
-        <div class="right">{{ item.total|money }} FCFA</div>
+
+        <div class="qr">
+          {% if qr_b64 %}
+            <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR" style="width:100%;height:100%;object-fit:contain;">
+          {% else %}
+            <div class="small" style="padding:6px; text-align:center;">
+              QR<br>INDISP
+            </div>
+          {% endif %}
+        </div>
       </div>
-    {% empty %}
-      <div class="small">Aucune ligne de commande.</div>
-    {% endfor %}
-  </div>
 
-  <div class="line"></div>
+      <div class="row"><div class="label">Commande</div><div class="value">{{ order.code|default:order.id }}</div></div>
+      <div class="row"><div class="label">Date</div><div class="value">{{ order.created_at|date:"d/m/Y H:i" }}</div></div>
+      <div class="row"><div class="label">Client</div><div class="value">{% if order.customer %}{{ order.customer.name|default:"—" }}{% else %}—{% endif %}</div></div>
+      {% if order.customer and order.customer.phone %}
+        <div class="row"><div class="label">Tel</div><div class="value">{{ order.customer.phone }}</div></div>
+      {% endif %}
 
-  <div class="totals">
-    <div class="row"><div class="label">Sous-total prestations</div><div class="value">{{ amounts.subtotal|default:0|money }} FCFA</div></div>
-    <div class="row"><div class="label">Service FAGNI</div><div class="value">{{ amounts.service_fee_ht|default:0|money }} FCFA</div></div>
-    <div class="row"><div class="label">Livraison</div><div class="value">{{ amounts.delivery_fee_client|default:0|money }} FCFA</div></div>
+      <div class="line"></div>
 
-    {% if amounts.express_for_client and amounts.express_for_client > 0 %}
-      <div class="row"><div class="label">Supplément express</div><div class="value">{{ amounts.express_for_client|money }} FCFA</div></div>
-    {% endif %}
+      <div class="items">
+        {% for item in items %}
+          <div class="item-row">
+            <div class="item-left">
+              <div class="item-name">
+                {% if item.ticket_name %}
+                  {{ item.ticket_name }}
+                {% elif item.designation %}
+                  {{ item.designation }}
+                {% elif item.service %}
+                  {{ item.service.name|default:"—" }}
+                {% else %}
+                  —
+                {% endif %}
+              </div>
+              <div class="item-meta">{{ item.quantity|default:0 }} x {{ item.unit_price|default:0|money }} FCFA</div>
+            </div>
+            <div class="right">{{ item.ticket_total|default:item.total|default:item.line_total|default:0|money }} FCFA</div>
+          </div>
+        {% empty %}
+          <div class="small">Aucune ligne de commande.</div>
+        {% endfor %}
+      </div>
 
-    <div class="row"><div class="label">TVA FAGNI ({{ vat_rate }}%)</div><div class="value">{{ vat_amount|default:0|money }} FCFA</div></div>
-    <div class="row total-main"><div>Total TTC</div><div>{{ total_ttc_client|money }} FCFA</div></div>
-  </div>
+      <div class="line"></div>
 
-  <div class="line"></div>
+      <div class="totals">
+        <div class="row"><div class="label">Prestations</div><div class="value">{{ prestations_amount|default:0|money }} FCFA</div></div>
+        <div class="row"><div class="label">Livraison</div><div class="value">{{ delivery_amount|default:0|money }} FCFA</div></div>
+        <div class="row"><div class="label">Service FAGNI</div><div class="value">{{ service_amount|default:0|money }} FCFA</div></div>
 
-  <div class="center qr">
-    {% if qr_data %}
-      <img src="https://api.qrserver.com/v1/create-qr-code/?data={{ qr_data|urlencode }}&size=140x140"
-           alt="QR Code commande {{ order.code }}">
-      <div class="small">Scanner pour vérifier la commande</div>
-    {% else %}
-      <div class="small">(QR non disponible)</div>
-    {% endif %}
-  </div>
+        {% if express_amount and express_amount|floatformat:"0" != "0" %}
+          <div class="row">
+            <div class="label">Express</div>
+            <div class="value"><span class="express">+ {{ express_amount|default:0|money }} FCFA</span></div>
+          </div>
+        {% endif %}
 
-  {# ✅ Message métier anti-litige #}
-  <div class="pay-note">
-    {% if order.payment_status == "paid" %}
-      <strong>Commande déjà réglée.</strong><br>
-      Aucun paiement n’est à effectuer auprès du livreur.
-    {% else %}
-      <strong>Paiement à effectuer à la livraison.</strong><br>
-      Merci de remettre le montant exact au livreur FAGNI.
-    {% endif %}
-  </div>
+        <div class="row"><div class="label">TVA FAGNI ({{ vat_rate|default:"—" }}%)</div><div class="value">{{ vat_amount|default:0|money }} FCFA</div></div>
 
-  <div class="center footer">
-    <div class="small">
-      {% include "orders/_doc_footer.html" %}
+        <div class="line"></div>
+
+        <div class="row">
+          <div class="label grand">TOTAL TTC</div>
+          <div class="value grand">{{ total_ttc_client|default:0|money }} FCFA</div>
+        </div>
+
+        <div style="margin-top:10px;">
+          {% if order.payment_status == "paid" %}
+            <span class="badge b-success">Payée</span>
+          {% elif order.payment_status == "unpaid" %}
+            <span class="badge b-warning">Non payée</span>
+          {% else %}
+            <span class="badge b-secondary">{{ order.get_payment_status_display|default:order.payment_status }}</span>
+          {% endif %}
+        </div>
+
+        {% if order.fne_invoice_number %}
+          <div class="line"></div>
+          <div class="small">FNE : <strong>{{ order.fne_invoice_number }}</strong></div>
+        {% endif %}
+
+        {% if order.invoice_number %}
+          <div class="small">Facture : <strong>{{ order.invoice_number }}</strong></div>
+        {% endif %}
+      </div>
+
+      <div class="line"></div>
+
+      <div class="small" style="text-align:center;">
+        Merci pour votre confiance 🙏
+      </div>
+
+      {% if qr_data %}
+        <div class="small" style="margin-top:8px; word-break:break-word;">
+          <span class="label">QR data :</span> {{ qr_data }}
+        </div>
+      {% endif %}
+
     </div>
   </div>
-
-</div>
 </body>
 </html>

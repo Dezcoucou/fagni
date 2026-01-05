@@ -37,23 +37,28 @@ def auto_assign_delivery(order) -> Optional[DeliveryPartner]:
     """
     Compat: assigne un livreur à la commande via pick_best_driver(order)
     et sauvegarde si trouvé.
+
+    IMPORTANT:
+    - Sur certains environnements (ex: Render), le champ
+      delivery_partner_unassigned_reason peut ne pas exister.
+    - Donc update_fields doit être construit dynamiquement.
     """
     dp, reason = pick_best_driver(order)
 
-    # --- si on a trouvé un livreur ---
     if dp:
         order.delivery_partner = dp
 
-        # champ optionnel (pas présent partout)
+        update_fields = ["delivery_partner"]
+
+        # Champ optionnel (ne pas casser si absent)
         if hasattr(order, "delivery_partner_unassigned_reason"):
             order.delivery_partner_unassigned_reason = None
-            order.save(update_fields=["delivery_partner", "delivery_partner_unassigned_reason"])
-        else:
-            order.save(update_fields=["delivery_partner"])
+            update_fields.append("delivery_partner_unassigned_reason")
 
+        order.save(update_fields=update_fields)
         return dp
 
-    # --- sinon, on stocke la raison si le champ existe (utile debug) ---
+    # Aucun livreur: stocker la raison uniquement si le champ existe
     if hasattr(order, "delivery_partner_unassigned_reason"):
         order.delivery_partner_unassigned_reason = reason or "Aucun livreur éligible."
         order.save(update_fields=["delivery_partner_unassigned_reason"])

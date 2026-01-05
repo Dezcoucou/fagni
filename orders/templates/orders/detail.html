@@ -396,6 +396,7 @@
         <div>
             <h1 class="page-title">Commande {{ order.code|default:order.id }}</h1>
             <p class="page-subtitle">Vue complète FAGNI – client, logistique, finances et photos pour contrôle qualité.</p>
+            <div class="chip">DEBUG ID: {{ order.id }} | CODE: {{ order.code }}</div>
 
             <div style="margin-top:6px;">
                 {% with s=order.status %}

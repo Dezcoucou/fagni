@@ -1197,9 +1197,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
 {% if GOOGLE_MAPS_API_KEY %}
 <script
-    src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&libraries=places&callback=initMap"
-    async
-    defer>
+  async
+  defer
+  src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&libraries=places&callback=initMap&loading=async">
 </script>
 {% else %}
 <script>

@@ -67,6 +67,7 @@ import csv
 import base64
 import json
 import re
+import logging
 
 
 DEC12 = DecimalField(max_digits=12, decimal_places=2)
@@ -74,6 +75,7 @@ DEC = DecimalField(max_digits=12, decimal_places=2)
 DECIMAL_ZERO = Decimal("0")
 
 
+logger = logging.getLogger(__name__)
 # =========================
 #  Helpers AJAX / Client auth
 # =========================
@@ -112,7 +114,6 @@ def client_login_required(view_func):
 # Aliases compat (anciens noms)
 client_required = client_login_required
 _client_required = client_login_required
-
 
 
 # =========================
@@ -4307,7 +4308,13 @@ def order_invoice_pdf(request, order_id):
     }
 
     html_string = render_to_string("orders/invoice_pdf.html", context=context, request=request)
-    pdf = HTML(string=html_string, base_url=request.build_absolute_uri("/")).write_pdf()
+    try:
+        pdf = HTML(string=html_string, base_url=request.build_absolute_uri("/")).write_pdf()
+    except Exception as e:
+        logger.exception("Invoice PDF generation failed (order_id=%s)", order_id)
+        if settings.DEBUG:
+            return HttpResponse(f"Invoice PDF error: {e!r}", status=500, content_type="text/plain")
+        return HttpResponse("Internal Server Error", status=500)
 
     filename = f"FACTURE-{order.invoice_number or order.code or order.id}.pdf"
     response = HttpResponse(pdf, content_type="application/pdf")

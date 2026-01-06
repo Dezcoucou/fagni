@@ -2,12 +2,21 @@
 document.addEventListener('DOMContentLoaded', function () {
     try {
 
-        const DELIVERY_MIN_FEE = parseFloat("{{ delivery_min_fee|default:'0'|unlocalize }}") || 0;
-        const DELIVERY_PRICE_PER_KM = parseFloat("{{ delivery_price_per_km|default:'0'|unlocalize }}") || 0;
-        const DELIVERY_FIXED_FEE = parseFloat("{{ delivery_fixed_fee|default:'0'|unlocalize }}") || 0;
+        function parseNum(v){
+            // Convertit "1 000", "1 000", "1,000", "1500,50" => nombre JS
+            const s = String(v ?? "0")
+                .replace(/[^\d.,-]/g, "")  // enlève espaces, espaces fines, etc.
+                .replace(",", ".");        // virgule -> point
+            const n = parseFloat(s);
+            return Number.isFinite(n) ? n : 0;
+        }
 
-        const EXPRESS_EXTRA_FLAT = parseFloat("{{ logi_express_extra_flat|default:'0'|unlocalize }}") || 0;       // ex: 3000
-        const EXPRESS_EXTRA_PERCENT = parseFloat("{{ logi_express_extra_percent|default:'0'|unlocalize }}") || 0; // ex: 0 ou 10
+        const DELIVERY_MIN_FEE = parseNum("{{ delivery_min_fee|default:'0' }}");
+        const DELIVERY_PRICE_PER_KM = parseNum("{{ delivery_price_per_km|default:'0' }}");
+        const DELIVERY_FIXED_FEE = parseNum("{{ delivery_fixed_fee|default:'0' }}");
+
+        const EXPRESS_EXTRA_FLAT = parseNum("{{ logi_express_extra_flat|default:'0' }}");        // ex: 3000
+        const EXPRESS_EXTRA_PERCENT = parseNum("{{ logi_express_extra_percent|default:'0' }}"); // ex: 0 ou 10
         const EXPRESS_ENABLED = {{ logi_express_enabled|default:True|yesno:"true,false" }};
 
         const LAUNDRIES_GEO = (function(){

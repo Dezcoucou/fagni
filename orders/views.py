@@ -3317,6 +3317,20 @@ def create(request):
     # 10) Recalcul financier complet (moteur unique) + distances + legs
     try:
         # ✅ on persiste les montants calculés (express, TVA, parts partenaires, etc.)
+        # === SAVE_DELIVERY_FIELDS_BEFORE_FINANCE ===
+        # Render/Prod: s'assurer que delivery_mode + delivery_fee sont bien persistés
+        try:
+            real_fields = {f.name for f in order._meta.fields}
+            uf = []
+            for f in ('delivery_mode', 'delivery_fee'):
+                if f in real_fields:
+                    uf.append(f)
+            if uf:
+                order.save(update_fields=uf)
+            else:
+                order.save()
+        except Exception:
+            order.save()
         order.update_financials(save=True)
     except Exception as e:
         print("Erreur update_financials:", e)
@@ -4287,7 +4301,14 @@ def order_invoice_pdf(request, order_id):
 
     html_string = render_to_string("orders/invoice_pdf.html", context=context, request=request)
     try:
-        pdf = HTML(string=html_string, base_url=request.build_absolute_uri("/")).write_pdf()
+        try:
+            pdf = HTML(string=html_string, base_url=request.build_absolute_uri("/")).write_pdf()
+        except Exception as e:
+            return HttpResponse(
+                f"<h1>Erreur génération PDF (WeasyPrint)</h1><pre>{e}</pre><hr>{html_string}",
+                content_type="text/html",
+                status=500,
+            )
     except Exception as e:
         return HttpResponse(
             f"<h1>Erreur génération PDF (WeasyPrint)</h1><pre>{e}</pre><hr>{html_string}",

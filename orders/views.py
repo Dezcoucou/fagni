@@ -3242,28 +3242,6 @@ def create(request):
 
     if driver:
         order.delivery_partner = driver
-        if hasattr(order, "delivery_partner_unassigned_reason"):
-            order.delivery_partner_unassigned_reason = None
-    else:
-        if hasattr(order, "delivery_partner_unassigned_reason"):
-            order.delivery_partner_unassigned_reason = (
-                reason or "Aucun livreur disponible au moment de la commande."
-            )
-
-    # 4) Calcul automatique des frais de livraison (après assign/geo)
-    try:
-        delivery_fee = order.compute_delivery_fee()
-    except Exception:
-        logi = getattr(settings, "FAGNI_LOGISTICS", {})
-        delivery_fee = Decimal(str(logi.get("client_min_fee", 1000)))
-
-    order.delivery_fee = delivery_fee
-
-    # On persiste ces infos avant la création des items
-    update_fields = ["laundry_partner", "delivery_partner", "delivery_fee"]
-    if hasattr(order, "delivery_partner_unassigned_reason"):
-        update_fields.append("delivery_partner_unassigned_reason")
-    order.save(update_fields=update_fields)
 
     # 9) Lignes de commande (PRIX VERROUILLÉS CÔTÉ SERVEUR)
     service_ids = request.POST.getlist("service_id[]")
@@ -4310,6 +4288,12 @@ def order_invoice_pdf(request, order_id):
     html_string = render_to_string("orders/invoice_pdf.html", context=context, request=request)
     try:
         pdf = HTML(string=html_string, base_url=request.build_absolute_uri("/")).write_pdf()
+    except Exception as e:
+        return HttpResponse(
+            f"<h1>Erreur génération PDF (WeasyPrint)</h1><pre>{e}</pre><hr>{html_string}",
+            content_type="text/html",
+            status=500,
+        )
     except Exception as e:
         logger.exception("Invoice PDF generation failed (order_id=%s)", order_id)
         if settings.DEBUG:

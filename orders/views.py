@@ -4301,25 +4301,13 @@ def order_invoice_pdf(request, order_id):
 
     html_string = render_to_string("orders/invoice_pdf.html", context=context, request=request)
     try:
-        try:
-            pdf = HTML(string=html_string, base_url=request.build_absolute_uri("/")).write_pdf()
-        except Exception as e:
-            return HttpResponse(
-                f"<h1>Erreur génération PDF (WeasyPrint)</h1><pre>{e}</pre><hr>{html_string}",
-                content_type="text/html",
-                status=500,
-            )
+        pdf = HTML(string=html_string, base_url=request.build_absolute_uri("/")).write_pdf()
     except Exception as e:
         return HttpResponse(
             f"<h1>Erreur génération PDF (WeasyPrint)</h1><pre>{e}</pre><hr>{html_string}",
             content_type="text/html",
             status=500,
         )
-    except Exception as e:
-        logger.exception("Invoice PDF generation failed (order_id=%s)", order_id)
-        if settings.DEBUG:
-            return HttpResponse(f"Invoice PDF error: {e!r}", status=500, content_type="text/plain")
-        return HttpResponse("Internal Server Error", status=500)
 
     filename = f"FACTURE-{order.invoice_number or order.code or order.id}.pdf"
     response = HttpResponse(pdf, content_type="application/pdf")

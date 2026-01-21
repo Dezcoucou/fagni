@@ -102,3 +102,7 @@ missions*.xlsx
 
 # local dev
 cookies.txt
+.venv/
+*.BAK_*
+*.BACKUP_*
+*.FIX_*

@@ -1,5 +1,5 @@
 from decimal import Decimal
-
+from django.core.exceptions import ValidationError
 from django.contrib import admin, messages
 from django.utils.html import format_html
 from django.db.models import Sum
@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.db import transaction
 
-from orders.views import _trigger_driver_payout_for_leg
+from orders.service_layer.payouts import trigger_driver_payout_for_leg
 
 from .models import (
     Customer,
@@ -219,11 +219,27 @@ class OrderAdmin(admin.ModelAdmin):
     actions = [
         "admin_validate_paid_psp",
         "admin_normalize_invoices_paid",
-        "admin_mark_unpaid",
         "admin_recompute_financials",
         "admin_catchup_wallets_paid",
         "admin_catchup_driver_payout_legs",
     ]
+
+    def get_readonly_fields(self, request, obj=None):
+        ro = list(super().get_readonly_fields(request, obj))
+        if obj:
+            from django.apps import apps
+            WalletTransaction = apps.get_model("wallets", "WalletTransaction")
+            if WalletTransaction.objects.filter(order_id=obj.pk).exists():
+                if "payment_status" not in ro:
+                    ro.append("payment_status")
+        return ro
+
+    def save_model(self, request, obj, form, change):
+        try:
+            super().save_model(request, obj, form, change)
+        except ValidationError as e:
+            # Message admin propre (pas de traceback)
+            self.message_user(request, "❌ " + "; ".join(e.messages), level=messages.ERROR)
 
     # ============================================================
     #  ACTIONS
@@ -378,26 +394,8 @@ class OrderAdmin(admin.ModelAdmin):
             f"Recalcul : {updated} OK. Erreurs : {skipped}."
         )
 
-    @admin.action(description="↩️ Marquer comme IMPAYÉ")
-    def admin_mark_unpaid(self, request, queryset):
-        updated = 0
-        skipped = 0
 
-        with transaction.atomic():
-            for order in queryset.select_for_update():
-                try:
-                    order.payment_status = "unpaid"
-                    order.payment_date = None
-                    order.amount_paid = Decimal("0")
-                    order.save(update_fields=["payment_status", "payment_date", "amount_paid"])
-                    updated += 1
-                except Exception:
-                    skipped += 1
 
-        messages.warning(
-            request,
-            f"Commandes repassées impayées : {updated}. Erreurs : {skipped}."
-        )
 
     @admin.action(description="🚚 Rattraper payout livreur (legs done)")
     def admin_catchup_driver_payout_legs(self, request, queryset):
@@ -413,7 +411,7 @@ class OrderAdmin(admin.ModelAdmin):
                 try:
                     legs_done = DeliveryLeg.objects.filter(order=order, status="done").select_related("driver")
                     for leg in legs_done:
-                        _trigger_driver_payout_for_leg(leg)
+                        trigger_driver_payout_for_leg(leg)
                     updated += 1
                 except Exception:
                     skipped += 1

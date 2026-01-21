@@ -24,7 +24,7 @@ class OrderItemForm(forms.ModelForm):
 class PaymentForm(forms.ModelForm):
     class Meta:
         model = Payment
-        fields = ["method", "amount", "status", "notes"]
+        fields = ["channel", "amount", "reference", "source"]
 
 # === Formulaire livraison ===
 class DeliveryForm(forms.ModelForm):

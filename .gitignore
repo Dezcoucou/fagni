@@ -116,3 +116,10 @@ cookies.txt
 *.FIX_*
 *.CLEANUP_*
 db_diagram.png
+
+# Template backups/snapshots (suffix after .html)
+*.html.BAD_*
+*.html.BEFORE_*
+*.html.PAYLIVE_*
+*.html.PLAN0_*
+*.html.FIXSCRIPT0_*

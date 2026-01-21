@@ -106,7 +106,9 @@ def get_or_create_internal_wallet() -> Wallet:
 def credit_wallet(
     wallet: Wallet,
     amount,
-    label: str = "",
+    description: str = "",
+    *,
+    label: Optional[str] = None,   # compat ancienne API
     order: Optional[Order] = None,
     leg=None,
     tx_type: str = "credit",
@@ -114,9 +116,17 @@ def credit_wallet(
     """
     Crédite un wallet (entrée d'argent).
     - direction = "in"
-    - type = tx_type (par ex: "credit", "topup", "payout", "mlm_commission")
-    - leg est optionnel (payouts logistiques par tronçon)
+    - type = tx_type (ex: "credit", "payout", "mlm_commission")
+    - leg optionnel (payouts logistiques par tronçon)
+
+    Compat:
+    - ancien param: label=...
+    - nouveau param: description=...
     """
+    # compat label -> description si description vide
+    if (not description) and label:
+        description = label
+
     amount = _to_decimal(amount)
     if amount <= 0:
         return None
@@ -133,8 +143,8 @@ def credit_wallet(
         type=tx_type,
         direction="in",
         amount=amount,
-        description=label or "",
-        allow_orphan=False,  # interdit si order=None et leg=None
+        description=description or "",
+        allow_orphan=False,
     )
     return tx
 
@@ -142,7 +152,9 @@ def credit_wallet(
 def debit_wallet(
     wallet: Wallet,
     amount,
-    label: str = "",
+    description: str = "",
+    *,
+    label: Optional[str] = None,   # compat ancienne API
     order: Optional[Order] = None,
     leg=None,
     tx_type: str = "debit",
@@ -152,7 +164,15 @@ def debit_wallet(
     - direction = "out"
     - type = tx_type
     - leg optionnel
+
+    Compat:
+    - ancien param: label=...
+    - nouveau param: description=...
     """
+    # compat label -> description si description vide
+    if (not description) and label:
+        description = label
+
     amount = _to_decimal(amount)
     if amount <= 0:
         return None
@@ -169,8 +189,8 @@ def debit_wallet(
         type=tx_type,
         direction="out",
         amount=amount,
-        description=label or "",
-        allow_orphan=False,  # interdit si order=None et leg=None
+        description=description or "",
+        allow_orphan=False,
     )
     return tx
 
@@ -241,7 +261,7 @@ def distribute_order_revenues(
         txs["laundry"] = credit_wallet(
             wl,
             amount_laundry,
-            label=f"Commande {order.code} – part blanchisserie",
+            description=f"Commande {order.code} – part blanchisserie",
             order=order,
             tx_type="payout",
         )
@@ -258,7 +278,7 @@ def distribute_order_revenues(
         txs["internal"] = credit_wallet(
             internal_wallet,
             fagni_ttc,
-            label=f"Commande {order.code} – revenu FAGNI TTC",
+            description=f"Commande {order.code} – revenu FAGNI TTC",
             order=order,
             tx_type="credit",
         )

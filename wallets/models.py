@@ -407,6 +407,14 @@ class WalletTransaction(models.Model):
             return -self.amount
         return self.amount
 
+    @property
+    def label(self):
+        return self.description
+
+    @label.setter
+    def label(self, value):
+        self.description = value
+
 
 class WithdrawalRequest(models.Model):
     """

@@ -25,13 +25,16 @@ def _get_pending_set() -> Set[int]:
 
 def _schedule_sync_order_status(order_id: int) -> None:
     """
-    Planifie un sync du statut commande après commit DB (on_commit),
-    avec garde-fou pour ne pas spammer / boucler si plusieurs legs changent.
+    Planifie un sync après commit DB (on_commit), avec garde-fou anti-boucles.
 
     Objectif:
-    - NE PAS réécrire les legs (pas de sync_delivery_legs_for_order ici)
-    - Autoriser un auto-heal "soft" (normalize_order_legs) sans casser accept/start/finish
+    - Auto-heal SOFT (normalize_order_legs) si dispo
+    - ✅ Sync legs (sync_delivery_legs_for_order) pour appliquer les règles métier
+      (ex: return "assigned" uniquement si pickup "done")
     - Puis recalculer Order.status à partir des legs.
+
+    Note:
+    - On évite les boucles grâce au thread-local `pending_order_ids`.
     """
     if not order_id:
         return
@@ -44,7 +47,7 @@ def _schedule_sync_order_status(order_id: int) -> None:
 
     def _run():
         try:
-            from .models import Order, sync_order_status_from_legs
+            from .models import Order, sync_order_status_from_legs, sync_delivery_legs_for_order
 
             order = Order.objects.filter(pk=order_id).first()
             if not order:
@@ -61,8 +64,18 @@ def _schedule_sync_order_status(order_id: int) -> None:
             except Exception:
                 pass
 
+            # ✅ IMPORTANT: appliquer les règles métier legs (idempotent)
+            # (ex: return reste pending tant que pickup n'est pas done)
+            try:
+                sync_delivery_legs_for_order(order)
+            except Exception:
+                pass
+
             # ✅ Recalcul du statut Order depuis les legs
-            sync_order_status_from_legs(order, save=True)
+            try:
+                sync_order_status_from_legs(order, save=True)
+            except Exception:
+                pass
 
         finally:
             pending.discard(order_id)
@@ -98,7 +111,7 @@ def deliveryleg_pre_save_capture_old_status(sender, instance: DeliveryLeg, **kwa
 
 # ============================================================
 # ✅ post_save : 1) payout si transition -> done (après commit)
-#             2) sync order status (after commit)
+#             2) sync order (legs + statut) after commit
 # ============================================================
 @receiver(post_save, sender=DeliveryLeg, dispatch_uid="orders_deliveryleg_post_save_sync_order_status")
 def deliveryleg_post_save_sync_order_status(sender, instance: DeliveryLeg, created=False, **kwargs):
@@ -114,6 +127,7 @@ def deliveryleg_post_save_sync_order_status(sender, instance: DeliveryLeg, creat
 
         became_done = (new_status == "done" and old_status != "done")
         if became_done:
+
             def _payout():
                 try:
                     from orders.service_layer.payouts import trigger_driver_payout_for_leg
@@ -134,7 +148,7 @@ def deliveryleg_post_save_sync_order_status(sender, instance: DeliveryLeg, creat
     except Exception:
         pass
 
-    # 2) ✅ Sync du statut commande depuis les legs
+    # 2) ✅ Sync legs + statut commande depuis les legs (après commit)
     if order_id:
         _schedule_sync_order_status(int(order_id))
 

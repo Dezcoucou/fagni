@@ -321,8 +321,7 @@ def sync_order_status_from_legs(order, save=False):
     - au moins un leg assigned / in_progress / done → in_progress
     """
 
-    from orders.models import DeliveryLeg
-
+    
     legs = (
         DeliveryLeg.objects
         .filter(order=order)
@@ -1221,59 +1220,229 @@ class Order(models.Model):
         save: bool = True,
     ):
         """
-        Porte d'entrée UNIQUE pour valider un paiement.
-        - Remplit payment_status/payment_date/amount_paid
-        - Remplit invoice_date/invoice_status
-        - Recalcule les montants + génère invoice_number (via update_financials)
-        - Déclenche la distribution via save() (payment_just_paid)
-        Idempotent : si déjà payé, on complète juste les champs manquants.
+        Porte d'entrée UNIQUE pour enregistrer un paiement.
+        - Si paiement partiel => ajoute Payment + sync => NE FORCE PAS paid
+        - Si paiement complet (>= total) => passe paid + facture + distribution (via save())
+        Idempotent.
         """
         from decimal import Decimal
         from django.utils import timezone
 
-        # 1) Date de paiement
         if paid_at is None:
             paid_at = timezone.now()
 
-        # 2) Assurer montants + invoice_number cohérents (sans save récursif)
+        # 1) Recalcule financiers (sans save récursif)
         try:
             self.update_financials(save=False)
         except Exception:
             pass
 
-        # 3) Statut payé
-        self.payment_status = "paid"
+        total_ttc = Decimal(str(getattr(self, "total_client_ttc", None) or 0))
+
+        # amount reçu
+        try:
+            amt_dec = Decimal(str(amount)) if amount is not None else total_ttc
+        except Exception:
+            amt_dec = Decimal("0")
+
+        # sécurités champs paiement
         if hasattr(self, "payment_method"):
-            self.payment_method = method or self.payment_method
+            self.payment_method = method or getattr(self, "payment_method", "") or "psp"
         if hasattr(self, "payment_reference") and reference:
             self.payment_reference = reference
-
-        # 4) payment_date (source de vérité)
         if getattr(self, "payment_date", None) is None:
             self.payment_date = paid_at
 
-        # 5) amount_paid
-        if amount is None:
-            total_ttc = getattr(self, "total_client_ttc", None)
-            total_ttc = Decimal(str(total_ttc)) if total_ttc not in (None, "", 0) else Decimal("0")
-            amount = total_ttc
+        # =========================
+        # ✅ CAS 1 : PAIEMENT PARTIEL
+        # =========================
+        if total_ttc > 0 and amt_dec > 0 and amt_dec < total_ttc:
+            # 1) Ajoute une ligne Payment (audit)
+            try:
+                self.add_payment(
+                    amount=int(amt_dec),
+                    channel=(method or "psp"),
+                    reference=(reference or ""),
+                    source="driver" if (method not in ("psp", "system")) else "system",
+                    save=True,
+                )
+            except Exception:
+                pass
+
+            # 2) Sync : amount_paid capé + statut reste unpaid tant que pas soldé
+            try:
+                self.sync_payment_status_from_payments(save=True)
+            except Exception:
+                pass
+
+            return self
+
+        # =========================
+        # ✅ CAS 2 : PAIEMENT TOTAL (ou >= total)
+        # =========================
+
+        # Marque paid seulement ici (pas avant)
+        self.payment_status = "paid"
+
+        # amount_paid = total (pas la somme brute)
         try:
-            self.amount_paid = Decimal(str(amount))
+            self.amount_paid = total_ttc
         except Exception:
             pass
 
-        # 6) Facturation
+        # Facture
         if getattr(self, "invoice_date", None) is None:
             self.invoice_date = self.payment_date or paid_at
-
-        # On force un statut "paid" (tu as déjà tes choix: draft/issued/paid/canceled)
         if getattr(self, "invoice_status", None) in (None, "", "draft", "issued"):
             self.invoice_status = "paid"
 
-        # 7) Persist + distribution (via save())
+        # Audit Payment idempotent (comme tu l’as déjà fait)
+        try:
+            from decimal import Decimal as _D
+            from .models import Payment as _Payment
+
+            channel = (method or "psp")[:20]
+            ref = (reference or "").strip()
+
+            pay_amount = int(_D(str(total_ttc))) if total_ttc and total_ttc > 0 else 0
+            if pay_amount > 0:
+                defaults = {"amount": pay_amount, "channel": channel, "source": "system"}
+
+                if ref:
+                    p, _ = _Payment.objects.get_or_create(
+                        order=self, reference=ref, defaults=defaults
+                    )
+                    upd = {}
+                    if getattr(p, "amount", None) != pay_amount:
+                        upd["amount"] = pay_amount
+                    if getattr(p, "channel", None) != channel:
+                        upd["channel"] = channel
+                    if not getattr(p, "source", None):
+                        upd["source"] = "system"
+                    if upd:
+                        _Payment.objects.filter(pk=p.pk).update(**upd)
+                else:
+                    _Payment.objects.get_or_create(
+                        order=self,
+                        reference="",
+                        channel=channel,
+                        amount=pay_amount,
+                        source="system",
+                    )
+        except Exception:
+            pass
+
         if save:
             self.save()
+
         return self
+
+
+    from django.db.models import Sum
+    from django.utils import timezone
+    from decimal import Decimal
+
+    def total_paid_from_payments(self) -> Decimal:
+        """
+        Source de vérité: somme des Payment.amount (entiers FCFA).
+        """
+        from .models import Payment
+        agg = Payment.objects.filter(order=self).aggregate(s=Sum("amount"))
+        s = agg.get("s") or 0
+        return Decimal(str(s)).quantize(Decimal("0.01"))
+
+    def sync_payment_status_from_payments(self, save=True) -> None:
+        """
+        Met à jour amount_paid + payment_status en fonction des paiements enregistrés.
+        Règles:
+        - amount_paid = min(sum(payments), total_client_ttc)
+        - payment_status reste 'unpaid' tant que pas soldé (compat UI)
+        - passe à 'paid' uniquement quand sum >= total
+        - la distribution ne part qu’au moment où on devient 'paid'
+        """
+        from django.utils import timezone
+        from decimal import Decimal
+
+        total_ttc = Decimal(str(getattr(self, "total_client_ttc", 0) or 0))
+        paid_sum = self.total_paid_from_payments()
+
+        if paid_sum < 0:
+            paid_sum = Decimal("0.00")
+
+        # ✅ CAP : on ne dépasse jamais le total côté Order.amount_paid
+        effective_paid = paid_sum
+        if total_ttc > 0:
+            effective_paid = min(paid_sum, total_ttc)
+
+        old_status = (getattr(self, "payment_status", None) or "unpaid")
+
+# ✅ statut: unpaid / partial / paid
+        if paid_sum <= 0:
+            new_status = "unpaid"
+        elif total_ttc > 0 and paid_sum < total_ttc:
+            new_status = "partial"
+        else:
+            new_status = "paid"
+
+        just_became_paid = (old_status != "paid" and new_status == "paid")
+
+
+        self.amount_paid = effective_paid
+        self.payment_status = new_status
+
+        if just_became_paid:
+            if getattr(self, "payment_date", None) is None:
+                self.payment_date = timezone.now()
+            if getattr(self, "invoice_date", None) is None:
+                self.invoice_date = self.payment_date
+            if getattr(self, "invoice_status", None) in (None, "", "draft", "issued"):
+                self.invoice_status = "paid"
+
+        if save:
+            self.save(update_fields=["amount_paid", "payment_status", "payment_date", "invoice_date", "invoice_status"])
+
+
+    def add_payment(self, amount, channel="psp", reference="", source="driver", confirmed_by=None, save=True):
+        """
+        Enregistre un paiement (partiel ou total), puis sync la commande.
+        Idempotent si reference fournie (order+reference unique soft via get_or_create).
+        """
+        from .models import Payment
+
+        try:
+            amt = int(Decimal(str(amount or 0)))
+        except Exception:
+            amt = 0
+        if amt <= 0:
+            return None
+
+        channel = (channel or "psp")[:20]
+        reference = (reference or "").strip()
+
+        if reference:
+            p, _ = Payment.objects.get_or_create(
+                order=self,
+                reference=reference,
+                defaults={"amount": amt, "channel": channel, "source": source, "confirmed_by": confirmed_by},
+            )
+            # normaliser si existant
+            upd = {}
+            if p.amount != amt: upd["amount"] = amt
+            if p.channel != channel: upd["channel"] = channel
+            if p.source != source: upd["source"] = source
+            if confirmed_by and p.confirmed_by_id != getattr(confirmed_by, "id", None):
+                upd["confirmed_by"] = confirmed_by
+            if upd:
+                Payment.objects.filter(pk=p.pk).update(**upd)
+        else:
+            p = Payment.objects.create(
+                order=self, amount=amt, channel=channel, reference="", source=source, confirmed_by=confirmed_by
+            )
+
+        if save:
+            self.sync_payment_status_from_payments(save=True)
+        return p
+
 
     # ---------- Propriétés de calcul ----------
     @property
@@ -1804,56 +1973,32 @@ class Order(models.Model):
 
         self.wallets_distributed = True
         super(Order, self).save(update_fields=["wallets_distributed"])
-
     def pay_driver_if_needed(self):
-        """
-        Paie le livreur à la fin de course ("done"), seulement si la commande est payée.
-        Anti-doublon basé sur WalletTransaction (source de vérité).
-        """
-        from decimal import Decimal
-        from wallets.services import credit_wallet, get_or_create_wallet_for_delivery_partner
-        from wallets.models import WalletTransaction
+        """LEGACY (désactivé): ancien paiement 'fin de course'.
 
-        # 1) La commande doit être payée
-        if self.payment_status != "paid":
+        ✅ Nouveau modèle: payout PAR JAMBE via orders.service_layer.payouts.trigger_driver_payout_for_leg()
+        Cette méthode reste pour compatibilité si du code l'appelle encore, mais elle ne crée plus
+        de payout 'order-level' sans leg.
+        """
+        if getattr(self, "payment_status", None) != "paid":
             return
 
-        # 2) Il doit y avoir un livreur assigné
-        if not self.delivery_partner:
-            return
 
-        wallet = get_or_create_wallet_for_delivery_partner(self.delivery_partner)
+        legs_done = DeliveryLeg.objects.filter(order=self, status="done").select_related("driver")
+        for leg in legs_done:
+            trigger_driver_payout_for_leg(leg)
 
-        # 3) 🔐 ANTI-DOUBLON DUR (SOURCE DE VÉRITÉ)
-        if WalletTransaction.objects.filter(
-            wallet=wallet,
-            order=self,
-            type="payout",
-            direction="in",
-        ).exists():
-            # on synchronise le flag si besoin
-            if not getattr(self, "driver_wallet_credited", False):
+        # Optionnel: synchroniser le flag cache en fonction des payouts leg existants
+        try:
+            from wallets.models import WalletTransaction
+            has_leg_payout = WalletTransaction.objects.filter(
+                order=self, leg__isnull=False, type="payout", direction="in"
+            ).exists()
+            if has_leg_payout and not getattr(self, "driver_wallet_credited", False):
                 self.driver_wallet_credited = True
-                self.save(update_fields=["driver_wallet_credited"])
-            return
-
-        # 4) Montant à payer
-        amount = self.amount_driver_partner_resolved or Decimal("0")
-        if amount <= 0:
-            return
-
-        # 5) Paiement effectif
-        credit_wallet(
-            wallet,
-            amount,
-            label=f"Commande {self.code} – paiement livreur (fin de course)",
-            order=self,
-            tx_type="payout",
-        )
-
-        # 6) Flag cache
-        self.driver_wallet_credited = True
-        self.save(update_fields=["driver_wallet_credited"])
+                super(type(self), self).save(update_fields=["driver_wallet_credited"])
+        except Exception:
+            pass
 
     def financial_timeline(self):
         """
@@ -1939,9 +2084,12 @@ class Order(models.Model):
 
         return events
 
+
     def save(self, *args, **kwargs):
         from decimal import Decimal
         from django.utils import timezone
+        from django.apps import apps
+        from django.core.exceptions import ValidationError
 
         payment_just_paid = False
         status_just_done = False
@@ -1949,12 +2097,95 @@ class Order(models.Model):
         old = None
         if self.pk:
             old = Order.objects.filter(pk=self.pk).first()
+
+            # ============================================================
+            # 🔒 GARDE-FOU (AVANT ÉCRITURE) — Interdire paid -> non-paid si tx wallet
+            # ============================================================
+            if old and getattr(old, "payment_status", None) == "paid" and getattr(self, "payment_status", None) != "paid":
+                WalletTransaction = apps.get_model("wallets", "WalletTransaction")
+                if WalletTransaction.objects.filter(order_id=self.pk).exists():
+                    raise ValidationError({"payment_status": "Impossible de marquer PAID : total_client_ttc est à 0."})
+
+            # flags transitions
             if old:
                 if old.payment_status != "paid" and self.payment_status == "paid":
                     payment_just_paid = True
                 if old.status != "done" and self.status == "done":
                     status_just_done = True
 
+        # ============================================================
+        # 🔒 VERROUS PAIEMENT (AVANT ÉCRITURE)
+        #  - paid => amount_paid=total_client_ttc + payment_date non null
+        #  - unpaid => amount_paid=0 + payment_date=None
+        #  - amount_paid borné [0, total_client_ttc]
+        # ============================================================
+        try:
+            st = (getattr(self, "payment_status", "") or "unpaid").strip().lower()
+
+            total_ttc = Decimal(str(getattr(self, "total_client_ttc", 0) or 0))
+            amt = Decimal(str(getattr(self, "amount_paid", 0) or 0))
+
+            # borne basse
+            if amt < 0:
+                raise ValidationError("amount_paid ne peut pas être négatif.")
+
+            # cap haute
+            if total_ttc > 0 and amt > total_ttc:
+                amt = total_ttc
+                self.amount_paid = total_ttc
+
+            if st == "paid":
+                # ❌ Interdire paid sans total
+                if total_ttc <= 0:
+                    raise ValidationError({"payment_status": "Impossible de marquer PAID : total_client_ttc est à 0."})
+
+                # paid => amount_paid doit être total_ttc
+                if amt < total_ttc:
+                    self.amount_paid = total_ttc
+
+                # paid => payment_date obligatoire
+                if getattr(self, "payment_date", None) is None:
+                    self.payment_date = timezone.now()
+
+            # règles statut
+            if st == "paid":
+                # paid => amount_paid doit être total_ttc (si total défini)
+                if total_ttc > 0 and amt < total_ttc:
+                    self.amount_paid = total_ttc
+
+                # paid => payment_date obligatoire
+                if getattr(self, "payment_date", None) is None:
+                    self.payment_date = timezone.now()
+
+            elif st == "unpaid":
+                # unpaid => aucun montant payé ni date
+                if amt != 0:
+                    self.amount_paid = Decimal("0")
+                if getattr(self, "payment_date", None) is not None:
+                    self.payment_date = None
+
+            elif st == "partial":
+                # cohérence simple : partial ne peut pas être soldé
+                if total_ttc > 0 and amt >= total_ttc:
+                    self.payment_status = "paid"
+                    if getattr(self, "payment_date", None) is None:
+                        self.payment_date = timezone.now()
+                elif amt <= 0:
+                    self.payment_status = "unpaid"
+                    self.amount_paid = Decimal("0")
+                    self.payment_date = None
+                else:
+                    # si partial avec montant >0 et pas de date, on peut dater
+                    if getattr(self, "payment_date", None) is None:
+                        self.payment_date = timezone.now()
+
+        except ValidationError:
+            raise
+        except Exception:
+            # ne pas casser une sauvegarde pour une conversion; on laisse le reste gérer
+            pass
+
+        # ✅ Écriture DB
         super().save(*args, **kwargs)
 
         # ============================================================
@@ -1985,12 +2216,7 @@ class Order(models.Model):
 
                 # 3) payment_date non null (source de vérité)
                 if getattr(self, "payment_date", None) is None:
-                    # priorité : old.payment_date si existait, sinon now()
-                    pd = None
-                    if old and getattr(old, "payment_date", None):
-                        pd = old.payment_date
-                    else:
-                        pd = timezone.now()
+                    pd = old.payment_date if (old and getattr(old, "payment_date", None)) else timezone.now()
                     updates["payment_date"] = pd
                     self.payment_date = pd
 
@@ -2018,7 +2244,7 @@ class Order(models.Model):
             self.mark_as_paid_and_distribute()
 
         # 2) Paiement livreur (DÉSACTIVÉ : payout driver géré par legs)
-        # payout driver géré par legs (orders.views._trigger_driver_payout_for_leg)
+        # payout driver géré par legs (orders.service_layer.payouts.trigger_driver_payout_for_leg)
         # if status_just_done or (payment_just_paid and self.status == "done"):
         #     self.pay_driver_if_needed()
 

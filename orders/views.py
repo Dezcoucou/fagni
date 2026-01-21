@@ -1,6 +1,7 @@
 from __future__ import annotations
 from functools import wraps
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import decimal
 from datetime import datetime, timedelta, time
 from django.template.loader import render_to_string
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
@@ -56,6 +57,7 @@ from .models import (
     LogisticsConfig,
 )
 from partners.models import LaundryPartner, DeliveryPartner
+from .assignment import assign_best_driver, assign_best_laundry
 from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -1134,19 +1136,70 @@ def order_mark_paid(request, order_id):
     method = (request.POST.get("payment_method") or "").strip() or None
     ref = (request.POST.get("payment_reference") or "").strip() or None
 
-    # 1) Marquer payé
-    order.payment_status = "paid"
+    from decimal import Decimal
+
+    # 1) Paiement via source-of-truth (Payment + sync)
     try:
-        # total_ttc_client peut être Decimal
-        order.amount_paid = total_ttc_client
+        # Total canon (Option A)
+        total_ttc = Decimal(str(getattr(order, "total_client_ttc", 0) or 0))
+
+        # Si ctx fournit mieux, on garde en fallback
+        try:
+            total_ctx = Decimal(str(total_ttc_client or 0))
+            if total_ctx > 0:
+                total_ttc = total_ctx
+        except Exception:
+            pass
+
+        already_paid = Decimal(str(getattr(order, "amount_paid", 0) or 0))
+        remaining = total_ttc - already_paid
+        if remaining < 0:
+            remaining = Decimal("0")
+
+        # ✅ Montant saisi (optionnel) : acompte / solde
+        raw_amt = (request.POST.get("payment_amount") or "").strip()
+        pay_amt = None
+        if raw_amt:
+            try:
+                pay_amt = Decimal(str(raw_amt).replace(" ", "").replace("\u202f", ""))
+            except Exception:
+                pay_amt = None
+
+
+        # Référence idempotente si l’utilisateur ne saisit rien
+        ref_eff = ref or f"BO-PAID-{order.id}-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+
+        if remaining > 0:
+            # channel = method (ex: cash, om, moov, card…), sinon "manual"
+            order.add_payment(
+                amount=(min(pay_amt, remaining) if pay_amt is not None else remaining),
+                channel=(method or "manual"),
+                reference=ref_eff,
+                source="backoffice",
+                confirmed_by=request.user,
+                save=True,
+            )
+        else:
+            # Rien à ajouter, mais on resynchronise au cas où
+            order.sync_payment_status_from_payments(save=True)
+
+    except Exception as e:
+        messages.warning(request, f"Paiement: erreur de sync via payments: {e}")
+
+    # (Optionnel) garder la trace du moyen / référence sur la commande
+    try:
+        if method is not None:
+            order.payment_method = method
+        if ref is not None:
+            order.payment_reference = ref
+        order.save(update_fields=["payment_method", "payment_reference", "updated_at"])
     except Exception:
         pass
-    order.payment_date = timezone.now()
 
-    if method is not None:
-        order.payment_method = method
-    if ref is not None:
-        order.payment_reference = ref
+    # 🔒 Stop si la commande n'est pas devenue "paid" ou "partial" après sync
+    if getattr(order, "payment_status", "unpaid") not in ("paid", "partial"):
+        messages.error(request, "Paiement non pris en compte (statut inchangé).")
+        return redirect("orders:detail", order_id=order.id)
 
     # 2) Facture / numéros / financials (si ton update_financials gère invoice_number)
     try:
@@ -1163,6 +1216,17 @@ def order_mark_paid(request, order_id):
             order.save(update_fields=["fne_status", "updated_at"])
     except Exception:
         pass
+
+    # ✅ Refresh order (assure état paiement à jour avant distribution/payout)
+    try:
+        order.refresh_from_db()
+    except Exception:
+        pass
+
+    # ✅ Ne distribuer / payer le livreur QUE si la commande est soldée
+    if getattr(order, "payment_status", None) != "paid":
+        messages.info(request, "Paiement enregistré. Commande non soldée (payout et distribution reportés).")
+        return redirect("orders:detail", order_id=order.id)
 
     # 4) Distribution des revenus (blanchisserie + wallet interne)
     #    (anti-doublon via order.wallets_distributed + contraintes uniques côté tx)
@@ -3465,7 +3529,7 @@ def detail(request, order_id):
     #    de la commande (compute_delivery_fee)
     # ====================================================================
     needs_delivery_recompute = (
-        (not order.delivery_fee or Decimal(str(order.delivery_fee)) == Decimal("0"))
+        (not order.delivery_fee or decimal.Decimal(str(order.delivery_fee)) == decimal.Decimal("0"))
         and order.customer
         and order.laundry_partner
     )
@@ -3491,7 +3555,7 @@ def detail(request, order_id):
     else:
         # On normalise juste le type Decimal si une valeur existe déjà
         if order.delivery_fee is not None:
-            order.delivery_fee = Decimal(str(order.delivery_fee))
+            order.delivery_fee = decimal.Decimal(str(order.delivery_fee))
 
     # ====================================================================
     # 2) APPLICATION DU MODÈLE FAGNI (update_financials)
@@ -3524,6 +3588,22 @@ def detail(request, order_id):
     # sur les champs order.* si besoin)
     finance = build_order_finance_context(order)
 
+    # juste avant context = { ... }
+    from orders.models import Payment
+    from decimal import Decimal
+
+    payments = Payment.objects.filter(order=order).order_by("-id")
+
+    try:
+        total = decimal.Decimal(str(getattr(order, "total_client_ttc", 0) or 0))
+        paid  = decimal.Decimal(str(getattr(order, "amount_paid", 0) or 0))
+    except Exception:
+        total, paid = decimal.Decimal("0"), decimal.Decimal("0")
+
+    remaining = (total - paid)
+    if remaining < 0:
+        remaining = decimal.Decimal("0")
+
     context = {
         "order": order,
         "items": items,
@@ -3533,6 +3613,8 @@ def detail(request, order_id):
         "ticket_thermal_url": ticket_thermal_url,
         "finance": finance,
         "financial_data": data,  # si un jour tu veux exploiter directement le dict
+        "payments": payments,
+        "remaining": remaining,
     }
 
     ctx_amounts = _build_invoice_context(order)
@@ -4315,7 +4397,7 @@ def order_invoice_pdf(request, order_id):
     return response
 
 
-from decimal import Decimal
+from decimal import Decimal as _Decimal
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.shortcuts import redirect, render
@@ -8148,7 +8230,7 @@ def update_leg_status(leg, action, user=None):
                     debit_wallet(
                         wallet,
                         to_reverse,
-                        label=f"Annulation leg #{leg.id} – reverse payout",
+                        description=f"Annulation leg #{leg.id} – reverse payout",
                         order=leg.order,
                         leg=leg,  # ✅ important
                         tx_type="adjustment",
@@ -8187,7 +8269,7 @@ def update_leg_status(leg, action, user=None):
             try:
                 if leg.status == "done":
                     if getattr(order, "payment_status", "unpaid") == "paid":
-                        _trigger_driver_payout_for_leg(leg)
+                        trigger_driver_payout_for_leg(leg)
 
                         # ✅ RECONCILE: si payouts existants != driver_amount => adjustment correctif
                         from decimal import Decimal
@@ -8226,7 +8308,7 @@ def update_leg_status(leg, action, user=None):
                                 credit_wallet(
                                     wallet,
                                     diff,
-                                    label=f"Correction payout leg #{leg.id} (diff +)",
+                                    description=f"Correction payout leg #{leg.id} (diff +)",
                                     order=order,
                                     leg=leg,
                                     tx_type="adjustment",
@@ -8235,7 +8317,7 @@ def update_leg_status(leg, action, user=None):
                                 debit_wallet(
                                     wallet,
                                     -diff,
-                                    label=f"Correction payout leg #{leg.id} (diff -)",
+                                    description=f"Correction payout leg #{leg.id} (diff -)",
                                     order=order,
                                     leg=leg,
                                     tx_type="adjustment",
@@ -8262,8 +8344,6 @@ def update_leg_status(leg, action, user=None):
 
 from orders.service_layer.payouts import trigger_driver_payout_for_leg
 
-def _trigger_driver_payout_for_leg(leg):
-    return trigger_driver_payout_for_leg(leg)
 
 
 def _redirect_back(request, fallback_name, **kwargs):
@@ -8444,6 +8524,10 @@ def driver_order_live_status(request, order_id):
             "id": order.id,
             "code": getattr(order, "code", None),
             "status": order.status,
+            "payment_status": getattr(order, "payment_status", None),
+            "amount_paid": float(getattr(order, "amount_paid", 0) or 0),
+            "total_ttc": float(getattr(order, "total_client_ttc", None) or getattr(order, "total", 0) or 0),
+            "amount_remaining": float(max((getattr(order, "total_client_ttc", None) or getattr(order, "total", 0) or 0) - (getattr(order, "amount_paid", 0) or 0), 0)),
             "created_at": dt_iso(getattr(order, "created_at", None)),
             "pickup_time": dt_iso(getattr(order, "pickup_time", None)),
             "dropoff_time": dt_iso(getattr(order, "dropoff_time", None)),

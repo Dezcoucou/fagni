@@ -1068,7 +1068,7 @@
                     <div class="kpi-box" style="grid-column:1 / -1;">
                         <div class="kpi-label">Payé par le client</div>
                         <div class="kpi-value"><span id="jsPayTotal">{{ total_client_ttc|default:0|money }}</span> FCFA</div>
-                        <div class="kpi-sub"><span id="jsPayPill" class="pill-soft" style="margin-right:6px;">{% if order.payment_status == "paid" %}Payé{% elif order.payment_status == "partial" %}Acompte{% else %}En attente{% endif %}</span><span id="jsPayDetails" style="font-weight:700;">Payé : {{ order.amount_paid|default:0|money }} / {{ total_client_ttc|default:0|money }} — Reste : {{ amount_remaining|default:0|money }}</span><span class="muted" style="margin-left:6px;">dont livraison : {{ delivery_fee_client|default:0|money }} FCFA</span></div>
+                        <div class="kpi-sub"><span id="jsPayPill" class="pill-soft" style="margin-right:6px;">{% if order.payment_status == "paid" %}Payé{% elif order.payment_status == "partial" %}Acompte{% else %}En attente{% endif %}</span><span id="jsPayDetails" style="font-weight:700;">Payé : {{ order.amount_paid|default:0|money }} / {{ total_client_ttc|default:0|money }} — Reste : {{ total_client_ttc|default:0|unlocalize }}</span><span class="muted" style="margin-left:6px;">dont livraison : {{ delivery_fee_client|default:0|money }} FCFA</span></div>
                     </div>
 
                     <div class="kpi-box" style="grid-column:1 / -1;">
@@ -1570,7 +1570,7 @@
 
     var total = Number(o.total_ttc || 0);
     var paid  = Number(o.amount_paid || 0);
-    var rest  = (o.amount_remaining != null) ? Number(o.amount_remaining) : Math.max(Number(o.total_ttc||0) - Number(o.amount_paid||0), 0);
+    var rest  = Number(o.amount_remaining);
     if(!isFinite(rest)) rest = Math.max(0, total - paid);
 
     var label = "En attente";

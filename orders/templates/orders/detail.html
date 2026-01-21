@@ -375,7 +375,6 @@
         color: #9a3412;
         font-weight: 700;
     }
-    /* pour éviter que la row prenne 100% de fond bizarre en flex */
     .totals-row.highlight-express {
         padding: 4px 6px;
         border-radius: 10px;
@@ -425,44 +424,7 @@
         </div>
 
         <div class="page-header__right">
-            <a href="{% url 'orders:list' %}" class="btn btn-secondary">← Retour aux commandes</a>
-
-            {% if order.id %}
-
-                {% if order.payment_status != "paid" %}
-                    <a href="{% url 'orders:update' order.id %}" class="btn btn-primary">✏️ Modifier la commande</a>
-
-                    {% if request.user.is_staff %}
-                    <form method="post" action="{% url 'orders:order_mark_paid' order.id %}" style="display:inline-flex; gap:6px; align-items:center;">
-                        {% csrf_token %}
-                        <input type="text" name="payment_method" placeholder="Moyen (OM, Moov, cash…)"
-                               style="max-width:170px; padding:8px 10px; border-radius:999px; border:1px solid #e5e7eb; font-size:12px;">
-                        <input type="text" name="payment_reference" placeholder="Référence (optionnel)"
-                               style="max-width:170px; padding:8px 10px; border-radius:999px; border:1px solid #e5e7eb; font-size:12px;">
-                        <button type="submit" class="btn btn-primary"
-                                onclick="return confirm('Confirmer encaissement ? La commande sera verrouillée et les wallets distribués.');">
-                            💳 Encaisser
-                        </button>
-                    </form>
-                    {% endif %}
-
-                {% else %}
-                    <span class="chip">🔒 Commande verrouillée (payée)</span>
-                {% endif %}
-
-                <a href="{% url 'orders:order_ticket_pdf' order.id %}" class="btn btn-primary" target="_blank">🧾 Ticket client (A4)</a>
-                <a href="{% url 'orders:order_ticket_thermal_pdf' order.id %}" class="btn btn-primary" target="_blank">🧾 Ticket thermique (80mm)</a>
-
-                {% if order.payment_status == "paid" %}
-                    <a href="{% url 'orders:order_invoice_pdf' order.id %}" class="btn btn-primary" target="_blank">
-                        ✅ Facture fiscale (A4)
-                        {% if order.invoice_number %}
-                            <span style="margin-left:6px; opacity:.75;">{{ order.invoice_number }}</span>
-                        {% endif %}
-                    </a>
-                {% endif %}
-
-            {% endif %}
+            {% include "orders/_order_actions_block.html" %}
         </div>
     </div>
 
@@ -825,115 +787,7 @@
                 {% endif %}
 
                 <!-- TOTAUX -->
-                <div class="totals-box">
-                    {% if finance %}
-                        <div class="totals-row">
-                            <span>Sous-total prestations (HT)</span>
-                            <strong>{{ finance.prestation_total|floatformat:0 }} FCFA</strong>
-                        </div>
-
-                        <div class="totals-row">
-                            <span>Service FAGNI (HT)</span>
-                            <strong>{{ finance.service_fee_ht|floatformat:0 }} FCFA</strong>
-                        </div>
-
-                        <div class="totals-row">
-                            <span>Frais de livraison facturés au client</span>
-                            <strong>{{ finance.delivery_fee_client|floatformat:0 }} FCFA</strong>
-                        </div>
-
-                        {% if amounts.express_extra_fee and amounts.express_extra_fee|floatformat:0 != "0" %}
-                            <div class="totals-row highlight-express">
-                                <span>⚡ Express</span>
-                                <strong>{{ amounts.express_extra_fee|floatformat:0 }} FCFA</strong>
-                            </div>
-                        {% endif %}
-
-                        <div class="totals-row">
-                            <span>TVA sur revenus FAGNI (18%)</span>
-                            <strong>{{ finance.vat_fagni|floatformat:0 }} FCFA</strong>
-                        </div>
-
-                        <div class="totals-row total-grand">
-                            <span><strong>Total TTC facturé au client</strong></span>
-                            <strong>{{ finance.total_ttc_client|floatformat:0 }} FCFA</strong>
-                        </div>
-
-                        <div class="divider"></div>
-
-                        <div class="totals-row">
-                            <span>Montant dû à la blanchisserie</span>
-                            <strong>{{ finance.amount_laundry|floatformat:0 }} FCFA</strong>
-                        </div>
-
-                        <div class="totals-row">
-                            <span>Montant dû au livreur</span>
-                            <strong>{{ finance.amount_driver|floatformat:0 }} FCFA</strong>
-                        </div>
-
-                        <div class="totals-row">
-                            <span>Total partenaires</span>
-                            <strong>{{ finance.partners_total|floatformat:0 }} FCFA</strong>
-                        </div>
-
-                        <div class="divider"></div>
-
-                        <div class="totals-row">
-                            <span>Revenu FAGNI (HT)</span>
-                            <strong>{{ finance.fagni_revenue_ht|floatformat:0 }} FCFA</strong>
-                        </div>
-
-                        <div class="totals-row">
-                            <span>Marge logistique / livraison FAGNI</span>
-                            <strong>{{ finance.margin_delivery|floatformat:0 }} FCFA</strong>
-                        </div>
-                    {% else %}
-                        <div class="totals-row">
-                            <span>Prestations</span>
-                            <strong>{{ order.prestation_total|floatformat:0 }} FCFA</strong>
-                        </div>
-
-                        <div class="totals-row">
-                            <span>Livraison</span>
-                            <strong>{{ order.delivery_fee|floatformat:0 }} FCFA</strong>
-                        </div>
-
-                        <div class="totals-row">
-                            <span>Service FAGNI</span>
-                            <strong>{{ order.service_fee|floatformat:0 }} FCFA</strong>
-                        </div>
-
-                        {% if amounts.express_extra_fee and amounts.express_extra_fee|floatformat:0 != "0" %}
-                            <div class="totals-row highlight-express">
-                                <span>⚡ Express</span>
-                                <strong>{{ amounts.express_extra_fee|floatformat:0 }} FCFA</strong>
-                            </div>
-                        {% elif express_client and express_client > 0 %}
-                            <div class="totals-row highlight-express">
-                                <span>⚡ Express</span>
-                                <strong>{{ express_client|floatformat:0 }} FCFA</strong>
-                            </div>
-                        {% endif %}
-
-                        {% if order.vat_fagni and order.vat_fagni > 0 %}
-                            <div class="totals-row">
-                                <span>TVA FAGNI</span>
-                                <strong>{{ order.vat_fagni|floatformat:0 }} FCFA</strong>
-                            </div>
-                        {% endif %}
-
-                        <div class="divider"></div>
-
-                        <div class="totals-row total-grand">
-                            <span><strong>Total client (TTC)</strong></span>
-                            <strong>{{ order.total_client_ttc|floatformat:0 }} FCFA</strong>
-                        </div>
-
-                        <div class="note">
-                            Total officiel = prestations + livraison + service + express + TVA FAGNI.
-                        </div>
-                    {% endif %}
-                </div>
+                {% include "orders/_payments_block.html" %}
             </section>
 
             <!-- PHOTOS GLOBALES -->

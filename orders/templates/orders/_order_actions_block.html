@@ -1,0 +1,41 @@
+{# Fragment INCLUDE : pas de extends / block ici #}
+<!-- ORDER_ACTIONS_OK -->
+
+<a href="{% url 'orders:list' %}" class="btn btn-secondary">← Retour aux commandes</a>
+
+{% if order.id %}
+
+  {% if order.payment_status != "paid" %}
+      <a href="{% url 'orders:update' order.id %}" class="btn btn-primary">✏️ Modifier la commande</a>
+
+      {% if request.user.is_staff %}
+      <form method="post" action="{% url 'orders:order_mark_paid' order.id %}" style="display:inline-flex; gap:6px; align-items:center;">
+          {% csrf_token %}
+          <input type="text" name="payment_method" placeholder="Moyen (OM, Moov, cash…)"
+                 style="max-width:170px; padding:8px 10px; border-radius:999px; border:1px solid #e5e7eb; font-size:12px;">
+          <input type="text" name="payment_reference" placeholder="Référence (optionnel)"
+                 style="max-width:170px; padding:8px 10px; border-radius:999px; border:1px solid #e5e7eb; font-size:12px;">
+          <button type="submit" class="btn btn-primary"
+                  onclick="return confirm('Confirmer encaissement ? La commande sera verrouillée et les wallets distribués.');">
+              💳 Encaisser
+          </button>
+      </form>
+      {% endif %}
+
+  {% else %}
+      <span class="chip">🔒 Commande verrouillée (payée)</span>
+  {% endif %}
+
+  <a href="{% url 'orders:order_ticket_pdf' order.id %}" class="btn btn-primary" target="_blank">🧾 Ticket client (A4)</a>
+  <a href="{% url 'orders:order_ticket_thermal_pdf' order.id %}" class="btn btn-primary" target="_blank">🧾 Ticket thermique (80mm)</a>
+
+  {% if order.payment_status == "paid" %}
+      <a href="{% url 'orders:order_invoice_pdf' order.id %}" class="btn btn-primary" target="_blank">
+          ✅ Facture fiscale (A4)
+          {% if order.invoice_number %}
+              <span style="margin-left:6px; opacity:.75;">{{ order.invoice_number }}</span>
+          {% endif %}
+      </a>
+  {% endif %}
+
+{% endif %}

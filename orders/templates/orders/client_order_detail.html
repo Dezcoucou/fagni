@@ -426,6 +426,7 @@
   const lastSync = document.getElementById("lastSync");
 
   const payTxt = document.getElementById("payTxt");
+    const payDetails = document.getElementById("payDetails");
   const payPill = document.getElementById("payPill");
 
   const phasePill = document.getElementById("phasePill");
@@ -492,22 +493,56 @@
     }
   }
 
-  function paymentLabel(ps){
-    const s = String(ps || "").toLowerCase();
+function paymentLabel(ps){
+      const s = String(ps || "").toLowerCase();
+      if(s.includes("paid") || s.includes("paye") || s.includes("payé")) return {cls:"pay-ok", label:"Payé"};
+      if(s.includes("partial")) return {cls:"pay-wait", label:"Acompte"};
+      if(s.includes("pending") || s.includes("attente") || s.includes("unpaid")) return {cls:"pay-wait", label:"En attente"};
+      if(s.includes("failed") || s.includes("echec") || s.includes("échoué")) return {cls:"pay-bad", label:"Échec"};
+      return {cls:"", label: ps};
+    }
+
+
+    // ✅ payé
     if(s.includes("paid") || s.includes("paye") || s.includes("payé")) return {cls:"pay-ok", label:"Payé"};
+
+    // ✅ en attente / impayé
     if(s.includes("pending") || s.includes("attente") || s.includes("unpaid")) return {cls:"pay-wait", label:"En attente"};
+
+    // ✅ échec
     if(s.includes("failed") || s.includes("echec") || s.includes("échoué")) return {cls:"pay-bad", label:"Échec"};
+
     if(!ps) return {cls:"", label:"non renseigné"};
     return {cls:"", label: ps};
   }
 
-  function setPayment(ps){
+  function setPayment(ps, amounts){
     const p = paymentLabel(ps);
     if(payTxt) payTxt.textContent = p.label;
     if(payPill){
       payPill.classList.remove("pay-ok","pay-wait","pay-bad");
       if(p.cls) payPill.classList.add(p.cls);
     }
+
+      // détails acompte
+      if(payDetails){
+        try{
+          const st = String(ps || "").toLowerCase();
+          const total = Number(String(amounts?.total_ttc ?? amounts?.total ?? 0).replace(",", "."));
+          const paid  = Number(String(amounts?.amount_paid ?? 0).replace(",", "."));
+          if(st.includes("partial") && total > 0 && paid > 0){
+            const rest = Math.max(0, total - paid);
+            payDetails.textContent = `Payé : ${formatMoney(paid)} / ${formatMoney(total)}  —  Reste : ${formatMoney(rest)}`;
+            payDetails.style.display = "";
+          }else{
+            payDetails.textContent = "";
+            payDetails.style.display = "none";
+          }
+        }catch(e){
+          payDetails.textContent = "";
+          payDetails.style.display = "none";
+        }
+      }
   }
 
   function formatMoney(n){
@@ -800,7 +835,7 @@
       const status = data.order?.status || "";
       setStatus(status);
 
-      setPayment(data.order?.payment_status || "");
+      setPayment(data.order?.payment_status || "", data.amounts);
 
       setAmounts(data.amounts);
 
@@ -820,10 +855,14 @@
       }
 
       if(isTerminalStatus(status)){
-        setLive(true, "Terminé");
-        stop();
-        return;
-      }
+          const ps = String(data.order?.payment_status || "").toLowerCase();
+          const isPaid = (ps.includes("paid") || ps.includes("paye") || ps.includes("payé"));
+          if(isPaid){
+            setLive(true, "Terminé");
+            stop();
+            return;
+          }
+        }
 
       setLive(true, "Connecté");
     }catch(e){

@@ -18,7 +18,7 @@
         --text-main:#111827;
         --text-muted:#6b7280;
         --shadow:0 2px 10px rgba(15,23,42,0.06);
-        --shadow2:0 8px 24px rgba(15,23,42,0.08);
+        --shadow2:0 10px 30px rgba(15,23,42,0.14);
     }
 
     .page{
@@ -92,44 +92,6 @@
         gap:8px;
         justify-content:flex-end;
         align-items:flex-start;
-    }
-
-    /* ✅ Bandeau “course non chiffrée” */
-    .pricing-alert{
-        border-radius:16px;
-        padding:12px 14px;
-        margin:0 0 14px;
-        background:linear-gradient(180deg, rgba(255,237,213,0.95), rgba(255,247,237,0.95));
-        border:1px solid #fed7aa;
-        color:#7c2d12;
-        box-shadow:var(--shadow);
-        display:flex;
-        align-items:flex-start;
-        justify-content:space-between;
-        gap:12px;
-        flex-wrap:wrap;
-    }
-    .pricing-alert strong{
-        color:#7c2d12;
-    }
-    .pricing-alert p{
-        margin:2px 0 0;
-        font-size:12px;
-        line-height:1.45;
-        color:#9a3412;
-    }
-    .pricing-alert .mini{
-        font-size:11px;
-        color:#9a3412;
-        opacity:0.95;
-        margin-top:6px;
-    }
-    .pricing-alert .cta{
-        display:flex;
-        gap:8px;
-        flex-wrap:wrap;
-        align-items:center;
-        justify-content:flex-end;
     }
 
     /* Layout */
@@ -251,12 +213,16 @@
     }
 
     .summary{
-        border-radius:16px;
+        border-radius:18px;
         padding:14px 16px;
-        border:1px solid rgba(229,231,235,0.95);
-        background:linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.95));
+        border:1px solid rgba(255,255,255,0.10);
+        background:
+            radial-gradient(1200px 280px at 0% 0%, rgba(255,122,0,0.18), transparent 60%),
+            radial-gradient(1000px 240px at 100% 0%, rgba(0,86,179,0.18), transparent 55%),
+            linear-gradient(135deg, rgba(15,23,42,0.96), rgba(30,41,59,0.96));
         color:#e2e8f0;
         box-shadow:var(--shadow2);
+        backdrop-filter: blur(6px);
     }
     .summary-title{
         display:flex;
@@ -276,10 +242,12 @@
     }
     .kpi-box{
         background:rgba(15,23,42,0.55);
-        border:1px solid rgba(148,163,184,0.35);
+        border:1px solid rgba(148,163,184,0.30);
         border-radius:14px;
         padding:10px 12px;
     }
+    .kpi-box--wide{ grid-column:1 / -1; }
+
     .kpi-label{
         font-size:11px;
         opacity:0.85;
@@ -298,6 +266,69 @@
     }
     .kpi-accent{
         color:#fbbf24;
+        font-weight:800;
+    }
+
+    /* KPI premium helpers (no inline styles) */
+    .kpi-row{
+        display:flex;
+        align-items:baseline;
+        gap:10px;
+    }
+    .kpi-unit{
+        font-size:12px;
+        opacity:.85;
+        font-weight:700;
+        letter-spacing:.02em;
+    }
+    .kpi-pill{
+        margin-left:auto;
+        font-size:11px;
+        padding:3px 10px;
+        border-radius:999px;
+        background:rgba(255,122,0,.10);
+        border:1px solid rgba(255,122,0,.25);
+        color:#ffd08a;
+        opacity:.95;
+        font-weight:700;
+    }
+    .kpi-sub-row{
+        display:flex;
+        justify-content:space-between;
+        gap:10px;
+        align-items:center;
+    }
+    .kpi-stack{
+        margin-top:8px;
+        display:grid;
+        gap:6px;
+    }
+    .kpi-strong{
+        font-weight:800;
+        color:#fff;
+    }
+    .kpi-strong-accent{
+        font-weight:900;
+        color:#fbbf24;
+    }
+    .kpi-progress{
+        height:8px;
+        border-radius:999px;
+        background:rgba(255,255,255,.10);
+        overflow:hidden;
+        border:1px solid rgba(255,255,255,.12);
+    }
+    .kpi-progress > div{
+        height:100%;
+        width:0%;
+        background:linear-gradient(90deg, rgba(255,122,0,.90), rgba(0,86,179,.60));
+    }
+    .kpi-hint{
+        font-size:11px;
+        opacity:.85;
+    }
+    .kpi-hint strong{
+        color:#fff;
         font-weight:800;
     }
 
@@ -606,14 +637,14 @@
 {% block content %}
 <div class="page"
      data-order-id="{{ order.id }}"
-     data-live-url="{% url 'orders:driver_order_live' order.id %}"
+     data-live-url="{% url 'orders:driver_order_live' order.id %}{% if driver %}?driver_id={{ driver.id }}{% endif %}"
      data-leg-action-base="/orders/drivers/app/leg/"
-     data-pickup-lat="{{ order.pickup_lat|default_if_none:''|unlocalize }}"
-     data-pickup-lng="{{ order.pickup_lng|default_if_none:''|unlocalize }}"
-     data-delivery-lat="{{ order.delivery_lat|default_if_none:''|unlocalize }}"
-     data-delivery-lng="{{ order.delivery_lng|default_if_none:''|unlocalize }}"
-     data-laundry-lat="{% if order.laundry_partner %}{{ order.laundry_partner.latitude|default_if_none:''|unlocalize }}{% endif %}"
-     data-laundry-lng="{% if order.laundry_partner %}{{ order.laundry_partner.longitude|default_if_none:''|unlocalize }}{% endif %}"
+     data-pickup-lat="{{ pickup_lat|default_if_none:''|unlocalize }}"
+     data-pickup-lng="{{ pickup_lng|default_if_none:''|unlocalize }}"
+     data-delivery-lat="{{ delivery_lat|default_if_none:''|unlocalize }}"
+     data-delivery-lng="{{ delivery_lng|default_if_none:''|unlocalize }}"
+     data-laundry-lat="{{ provider_lat|default_if_none:''|unlocalize }}"
+     data-laundry-lng="{{ provider_lng|default_if_none:''|unlocalize }}"
 >
     <div id="liveToast" class="toast"></div>
 
@@ -701,36 +732,6 @@
             </div>
         </div>
     </div>
-
-    {# ✅ Bandeau UX : course non chiffrée #}
-    {% with tc=total_client_ttc|default:0 di=driver_income|default:0 %}
-        {% if tc <= 0 or di <= 0 %}
-            <div class="pricing-alert" role="alert" aria-live="polite">
-                <div>
-                    <strong>⚠️ Course non chiffrée</strong>
-                    <p>
-                        Impossible d’accepter / démarrer / terminer tant que la commande n’est pas validée
-                        (prestations + frais + montant livreur).
-                    </p>
-                    <div class="mini">
-                        {% if order.items.count == 0 %}
-                            • Aucune prestation n’est enregistrée sur cette commande.<br>
-                        {% endif %}
-                        • Total client : <strong>{{ total_client_ttc|default:0|money }}</strong> FCFA —
-                        • Ton gain : <strong>{{ driver_income|default:0|money }}</strong> FCFA
-                    </div>
-                </div>
-                <div class="cta">
-                    {% if order.customer and order.customer.phone %}
-                        <a class="btn-soft" href="tel:{{ order.customer.phone }}">📞 Appeler client</a>
-                    {% endif %}
-                    {% if driver_wallet_url %}
-                        <a class="btn-soft" target="_blank" href="{{ driver_wallet_url }}">🚴💳 Wallet</a>
-                    {% endif %}
-                </div>
-            </div>
-        {% endif %}
-    {% endwith %}
 
     <div class="two-cols">
         <!-- LEFT -->
@@ -885,55 +886,45 @@
             </section>
 
             <!-- Timeline -->
-            <section class="card">
+            <section class="card" id="timelineCard">
                 <h2 class="card-title"><span class="emoji">🕒</span> Timeline de la course</h2>
 
                 <div class="timeline">
                     <div class="timeline-item">
                         <div class="timeline-bullet"></div>
                         <p class="timeline-title">Course créée</p>
-                        <p class="timeline-meta">{{ order.created_at|date:"d/m/Y H:i" }}</p>
+                        <p class="timeline-meta" id="tl_created">{{ order.created_at|date:"d/m/Y H:i" }}</p>
                     </div>
 
-                    {% if order.pickup_time %}
-                        <div class="timeline-item">
-                            <div class="timeline-bullet"></div>
-                            <p class="timeline-title">Collecte démarrée</p>
-                            <p class="timeline-meta">{{ order.pickup_time|date:"d/m/Y H:i" }}</p>
-                        </div>
-                    {% endif %}
+                    <div class="timeline-item" id="tlPickupWrap" {% if not order.pickup_time %}style="display:none"{% endif %}>
+                        <div class="timeline-bullet"></div>
+                        <p class="timeline-title">Collecte démarrée</p>
+                        <p class="timeline-meta" id="tl_pickup">{% if order.pickup_time %}{{ order.pickup_time|date:"d/m/Y H:i" }}{% endif %}</p>
+                    </div>
 
-                    {% if order.dropoff_time %}
-                        <div class="timeline-item">
-                            <div class="timeline-bullet"></div>
-                            <p class="timeline-title">Déposée au prestataire</p>
-                            <p class="timeline-meta">{{ order.dropoff_time|date:"d/m/Y H:i" }}</p>
-                        </div>
-                    {% endif %}
+                    <div class="timeline-item" id="tlDropoffWrap" {% if not order.dropoff_time %}style="display:none"{% endif %}>
+                        <div class="timeline-bullet"></div>
+                        <p class="timeline-title">Déposée au prestataire</p>
+                        <p class="timeline-meta" id="tl_dropoff">{% if order.dropoff_time %}{{ order.dropoff_time|date:"d/m/Y H:i" }}{% endif %}</p>
+                    </div>
 
-                    {% if order.wash_complete_time %}
-                        <div class="timeline-item">
-                            <div class="timeline-bullet"></div>
-                            <p class="timeline-title">Prestataire validé (prêt)</p>
-                            <p class="timeline-meta">{{ order.wash_complete_time|date:"d/m/Y H:i" }}</p>
-                        </div>
-                    {% endif %}
+                    <div class="timeline-item" id="tlWashWrap" {% if not order.wash_complete_time %}style="display:none"{% endif %}>
+                        <div class="timeline-bullet"></div>
+                        <p class="timeline-title">Prestataire validé (prêt)</p>
+                        <p class="timeline-meta" id="tl_wash_complete">{% if order.wash_complete_time %}{{ order.wash_complete_time|date:"d/m/Y H:i" }}{% endif %}</p>
+                    </div>
 
-                    {% if order.return_time %}
-                        <div class="timeline-item">
-                            <div class="timeline-bullet"></div>
-                            <p class="timeline-title">Reprise pour livraison</p>
-                            <p class="timeline-meta">{{ order.return_time|date:"d/m/Y H:i" }}</p>
-                        </div>
-                    {% endif %}
+                    <div class="timeline-item" id="tlReturnWrap" {% if not order.return_time %}style="display:none"{% endif %}>
+                        <div class="timeline-bullet"></div>
+                        <p class="timeline-title">Reprise pour livraison</p>
+                        <p class="timeline-meta" id="tl_return">{% if order.return_time %}{{ order.return_time|date:"d/m/Y H:i" }}{% endif %}</p>
+                    </div>
 
-                    {% if order.delivered_time %}
-                        <div class="timeline-item">
-                            <div class="timeline-bullet"></div>
-                            <p class="timeline-title">Livrée au client</p>
-                            <p class="timeline-meta">{{ order.delivered_time|date:"d/m/Y H:i" }}</p>
-                        </div>
-                    {% endif %}
+                    <div class="timeline-item" id="tlDeliveredWrap" {% if not order.delivered_time %}style="display:none"{% endif %}>
+                        <div class="timeline-bullet"></div>
+                        <p class="timeline-title">Livrée au client</p>
+                        <p class="timeline-meta" id="tl_delivered">{% if order.delivered_time %}{{ order.delivered_time|date:"d/m/Y H:i" }}{% endif %}</p>
+                    </div>
                 </div>
             </section>
 
@@ -989,45 +980,55 @@
 
                                 {% else %}
 
-                                    {% if st == "pending" %}
-                                        <form method="post" action="{% url 'orders:driver_leg_action' leg.id 'accept' %}">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn-xxs">✅ Accepter</button>
-                                        </form>
-                                    {% endif %}
+                                    {# on capture l’URL courante (avec params) pour back #}
+                                    {% with back_url=request.get_full_path|urlencode %}
 
-                                    {% if st == "assigned" %}
-                                        <form method="post" action="{% url 'orders:driver_leg_action' leg.id 'start' %}">
-                                            {% csrf_token %}
-                                            <button type="submit"
-                                                    class="btn-xxs btn-xxs-primary js-geo-action"
-                                                    data-action="start"
-                                                    data-leg="{{ leg.leg_type }}">
-                                                🚴 Démarrer
-                                            </button>
-                                        </form>
-                                    {% endif %}
+                                        {% if st == "pending" %}
+                                            <form method="post" action="{% url 'orders:driver_leg_action' leg.id 'accept' %}?back={{ back_url }}">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="back" value="{{ back_url }}">
+                                                <button type="submit" class="btn-xxs">✅ Accepter</button>
+                                            </form>
+                                        {% endif %}
 
-                                    {% if st == "in_progress" %}
-                                        <form method="post" action="{% url 'orders:driver_leg_action' leg.id 'finish' %}">
-                                            {% csrf_token %}
-                                            <button type="submit"
-                                                    class="btn-xxs btn-xxs-primary js-geo-action"
-                                                    data-action="finish"
-                                                    data-leg="{{ leg.leg_type }}">
-                                                ✅ Terminer
-                                            </button>
-                                        </form>
-                                    {% endif %}
+                                        {% if st == "assigned" %}
+                                            <form method="post" action="{% url 'orders:driver_leg_action' leg.id 'start' %}?back={{ back_url }}">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="back" value="{{ back_url }}">
+                                                <button type="submit"
+                                                        class="btn-xxs btn-xxs-primary js-geo-action"
+                                                        data-action="start"
+                                                        data-leg="{{ leg.leg_type }}">
+                                                    🚴 Démarrer
+                                                </button>
+                                            </form>
+                                        {% endif %}
 
-                                    {% if st != "done" and st != "canceled" %}
-                                        <form method="post" action="{% url 'orders:driver_leg_action' leg.id 'cancel' %}">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn-xxs">❌ Annuler</button>
-                                        </form>
-                                    {% endif %}
+                                        {% if st == "in_progress" %}
+                                            <form method="post" action="{% url 'orders:driver_leg_action' leg.id 'finish' %}?back={{ back_url }}">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="back" value="{{ back_url }}">
+                                                <button type="submit"
+                                                        class="btn-xxs btn-xxs-primary js-geo-action"
+                                                        data-action="finish"
+                                                        data-leg="{{ leg.leg_type }}">
+                                                    ✅ Terminer
+                                                </button>
+                                            </form>
+                                        {% endif %}
+
+                                        {% if st != "done" and st != "canceled" %}
+                                            <form method="post" action="{% url 'orders:driver_leg_action' leg.id 'cancel' %}?back={{ back_url }}">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="back" value="{{ back_url }}">
+                                                <button type="submit" class="btn-xxs">❌ Annuler</button>
+                                            </form>
+                                        {% endif %}
+
+                                    {% endwith %}
 
                                 {% endif %}
+
                             </div>
                         </div>
                         {% endwith %}
@@ -1047,12 +1048,48 @@
                 </div>
 
                 <div class="summary-kpi">
+                    <!-- Ton gain -->
                     <div class="kpi-box">
                         <div class="kpi-label">Ton gain</div>
-                        <div class="kpi-value"><span class="kpi-accent">{{ driver_income|default:0|money }}</span> FCFA</div>
-                        <div class="kpi-sub">sur cette course</div>
+
+                        <div class="kpi-value kpi-row">
+                            <span id="kpiDriverIncome" class="kpi-accent">{{ driver_income|default:0|money }}</span>
+                            <span class="kpi-unit">FCFA</span>
+
+                            {% if driver_leg_amount_all and driver_leg_amount_all > driver_income %}
+                                <span class="kpi-pill">Partiel</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="kpi-sub kpi-sub-row">
+                            <span>Payé (wallet) sur cette course</span>
+                            <span id="kpiDriverIncomePct" style="opacity:.85;">{{ driver_income_progress_pct|default:0 }}%</span>
+                        </div>
+
+                        {% if driver_leg_amount_all and driver_leg_amount_all > driver_income %}
+                            <div class="kpi-stack">
+                                <div class="kpi-sub kpi-sub-row">
+                                    <span>Potentiel total</span>
+                                    <strong id="kpiDriverPotential">{{ driver_leg_amount_all|money }} FCFA</strong>
+                                </div>
+
+                                <div class="kpi-sub kpi-sub-row">
+                                    <span>Reste à gagner</span>
+                                    <strong id="kpiDriverRemaining" class="kpi-accent">{{ driver_income_remaining|default:0|money }} FCFA</strong>
+                                </div>
+
+                                <div class="kpi-progress" aria-hidden="true">
+                                    <div id="kpiDriverBar" style="height:100%; width:{{ driver_income_progress_pct|default:0 }}%; background:rgba(255,122,0,.75);"></div>
+                                </div>
+
+                                <div class="kpi-hint">
+                                    (le reste s’ajoute quand les jambes restantes passent <strong>done</strong>)
+                                </div>
+                            </div>
+                        {% endif %}
                     </div>
 
+                    <!-- Distance -->
                     <div class="kpi-box">
                         <div class="kpi-label">Distance mission</div>
                         <div class="kpi-value">
@@ -1065,13 +1102,30 @@
                         <div class="kpi-sub">estimée / legs</div>
                     </div>
 
-                    <div class="kpi-box" style="grid-column:1 / -1;">
-                        <div class="kpi-label">Payé par le client</div>
-                        <div class="kpi-value"><span id="jsPayTotal">{{ total_client_ttc|default:0|money }}</span> FCFA</div>
-                        <div class="kpi-sub"><span id="jsPayPill" class="pill-soft" style="margin-right:6px;">{% if order.payment_status == "paid" %}Payé{% elif order.payment_status == "partial" %}Acompte{% else %}En attente{% endif %}</span><span id="jsPayDetails" style="font-weight:700;">Payé : {{ order.amount_paid|default:0|money }} / {{ total_client_ttc|default:0|money }} — Reste : {{ amount_remaining|default:0|money }}</span><span class="muted" style="margin-left:6px;">dont livraison : {{ delivery_fee_client|default:0|money }} FCFA</span></div>
-                    </div>
+                    <!-- Paiement client -->
+<div class="kpi-box kpi-box--wide">
+  <div class="kpi-label">Payé par le client</div>
+  <div class="kpi-value"><span id="jsPayTotal">{{ total_client_ttc|default:0|money }}</span> FCFA</div>
+  <div class="kpi-sub">
+    <span id="jsPayPill" class="pill-soft" style="margin-right:6px;">—</span>
+    <span id="jsPayDetails" style="font-weight:700;">Payé : — / — — Reste : —</span>
+    <div style="margin-top:6px;">
+dont livraison : {{ delivery_fee_client|default:0|money }} FCFA
+                            {% if express_surcharge and express_surcharge > 0 %}
+                                • express : {{ express_surcharge|default:0|money }} FCFA
+                            {% endif %}
+                            {% if service_fee_ht and service_fee_ht > 0 %}
+                                • service FAGNI : {{ service_fee_ht|default:0|money }} FCFA
+                            {% endif %}
+                            {% if vat_fagni and vat_fagni > 0 %}
+                                • TVA : {{ vat_fagni|default:0|money }} FCFA
+                            {% endif %}
+    </div>
+  </div>
+</div>
 
-                    <div class="kpi-box" style="grid-column:1 / -1;">
+                    <!-- Next step -->
+                    <div class="kpi-box kpi-box--wide">
                         <div class="kpi-label">Prochaine étape</div>
                         <div class="kpi-value" id="nextStepLabel">—</div>
                         <div class="kpi-sub" id="nextStepDistance">Distance restante : —</div>
@@ -1106,12 +1160,19 @@
                         {% for item in order.items.all %}
                             <tr>
                                 <td>
-                                    <div class="line-designation">{{ item.designation|default:item.service.name }}</div>
+                                    {% if item.designation %}
+                                        <div class="line-designation">{{ item.designation }}</div>
+                                    {% elif item.service %}
+                                        <div class="line-designation">{{ item.service.name }}</div>
+                                    {% else %}
+                                        <div class="line-designation">Sans désignation</div>
+                                    {% endif %}
+
                                     <div class="line-meta">
                                         {% if item.service and item.service.category %}
                                             {{ item.service.category.name }} •
                                         {% endif %}
-                                        ID #{{ item.service.id|default:item.id }}
+                                        ID #{% if item.service %}{{ item.service.id }}{% else %}{{ item.id }}{% endif %}
                                     </div>
                                 </td>
                                 <td class="num">{{ item.quantity }}</td>
@@ -1186,7 +1247,6 @@
         {% endif %}
       {% endwith %}
     </div>
-    </div>
 </div>
 {% endblock %}
 
@@ -1194,9 +1254,6 @@
 <script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
 
 <script>
-// ==========================================
-    
-
   (function () {
     if (!window.L) return;
 
@@ -1278,7 +1335,7 @@
       body: body.toString(),
       credentials: "same-origin"
     }).then(function (r) {
-      return r.json()["catch"](function () { return {}; }).then(function (j) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
         if (!r.ok) {
           var err = (j && (j.error || j.detail)) ? (j.error || j.detail) : ("HTTP " + r.status);
           throw new Error(err);
@@ -1286,6 +1343,12 @@
         return j;
       });
     });
+  }
+
+  function fmtXof(n){
+    n = Number(n || 0);
+    try { return new Intl.NumberFormat("fr-FR").format(Math.round(n)); }
+    catch(e){ return String(Math.round(n)); }
   }
 
   // ==========================================
@@ -1376,16 +1439,13 @@
     attribution: "&copy; OpenStreetMap"
   }).addTo(map);
 
-  // ✅ Dès qu’une tuile arrive → on enlève l’overlay
   tiles.once("tileload", function(){ hideLoading(); });
   tiles.once("load", function(){ hideLoading(); });
 
-  // ❌ Si problème réseau/quota/blocage → message clair
   tiles.on("tileerror", function(){
     showLoading("⚠️ Carte indisponible (réseau/tiles). Utilise les boutons Google Maps.");
   });
 
-  // ✅ Icône FAGNI
   var fagniIcon = L.icon({
     iconRetinaUrl: "{% static 'vendor/leaflet/images/marker-icon-2x.png' %}",
     iconUrl: "{% static 'vendor/leaflet/images/marker-icon.png' %}",
@@ -1419,10 +1479,8 @@
     map.setView(center, 15);
   }
 
-  // ✅ mobile : délai plus long + invalidateSize(true)
   setTimeout(function () { map.invalidateSize(true); }, 650);
 
-  // ✅ orientationchange / resize : évite la carte “bloquée”
   window.addEventListener("resize", function(){ setTimeout(function(){ map.invalidateSize(true); }, 250); });
   window.addEventListener("orientationchange", function(){ setTimeout(function(){ map.invalidateSize(true); }, 450); });
 
@@ -1443,7 +1501,7 @@
 
     return postForm(UPDATE_URL, { lat: lat, lng: lng })
       .then(function () { return { ok: true }; })
-      ["catch"](function (e) {
+      .catch(function (e) {
         console.warn("GPS sync error:", e && e.message ? e.message : e);
         return { ok: false, error: (e && e.message) ? e.message : "Erreur envoi GPS" };
       });
@@ -1552,90 +1610,166 @@
   if (btnStartWatch) btnStartWatch.addEventListener("click", startWatch);
   if (btnStopWatch)  btnStopWatch.addEventListener("click", stopWatch);
 
+  // ==========================================
+  // LIVE REFRESH (Lot 4.4) — sans reload
+  // ==========================================
+  var liveUrl = page.dataset.liveUrl;
+
+  function statusLabel(s){
+    if (s === "pending") return "⏳ En attente";
+    if (s === "assigned") return "📌 Assignée";
+    if (s === "in_progress") return "🚴 En cours";
+    if (s === "done") return "✅ Terminée";
+    if (s === "canceled") return "❌ Annulée";
+    return s || "—";
+  }
+
+  function showToast(html){
+    var t = document.getElementById("liveToast");
+    if (!t) return;
+    t.innerHTML = html;
+    t.style.display = "block";
+    clearTimeout(showToast._tm);
+    showToast._tm = setTimeout(function(){ t.style.display = "none"; }, 2500);
+  }
+
+  function setOrderBadge(status){
+    var b = document.getElementById("orderStatusBadge");
+    if (!b) return;
+    b.className = "badge-status " + (status || "");
+    b.textContent = (status === "pending") ? "⏳ En attente"
+      : (status === "in_progress") ? "🚦 En cours"
+      : (status === "done") ? "✅ Terminée"
+      : (status === "canceled") ? "❌ Annulée"
+      : ("📦 " + (status || "—"));
+  }
+
+  function setLegBadge(card, status){
+    var badge = card.querySelector(".js-leg-status-badge");
+    var txt   = card.querySelector(".js-leg-status-text");
+    if (badge){
+      badge.className = "leg-status-badge js-leg-status-badge leg-status-" + (status || "");
+    }
+    if (txt){
+      txt.textContent = statusLabel(status);
+    }
+  }
+  
+  function setTime(wrapId, textId, value){
+    // Si tu as des wrappers (ex: <div id="tlPickupWrap">...</div>)
+    // on les affiche/masque proprement.
+    var wrap = wrapId ? document.getElementById(wrapId) : null;
+    var el   = textId ? document.getElementById(textId) : null;
+
+    if (!el && !wrap) return;
+
+    if (value){
+      if (el) el.textContent = value;
+      if (wrap) wrap.style.display = "";
+    } else {
+      // si pas de valeur, on masque le bloc si wrapper existe
+      if (wrap) wrap.style.display = "none";
+    }
+  }
+
+  function applyLive(payload){
+    if (!payload || !payload.ok) return;
+
+    // --- Order badge ---
+    setOrderBadge(payload.order && payload.order.status);
+
+    // --- Legs grid ---
+    var mapById = {};
+    (payload.legs || []).forEach(function(l){ mapById[String(l.id)] = l; });
+
+    document.querySelectorAll("#legsGrid .leg-card[data-leg-id]").forEach(function(card){
+      var id = card.getAttribute("data-leg-id");
+      var leg = mapById[String(id)];
+      if (!leg) return;
+
+      var dEl = card.querySelector(".js-leg-distance");
+      if (dEl) dEl.textContent = (leg.distance_km || 0).toFixed(2);
+
+      var aEl = card.querySelector(".js-leg-amount");
+      if (aEl) aEl.textContent = String(Math.round(leg.driver_amount || 0));
+
+      setLegBadge(card, leg.status);
+    });
+
+    // -------- Timeline live --------
+    if (payload.order_times){
+      var t = payload.order_times;
+
+      // Version “simple” : si tu as juste des <p id="tl_pickup">...</p>
+      var elPickup = document.getElementById("tl_pickup");
+      if (elPickup && t.pickup_time) elPickup.textContent = t.pickup_time;
+
+      var elDropoff = document.getElementById("tl_dropoff");
+      if (elDropoff && t.dropoff_time) elDropoff.textContent = t.dropoff_time;
+
+      var elWash = document.getElementById("tl_wash_complete");
+      if (elWash && t.wash_complete_time) elWash.textContent = t.wash_complete_time;
+
+      var elReturn = document.getElementById("tl_return");
+      if (elReturn && t.return_time) elReturn.textContent = t.return_time;
+
+      var elDelivered = document.getElementById("tl_delivered");
+      if (elDelivered && t.delivered_time) elDelivered.textContent = t.delivered_time;
+
+      // Version “premium” : si tu as aussi des wrappers tlPickupWrap etc.
+      // (si tu ne les as pas, ça ne fera rien)
+      setTime("tlPickupWrap","tl_pickup", t.pickup_time);
+      setTime("tlDropoffWrap","tl_dropoff", t.dropoff_time);
+      setTime("tlWashWrap","tl_wash_complete", t.wash_complete_time);
+      setTime("tlReturnWrap","tl_return", t.return_time);
+      setTime("tlDeliveredWrap","tl_delivered", t.delivered_time);
+    }
+
+    // -------- KPI live --------
+    if (payload.kpi){
+      var elIncome = document.getElementById("kpiDriverIncome");
+      var elPct = document.getElementById("kpiDriverIncomePct");
+      var elPot = document.getElementById("kpiDriverPotential");
+      var elRem = document.getElementById("kpiDriverRemaining");
+      var elBar = document.getElementById("kpiDriverBar");
+
+      function clamp0(x){ x = Number(x || 0); return (x < 0) ? 0 : x; }
+
+      var inc = clamp0(payload.kpi.driver_income);
+      var pct = clamp0(payload.kpi.driver_income_progress_pct);
+      if (pct > 100) pct = 100;
+
+      if (elIncome) elIncome.textContent = fmtXof(inc);
+      if (elPct) elPct.textContent = (pct || 0) + "%";
+
+      if (elPot) elPot.textContent = fmtXof(payload.kpi.driver_leg_amount_all) + " FCFA"; 
+      if (elRem) elRem.textContent = fmtXof(clamp0(payload.kpi.driver_income_remaining)) + " FCFA";
+      if (elBar) elBar.style.width = (pct || 0) + "%";
+    }
+  }
+
+  var _lastKey = null;
+  function pollLive(){
+    if (!liveUrl) return;
+    fetch(liveUrl, { credentials: "same-origin" })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        var key = JSON.stringify((j.legs||[]).map(function(l){ return [l.id,l.status]; }));
+        if (_lastKey && key !== _lastKey){
+          showToast("<strong>✅ Mise à jour</strong><br>Statuts rafraîchis.");
+        }
+        _lastKey = key;
+        applyLive(j);
+      })
+      .catch(function(){});
+  }
+
+  setInterval(pollLive, 6000);
+  setTimeout(pollLive, 800);
+
   updateNextStepUI();
   setStatus("GPS : prêt");
 
 })();
 </script>
-
-  <script>
-  // PAYLIVE_DRIVER_UI
-
-  function updatePayUI(o){
-    if(!o) return;
-
-    var pill = document.getElementById("jsPayPill");
-    var details = document.getElementById("jsPayDetails");
-    if(!pill || !details) return;
-
-    var total = Number(o.total_ttc || 0);
-    var paid  = Number(o.amount_paid || 0);
-    var rest  = (o.amount_remaining != null) ? Number(o.amount_remaining) : Math.max(Number(o.total_ttc||0) - Number(o.amount_paid||0), 0);
-    if(!isFinite(rest)) rest = Math.max(0, total - paid);
-
-    var label = "En attente";
-    var cls   = "pill-unpaid";
-    var ps = String(o.payment_status || "").toLowerCase();
-
-    if(ps === "paid" || ps.indexOf("paid") >= 0){
-      label = "Payé"; cls = "pill-paid";
-    } else if(ps === "partial" || ps.indexOf("partial") >= 0){
-      label = "Acompte"; cls = "pill-partial";
-    }
-
-    pill.classList.remove("pill-paid","pill-partial","pill-unpaid");
-    pill.classList.add(cls);
-    pill.textContent = label;
-
-    details.textContent =
-      "Payé : " + Math.round(paid).toLocaleString() +
-      " / " + Math.round(total).toLocaleString() +
-      " — Reste : " + Math.round(rest).toLocaleString();
-  }
-
-  function pollPayLive(){
-    var page = document.querySelector(".page");
-    if(!page || !page.dataset.liveUrl) return;
-
-    var url = page.dataset.liveUrl;
-    var did = null;
-    try{ did = new URLSearchParams(window.location.search).get("driver_id"); }catch(e){}
-    if(did && url.indexOf("driver_id=") < 0){
-      url += (url.indexOf("?") >= 0 ? "&" : "?") + "driver_id=" + encodeURIComponent(did);
-    }
-
-    fetch(url, {credentials:"same-origin"})
-      .then(function(r){
-        var ct = (r.headers.get("content-type") || "").toLowerCase();
-        if(ct.indexOf("application/json") < 0) throw new Error("non-json");
-        return r.json();
-      })
-      .then(function(d){
-        if(d && d.order) updatePayUI(d.order);
-      })["catch"](function(){});
-  }
-
-  function __initPayLive(){
-    // init serveur (reste calculé sans attribut modèle)
-    updatePayUI({
-      payment_status: "{{ order.payment_status|default:'' }}",
-      total_ttc: {{ total_client_ttc|default:0|unlocalize }},
-      amount_paid: {{ order.amount_paid|default:0|unlocalize }},
-      amount_remaining: ({{ total_client_ttc|default:0|unlocalize }} - {{ order.amount_paid|default:0|unlocalize }})
-    });
-
-    pollPayLive();
-    setTimeout(pollPayLive, 800);
-    setInterval(pollPayLive, 6000);
-  }
-
-  try{
-    if(document.readyState === "loading"){
-      document.addEventListener("DOMContentLoaded", __initPayLive);
-    }else{
-      __initPayLive();
-    }
-  }catch(e){}
-</script>
-
 {% endblock %}

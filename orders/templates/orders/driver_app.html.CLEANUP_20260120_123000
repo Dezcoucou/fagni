@@ -763,8 +763,8 @@
   }
 
   function incomePill(o){
-    const paid = Number(o?.driver_income_paid ?? 0) 
-    const pot  = Number(o?.driver_income_potential ?? 0) 
+    const paid = Number(o?.driver_income_paid ?? 0) || 0;
+    const pot  = Number(o?.driver_income_potential ?? 0) || 0;
 
     // cas 1: payé partiel
     if (paid > 0 && pot > 0 && paid < pot){
@@ -807,19 +807,19 @@
       const services = pickNumber(o, [
         "services_total_ttc","items_total_ttc","subtotal_ttc","subtotal_services_ttc",
         "subtotal","sub_total","services_subtotal","items_subtotal"
-      ]) 
+      ]) || 0;
 
       const delivery = pickNumber(o, [
         "delivery_fee_client","delivery_fee","delivery_total","shipping_fee","transport_fee"
-      ]) 
+      ]) || 0;
 
       const serviceFee = pickNumber(o, [
         "service_fee","service_fee_client","platform_fee","fagni_fee"
-      ]) 
+      ]) || 0;
 
       const tva = pickNumber(o, [
         "tva","vat","tax","tax_amount"
-      ]) 
+      ]) || 0;
 
       const total = Number(services) + Number(delivery) + Number(serviceFee) + Number(tva);
       return (isFinite(total) && total > 0) ? total : null;
@@ -835,15 +835,16 @@
     const totalSafe = (totalNum === null || isNaN(totalNum) || totalNum <= 0) ? null : totalNum;
 
     let due = pickNumber(o, ["due_amount","amount_due"]);
-      if (due === null) {
-      const paidClient = (pickNumber(o, ["amount_paid","paid_amount","client_paid"]) || 0);
-        if (totalSafe !== null && isFinite(totalSafe)) {
-          due = Math.max(0, Number(totalSafe) - Number(paidClient));
-        } else {
-          due = (o.pay_label === "PAYÉ" || isCalc) ? 0 : 0;
-        }
-      }
-      due = Number(due || 0);
+    if (due === null) {
+    // si on a le payé, on calcule le reste = total - payé
+    const paidClient = pickNumber(o, ["amount_paid","paid_amount","client_paid"]) || 0;
+    if (totalSafe !== null && isFinite(totalSafe)) {
+      due = Math.max(0, Number(totalSafe) - Number(paidClient));
+    } else {
+      due = (o.pay_label === "PAYÉ" || isCalc) ? 0 : 0;
+    }
+  }
+  due = Number(due || 0);
 
     const totalHtml = isCalc || totalSafe === null
       ? `<span class="course-value amount-client">—</span>`
@@ -870,9 +871,9 @@
     const distNum = Number(o.driver_distance || 0);
     const showDist = distNum > 0;
 
-    const paidNum = Number(o?.driver_income_paid ?? 0) ;
-    const potNum  = Number(o?.driver_income_potential ?? 0) 
-;
+    const paidNum = Number(o?.driver_income_paid ?? 0) || 0;
+    const potNum  = Number(o?.driver_income_potential ?? 0) || 0;
+
     // ✅ Affichage: payé si dispo, sinon potentiel
     const incomeNum = (paidNum > 0) ? paidNum : potNum;
     const cta = ctaForStatus(o.status);
@@ -930,8 +931,6 @@
         </div>
       </div>
     `;
-    }
-
 
   const colState = {
     pending: new Map(),

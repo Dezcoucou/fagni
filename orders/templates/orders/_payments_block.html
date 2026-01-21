@@ -1,0 +1,121 @@
+{# Fragment INCLUDE : pas de extends / block ici #}
+<!-- PAYMENTS_BLOCK_OK -->
+
+{# =========================
+   TOTAUX / FINANCES
+   Variables attendues:
+   - finance (dict) ou order.*
+   - amounts (dict) optionnel
+   - express_client (number) optionnel
+   ========================= #}
+
+<div class="totals-box">
+  {% if finance %}
+      <div class="totals-row">
+          <span>Sous-total prestations (HT)</span>
+          <strong>{{ finance.prestation_total|floatformat:0 }} FCFA</strong>
+      </div>
+
+      <div class="totals-row">
+          <span>Service FAGNI (HT)</span>
+          <strong>{{ finance.service_fee_ht|floatformat:0 }} FCFA</strong>
+      </div>
+
+      <div class="totals-row">
+          <span>Frais de livraison facturés au client</span>
+          <strong>{{ finance.delivery_fee_client|floatformat:0 }} FCFA</strong>
+      </div>
+
+      {% if express_client and express_client|floatformat:0 != "0" %}
+          <div class="totals-row highlight-express">
+              <span>⚡ Express</span>
+              <strong>{{ express_client|floatformat:0 }} FCFA</strong>
+          </div>
+      {% endif %}
+
+      <div class="totals-row">
+          <span>TVA sur revenus FAGNI (18%)</span>
+          <strong>{{ finance.vat_fagni|floatformat:0 }} FCFA</strong>
+      </div>
+
+      <div class="totals-row total-grand">
+          <span><strong>Total TTC facturé au client</strong></span>
+          <strong>{{ finance.total_client_ttc|default:finance.total_ttc_client|floatformat:0 }} FCFA</strong>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="totals-row">
+          <span>Montant dû à la blanchisserie</span>
+          <strong>{{ finance.amount_laundry|floatformat:0 }} FCFA</strong>
+      </div>
+
+      <div class="totals-row">
+          <span>Montant dû au livreur</span>
+          <strong>{{ finance.amount_driver|floatformat:0 }} FCFA</strong>
+      </div>
+
+      <div class="totals-row">
+          <span>Total partenaires</span>
+          <strong>{{ finance.partners_total|floatformat:0 }} FCFA</strong>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="totals-row">
+          <span>Revenu FAGNI (HT)</span>
+          <strong>{{ finance.fagni_revenue_ht|floatformat:0 }} FCFA</strong>
+      </div>
+
+      <div class="totals-row">
+          <span>Marge logistique / livraison FAGNI</span>
+          <strong>{{ finance.margin_delivery|floatformat:0 }} FCFA</strong>
+      </div>
+
+  {% else %}
+      <div class="totals-row">
+          <span>Prestations</span>
+          <strong>{{ order.prestation_total|floatformat:0 }} FCFA</strong>
+      </div>
+
+      <div class="totals-row">
+          <span>Livraison</span>
+          <strong>{{ order.delivery_fee|floatformat:0 }} FCFA</strong>
+      </div>
+
+      <div class="totals-row">
+          <span>Service FAGNI</span>
+          <strong>{{ order.service_fee|floatformat:0 }} FCFA</strong>
+      </div>
+
+      {% if amounts.express_extra_fee and amounts.express_extra_fee|floatformat:0 != "0" %}
+          <div class="totals-row highlight-express">
+              <span>⚡ Express</span>
+              <strong>{{ amounts.express_extra_fee|floatformat:0 }} FCFA</strong>
+          </div>
+      {% elif express_client and express_client > 0 %}
+          <div class="totals-row highlight-express">
+              <span>⚡ Express</span>
+              <strong>{{ express_client|floatformat:0 }} FCFA</strong>
+          </div>
+      {% endif %}
+
+      {% if order.vat_fagni and order.vat_fagni > 0 %}
+          <div class="totals-row">
+              <span>TVA FAGNI</span>
+              <strong>{{ order.vat_fagni|floatformat:0 }} FCFA</strong>
+          </div>
+      {% endif %}
+
+      <div class="divider"></div>
+
+      <div class="totals-row total-grand">
+          <span><strong>Total client (TTC)</strong></span>
+          <strong>{{ order.total_client_ttc|floatformat:0 }} FCFA</strong>
+      </div>
+
+      <div class="note">
+          Total officiel = prestations + livraison + service + express + TVA FAGNI.
+      </div>
+  {% endif %}
+</div>

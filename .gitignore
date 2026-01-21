@@ -106,3 +106,12 @@ cookies.txt
 *.BAK_*
 *.BACKUP_*
 *.FIX_*
+
+# Local dev
+.venv/
+
+# Work backups
+*.BAK_*
+*.BACKUP_*
+*.FIX_*
+*.CLEANUP_*

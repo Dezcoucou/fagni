@@ -90,11 +90,13 @@ class WithdrawalRequestAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         """
-        Logique métier :
-        - Si status passe à 'paid' (et qu'on n'a pas encore débité ce retrait),
-          alors on débite le wallet du livreur et on crée une WalletTransaction.
+        Source unique : le modèle (obj.apply_payout) gère TOUT :
+        - lock wallet
+        - anti-doublon
+        - création de WalletTransaction
+        - processed_at
+        L'admin ne fait que déclencher au bon moment.
         """
-
         # Ancien statut avant sauvegarde
         old_status = None
         if obj.pk:
@@ -107,59 +109,24 @@ class WithdrawalRequestAdmin(admin.ModelAdmin):
         # On recharge en base après super().save_model()
         obj.refresh_from_db()
 
-        # Si ce n'est PAS un passage vers "paid", on ne fait rien
+        # Ne déclencher que lors d'un passage vers "paid"
         if obj.status != "paid":
             return
-
-        # Si déjà traité : vérifier s'il y a déjà une WalletTransaction correspondante
-        existing_tx = WalletTransaction.objects.filter(
-            wallet=obj.wallet,
-            amount=obj.amount,
-            type="payout",
-            direction="out",
-        description__icontains=f"Retrait #{obj.id}",
-        ).exists()
-
-        if existing_tx:
-            return  # On ne recrée pas un deuxième débit
-
-        wallet = obj.wallet
-
-        # Sécurité : vérifier solde suffisant
-        if wallet.balance < obj.amount:
-            messages.error(
-                request,
-                f"Solde insuffisant sur le wallet (solde actuel {wallet.balance} XOF) "
-                f"pour payer ce retrait de {obj.amount} XOF."
-            )
+        if old_status == "paid":
             return
 
-        # Débit effectif du wallet + création de la transaction
-        with transaction.atomic():
-            # 1) Débit du wallet
-            amount_dec = obj.amount
-            if not isinstance(amount_dec, Decimal):
-                amount_dec = Decimal(str(amount_dec))
-            amount_dec = amount_dec.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-            wallet.balance = (wallet.balance - amount_dec).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
-            wallet.save(update_fields=["balance", "updated_at"])
-
-            # 2) Transaction wallet
-            WalletTransaction.create_tx(
-                wallet=wallet,
-                order=None,
-                leg=None,
-                type="payout",
-                direction="out",
-                amount=amount_dec,
-                description=f"Retrait #{obj.id} – livreur {wallet.delivery_partner or wallet}",
-                allow_orphan=True,
-            )
-
-        messages.success(
-            request,
-            f"Retrait #{obj.id} payé et wallet livreur débité de {obj.amount} XOF."
-        )
+        try:
+            obj.apply_payout()
+            obj.refresh_from_db()
+            if obj.processed_at:
+                messages.success(
+                    request,
+                    f"Retrait #{obj.id} payé : wallet débité de {obj.amount} XOF."
+                )
+            else:
+                messages.warning(
+                    request,
+                    f"Retrait #{obj.id} : paiement non appliqué (déjà traité, tx existante ou solde insuffisant)."
+                )
+        except Exception as e:
+            messages.error(request, f"Erreur paiement retrait #{obj.id} : {e}")

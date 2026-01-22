@@ -12,13 +12,6 @@ from partners.models import LaundryPartner, DeliveryPartner, RelayPointPartner
 
 User = get_user_model()
 
-delivery_leg = models.ForeignKey(
-    "orders.DeliveryLeg",
-    on_delete=models.PROTECT,
-    null=True,
-    blank=True,
-    related_name="wallet_transactions",
-)
 
 class Wallet(models.Model):
     """
@@ -254,24 +247,22 @@ class Wallet(models.Model):
             allow_orphan=True,
         )
 
-
 class WalletTransaction(models.Model):
     """
     Historique des mouvements d'un wallet.
     """
 
-    TYPE_CHOICES = [
-        ("credit", "Crédit"),
-        ("debit", "Débit"),
-        ("payout", "Paiement / Retrait"),
-        ("refund", "Remboursement"),
-        ("adjustment", "Ajustement"),
-    ]
+    class TxType(models.TextChoices):
+        CREDIT = "credit", "Crédit"
+        DEBIT = "debit", "Débit"
+        PAYOUT = "payout", "Paiement / Retrait"
+        REFUND = "refund", "Remboursement"
+        ADJUSTMENT = "adjustment", "Ajustement"
+        LEGACY_PAYOUT = "legacy_payout", "Legacy payout"
 
-    DIRECTION_CHOICES = [
-        ("in", "Entrée"),
-        ("out", "Sortie"),
-    ]
+    class TxDirection(models.TextChoices):
+        IN = "in", "Entrée"
+        OUT = "out", "Sortie"
 
     wallet = models.ForeignKey(
         Wallet,
@@ -301,13 +292,13 @@ class WalletTransaction(models.Model):
     type = models.CharField(
         "Type",
         max_length=30,
-        choices=TYPE_CHOICES,
+        choices=TxType.choices,
     )
 
     direction = models.CharField(
         "Sens",
         max_length=10,
-        choices=DIRECTION_CHOICES,
+        choices=TxDirection.choices,
     )
 
     amount = models.DecimalField(
@@ -326,21 +317,16 @@ class WalletTransaction(models.Model):
         verbose_name_plural = "Transactions wallet"
         ordering = ["-created_at"]
         constraints = [
-            # Anti-doublon HARD (nouveau) : 1 seule tx par (wallet, leg, type, direction)
             models.UniqueConstraint(
                 fields=["wallet", "leg", "type", "direction"],
                 condition=models.Q(leg__isnull=False),
                 name="uniq_wtx_wallet_leg_type_dir",
             ),
-            # Anti-doublon ULTIME : 1 seule tx par (order, leg, type, direction)
-            # utile même si le wallet change (ex: driver réassigné)
             models.UniqueConstraint(
                 fields=["order", "leg", "type", "direction"],
                 condition=models.Q(order__isnull=False) & models.Q(leg__isnull=False),
                 name="uniq_wtx_order_leg_type_dir",
             ),
-            # Anti-doublon LEGACY : 1 seule tx par (wallet, order, type, direction)
-            # mais uniquement si leg est NULL (anciens usages)
             models.UniqueConstraint(
                 fields=["wallet", "order", "type", "direction"],
                 condition=models.Q(order__isnull=False) & models.Q(leg__isnull=True),
@@ -384,6 +370,9 @@ class WalletTransaction(models.Model):
                 "Use allow_orphan=True explicitly if intended."
             )
 
+        if type == cls.TxType.LEGACY_PAYOUT:
+            raise ValueError("WalletTransaction.create_tx: legacy_payout is forbidden (migration planned/handled).")
+
         return cls.objects.create(
             wallet=wallet,
             order=order,
@@ -395,15 +384,12 @@ class WalletTransaction(models.Model):
         )
 
     def __str__(self):
-        sign = "+" if self.direction == "in" else "-"
+        sign = "+" if self.direction == self.TxDirection.IN else "-"
         return f"{sign}{self.amount} {self.wallet.currency} – {self.type}"
 
     @property
     def signed_amount(self):
-        """
-        Montant signé (positif = entrant, négatif = sortant).
-        """
-        if self.direction == "out":
+        if self.direction == self.TxDirection.OUT:
             return -self.amount
         return self.amount
 
@@ -500,16 +486,15 @@ class WithdrawalRequest(models.Model):
         """
         if not self.pk:
             return False
+
         needle = f"Retrait #{self.id}"
-        return WalletTransaction.create_tx(
-            wallet=wallet,
-            order=None,
-            leg=None,
+        return WalletTransaction.objects.filter(
+            wallet_id=self.wallet_id,
+            order__isnull=True,
+            leg__isnull=True,
             type="payout",
             direction="out",
-            amount=amount,
-            description=f"Retrait #{self.id} – livreur {self.delivery_partner.name}",
-            allow_orphan=True,
+            description__icontains=needle,
         ).exists()
 
     def _can_debit_wallet(self) -> bool:
@@ -554,10 +539,11 @@ class WithdrawalRequest(models.Model):
             WalletTransaction.objects.create(
                 wallet=wallet,
                 order=None,
+                leg=None,  # ✅ explicite
                 type="payout",
                 direction="out",
                 amount=amount,
-                description=f"Retrait #{self.id} – livreur {self.delivery_partner.name}",
+                description=f"Retrait #{self.id} – livreur {getattr(self.delivery_partner, 'name', '—')}",
             )
 
             # 3) Marquer traité

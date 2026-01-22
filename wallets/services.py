@@ -5,7 +5,7 @@ from django.db import transaction
 
 from orders.models import Order, Customer
 from partners.models import LaundryPartner, DeliveryPartner, RelayPointPartner
-from .models import Wallet, WalletTransaction
+from wallets.models import Wallet, WalletTransaction
 
 
 # ==========================
@@ -128,6 +128,11 @@ def credit_wallet(
         description = label
 
     amount = _to_decimal(amount)
+
+    # 🔒 PILOT GUARD — un payout driver lié à une commande DOIT être rattaché à une jambe (leg)
+    if tx_type == "payout" and order is not None and getattr(wallet, "owner_type", None) == "driver" and leg is None:
+        raise ValueError("Driver payout for order requires leg (DeliveryLeg).")
+
     if amount <= 0:
         return None
 
@@ -174,6 +179,11 @@ def debit_wallet(
         description = label
 
     amount = _to_decimal(amount)
+
+    # 🔒 PILOT GUARD — un payout driver lié à une commande DOIT être rattaché à une jambe (leg)
+    if tx_type == "payout" and order is not None and getattr(wallet, "owner_type", None) == "driver" and leg is None:
+        raise ValueError("Driver payout for order requires leg (DeliveryLeg).")
+
     if amount <= 0:
         return None
 

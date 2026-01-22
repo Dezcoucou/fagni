@@ -399,8 +399,8 @@
 
             <div style="margin-top:6px;">
                 {% with s=order.status %}
-                    <span class="badge-status {{ s }}">
-                        {% if s == "pending" %}⏳ En attente
+                    <span id="live-order-status" class="badge-status {{ s }}">
+                        {% if s == "pending" %}⏳ En attente        
                         {% elif s == "in_progress" %}🚦 En cours
                         {% elif s == "done" %}✅ Terminée
                         {% elif s == "canceled" %}❌ Annulée
@@ -410,7 +410,7 @@
                 {% endwith %}
 
                 {% if order.payment_status %}
-                    <span class="chip">
+                    <span id="live-payment-chip" class="chip">
                         💳 Paiement : {{ order.get_payment_status_display|default:order.payment_status }}
                     </span>
                 {% endif %}
@@ -554,7 +554,7 @@
                 <div class="grid">
                     <div>
                         <div class="label">Livreur</div>
-                        <div class="value">
+                        <div id="live-driver" class="value">
                             {% if order.delivery_partner %}
                                 🚴 {{ order.delivery_partner.name|default:"Livreur" }}
                                 {% if order.delivery_partner.phone %} – {{ order.delivery_partner.phone }}{% endif %}
@@ -571,7 +571,7 @@
 
                     <div>
                         <div class="label">Blanchisserie</div>
-                        <div class="value">
+                        <div id="live-laundry" class="value">
                             {% if order.laundry_partner %}
                                 🧺 {{ order.laundry_partner.name|default:"Blanchisserie partenaire" }}
                             {% else %}
@@ -824,4 +824,93 @@
     </div>
 
 </div>
+
+
+
+<!-- ✅ LIVE POLLING (Back-office detail) -->
+<script>
+(function () {
+  const orderId = "{{ order.id }}";
+  const url = `/orders/${orderId}/live/`;
+
+  const elStatus = document.getElementById("live-order-status");
+  const elPay = document.getElementById("live-payment-chip");
+  const elDriver = document.getElementById("live-driver");
+  const elLaundry = document.getElementById("live-laundry");
+
+  let lastUpdated = null;
+  let timer = null;
+
+  function setStatusClass(el, status) {
+    if (!el) return;
+    el.classList.remove("pending","in_progress","done","canceled");
+    if (status) el.classList.add(status);
+  }
+
+  async function tick() {
+    try {
+      if (document.hidden) return;
+
+      const res = await fetch(url, {
+        headers: {
+          "Accept": "application/json",
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        cache: "no-store"
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      if (!data || data.ok === false) return;
+
+      if (data.updated_at && lastUpdated && data.updated_at === lastUpdated) return;
+      if (data.updated_at) lastUpdated = data.updated_at;
+
+      if (elStatus) {
+        elStatus.textContent = data.status_label || data.status || "";
+        setStatusClass(elStatus, data.status);
+      }
+
+      if (elPay) {
+        if (data.payment_label) {
+          elPay.style.display = "";
+          elPay.textContent = `💳 Paiement : ${data.payment_label}`;
+        } else {
+          elPay.style.display = "none";
+        }
+      }
+
+      if (elDriver && typeof data.driver_html === "string") {
+        elDriver.innerHTML = data.driver_html;
+      }
+      if (elLaundry && typeof data.laundry_html === "string") {
+        elLaundry.innerHTML = data.laundry_html;
+      }
+    } catch (e) {
+      // silencieux
+    }
+  }
+
+  function start() {
+    if (timer) return;
+    tick();
+    timer = setInterval(tick, 4000);
+  }
+
+  function stop() {
+    if (!timer) return;
+    clearInterval(timer);
+    timer = null;
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stop();
+    else start();
+  });
+
+  start();
+})();
+</script>
+
 {% endblock %}

@@ -33,6 +33,7 @@ from wallets.services import (
 )
 from django.db.models.functions import Coalesce, Cast, TruncDate
 from django.views.decorators.http import require_POST, require_http_methods
+from django.contrib.admin.views.decorators import staff_member_required
 from django.urls import reverse
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
@@ -180,7 +181,9 @@ def client_order_live_status(request, order_id: int):
     if not o:
         return JsonResponse({"ok": False, "error": "not_found"}, status=404)
 
-    customer_phone = ((getattr(o.customer, "phone", "") or "")).strip()
+    customer_phone = _normalize_phone(getattr(o.customer, "phone", "") or "")
+    phone = _normalize_phone(phone or "")
+
     if not customer_phone or not phone or customer_phone != phone:
         return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
 
@@ -209,6 +212,22 @@ def client_order_live_status(request, order_id: int):
     # ✅ Source unique de vérité pour les montants
     pricing = _compute_order_pricing(o)
 
+    # (optionnel mais recommandé) sync sans effet DB pour refléter Payments
+    try:
+        o.sync_payment_status_from_payments(save=False)
+    except Exception:
+        pass
+
+    # Paiement (UI)
+    from decimal import Decimal
+    total_ttc_dec = Decimal(str(pricing.get("total_client", 0) or 0))
+    paid_dec = Decimal(str(getattr(o, "amount_paid", 0) or 0))
+    if paid_dec < 0:
+        paid_dec = Decimal("0")
+    remaining_dec = total_ttc_dec - paid_dec
+    if remaining_dec < 0:
+        remaining_dec = Decimal("0")
+
     amounts = {
         "prestation_total": float(pricing["items_total"]),
         "service_fee": float(pricing["service_fee"]),
@@ -216,6 +235,8 @@ def client_order_live_status(request, order_id: int):
         "express_extra_fee": float(pricing.get("express_extra_fee", 0)),
         "vat_fagni": float(pricing["vat_fagni"]),
         "total_ttc": float(pricing["total_client"]),
+        "amount_paid": float(paid_dec),
+        "amount_remaining": float(remaining_dec),
     }
 
     return JsonResponse({
@@ -225,6 +246,7 @@ def client_order_live_status(request, order_id: int):
             "code": o.code,
             "status": o.status,
             "payment_status": o.payment_status,
+            "amount_paid": float(paid_dec),
             "items": items,
             "pickup_time": o.pickup_time.isoformat() if o.pickup_time else None,
             "wash_complete_time": o.wash_complete_time.isoformat() if o.wash_complete_time else None,
@@ -1102,6 +1124,76 @@ def ops_update_step(request, order_id, action):
     return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}")
 
 
+def _ensure_delivery_legs_for_order(order):
+    """
+    Crée les legs pickup/return si la commande est en mode livraison et n'a aucun leg.
+    Idempotent.
+
+    - Crée 2 legs (pickup + return) en status="pending"
+    - Remplit client_fee_share / driver_amount / fagni_margin (NOT NULL)
+    - Pas de payout rétro (on ne met jamais done)
+    """
+    from decimal import Decimal, ROUND_HALF_UP
+    from orders.models import DeliveryLeg
+
+    def _round_fcfa(v):
+        if v is None:
+            v = Decimal("0")
+        if not isinstance(v, Decimal):
+            v = Decimal(str(v))
+        # FCFA arrondi à l'entier (stocké en decimal(10,2))
+        return v.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
+    delivery_fee = Decimal(str(getattr(order, "delivery_fee", 0) or 0))
+    delivery_mode = getattr(order, "delivery_mode", None)
+    amount_driver = Decimal(str(getattr(order, "amount_driver_partner", 0) or 0))
+    margin_total = Decimal(str(getattr(order, "logistic_margin", 0) or 0))
+
+    is_delivery = (
+        bool(getattr(order, "delivery_partner_id", None))
+        or delivery_fee > 0
+        or (delivery_mode not in (None, "", "none"))
+        or amount_driver > 0
+    )
+    if not is_delivery:
+        return 0
+
+    # idempotent
+    if DeliveryLeg.objects.filter(order=order).exists():
+        return 0
+
+    driver = getattr(order, "delivery_partner", None)
+
+    client_1 = _round_fcfa(delivery_fee / 2)
+    client_2 = _round_fcfa(delivery_fee - client_1)
+
+    driver_1 = _round_fcfa(amount_driver / 2)
+    driver_2 = _round_fcfa(amount_driver - driver_1)
+
+    margin_1 = _round_fcfa(margin_total / 2)
+    margin_2 = _round_fcfa(margin_total - margin_1)
+
+    DeliveryLeg.objects.create(
+        order=order,
+        leg_type="pickup",
+        status="pending",
+        driver=driver,
+        client_fee_share=client_1,
+        driver_amount=driver_1,
+        fagni_margin=margin_1,
+    )
+    DeliveryLeg.objects.create(
+        order=order,
+        leg_type="return",
+        status="pending",
+        driver=driver,
+        client_fee_share=client_2,
+        driver_amount=driver_2,
+        fagni_margin=margin_2,
+    )
+    return 2
+
+
 @login_required
 @require_POST
 def order_mark_paid(request, order_id):
@@ -1132,11 +1224,34 @@ def order_mark_paid(request, order_id):
     ctx = _build_invoice_context(order)
     total_ttc_client = ctx.get("total_ttc_client") or 0
 
+    from decimal import Decimal
+
+    try:
+        total_ctx = Decimal(str(total_ttc_client or 0))
+    except Exception:
+        total_ctx = Decimal("0")
+
+    total_db = Decimal(str(getattr(order, "total_client_ttc", 0) or 0))
+    total_eff = total_ctx if total_ctx > 0 else total_db
+
+    if total_eff <= 0:
+        messages.error(request, "Impossible d'encaisser : total client = 0 (commande non chiffrée). Ajoute les prestations / calcule les montants avant.")
+        return redirect("orders:detail", order_id=order.id)
+
     # Saisie optionnelle
     method = (request.POST.get("payment_method") or "").strip() or None
     ref = (request.POST.get("payment_reference") or "").strip() or None
 
     from decimal import Decimal
+
+    # ✅ SAFETY: si la commande est en mode livraison et qu'elle n'a pas de legs, on les crée (idempotent)
+    try:
+        created = _ensure_delivery_legs_for_order(order)
+        if created:
+            messages.info(request, f"Legs logistiques créés automatiquement ({created}) pour cette commande.")
+    except Exception as e:
+        messages.warning(request, f"Attention: impossible d'initialiser les legs logistiques: {e}")
+
 
     # 1) Paiement via source-of-truth (Payment + sync)
     try:
@@ -1836,11 +1951,25 @@ def _compute_order_pricing(order):
     # total stocké DB (peut être faux)
     stored_total = _dec_or_zero(getattr(order, "total_client_ttc", 0))
 
-    # ✅ DB utilisée seulement si cohérente (±1 FCFA)
-    if stored_total > 0 and abs(stored_total - computed_total) <= Decimal("1"):
+    # ✅ Fallback legacy:
+    # - si computed_total est 0 mais que la DB a un total > 0, on garde le total DB
+    # - sinon, on garde la DB uniquement si cohérente (±1 FCFA)
+    if stored_total > 0 and (
+        computed_total <= Decimal("0") or abs(stored_total - computed_total) <= Decimal("1")
+    ):
         total_client = stored_total
     else:
         total_client = computed_total
+
+    # Bonus UX: si on est en legacy (breakdown vide), on tente de reconstruire un "delivery_fee"
+    # pour que la somme des lignes affiche le total (même si c'est une estimation).
+    if stored_total > 0 and computed_total <= Decimal("0"):
+        # tout ce qui n'est pas prestations/service/vat/express est mis en livraison (fallback)
+        guessed_delivery = stored_total - (items_total + service_fee + vat_fagni + express_extra_fee)
+        if guessed_delivery < 0:
+            guessed_delivery = Decimal("0")
+        if delivery_fee <= 0:
+            delivery_fee = guessed_delivery
 
     # 4) Revenu livreur
     driver_income = _dec_or_zero(getattr(order, "amount_driver_partner", None))
@@ -3498,12 +3627,14 @@ def build_order_finance_context(order):
 # ============================================================
 #   DETAIL COMMANDE
 # ============================================================
+@login_required
 def detail(request, order_id):
     """
     Détail d'une commande FAGNI :
     - recalcule si besoin les frais de livraison via le moteur intégré de la commande
     - applique le modèle financier FAGNI via update_financials()
     - affiche les lignes, photos et historique de statut
+    - (Back-office) permet d'ajouter un paiement via POST (order.add_payment)
     """
     # --- Récupération de la commande ---
     order = (
@@ -3515,6 +3646,61 @@ def detail(request, order_id):
 
     if not order:
         return redirect("orders:list")
+
+    # ====================================================================
+    # ✅ POST: Ajouter un paiement (back-office)
+    # ====================================================================
+    if request.method == "POST" and (request.POST.get("action") or "").strip() == "add_payment":
+        from django.contrib import messages
+        from django.core.exceptions import ValidationError
+        from decimal import Decimal
+
+        try:
+            amt_raw = (request.POST.get("amount") or "").strip()
+            channel = (request.POST.get("channel") or "").strip() or "cash"
+            ref = (request.POST.get("reference") or "").strip()
+
+            amount = Decimal(amt_raw)
+            if amount <= 0:
+                raise ValidationError({"amount": "Le montant doit être > 0."})
+
+            # Référence auto si vide (utile pour tracer)
+            if not ref:
+                ref = f"BO-{order.code}-{int(amount)}"
+
+            # ✅ utilise ton garde-fou + idempotence + cap surpaiement
+            order.add_payment(
+                amount=int(amount),
+                channel=channel,
+                reference=ref,
+                source="backoffice",
+                save=True,
+            )
+
+            messages.success(request, f"Paiement enregistré : {int(amount)} FCFA ({channel}).")
+        except ValidationError as e:
+            # rendre l'erreur lisible
+            msg = "Erreur paiement."
+            try:
+                if hasattr(e, "message_dict") and e.message_dict:
+                    flat = []
+                    for k, vals in e.message_dict.items():
+                        if isinstance(vals, (list, tuple)):
+                            for v in vals:
+                                flat.append(str(v))
+                        else:
+                            flat.append(str(vals))
+                    if flat:
+                        msg = " | ".join(flat)
+                elif e.messages:
+                    msg = " | ".join([str(x) for x in e.messages])
+            except Exception:
+                msg = "Erreur paiement."
+            messages.error(request, msg)
+        except Exception as e:
+            messages.error(request, f"Erreur technique paiement : {e}")
+
+        return redirect("orders:detail", order_id=order.id)
 
     # --- Lignes de commande (prestations) ---
     items = (
@@ -3535,15 +3721,8 @@ def detail(request, order_id):
     )
 
     if needs_delivery_recompute:
-        # Utilise le moteur dynamique (distance + surge éventuel)
         delivery_fee = order.compute_delivery_fee()
-
-        # On met à jour la commande avec ce qui a été calculé dans compute_delivery_fee
         order.delivery_fee = delivery_fee
-        # compute_delivery_fee a déjà mis à jour :
-        # - order.distance_km
-        # - order.driver_logistic_cost
-        # - order.logistic_margin
         order.save(
             update_fields=[
                 "delivery_fee",
@@ -3553,21 +3732,12 @@ def detail(request, order_id):
             ]
         )
     else:
-        # On normalise juste le type Decimal si une valeur existe déjà
         if order.delivery_fee is not None:
             order.delivery_fee = decimal.Decimal(str(order.delivery_fee))
 
     # ====================================================================
     # 2) APPLICATION DU MODÈLE FAGNI (update_financials)
     # ====================================================================
-    # -> ceci remplit notamment :
-    #    - prestation_total
-    #    - service_fee
-    #    - commission_laundry_ht / commission_delivery_ht
-    #    - fagni_revenue_ht / fagni_revenue_ttc
-    #    - vat_fagni
-    #    - amount_laundry_partner / amount_driver_partner
-    #    - total_client_ttc
     data = order.update_financials(save=True)
 
     # ====================================================================
@@ -3584,19 +3754,14 @@ def detail(request, order_id):
     ticket_url = reverse("orders:order_ticket_pdf", args=[order.id])
     ticket_thermal_url = reverse("orders:order_ticket_thermal_pdf", args=[order.id])
 
-    # Contexte "finance" déjà utilisé dans le template (avec des fallback
-    # sur les champs order.* si besoin)
     finance = build_order_finance_context(order)
 
-    # juste avant context = { ... }
     from orders.models import Payment
-    from decimal import Decimal
-
     payments = Payment.objects.filter(order=order).order_by("-id")
 
     try:
         total = decimal.Decimal(str(getattr(order, "total_client_ttc", 0) or 0))
-        paid  = decimal.Decimal(str(getattr(order, "amount_paid", 0) or 0))
+        paid = decimal.Decimal(str(getattr(order, "amount_paid", 0) or 0))
     except Exception:
         total, paid = decimal.Decimal("0"), decimal.Decimal("0")
 
@@ -3612,13 +3777,13 @@ def detail(request, order_id):
         "ticket_url": ticket_url,
         "ticket_thermal_url": ticket_thermal_url,
         "finance": finance,
-        "financial_data": data,  # si un jour tu veux exploiter directement le dict
+        "financial_data": data,
         "payments": payments,
         "remaining": remaining,
     }
 
     ctx_amounts = _build_invoice_context(order)
-    context.update(ctx_amounts)  # ajoute amounts + express_for_client etc.
+    context.update(ctx_amounts)
     context["express_client"] = (ctx_amounts.get("amounts") or {}).get("express_for_client", 0)
 
     return render(request, "orders/detail.html", context)
@@ -3651,6 +3816,88 @@ def _normalize_phone(raw: str) -> str:
         digits = digits[3:]
 
     return digits
+
+
+@require_GET
+@staff_member_required
+def order_live_status(request, order_id: int):
+    """
+    Endpoint JSON "live" pour la page back-office detail.html
+    (polling JS, sans websockets).
+    """
+    o = (
+        Order.objects
+        .select_related("customer", "delivery_partner", "laundry_partner")
+        .filter(pk=order_id)
+        .first()
+    )
+    if not o:
+        return JsonResponse({"ok": False, "error": "not_found"}, status=404)
+
+    # --- updated_at (fallback)
+    updated_dt = None
+    for attr in ("updated_at", "modified_at", "updated", "modified", "last_updated", "created_at"):
+        if hasattr(o, attr):
+            updated_dt = getattr(o, attr)
+            if updated_dt:
+                break
+    updated_at = updated_dt.isoformat() if updated_dt else None
+
+    # --- status label (comme ton template)
+    status = (o.status or "").strip()
+    status_label = status
+    if status == "pending":
+        status_label = "⏳ En attente"
+    elif status == "in_progress":
+        status_label = "🚦 En cours"
+    elif status == "done":
+        status_label = "✅ Terminée"
+    elif status == "canceled":
+        status_label = "❌ Annulée"
+    else:
+        try:
+            status_label = f"📦 {o.get_status_display()}"
+        except Exception:
+            status_label = status or "—"
+
+    # --- payment label
+    payment_label = None
+    try:
+        if getattr(o, "payment_status", None):
+            payment_label = o.get_payment_status_display() or o.payment_status
+    except Exception:
+        payment_label = getattr(o, "payment_status", None) or None
+
+    # --- driver HTML (même logique que le template)
+    if o.delivery_partner:
+        driver_html = f"🚴 {o.delivery_partner.name or 'Livreur'}"
+        if getattr(o.delivery_partner, "phone", None):
+            driver_html += f" – {o.delivery_partner.phone}"
+    else:
+        reason = getattr(o, "delivery_partner_unassigned_reason", None) or ""
+        if reason:
+            driver_html = f'<span class="muted">⚠️ Aucun livreur assigné</span><br><span class="muted">{reason}</span>'
+        else:
+            driver_html = (
+                '<span class="muted">⚠️ Aucun livreur assigné</span><br>'
+                '<span class="muted">Probablement aucun livreur disponible ou coordonnées client incomplètes.</span>'
+            )
+
+    # --- laundry HTML
+    if o.laundry_partner:
+        laundry_html = f"🧺 {o.laundry_partner.name or 'Blanchisserie partenaire'}"
+    else:
+        laundry_html = '<span class="muted">Non encore affectée</span>'
+
+    return JsonResponse({
+        "ok": True,
+        "updated_at": updated_at,
+        "status": status,
+        "status_label": status_label,
+        "payment_label": payment_label,
+        "driver_html": driver_html,
+        "laundry_html": laundry_html,
+    })
 
 
 # -------------------------------------------------------------------
@@ -3822,6 +4069,8 @@ def client_new_order(request):
             order = Order.objects.create(
                 customer=customer,
                 status="pending",
+                payment_status="unpaid",
+                amount_paid=0,
                 code=code,
                 notes=notes or None,
                 pickup_address=address,
@@ -8859,7 +9108,6 @@ def driver_map(request):
 
 
 @require_GET
-@login_required
 def driver_map_data(request):
     """
     Endpoint JSON pour rafraîchir la carte des livreurs (Leaflet).

@@ -11,6 +11,7 @@ urlpatterns = [
 
     # Détail / édition / suppression simple (Back-office)
     path("<int:order_id>/", views.detail, name="detail"),
+    path("<int:order_id>/live/", views.order_live_status, name="order_live"),
     path("<int:order_id>/status/", views.update_status, name="update_status"),
     path("<int:order_id>/edit/", views.update, name="update"),
     path("<int:order_id>/delete/", views.delete, name="delete"),

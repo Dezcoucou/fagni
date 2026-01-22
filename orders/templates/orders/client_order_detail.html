@@ -304,6 +304,10 @@
 
         <div class="kv"><div class="k">Total client</div><div class="v" id="amtTotal">{{ amounts.total_ttc|fcfa }}</div></div>
 
+        <div class="meta" id="payDetails" style="margin-top:6px;font-weight:800;">
+          Payé : <span id="payPaid">0</span> / <span id="payTotal">0</span> — Reste : <span id="payRemain">0</span>
+        </div>
+
         <div class="meta">NB : les montants peuvent évoluer si la livraison change (distance/express).</div>
 
         {% if order.status == "pending" or order.status == "in_progress" %}
@@ -327,7 +331,7 @@
     <div class="row" style="align-items:center;">
       <h3 class="section-title" style="margin:0;">Prestations</h3>
       <div class="actions">
-        <a class="btn btn-ghost" href="{% url 'orders:client_order_item_new' order.id %}">➕ Ajouter</a>
+        {% if not locked %}<a class="btn btn-ghost" href="{% url 'orders:client_order_item_new' order.id %}">➕ Ajouter</a>{% else %}<span class="meta" style="font-weight:800;">🔒 Prestations verrouillées (commande payée / mission créée)</span>{% endif %}
       </div>
     </div>
 
@@ -344,8 +348,8 @@
               <div style="font-weight:900;color:#0f172a;">
                 {{ it.designation|default:"—" }}
                 <div class="meta" style="margin-top:3px;">
-                  <a class="btn btn-ghost" style="padding:6px 10px;font-size:12px;" href="{% url 'orders:client_order_item_edit' order.id it.id %}">Modifier</a>
-                  <a class="btn btn-ghost" style="padding:6px 10px;font-size:12px;border-color:#fecaca;color:#991b1b;" href="{% url 'orders:client_order_item_delete' order.id it.id %}">Supprimer</a>
+                  {% if not locked %}<a class="btn btn-ghost" style="padding:6px 10px;font-size:12px;" href="{% url 'orders:client_order_item_edit' order.id it.id %}">Modifier</a>
+                  <a class="btn btn-ghost" style="padding:6px 10px;font-size:12px;border-color:#fecaca;color:#991b1b;" href="{% url 'orders:client_order_item_delete' order.id it.id %}">Supprimer</a>{% endif %}
                 </div>
               </div>
               <div style="font-weight:900;">{{ it.quantity }}</div>
@@ -493,15 +497,16 @@
     }
   }
 
-function paymentLabel(ps){
-      const s = String(ps || "").toLowerCase();
-      if(s.includes("paid") || s.includes("paye") || s.includes("payé")) return {cls:"pay-ok", label:"Payé"};
-      if(s.includes("partial")) return {cls:"pay-wait", label:"Acompte"};
-      if(s.includes("pending") || s.includes("attente") || s.includes("unpaid")) return {cls:"pay-wait", label:"En attente"};
-      if(s.includes("failed") || s.includes("echec") || s.includes("échoué")) return {cls:"pay-bad", label:"Échec"};
-      return {cls:"", label: ps};
-    }
+  function paymentLabel(ps){
+    const s = String(ps || "").toLowerCase();
 
+    if(s.includes("paid") || s.includes("paye") || s.includes("payé")) return {cls:"pay-ok", label:"Payé"};
+    if(s.includes("partial")) return {cls:"pay-wait", label:"Acompte"};
+    if(s.includes("pending") || s.includes("attente") || s.includes("unpaid")) return {cls:"pay-wait", label:"En attente"};
+    if(s.includes("failed") || s.includes("echec") || s.includes("échoué")) return {cls:"pay-bad", label:"Échec"};
+
+    return {cls:"", label: ps || "non renseigné"};
+  }
 
     // ✅ payé
     if(s.includes("paid") || s.includes("paye") || s.includes("payé")) return {cls:"pay-ok", label:"Payé"};
@@ -524,24 +529,27 @@ function paymentLabel(ps){
       if(p.cls) payPill.classList.add(p.cls);
     }
 
-      // détails acompte
-      if(payDetails){
-        try{
-          const st = String(ps || "").toLowerCase();
-          const total = Number(String(amounts?.total_ttc ?? amounts?.total ?? 0).replace(",", "."));
-          const paid  = Number(String(amounts?.amount_paid ?? 0).replace(",", "."));
-          if(st.includes("partial") && total > 0 && paid > 0){
-            const rest = Math.max(0, total - paid);
-            payDetails.textContent = `Payé : ${formatMoney(paid)} / ${formatMoney(total)}  —  Reste : ${formatMoney(rest)}`;
-            payDetails.style.display = "";
-          }else{
-            payDetails.textContent = "";
-            payDetails.style.display = "none";
-          }
-        }catch(e){
-          payDetails.textContent = "";
-          payDetails.style.display = "none";
+      // ✅ détails paiement (payPaid / payTotal / payRemain)
+      try{
+        const total = Number(String(amounts?.total_ttc ?? 0).replace(",", "."));
+        const paid  = Number(String(amounts?.amount_paid ?? 0).replace(",", "."));
+        const rest  = Number(String(amounts?.amount_remaining ?? Math.max(0, total - paid)).replace(",", "."));
+
+        const elPaid = document.getElementById("payPaid");
+        const elTotal = document.getElementById("payTotal");
+        const elRemain = document.getElementById("payRemain");
+
+        if(elPaid)  elPaid.textContent  = formatMoney(paid);
+        if(elTotal) elTotal.textContent = formatMoney(total);
+        if(elRemain)elRemain.textContent= formatMoney(rest);
+
+        if(payDetails){
+          // On affiche seulement si on a un total > 0
+          payDetails.style.display = (total > 0) ? "" : "none";
         }
+      }catch(e){
+        // en cas d’erreur, on masque
+        if(payDetails) payDetails.style.display = "none";
       }
   }
 

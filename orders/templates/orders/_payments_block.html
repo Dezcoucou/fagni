@@ -1,14 +1,3 @@
-{# Fragment INCLUDE : pas de extends / block ici #}
-<!-- PAYMENTS_BLOCK_OK -->
-
-{# =========================
-   TOTAUX / FINANCES
-   Variables attendues:
-   - finance (dict) ou order.*
-   - amounts (dict) optionnel
-   - express_client (number) optionnel
-   ========================= #}
-
 <div class="totals-box">
   {% if finance %}
       <div class="totals-row">
@@ -26,7 +15,7 @@
           <strong>{{ finance.delivery_fee_client|floatformat:0 }} FCFA</strong>
       </div>
 
-      {% if express_client and express_client|floatformat:0 != "0" %}
+      {% if express_client and express_client|floatformat:0 != '0' %}
           <div class="totals-row highlight-express">
               <span>⚡ Express</span>
               <strong>{{ express_client|floatformat:0 }} FCFA</strong>
@@ -88,7 +77,7 @@
           <strong>{{ order.service_fee|floatformat:0 }} FCFA</strong>
       </div>
 
-      {% if amounts.express_extra_fee and amounts.express_extra_fee|floatformat:0 != "0" %}
+      {% if amounts.express_extra_fee and amounts.express_extra_fee|floatformat:0 != '0' %}
           <div class="totals-row highlight-express">
               <span>⚡ Express</span>
               <strong>{{ amounts.express_extra_fee|floatformat:0 }} FCFA</strong>
@@ -117,5 +106,150 @@
       <div class="note">
           Total officiel = prestations + livraison + service + express + TVA FAGNI.
       </div>
+  {% endif %}
+</div>
+
+<!-- ===================================================== -->
+<!--  PAIEMENTS (Back-office) -->
+<!-- ===================================================== -->
+<div class="card" style="margin-top:12px;">
+  <h2 class="card-title"><span class="emoji">💳</span> Paiements</h2>
+
+  <div class="grid" style="margin-top:8px;">
+    <div>
+      <div class="label">Statut</div>
+      <div class="value">
+        {% if order.payment_status %}
+          {{ order.get_payment_status_display|default:order.payment_status }}
+        {% else %}
+          —
+        {% endif %}
+      </div>
+    </div>
+
+    <div>
+      <div class="label">Total payé</div>
+      <div class="value"><strong>{{ order.amount_paid|default:0|floatformat:0 }} FCFA</strong></div>
+    </div>
+
+    <div>
+      <div class="label">Reste à payer</div>
+      <div class="value"><strong>{{ remaining|default:0|floatformat:0 }} FCFA</strong></div>
+    </div>
+  </div>
+
+  {% if request.user.is_staff %}
+    <div class="divider"></div>
+
+    <h3 class="card-subtitle">Ajouter un paiement</h3>
+
+    <form method="post" style="margin-top:8px;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="add_payment">
+
+      {% if remaining|default:0|floatformat:0 == '0' %}
+        <div class="note" style="margin:8px 0 10px;">
+          ✅ Commande soldée — aucun paiement supplémentaire requis.
+        </div>
+      {% else %}
+        <div class="note" style="margin:8px 0 10px;">
+          💡 Suggestion : reste à payer = <strong>{{ remaining|default:0|floatformat:0 }} FCFA</strong>
+        </div>
+      {% endif %}
+
+      <div class="grid" style="align-items:end; opacity:{% if remaining|default:0|floatformat:0 == '0' %}0.55{% else %}1{% endif %};">
+        <div>
+          <div class="label">Montant (FCFA)</div>
+          <input
+            type="number"
+            name="amount"
+            min="1"
+            step="1"
+            required
+            {% if remaining|default:0|floatformat:0 == '0' %}disabled{% endif %}
+            style="width:100%;padding:10px;border-radius:12px;border:1px solid #e5e7eb;"
+            placeholder="ex: 1000"
+            value="{% if remaining|default:0|floatformat:0 != '0' %}{{ remaining|default:0 }}{% endif %}"
+          >
+        </div>
+
+        <div>
+          <div class="label">Canal</div>
+          <select
+            name="channel"
+            required
+            {% if remaining|default:0|floatformat:0 == '0' %}disabled{% endif %}
+            style="width:100%;padding:10px;border-radius:12px;border:1px solid #e5e7eb;background:#fff;"
+          >
+            <option value="cash">cash</option>
+            <option value="orange">orange</option>
+            <option value="mtn">mtn</option>
+            <option value="wave">wave</option>
+            <option value="card">card</option>
+            <option value="bank">bank</option>
+          </select>
+        </div>
+
+        <div>
+          <div class="label">Référence (optionnel)</div>
+          <input
+            type="text"
+            name="reference"
+            maxlength="120"
+            {% if remaining|default:0|floatformat:0 == '0' %}disabled{% endif %}
+            style="width:100%;padding:10px;border-radius:12px;border:1px solid #e5e7eb;"
+            placeholder="ex: OM-2026-0001"
+          >
+          <div class="note" style="margin-top:6px;">
+            Astuce : si tu mets une référence identique, l’idempotence évite les doublons.
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button
+            class="btn btn-primary"
+            type="submit"
+            {% if remaining|default:0|floatformat:0 == '0' %}disabled style="opacity:.6;cursor:not-allowed;"{% endif %}
+          >
+            Enregistrer
+          </button>
+        </div>
+      </div>
+    </form>
+  {% endif %}
+
+  <div class="divider"></div>
+
+  <h3 class="card-subtitle">Historique des paiements</h3>
+
+  {% if payments %}
+    <div style="overflow:auto;">
+      <table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;">
+        <thead>
+          <tr style="text-align:left;border-bottom:1px solid #e5e7eb;">
+            <th style="padding:8px;">#</th>
+            <th style="padding:8px;">Date</th>
+            <th style="padding:8px;">Canal</th>
+            <th style="padding:8px;">Réf</th>
+            <th style="padding:8px;">Source</th>
+            <th style="padding:8px;text-align:right;">Montant</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in payments %}
+            <tr style="border-bottom:1px solid #f1f5f9;">
+              <td style="padding:8px;">{{ p.id }}</td>
+              <td style="padding:8px;">{{ p.created_at|date:"Y-m-d H:i" }}</td>
+              <td style="padding:8px;">{{ p.channel|default:"—" }}</td>
+              <td style="padding:8px;">{{ p.reference|default:"—" }}</td>
+              <td style="padding:8px;">{{ p.source|default:"—" }}</td>
+              <td style="padding:8px;text-align:right;"><strong>{{ p.amount|floatformat:0 }} FCFA</strong></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted" style="margin-top:8px;">Aucun paiement enregistré.</p>
   {% endif %}
 </div>

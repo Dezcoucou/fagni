@@ -763,8 +763,10 @@
   }
 
   function incomePill(o){
-    const paid = Number(o?.driver_income_paid ?? 0) 
-    const pot  = Number(o?.driver_income_potential ?? 0) 
+    const paidRaw = Number(data.total_driver_income_paid ?? 0);
+    const potRaw  = Number(data.total_driver_income_potential ?? 0);
+    const paid = Math.max(0, paidRaw);
+    const pot  = Math.max(0, potRaw); 
 
     // cas 1: payé partiel
     if (paid > 0 && pot > 0 && paid < pot){
@@ -795,37 +797,34 @@
       const v = o?.[k];
       if (v === null || v === undefined) continue;
       const n = Number(v);
-      if (!isNaN(n)) return n;
+      if (Number.isFinite(n)) return n;
     }
-
-    function computeTotalClient(o){
-      // 1) champs "officiels" si le backend les fournit
-      const direct = pickNumber(o, ["total_client_ttc","total_client_display","total_client"]);
-      if(direct !== null && isFinite(direct) && direct > 0) return direct;
-
-      // 2) reconstruire depuis les morceaux (on teste plusieurs noms possibles)
-      const services = pickNumber(o, [
-        "services_total_ttc","items_total_ttc","subtotal_ttc","subtotal_services_ttc",
-        "subtotal","sub_total","services_subtotal","items_subtotal"
-      ]) 
-
-      const delivery = pickNumber(o, [
-        "delivery_fee_client","delivery_fee","delivery_total","shipping_fee","transport_fee"
-      ]) 
-
-      const serviceFee = pickNumber(o, [
-        "service_fee","service_fee_client","platform_fee","fagni_fee"
-      ]) 
-
-      const tva = pickNumber(o, [
-        "tva","vat","tax","tax_amount"
-      ]) 
-
-      const total = Number(services) + Number(delivery) + Number(serviceFee) + Number(tva);
-      return (isFinite(total) && total > 0) ? total : null;
-    }
-
     return null;
+  }
+
+  function computeTotalClient(o){
+    const direct = pickNumber(o, ["total_client_ttc","total_client_display","total_client","total_ttc","total"]);
+    if (direct !== null && direct > 0) return direct;
+
+    const services = pickNumber(o, [
+      "services_total_ttc","items_total_ttc","subtotal_ttc","subtotal_services_ttc",
+      "subtotal","sub_total","services_subtotal","items_subtotal"
+    ]) || 0;
+
+    const delivery = pickNumber(o, [
+      "delivery_fee_client","delivery_fee","delivery_total","shipping_fee","transport_fee"
+    ]) || 0;
+
+    const serviceFee = pickNumber(o, [
+      "service_fee","service_fee_client","platform_fee","fagni_fee"
+    ]) || 0;
+
+    const tva = pickNumber(o, [
+      "tva","vat","tax","tax_amount"
+    ]) || 0;
+
+    const total = Number(services) + Number(delivery) + Number(serviceFee) + Number(tva);
+    return (Number.isFinite(total) && total > 0) ? total : 0;
   }
 
   function cardHTML(o){
@@ -1089,14 +1088,24 @@
       setText(els.badgeDone, d);
 
       setText(els.kpiDistance, `${Number(data.total_distance_km ?? 0).toFixed(2)} km`);
-      setText(els.kpiIncome, `${money(data.total_driver_income_display ?? data.total_driver_income ?? 0)} FCFA`);
+      // KPI Revenu: afficher le "payé" (si dispo), sinon fallback (display/legacy). Sécurise les valeurs négatives.
+        const paidRaw = Number(data.total_driver_income_paid ?? 0);
+        const potRaw  = Number(data.total_driver_income_potential ?? 0);
+        const paid = Math.max(0, paidRaw);
+        const pot  = Math.max(0, potRaw);
+        const incomeMain = (paid > 0) ? paid : Number(data.total_driver_income_display ?? data.total_driver_income ?? 0);
+        setText(els.kpiIncome, `${money(incomeMain)} FCFA`);
 
       if(els.kpiSource){
         const sd = data.source_distance || "—";
         const si = data.source_income || "—";
-        const paid = Number(data.total_driver_income_paid ?? 0);
-        const pot = Number(data.total_driver_income_potential ?? 0);
-        const hint = (paid > 0) ? `payé=${money(paid)} • potentiel=${money(pot)}` : `potentiel=${money(pot)} • payé=${money(paid)}`;
+        const paidRaw = Number(data.total_driver_income_paid ?? 0);
+        const potRaw  = Number(data.total_driver_income_potential ?? 0);
+        const paid = Math.max(0, paidRaw);
+        const pot  = Math.max(0, potRaw);
+        const hint = (paid > 0)
+          ? `payé=${money(paid)} • potentiel=${money(pot)}`
+          : `potentiel=${money(pot)} • payé=${money(paid)}`;
         els.kpiSource.textContent = `Source: distance=${sd} • revenu=${si} (${hint})`;
       }
       if(els.kpiUpdated){

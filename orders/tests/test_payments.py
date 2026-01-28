@@ -5,19 +5,51 @@ from django.db import models
 from django.test import TestCase
 
 from orders.models import Customer, Order, OrderItem, Payment
+from partners.models import LaundryPartner
 
 
 class PaymentGuardsTests(TestCase):
+    def _get_any_laundry(self):
+        """
+        Les migrations de test appliquent partners.0005_seed_demo_partners,
+        donc on devrait avoir au moins une blanchisserie en base.
+        On prend une active si possible, sinon la première.
+        """
+        lp = LaundryPartner.objects.filter(is_active=True).first()
+        if lp:
+            return lp
+        lp = LaundryPartner.objects.first()
+        if lp:
+            return lp
+        # Fallback ultra défensif (normalement inutile).
+        # Si ça casse ici, on adaptera aux champs requis du modèle.
+        return LaundryPartner.objects.create(
+            name="TEST LAUNDRY",
+            address="X",
+            latitude=0,
+            longitude=0,
+            is_active=True,
+        )
+
     def _make_order_with_total(self, phone="0700009999"):
         c, _ = Customer.objects.get_or_create(
             phone=phone,
             defaults={"name": "TEST", "address": "X", "latitude": 0, "longitude": 0},
         )
-        o = Order.objects.create(customer=c)
-        OrderItem.objects.create(order=o, designation="TEST PRESTATION", quantity=1, unit_price=Decimal("3000"))
+
+        laundry = self._get_any_laundry()
+        o = Order.objects.create(customer=c, laundry_partner=laundry)
+
+        OrderItem.objects.create(
+            order=o,
+            designation="TEST PRESTATION",
+            quantity=1,
+            unit_price=Decimal("3000"),
+        )
         o.update_financials(save=True)
         o.refresh_from_db()
         self.assertGreater(Decimal(str(o.total_client_ttc or 0)), 0)
+        self.assertIsNotNone(o.laundry_partner_id)
         return o
 
     def test_add_payment_refused_if_total_is_zero(self):

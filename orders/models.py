@@ -3,7 +3,7 @@ import uuid
 import math
 from orders.utils.distances import haversine_distance_km
 from django.db import models
-from django.db.models import Sum, F, DecimalField, Q
+from django.db.models import Sum, F, DecimalField
 from django.conf import settings
 from django.utils import timezone
 from partners.models import LaundryPartner, DeliveryPartner, RelayPointPartner
@@ -27,98 +27,35 @@ def _round_fcfa(value):
 # ============================
 def sync_delivery_legs_for_order(order):
     """
-    Synchronise les DeliveryLeg à partir des infos de la commande.
+    Crée / synchronise les 2 jambes logistiques standard:
+    - pickup
+    - return
 
-    - Si pas de delivery_partner ou pas de delivery_fee -> on supprime les jambes.
-    - Sinon on crée / met à jour 2 jambes : pickup & return,
-      avec répartition du montant client / livreur / FAGNI.
-
-    ✅ FIX CRITIQUE:
-    - Si une jambe a déjà été PAYÉE (WalletTransaction payout/in liée à leg),
-      alors on NE RÉÉCRIT PAS driver_amount avec un nouveau calcul.
-      La tx est la source de vérité.
-    - On évite de delete() des legs si possible, pour préserver l'identité (leg_id)
-      et garder l'anti-doublon solide.
+    Règles:
+    - Split 50/50 (avec correction de rounding sur la 2e jambe)
+    - Ne jamais rétrograder un leg déjà avancé (done/in_progress/canceled)
+    - return ne doit pas être "assigned" tant que pickup n'est pas "done"
+    - Si un payout tx existe déjà pour un leg, driver_amount est verrouillé sur tx.amount
+    - En cas de doublons pickup/return, garder en priorité celui qui a un payout tx, sinon statut puis id
     """
-    from decimal import Decimal
-    from django.db.models.deletion import ProtectedError
-
-    delivery_fee = order.delivery_fee or Decimal("0")
-    driver_total = order.amount_driver_partner or Decimal("0")
-    margin_total = Decimal(order.logistic_margin or 0)
-
-    # distance totale A/R (si renseignée)
-    distance_total = order.distance_km or order.distance_km_total or Decimal("0")
-
-    # Helper: reset timestamps logistiques (anti-legacy)
-    def _reset_logistic_timestamps():
-        # On ne touche PAS wash_complete_time (côté blanchisserie)
-        dirty = False
-        for field in ("pickup_time", "dropoff_time", "return_time", "delivered_time"):
-            if getattr(order, field, None) is not None:
-                setattr(order, field, None)
-                dirty = True
-        return dirty
-
-    # 1) Si pas une commande "livrable" -> supprimer legs
-    delivery_mode = getattr(order, "delivery_mode", None)
-    amount_driver = order.amount_driver_partner or Decimal("0")
-
-    is_delivery = (
-        bool(getattr(order, "delivery_partner_id", None))
-        or delivery_fee > 0
-        or (delivery_mode not in (None, "", "none"))
-        or amount_driver > 0
-    )
-
-    if not is_delivery:
-        from orders.models import DeliveryLeg  # safe local import
-        DeliveryLeg.objects.filter(order=order).delete()
-
-        changed = False
-        if order.status == "pending":
-            changed = _reset_logistic_timestamps()
-
-        if order.status != "pending":
-            order.status = "pending"
-            changed = True
-
-        if changed:
-            order.save(update_fields=["pickup_time", "dropoff_time", "return_time", "delivered_time", "status"])
-        return
-
-    # ------------------------------------------------------------
-    # 2) Récupérer legs existants
-    # ------------------------------------------------------------
+    from decimal import Decimal, ROUND_HALF_UP
+    from django.db.models import Sum
     from orders.models import DeliveryLeg  # safe local import
 
-    legs_qs = DeliveryLeg.objects.filter(order=order).order_by("id")
+    # Legs existants
+    legs_existing = list(
+        DeliveryLeg.objects.filter(order=order).select_related("driver")
+    )
 
-    # ✅ IMPORTANT : on évite de delete() si on peut, pour préserver leg_id
-    # (et donc l'anti-doublon des payouts).
-    try:
-        legs_existing = list(legs_qs)
-        # On tente delete uniquement si aucun leg n'existe (cas rare)
-        # ou si tu veux vraiment repartir de zéro (désactivé par défaut).
-        # legs_qs.delete()
-    except ProtectedError:
-        legs_existing = list(legs_qs)
+    # Config de répartition
+    delivery_fee = Decimal(str(getattr(order, "delivery_fee", 0) or 0))
+    driver_total = Decimal(str(getattr(order, "driver_logistic_cost", 0) or 0))
+    margin_total = Decimal(str(getattr(order, "logistic_margin", 0) or 0))
 
-    # ✅ SAFE : reset timeline uniquement si la commande est encore en pending
-    changed = False
-    if order.status == "pending":
-        changed = _reset_logistic_timestamps()
+    distance_total = Decimal(str(getattr(order, "distance_km", 0) or 0))
+    distance_one_way = (distance_total / Decimal("2")).quantize(Decimal("0.01")) if distance_total else Decimal("0.00")
 
-    # Distance aller simple (si on a une distance totale A/R)
-    distance_one_way = None
-    if distance_total and distance_total > 0:
-        if not isinstance(distance_total, Decimal):
-            distance_total = Decimal(str(distance_total))
-        distance_one_way = (distance_total / Decimal("2")).quantize(Decimal("0.01"))
-
-    # -------- Répartition 50/50 avec correction sur la 2e jambe --------
     def _round_fcfa(value):
-        from decimal import ROUND_HALF_UP
         if value is None:
             return Decimal("0")
         if not isinstance(value, Decimal):
@@ -135,9 +72,10 @@ def sync_delivery_legs_for_order(order):
     margin_share_2 = _round_fcfa(margin_total - margin_share_1)
 
     # Statut de base des jambes
-    if order.status == "done":
+    st = (getattr(order, "status", None) or "pending").lower()
+    if st == "done":
         base_status = "done"
-    elif order.status == "in_progress":
+    elif st == "in_progress":
         base_status = "assigned"
     else:
         base_status = "pending"
@@ -147,65 +85,87 @@ def sync_delivery_legs_for_order(order):
         ("return", client_share_2, driver_share_2, margin_share_2),
     ]
 
-    # Map des legs existants par type (pickup/return) en gardant le "meilleur"
     _status_rank = {"done": 5, "in_progress": 4, "assigned": 3, "pending": 2, "canceled": 1}
 
+    # Helper payout
+    def _paid_amount_for_leg(leg):
+        try:
+            from wallets.models import WalletTransaction
+            tx = (
+                WalletTransaction.objects.filter(
+                    order=order,
+                    leg=leg,
+                    type="payout",
+                    direction="in",
+                )
+                .order_by("id")
+                .first()
+            )
+            return tx.amount if tx else None
+        except Exception:
+            return None
+
+    def _has_payout_tx(leg):
+        return _paid_amount_for_leg(leg) is not None
+
+    # Map existants par type, en gardant le "meilleur"
     existing_by_type = {}
     for leg in legs_existing:
         lt = getattr(leg, "leg_type", None)
         if lt not in {"pickup", "return"}:
             continue
+
         cur = existing_by_type.get(lt)
-        rank = _status_rank.get(getattr(leg, "status", None), 0)
-        cur_rank = _status_rank.get(getattr(cur, "status", None), 0) if cur else -1
-        if (cur is None) or (rank > cur_rank) or (rank == cur_rank and getattr(leg, "id", 0) > getattr(cur, "id", 0)):
+        if cur is None:
+            existing_by_type[lt] = leg
+            continue
+
+        leg_paid = _has_payout_tx(leg)
+        cur_paid = _has_payout_tx(cur)
+
+        # PRIORITÉ 1: garder celui qui a déjà un payout
+        if leg_paid and not cur_paid:
+            existing_by_type[lt] = leg
+            continue
+        if cur_paid and not leg_paid:
+            continue
+
+        # PRIORITÉ 2: statut puis id
+        rank = _status_rank.get((getattr(leg, "status", None) or "").lower(), 0)
+        cur_rank = _status_rank.get((getattr(cur, "status", None) or "").lower(), 0)
+        if (rank > cur_rank) or (rank == cur_rank and (getattr(leg, "id", 0) or 0) > (getattr(cur, "id", 0) or 0)):
             existing_by_type[lt] = leg
 
-    # ✅ Annule les doublons pickup/return qui ne sont pas retenus
+    # Annule les doublons pickup/return qui ne sont pas retenus
     for leg in legs_existing:
         lt = getattr(leg, "leg_type", None)
         if lt in {"pickup", "return"}:
             kept = existing_by_type.get(lt)
             if kept and getattr(leg, "id", None) != getattr(kept, "id", None):
-                if getattr(leg, "status", None) != "canceled":
+                # Ne pas annuler un leg déjà payé; on annule l'autre
+                if _has_payout_tx(leg):
+                    continue
+                if (getattr(leg, "status", None) or "").lower() != "canceled":
                     leg.status = "canceled"
                     leg.save(update_fields=["status"])
 
-    # ✅ CANCEL legs legacy/protégés
+    # CANCEL legs legacy/protégés (autres types)
     for leg in legs_existing:
         lt = getattr(leg, "leg_type", None)
         if lt not in {"pickup", "return"}:
-            if getattr(leg, "status", None) != "canceled":
+            if (getattr(leg, "status", None) or "").lower() != "canceled":
+                # si payé (rare) on évite de casser l'historique
+                if _has_payout_tx(leg):
+                    continue
                 leg.status = "canceled"
                 leg.save(update_fields=["status"])
 
-    # ------------------------------------------------------------
-    # ✅ RÈGLE BUSINESS : return ne doit pas être "assigné"
-    # tant que pickup n'est pas "done"
-    # ------------------------------------------------------------
+    # RÈGLE: return pending tant que pickup pas done
     pickup_leg = existing_by_type.get("pickup")
-    pickup_done = bool(pickup_leg and pickup_leg.status == "done")
+    pickup_done = bool(pickup_leg and (getattr(pickup_leg, "status", None) or "").lower() == "done")
     base_status_return = base_status if pickup_done else "pending"
 
-    # ------------------------------------------------------------
-    # ✅ Helper: détecter si la jambe a déjà un payout (source de vérité)
-    # ------------------------------------------------------------
-    def _paid_amount_for_leg(leg):
-        try:
-            from wallets.models import WalletTransaction
-            tx = WalletTransaction.objects.filter(
-                order=order,
-                leg=leg,
-                type="payout",
-                direction="in",
-            ).order_by("id").first()
-            return tx.amount if tx else None
-        except Exception:
-            return None
-
-    # ------------------------------------------------------------
-    # 3) CREATE/UPDATE legs (sans rétrograder un leg avancé)
-    # ------------------------------------------------------------
+    # Create / Update
     for leg_type, client_part, driver_part, margin_part in legs_data:
         leg = existing_by_type.get(leg_type)
 
@@ -214,33 +174,35 @@ def sync_delivery_legs_for_order(order):
             desired_status = base_status_return
 
         if leg:
-            leg.driver = order.delivery_partner
+            # ✅ Ne jamais écraser un driver existant par None
+            if getattr(order, "delivery_partner_id", None):
+                leg.driver_id = order.delivery_partner_id
 
-            # 🔒 NE JAMAIS "reculer" un leg déjà avancé
-            if leg.status not in {"done", "canceled", "in_progress"}:
+            # ne pas rétrograder
+            if (getattr(leg, "status", None) or "").lower() not in {"done", "canceled", "in_progress"}:
                 leg.status = desired_status
 
             leg.distance_km = distance_one_way
             leg.client_fee_share = client_part
             leg.fagni_margin = margin_part
 
-            # ✅ LOCK driver_amount si déjà payé
             paid_amount = _paid_amount_for_leg(leg)
             if paid_amount is not None:
                 leg.driver_amount = paid_amount
             else:
                 leg.driver_amount = driver_part
 
-            leg.save(update_fields=[
-                "driver", "status", "distance_km",
-                "client_fee_share", "driver_amount", "fagni_margin"
-            ])
+            update_fields = ["status", "distance_km", "client_fee_share", "driver_amount", "fagni_margin"]
+            if getattr(order, "delivery_partner_id", None):
+                update_fields.insert(0, "driver")  # driver_id modifie le champ FK
+
+            leg.save(update_fields=update_fields)
+
 
         else:
-            # Création d'une jambe neuve (pas encore payée, donc OK)
             DeliveryLeg.objects.create(
                 order=order,
-                driver=order.delivery_partner,
+                driver_id=getattr(order, "delivery_partner_id", None),
                 leg_type=leg_type,
                 status=desired_status,
                 distance_km=distance_one_way,
@@ -249,12 +211,26 @@ def sync_delivery_legs_for_order(order):
                 fagni_margin=margin_part,
             )
 
-    # ✅ Après sync legs : aligner le statut de la commande sur les legs
+    # Après sync legs: aligner statut commande
     try:
         from orders.models import sync_order_status_from_legs
         sync_order_status_from_legs(order, save=True)
     except Exception:
         pass
+
+    keepers = {existing_by_type.get("pickup"), existing_by_type.get("return")}
+    keepers = {k for k in keepers if k is not None}
+
+    for leg in legs_existing:
+        if leg in keepers:
+            continue
+        if getattr(leg, "leg_type", None) not in {"pickup", "return"}:
+            continue
+
+        # si pas de payout + pas done => on neutralise
+        if (not _has_payout_tx(leg)) and leg.status in {"pending", "assigned"}:
+            leg.status = "canceled"
+            leg.save(update_fields=["status"])
 
 
 def _order_status_to_leg_status(order_status: str) -> str:
@@ -360,6 +336,189 @@ def sync_order_status_from_legs(order, save=False):
     return new_status
 
 
+
+# =====================
+#  ABONNEMENTS (PILOTE COCODY) — ADDITIF (NE SUPPRIME RIEN)
+# =====================
+class Subscription(models.Model):
+    """
+    Abonnement hebdomadaire par sac (pilot Cocody).
+    Objectif: générer des collectes/livraisons planifiées SANS toucher au modèle Order existant.
+    """
+
+    PACK_CHOICES = [
+        ("essential", "Essentiel"),
+        ("comfort", "Confort"),
+    ]
+
+    BAG_SIZE_CHOICES = [
+        ("S", "Sac S"),
+        ("M", "Sac M"),
+    ]
+
+    WEEKDAY_CHOICES = [
+        (0, "Lundi"),
+        (1, "Mardi"),
+        (2, "Mercredi"),
+        (3, "Jeudi"),
+        (4, "Vendredi"),
+        (5, "Samedi"),
+        (6, "Dimanche"),
+    ]
+
+    customer = models.ForeignKey(
+        "Customer",
+        on_delete=models.PROTECT,
+        related_name="subscriptions",
+        verbose_name="Client",
+    )
+
+    pack = models.CharField("Pack", max_length=20, choices=PACK_CHOICES, default="essential")
+    bag_size = models.CharField("Taille sac", max_length=2, choices=BAG_SIZE_CHOICES, default="M")
+
+    pickup_weekday = models.PositiveSmallIntegerField(
+        "Jour collecte",
+        choices=WEEKDAY_CHOICES,
+        default=0,
+        help_text="Jour fixe de collecte hebdomadaire.",
+    )
+    delivery_weekday = models.PositiveSmallIntegerField(
+        "Jour livraison",
+        choices=WEEKDAY_CHOICES,
+        default=3,
+        help_text="Jour fixe de livraison hebdomadaire.",
+    )
+
+    start_date = models.DateField("Date de début", null=True, blank=True)
+    is_active = models.BooleanField("Actif", default=True)
+    notes = models.CharField("Notes (optionnel)", max_length=255, blank=True, default="")
+
+    created_at = models.DateTimeField("Créé le", auto_now_add=True)
+    updated_at = models.DateTimeField("Mis à jour le", auto_now=True)
+
+    class Meta:
+        verbose_name = "Abonnement"
+        verbose_name_plural = "Abonnements"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Abonnement {self.customer} ({self.get_pack_display()} / Sac {self.bag_size})"
+
+    def _week_start(self, d):
+        # Lundi comme début de semaine
+        from datetime import timedelta
+        return d - timedelta(days=d.weekday())
+
+    def _next_date_for_weekday(self, week_start, weekday):
+        from datetime import timedelta
+        return week_start + timedelta(days=int(weekday))
+
+    def generate_cycles(self, weeks_ahead: int = 4, save: bool = True) -> int:
+        """
+        Génère à l'avance des cycles (collecte+livraison) pour les prochaines semaines.
+        Idempotent: ne recrée pas si déjà existant.
+        """
+        from datetime import timedelta
+        from django.utils import timezone
+
+        if not self.is_active:
+            return 0
+
+        today = timezone.localdate()
+        base = self.start_date or today
+        # on part de la semaine du "base"
+        wk0 = self._week_start(base)
+
+        created = 0
+        for w in range(int(weeks_ahead)):
+            ws = wk0 + timedelta(days=7*w)
+            pickup_date = self._next_date_for_weekday(ws, self.pickup_weekday)
+            delivery_date = self._next_date_for_weekday(ws, self.delivery_weekday)
+
+            # garde-fou : livraison doit être >= collecte (sinon semaine suivante)
+            if delivery_date < pickup_date:
+                delivery_date = delivery_date + timedelta(days=7)
+
+            obj, was_created = SubscriptionCycle.objects.get_or_create(
+                subscription=self,
+                week_start=ws,
+                defaults={
+                    "customer": self.customer,
+                    "pickup_date": pickup_date,
+                    "delivery_date": delivery_date,
+                    "bag_size": self.bag_size,
+                    "status": "COLLECTE",
+                },
+            )
+            if was_created:
+                created += 1
+
+        return created
+
+
+class SubscriptionCycle(models.Model):
+    """
+    Un cycle opérationnel (collecte/livraison) généré depuis un abonnement.
+    On le traite comme "vérité terrain" pour le planning.
+    """
+
+    STATUS_CHOICES = [
+        ("COLLECTE", "À collecter"),
+        ("EN_TRAITEMENT", "En traitement"),
+        ("EN_LIVRAISON", "En livraison"),
+        ("LIVRE", "Livré"),
+        ("ANNULE", "Annulé"),
+    ]
+
+    subscription = models.ForeignKey(
+        "Subscription",
+        on_delete=models.CASCADE,
+        related_name="cycles",
+        verbose_name="Abonnement",
+    )
+
+    # dénormalisation utile pour filtres/exports
+    customer = models.ForeignKey(
+        "Customer",
+        on_delete=models.PROTECT,
+        related_name="subscription_cycles",
+        verbose_name="Client",
+    )
+
+    week_start = models.DateField("Semaine (lundi)", db_index=True)
+    pickup_date = models.DateField("Date collecte", db_index=True)
+    delivery_date = models.DateField("Date livraison", db_index=True)
+
+    bag_size = models.CharField("Taille sac", max_length=2, default="M")
+    status = models.CharField("Statut", max_length=20, choices=STATUS_CHOICES, default="COLLECTE")
+
+    # lien optionnel vers une commande existante si un jour tu veux "matérialiser" en Order
+    related_order = models.ForeignKey(
+        "Order",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="subscription_cycles",
+        verbose_name="Commande liée (optionnel)",
+    )
+
+    created_at = models.DateTimeField("Créé le", auto_now_add=True)
+    updated_at = models.DateTimeField("Mis à jour le", auto_now=True)
+
+    class Meta:
+        verbose_name = "Cycle abonnement"
+        verbose_name_plural = "Cycles abonnement"
+        ordering = ["-pickup_date", "-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["subscription", "week_start"],
+                name="uniq_subscription_week_start",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.customer} — collecte {self.pickup_date} / livraison {self.delivery_date} ({self.status})"
+
 # =====================
 #  CLIENT
 # =====================
@@ -393,9 +552,7 @@ class Customer(models.Model):
         phone = (self.phone or "").strip()
         return f"{name} ({phone})" if phone else name
 
-    def save(self, *args, **kwargs):
-        """Save minimal: Customer n'a pas de status/started_at/finished_at."""
-        return super().save(*args, **kwargs)
+
 class LogisticsConfig(models.Model):
     """
     Configuration logistique globale / par ville.
@@ -1124,7 +1281,7 @@ class Order(models.Model):
         # 0) Recalcul distance depuis les DeliveryLeg si possible
         try:
             from .services import recompute_order_distance_from_legs
-            recompute_order_distance_from_legs(self, save=True)
+            recompute_order_distance_from_legs(self, save=False)
         except Exception:
             pass
 
@@ -1138,7 +1295,25 @@ class Order(models.Model):
         self.driver_logistic_cost = data.get("delivery_cost_driver", Decimal("0"))
 
         # 3) Service FAGNI & express
-        self.service_fee = data.get("service_fee_ht", Decimal("0"))
+        prev_service_fee = self.service_fee
+        computed_service_fee = data.get("service_fee_ht", Decimal("0"))
+
+        # ✅ Ne pas écraser un service_fee déjà fixé (tests/imports/admin)
+        # quand le moteur sort 0 et qu'il n'y a aucune ligne (items).
+        has_items = False
+        try:
+            has_items = bool(getattr(self, "items", None) and self.items.exists())
+        except Exception:
+            has_items = False
+
+        if (
+            Decimal(str(computed_service_fee or 0)) <= 0
+            and Decimal(str(prev_service_fee or 0)) > 0
+            and not has_items
+        ):
+            self.service_fee = prev_service_fee
+        else:
+            self.service_fee = computed_service_fee
 
         # ✅ IMPORTANT : express_extra_fee = montant facturé au client pour l'option express
         if hasattr(self, "express_extra_fee"):
@@ -1230,9 +1405,10 @@ class Order(models.Model):
     ):
         """
         Porte d'entrée UNIQUE pour enregistrer un paiement.
-        - Si paiement partiel => ajoute Payment + sync => NE FORCE PAS paid
-        - Si paiement complet (>= total) => passe paid + facture + distribution (via save())
-        Idempotent.
+        - Enregistre un paiement (audit) via add_payment() si disponible
+        - Recalcule amount_paid + payment_status à partir des paiements (source de vérité)
+        - Si devient 'paid' => prépare invoice_date/invoice_status + update_financials()
+        Idempotent / safe (ne doit pas casser même si modules manquent).
         """
         from decimal import Decimal
         from django.utils import timezone
@@ -1240,152 +1416,179 @@ class Order(models.Model):
         if paid_at is None:
             paid_at = timezone.now()
 
-        # 1) Recalcule financiers (sans save récursif)
+        # 0) Recalcule financiers (sans save récursif) pour avoir total_client_ttc correct
         try:
             self.update_financials(save=False)
         except Exception:
             pass
 
-        total_ttc = Decimal(str(getattr(self, "total_client_ttc", None) or 0))
+        total_ttc = Decimal(str(getattr(self, "total_client_ttc", 0) or 0))
 
-        # amount reçu
-        try:
-            amt_dec = Decimal(str(amount)) if amount is not None else total_ttc
-        except Exception:
-            amt_dec = Decimal("0")
-
-        # sécurités champs paiement
-        if hasattr(self, "payment_method"):
-            self.payment_method = method or getattr(self, "payment_method", "") or "psp"
-        if hasattr(self, "payment_reference") and reference:
-            self.payment_reference = reference
-        if getattr(self, "payment_date", None) is None:
-            self.payment_date = paid_at
-
-        # =========================
-        # ✅ CAS 1 : PAIEMENT PARTIEL
-        # =========================
-        if total_ttc > 0 and amt_dec > 0 and amt_dec < total_ttc:
-            # 1) Ajoute une ligne Payment (audit)
-            try:
-                self.add_payment(
-                    amount=int(amt_dec),
-                    channel=(method or "psp"),
-                    reference=(reference or ""),
-                    source="driver" if (method not in ("psp", "system")) else "system",
-                    save=True,
-                )
-            except Exception:
-                pass
-
-            # 2) Sync : amount_paid capé + statut reste unpaid tant que pas soldé
-            try:
-                self.sync_payment_status_from_payments(save=True)
-            except Exception:
-                pass
-
-            return self
-
-        # ✅ CAS 2 : PAIEMENT TOTAL (ou >= total)
-        # --------------------------------------
-
-        # 🔒 Impossible de payer une commande à total=0
+        # 🔒 Total invalide => pas de "paid"
         if total_ttc <= 0:
-            # on ne force pas paid
-            self.payment_status = "unpaid"
-            self.amount_paid = Decimal("0.00")
+            try:
+                self.amount_paid = Decimal("0.00")
+                self.payment_status = "unpaid"
+                if save:
+                    self.save(update_fields=["amount_paid", "payment_status"])
+            except Exception:
+                pass
             return self
 
-        # 1) Ajoute une ligne Payment (audit) si montant > 0
+        # 1) Montant payé
         try:
-            pay_amount = int(amt_dec) if amt_dec and amt_dec > 0 else int(total_ttc)
+            amt = Decimal(str(amount)) if amount is not None else total_ttc
         except Exception:
-            pay_amount = int(total_ttc)
+            amt = Decimal("0")
 
-        # si on a un montant >= total, on enregistre total (audit propre)
-        if pay_amount >= int(total_ttc):
-            pay_amount = int(total_ttc)
+        if amt < 0:
+            amt = Decimal("0")
 
+        # 2) Remplir métadonnées paiement (sans forcer 'paid' ici)
         try:
-            if pay_amount > 0:
-                self.add_payment(
-                    amount=pay_amount,
-                    channel=(method or "psp"),
-                    reference=(reference or ""),
-                    source="driver" if (method not in ("psp", "system")) else "system",
-                    save=True,
-                )
+            if hasattr(self, "payment_method") and method:
+                self.payment_method = method
+            if hasattr(self, "payment_reference") and reference:
+                self.payment_reference = reference
+            if getattr(self, "payment_date", None) is None:
+                self.payment_date = paid_at
         except Exception:
             pass
 
-        # 2) Sync canonique (détermine paid/partial/unpaid)
+        # 3) Audit : add_payment si possible (FCFA entier)
+        pay_amount = amt
+        if pay_amount > total_ttc:
+            pay_amount = total_ttc
         try:
-            self.sync_payment_status_from_payments(save=True)
+            pay_amount_int = int(pay_amount)
         except Exception:
-            # 🔒 Total invalide => impossible de marquer paid
-            if total_ttc <= 0:
+            pay_amount_int = 0
+
+        if pay_amount_int > 0 and hasattr(self, "add_payment"):
+            try:
+                self.add_payment(
+                    amount=pay_amount_int,
+                    channel=(method or "psp"),
+                    reference=(reference or ""),
+                    source="system",
+                    save=True,
+                )
+            except Exception:
+                # Ne jamais casser mark_paid si l'audit échoue
+                pass
+
+        # 4) Sync canonique depuis Payments (source de vérité)
+        just_became_paid = False
+        try:
+            just_became_paid = bool(self.sync_payment_status_from_payments(save=False))
+        except Exception:
+            # Fallback: si on a payé >= total => paid sinon partial/unpaid
+            if pay_amount_int >= int(total_ttc):
+                self.payment_status = "paid"
+                self.amount_paid = total_ttc
+                just_became_paid = True
+            elif pay_amount_int > 0:
+                self.payment_status = "partial"
+                self.amount_paid = Decimal(str(pay_amount_int))
+            else:
                 self.payment_status = "unpaid"
                 self.amount_paid = Decimal("0.00")
-                return self
 
-        except Exception:
-            # fallback (si sync crash) : on force paid (puisque CAS 2)
-            self.payment_status = "paid"
-            self.amount_paid = total_ttc
-
-        # 3) Facture (si paid)
+        # 5) Si on devient paid => préparer facture + recalcul finance (génère invoice_number etc.)
         if getattr(self, "payment_status", None) == "paid":
-            if getattr(self, "invoice_date", None) is None:
-                self.invoice_date = self.payment_date or paid_at
-            if getattr(self, "invoice_status", None) in (None, "", "draft", "issued"):
-                self.invoice_status = "paid"
+            try:
+                if getattr(self, "invoice_date", None) is None:
+                    self.invoice_date = getattr(self, "payment_date", None) or paid_at
+                if getattr(self, "invoice_status", None) in (None, "", "draft", "issued"):
+                    self.invoice_status = "paid"
+            except Exception:
+                pass
+
+            try:
+                # update_financials gère invoice_number + fne_status, + sync legs (si save=True)
+                self.update_financials(save=False)
+            except Exception:
+                pass
+
+        if save:
+            try:
+                fields = []
+                for f in (
+                    "payment_status",
+                    "amount_paid",
+                    "payment_date",
+                    "payment_method",
+                    "payment_reference",
+                    "invoice_number",
+                    "invoice_date",
+                    "invoice_status",
+                    "fne_status",
+                ):
+                    if hasattr(self, f):
+                        fields.append(f)
+                if fields:
+                    self.save(update_fields=list(dict.fromkeys(fields)))
+                else:
+                    self.save()
+            except Exception:
+                pass
+
+            # Sync legs après save si ton moteur en dépend (sécurisé)
+            try:
+                sync_delivery_legs_for_order(self)
+            except Exception:
+                pass
+
+        return self
 
 
-    from django.db.models import Sum
-    from django.utils import timezone
-    from decimal import Decimal
-
-    def total_paid_from_payments(self) -> Decimal:
+    def total_paid_from_payments(self):
         """
-        Source de vérité: somme des Payment.amount (entiers FCFA).
+        Source de vérité : somme des Payment.amount (entiers FCFA).
+        Retourne un Decimal.
         """
-        from .models import Payment
+        from decimal import Decimal
+        from django.db.models import Sum
+        try:
+            from .models import Payment
+        except Exception:
+            return Decimal("0.00")
+
         agg = Payment.objects.filter(order=self).aggregate(s=Sum("amount"))
         s = agg.get("s") or 0
-        return Decimal(str(s)).quantize(Decimal("0.01"))
+        try:
+            return Decimal(str(s))
+        except Exception:
+            return Decimal("0.00")
 
-    def sync_payment_status_from_payments(self, save=True) -> None:
+
+    def sync_payment_status_from_payments(self, save: bool = True):
         """
-        Met à jour amount_paid + payment_status en fonction des paiements enregistrés.
+        Met à jour amount_paid + payment_status à partir des paiements (Payments).
         Règles:
-        - Si total_client_ttc <= 0 => toujours unpaid (évite paid incohérent)
+        - total_client_ttc <= 0 => unpaid
         - amount_paid = min(sum(payments), total_client_ttc)
-        - new_status: unpaid / partial / paid
+        - status: unpaid / partial / paid
+        Retourne True si la commande vient juste de passer à 'paid'.
         """
-        from django.utils import timezone
         from decimal import Decimal
+        from django.utils import timezone
 
         total_ttc = Decimal(str(getattr(self, "total_client_ttc", 0) or 0))
-        paid_sum = self.total_paid_from_payments()
-
-        if paid_sum < 0:
-            paid_sum = Decimal("0.00")
-
         old_status = (getattr(self, "payment_status", None) or "unpaid")
 
-        # 🔒 Total invalide => jamais paid
         if total_ttc <= 0:
             self.amount_paid = Decimal("0.00")
             self.payment_status = "unpaid"
-            # on ne force pas payment_date/invoice ici
             if save:
                 self.save(update_fields=["amount_paid", "payment_status"])
-            return
+            return False
 
-        # ✅ CAP
-        effective_paid = min(paid_sum, total_ttc)
+        paid_sum = self.total_paid_from_payments()
+        if paid_sum < 0:
+            paid_sum = Decimal("0.00")
 
-        # ✅ statut
+        effective_paid = paid_sum if paid_sum <= total_ttc else total_ttc
         if paid_sum <= 0:
             new_status = "unpaid"
         elif paid_sum < total_ttc:
@@ -1407,10 +1610,14 @@ class Order(models.Model):
                 self.invoice_status = "paid"
 
         if save:
-            self.save(update_fields=["amount_paid", "payment_status", "payment_date", "invoice_date", "invoice_status"])
+            fields = ["amount_paid", "payment_status"]
+            if just_became_paid:
+                for f in ("payment_date", "invoice_date", "invoice_status"):
+                    if hasattr(self, f):
+                        fields.append(f)
+            self.save(update_fields=list(dict.fromkeys(fields)))
 
-    from decimal import Decimal
-
+        return just_became_paid
     @property
     def amount_remaining(self):
         try:
@@ -1435,12 +1642,18 @@ class Order(models.Model):
 
     def add_payment(self, amount, channel="psp", reference="", source="driver", confirmed_by=None, save=True):
         """
-        Enregistre un paiement (partiel ou total), puis sync la commande.
-        Idempotent si reference fournie (order+reference unique soft via get_or_create).
+        Enregistre un paiement (partiel ou total) avec garde-fous:
+        - total_client_ttc == 0 => ValidationError
+        - commande déjà soldée => None (ne crée rien)
+        - surpaiement => cappé au reste dû
+        - idempotent si reference fournie (order+reference unique soft via get_or_create)
         """
-        from .models import Payment
         from decimal import Decimal
+        from django.core.exceptions import ValidationError
+        from django.db.models import Sum
+        from .models import Payment
 
+        # normalisation amount -> int FCFA
         try:
             amt = int(Decimal(str(amount or 0)))
         except Exception:
@@ -1448,54 +1661,69 @@ class Order(models.Model):
         if amt <= 0:
             return None
 
-        # 🔒 Interdire un paiement si le total client TTC n'est pas défini (>0)
-        # (évite les Payment "orphelins" quand total_client_ttc == 0)
-        from django.core.exceptions import ValidationError
-        total_ttc = Decimal(str(getattr(self, "total_client_ttc", 0) or 0))
-        if total_ttc <= 0:
-            raise ValidationError({"total_client_ttc": "Impossible d'ajouter un paiement : total_client_ttc est à 0 (ou non calculé)."})
-
-        # ✅ Cap au reste dû (évite sum(Payment) > total)
-        # reste dû = total_ttc - amount_paid (borné à >=0)
-        try:
-            already_paid = Decimal(str(getattr(self, "amount_paid", 0) or 0))
-        except Exception:
-            already_paid = Decimal("0")
-        remaining = total_ttc - already_paid
-        if remaining <= 0:
-            return None
-        if Decimal(str(amt)) > remaining:
-            amt = int(remaining)
-            if amt <= 0:
-                return None
-
         channel = (channel or "psp")[:20]
         reference = (reference or "").strip()
 
+        # refresh minimal (évite états stale)
+        try:
+            self.refresh_from_db(fields=["total_client_ttc", "payment_status", "amount_paid"])
+        except Exception:
+            pass
+
+        total_ttc = Decimal(str(getattr(self, "total_client_ttc", 0) or 0))
+        if total_ttc <= 0:
+            raise ValidationError("Impossible d'enregistrer un paiement : total_client_ttc est à 0.")
+
+        # source de vérité: somme des paiements existants
+        paid_sum = Payment.objects.filter(order=self).aggregate(s=Sum("amount")).get("s") or 0
+        paid_sum = Decimal(str(paid_sum))
+        if paid_sum < 0:
+            paid_sum = Decimal("0")
+
+        remaining = total_ttc - paid_sum
+        if remaining <= 0:
+            # commande déjà soldée
+            return None
+
+        # cap au reste dû
+        capped = Decimal(str(min(Decimal(str(amt)), remaining)))
+        amt = int(capped)
+        if amt <= 0:
+            return None
+
+        # idempotence: si reference existe déjà, on retourne l'existant (sans créer un nouveau)
         if reference:
-            p, _ = Payment.objects.get_or_create(
+            p, created = Payment.objects.get_or_create(
                 order=self,
                 reference=reference,
                 defaults={"amount": amt, "channel": channel, "source": source, "confirmed_by": confirmed_by},
             )
-            # normaliser si existant
+            # si on vient de le créer mais qu'entre-temps remaining a changé, le Payment.save guard gérera.
+            # normaliser champs (soft)
             upd = {}
-            if p.amount != amt: upd["amount"] = amt
-            if p.channel != channel: upd["channel"] = channel
-            if p.source != source: upd["source"] = source
+            if p.amount != amt:
+                upd["amount"] = amt
+            if p.channel != channel:
+                upd["channel"] = channel
+            if p.source != source:
+                upd["source"] = source
             if confirmed_by and p.confirmed_by_id != getattr(confirmed_by, "id", None):
                 upd["confirmed_by"] = confirmed_by
             if upd:
                 Payment.objects.filter(pk=p.pk).update(**upd)
         else:
             p = Payment.objects.create(
-                order=self, amount=amt, channel=channel, reference="", source=source, confirmed_by=confirmed_by
+                order=self,
+                amount=amt,
+                channel=channel,
+                reference="",
+                source=source,
+                confirmed_by=confirmed_by,
             )
 
         if save:
             self.sync_payment_status_from_payments(save=True)
         return p
-
 
     # ---------- Propriétés de calcul ----------
     @property
@@ -1634,9 +1862,22 @@ class Order(models.Model):
 
         # 2) Si impossible de calculer la distance → on applique le minimum client
         if one_way_km is None:
+            logi = getattr(settings, "FAGNI_LOGISTICS", {})
+            driver_fixed_per_leg = Decimal(str(logi.get("driver_fixed_per_leg", 300)))
+
+            # Minimum driver pour 2 jambes
+            driver_min = (Decimal("2.0") * driver_fixed_per_leg).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+            # Le client paye au moins min
             self.distance_km = None
-            self.driver_logistic_cost = Decimal("0.00")
-            self.logistic_margin = int(client_min_fee)
+            self.driver_logistic_cost = driver_min
+
+            # marge = min - driver_min (bornée >=0)
+            margin = (client_min_fee - driver_min)
+            if margin < 0:
+                margin = Decimal("0.00")
+            self.logistic_margin = int(margin)
+
             return client_min_fee.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
         # 3) Base pricing (sans surge)
@@ -1712,23 +1953,82 @@ class Order(models.Model):
 
     def recompute_logistics_from_legs(self, save_legs: bool = True, save_order: bool = True):
         """
-        Recalcule les montants logistiques (par jambe + agrégats Order)
-        à partir des DeliveryLeg existantes.
+        Recalcule les montants logistiques à partir des DeliveryLeg existantes.
+
+        Garde-fous:
+        - Exclut les legs canceled des calculs ET remet leurs montants à 0.
+        - Répartit delivery_fee / driver_total / margin_total sur les legs actifs.
+        - Si une tx payout existe pour une jambe: driver_amount est VERROUILLÉ sur tx.amount.
+          (on répartit le reste sur les autres jambes non verrouillées)
+        - Ne change pas les statuts et ne crée aucune transaction.
         """
-        legs = list(self.legs.all())
+        from decimal import Decimal, ROUND_HALF_UP
+
+        # 0) Canceled -> montants à 0 (hors calcul)
+        canceled = list(self.legs.filter(status="canceled"))
+        if canceled:
+            for leg in canceled:
+                if (leg.client_fee_share or 0) != 0 or (leg.driver_amount or 0) != 0 or (leg.fagni_margin or 0) != 0:
+                    leg.client_fee_share = Decimal("0")
+                    leg.driver_amount = Decimal("0")
+                    leg.fagni_margin = Decimal("0")
+                    if save_legs:
+                        leg.save(update_fields=["client_fee_share", "driver_amount", "fagni_margin"])
+
+        legs = list(self.legs.exclude(status__in=["canceled", "pending"]).order_by("id"))
         if not legs:
             return
 
-        delivery_fee = Decimal(self.delivery_fee or 0)
-        driver_total = Decimal(self.amount_driver_partner or 0)
-        margin_total = Decimal(self.logistic_margin or 0)
+        def _round_fcfa(v: Decimal) -> Decimal:
+            v = Decimal(str(v or 0))
+            return v.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
-        if delivery_fee and not margin_total and driver_total:
+        # 1) Totaux de référence (commande)
+        delivery_fee = Decimal(str(getattr(self, "delivery_fee", 0) or 0))
+        driver_total = Decimal(str(getattr(self, "amount_driver_partner", 0) or 0))
+        margin_total = Decimal(str(getattr(self, "logistic_margin", 0) or 0))
+
+        # ✅ Pool cohérent = source de vérité (ne pas écraser ces montants)
+        # Si delivery_fee == amount_driver_partner + logistic_margin, on verrouille le pool.
+        lock_pool = False
+        try:
+            _df = Decimal(str(delivery_fee or 0))
+            _dt = Decimal(str(self.amount_driver_partner or 0))
+            _mt = Decimal(str(self.logistic_margin or 0))
+            if _df > 0 and _round_fcfa(_dt + _mt) == _round_fcfa(_df):
+                driver_total = _dt
+                margin_total = _mt
+                lock_pool = True
+        except Exception:
+            lock_pool = False
+
+        driver_cost_field = Decimal(str(getattr(self, "driver_logistic_cost", 0) or 0))
+
+        # Driver total: priorité amount_driver_partner, sinon driver_logistic_cost
+        if (not lock_pool) and delivery_fee and (not driver_total) and driver_cost_field:
+            driver_total = driver_cost_field
+
+        # Inférences cohérentes si un des 3 manque
+        if (not lock_pool) and delivery_fee and margin_total and (not driver_total):
+            driver_total = delivery_fee - margin_total
+        if (not lock_pool) and delivery_fee and driver_total and (not margin_total):
             margin_total = delivery_fee - driver_total
 
-        if delivery_fee and not driver_total and not margin_total:
+        if driver_total < 0:
+            driver_total = Decimal("0")
+        if margin_total < 0:
+            margin_total = Decimal("0")
+
+        # ✅ Invariant pool logistique (marge négative interdite)
+        if (not lock_pool) and delivery_fee and driver_total > delivery_fee:
+            driver_total = delivery_fee
+            margin_total = Decimal("0")
+
+        # Si juste delivery_fee (et rien d’autre) -> tout au driver
+        if (not lock_pool) and delivery_fee and (not driver_total) and (not margin_total):
             driver_total = delivery_fee
 
+        # Cas tout à 0 -> reset legs actifs
         if delivery_fee == 0 and driver_total == 0 and margin_total == 0:
             for leg in legs:
                 leg.client_fee_share = Decimal("0")
@@ -1736,73 +2036,168 @@ class Order(models.Model):
                 leg.fagni_margin = Decimal("0")
                 if save_legs:
                     leg.save(update_fields=["client_fee_share", "driver_amount", "fagni_margin"])
-
             if save_order:
+                total_dist = sum([leg.distance_km or 0 for leg in legs])
                 self.amount_driver_partner = Decimal("0")
                 self.logistic_margin = Decimal("0")
-                total_dist = sum([leg.distance_km or 0 for leg in legs])
                 self.distance_km = total_dist or None
-                self.save(update_fields=["amount_driver_partner", "logistic_margin", "distance_km"])
+                self.driver_logistic_cost = Decimal("0")
+                self.save(update_fields=["amount_driver_partner", "logistic_margin", "distance_km", "driver_logistic_cost"])
             return
 
-        distances = [Decimal(leg.distance_km or 0) for leg in legs]
+        # 2) Poids (distance sinon égal)
+        distances = [Decimal(str(leg.distance_km or 0)) for leg in legs]
         total_dist = sum(distances)
-
-        weights = []
         if total_dist > 0:
-            for d in distances:
-                if d > 0:
-                    weights.append(d / total_dist)
-                else:
-                    weights.append(Decimal("0"))
+            weights = [(d / total_dist) if d > 0 else Decimal("0") for d in distances]
         else:
             n = len(legs)
-            if n == 0:
-                return
-            equal_weight = Decimal("1") / Decimal(str(n))
-            weights = [equal_weight] * n
+            weights = [Decimal("1") / Decimal(str(n)) for _ in legs]
 
-        client_shares = []
-        driver_shares = []
-        margin_shares = []
+        # ✅ Re-verrouillage du pool juste avant payouts (évite toute dérive de recalcul)
+        if lock_pool:
+            try:
+                driver_total = Decimal(str(self.amount_driver_partner or 0))
+                margin_total = Decimal(str(self.logistic_margin or 0))
+            except Exception:
+                pass
 
-        for w in weights:
-            client_shares.append(
-                (delivery_fee * w).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-            )
-            driver_shares.append(
-                (driver_total * w).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-            )
-            margin_shares.append(
-                (margin_total * w).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-            )
+        # 3) Verrouillage payout par jambe (si tx payout existe)
+        locked_driver_amount = {}
+        try:
+            from wallets.models import WalletTransaction
+            for leg in legs:
+                tx = (
+                    WalletTransaction.objects.filter(
+                        order_id=self.id,
+                        leg=leg,
+                        type="payout",
+                        direction="in",
+                    )
+                    .order_by("-id")
+                    .first()
+                )
+                if tx:
+                    locked_driver_amount[leg.id] = Decimal(str(tx.amount or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        except Exception:
+            locked_driver_amount = {}
 
-        def fix_rounding(shares, target_total):
-            diff = target_total - sum(shares)
-            if diff != 0 and shares:
-                shares[0] = shares[0] + diff
+        locked_sum = sum(locked_driver_amount.values()) if locked_driver_amount else Decimal("0")
+
+        # 🔒 Réalité > théorie : si des payouts existent, on ne doit jamais "réduire" le total driver
+        if locked_sum > driver_total:
+            driver_total = locked_sum
+
+        remaining_driver_total = driver_total - locked_sum
+        if remaining_driver_total < 0:
+            remaining_driver_total = Decimal("0")
+
+        unlocked_idx = [i for i, leg in enumerate(legs) if leg.id not in locked_driver_amount]
+        unlocked_wsum = sum([weights[i] for i in unlocked_idx]) if unlocked_idx else Decimal("0")
+
+
+        # ✅ Cas simple (et le plus sûr): un seul leg non verrouillé => il prend 100% du reste
+        # évite des effets de bords de pondération/rounding
+        if len(unlocked_idx) == 1:
+            only_i = unlocked_idx[0]
+            # driver_shares sera créé plus bas, on stocke une intention dans remaining_driver_total
+            single_unlocked_idx = only_i
+        else:
+            single_unlocked_idx = None
+
+        # 4) Shares client/marge
+        client_shares = [_round_fcfa(delivery_fee * w) for w in weights]
+        margin_shares = [_round_fcfa(margin_total * w) for w in weights]
+
+        # 5) Shares driver (verrouillés + restant)
+        driver_shares = [Decimal("0") for _ in legs]
+        for i, leg in enumerate(legs):
+            if leg.id in locked_driver_amount:
+                driver_shares[i] = _round_fcfa(locked_driver_amount[leg.id])
+
+        if unlocked_idx and remaining_driver_total > 0:
+            # ✅ Si un seul unlocked => 100% du remaining sur lui
+            if single_unlocked_idx is not None:
+                driver_shares[single_unlocked_idx] = _round_fcfa(remaining_driver_total)
+            else:
+                for i in unlocked_idx:
+                    w = weights[i]
+                    if unlocked_wsum > 0:
+                        w = w / unlocked_wsum
+                    driver_shares[i] = _round_fcfa(remaining_driver_total * w)
+
+        def fix_rounding(shares, target_total, allowed_idx=None):
+            allowed_idx = allowed_idx if allowed_idx is not None else list(range(len(shares)))
+            if not allowed_idx:
+                return shares
+            target_total = _round_fcfa(target_total)
+            current = sum([_round_fcfa(x) for x in shares])
+            diff = target_total - current
+            if diff != 0:
+                shares[allowed_idx[0]] = _round_fcfa(shares[allowed_idx[0]] + diff)
             return shares
 
         client_shares = fix_rounding(client_shares, delivery_fee)
-        driver_shares = fix_rounding(driver_shares, driver_total)
         margin_shares = fix_rounding(margin_shares, margin_total)
+        # ⚠️ Rounding driver uniquement sur les jambes non verrouillées
+        if unlocked_idx:
+            driver_shares = fix_rounding(driver_shares, driver_total, allowed_idx=unlocked_idx)
+        # sinon: tout est verrouillé -> on ne touche pas aux driver_shares (payout = vérité)
 
+        # ✅ Cas déterministe: s'il ne reste qu'UNE seule jambe non verrouillée,
+        # elle prend 100% du remaining du pool driver (après rounding), sans pondération.
+        try:
+            _unlocked_idx = [i for i, lg in enumerate(legs) if lg.id not in locked_driver_amount]
+            if len(_unlocked_idx) == 1:
+                _i = _unlocked_idx[0]
+                _locked_sum_fcfa = sum([_round_fcfa(v) for v in locked_driver_amount.values()]) if locked_driver_amount else Decimal("0")
+                _remaining_fcfa = _round_fcfa(driver_total) - _locked_sum_fcfa
+                if _remaining_fcfa < 0:
+                    _remaining_fcfa = Decimal("0")
+                driver_shares[_i] = _remaining_fcfa
+        except Exception:
+            pass
+
+        # 6) Écriture legs
         for idx, leg in enumerate(legs):
             leg.client_fee_share = client_shares[idx] if delivery_fee else Decimal("0")
-            leg.driver_amount = driver_shares[idx] if driver_total else Decimal("0")
-            leg.fagni_margin = margin_shares[idx] if margin_total else Decimal("0")
-            if save_legs:
-                leg.save(update_fields=["client_fee_share", "driver_amount", "fagni_margin"])
 
+            # driver: payout lock > calcul
+            if leg.id in locked_driver_amount:
+                leg.driver_amount = locked_driver_amount[leg.id]
+            else:
+                # driver_shares est déjà en FCFA entier (round_fcfa) -> on garde .00
+                leg.driver_amount = Decimal(str(driver_shares[idx] or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+            leg.fagni_margin = margin_shares[idx] if margin_total else Decimal("0")
+
+            if save_legs:
+                # ⚠️ bypass DeliveryLeg.save() (évite tout resync implicite)
+                type(leg).objects.filter(pk=leg.pk).update(
+                    client_fee_share=leg.client_fee_share,
+                    driver_amount=leg.driver_amount,
+                    fagni_margin=leg.fagni_margin,
+                )
+
+
+        # 7) Agrégats commande (legs actifs)
         if save_order:
-            total_driver = sum([leg.driver_amount for leg in legs])
-            total_margin = sum([leg.fagni_margin for leg in legs])
-            total_dist = sum([leg.distance_km or 0 for leg in legs])
+            total_driver = sum([Decimal(str(l.driver_amount or 0)) for l in legs]).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            total_margin = sum([Decimal(str(l.fagni_margin or 0)) for l in legs]).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            total_dist2 = sum([l.distance_km or 0 for l in legs])
 
             self.amount_driver_partner = total_driver
             self.logistic_margin = total_margin
-            self.distance_km = total_dist or None
-            self.save(update_fields=["amount_driver_partner", "logistic_margin", "distance_km"])
+            self.distance_km = total_dist2 or None
+            self.driver_logistic_cost = total_driver
+
+            # ⚠️ IMPORTANT: ne PAS appeler Order.save() ici (risque de recalcul/écrasement)
+            type(self).objects.filter(pk=self.pk).update(
+                amount_driver_partner=total_driver,
+                logistic_margin=total_margin,
+                distance_km=total_dist2 or None,
+                driver_logistic_cost=total_driver,
+            )
 
     # ---------- Photos ----------
     @property
@@ -1891,167 +2286,180 @@ class Order(models.Model):
         cost = self.driver_logistic_cost or Decimal("0")
         return cost.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
+
     @property
     def distribute_mlm_commissions(self):
         """
-        Distribue les commissions MLM sur 3 niveaux à partir du service_fee.
+        Compat legacy (NE PAS utiliser comme déclencheur principal).
+        On délègue au moteur canonique mlm.services.generate_mlm_commissions_for_order().
         """
-        from mlm.models import ReferralLink, ReferralCommission, MLMSettings
-        from wallets.models import Wallet, WalletTransaction
-
-        if self.mlm_distributed:
-            return
-
-        if ReferralCommission.objects.filter(order=self).exists():
-            if not self.mlm_distributed and self.pk:
-                type(self).objects.filter(pk=self.pk).update(mlm_distributed=True)
-                self.mlm_distributed = True
-            return
-
-        mlm_cfg = MLMSettings.get_active()
-        if not mlm_cfg.enabled:
-            return
-
         try:
-            link = ReferralLink.objects.get(customer=self.customer)
-        except ReferralLink.DoesNotExist:
-            return
+            from mlm.services import generate_mlm_commissions_for_order
+            return generate_mlm_commissions_for_order(self)
+        except Exception:
+            return None
 
-        upline = link.get_upline(levels=3)
-        if not upline:
-            return
+    def _has_partner_distribution(self):
+        """
+        True si au moins la distribution vers la blanchisserie est TRAÇABLE en WalletTransaction.
 
-        fee_base_decimal = self.service_fee or Decimal("0.00")
-        if fee_base_decimal <= 0:
-            return
+        On accepte credit OU payout (selon l'implémentation wallets.services).
+        """
+        from decimal import Decimal
+        try:
+            from wallets.models import WalletTransaction
+        except Exception:
+            return False
 
-        fee_base_decimal = fee_base_decimal.quantize(
-            Decimal("0.01"),
-            rounding=ROUND_HALF_UP,
-        )
+        laundry_amount = Decimal(str(getattr(self, "amount_laundry_partner", 0) or 0))
+        if laundry_amount <= 0:
+            return False
 
-        min_fee = Decimal(str(mlm_cfg.min_service_fee_for_commission or 0))
-        if fee_base_decimal < min_fee:
-            return
-
-        fee_base_int = int(fee_base_decimal)
-
-        percent_levels = [
-            mlm_cfg.n1_percent or Decimal("0.00"),
-            mlm_cfg.n2_percent or Decimal("0.00"),
-            mlm_cfg.n3_percent or Decimal("0.00"),
-        ]
-
-        for idx, sponsor_link in enumerate(upline):
-            if idx >= len(percent_levels):
-                break
-
-            sponsor_customer = getattr(sponsor_link, "customer", None)
-            if sponsor_customer is None:
-                continue
-
-            percent = percent_levels[idx] or Decimal("0.00")
-            if percent <= 0:
-                continue
-
-            rate = percent / Decimal("100")
-
-            commission_decimal = (fee_base_decimal * rate).quantize(
-                Decimal("0.01"),
-                rounding=ROUND_HALF_UP,
-            )
-            commission_int = int(commission_decimal)
-
-            if commission_int <= 0:
-                continue
-
-            level = idx + 1
-
-            ReferralCommission.objects.create(
-                beneficiary_profile=sponsor_link,
-                level=level,
-                order=self,
-                service_fee_base=fee_base_int,
-                commission_percent=percent,
-                commission_amount=commission_int,
-            )
-
-        from wallets.services import credit_wallet
-
-        # (on garde ton wallet get_or_create)
-        wallet, _ = Wallet.objects.get_or_create(
-            owner_type="customer",
-            customer=sponsor_customer,
-            defaults={"currency": "XOF"},
-        )
-
-        commission_amount_decimal = Decimal(commission_int).quantize(
-            Decimal("0.01"),
-            rounding=ROUND_HALF_UP,
-        )
-
-        credit_wallet(
-            wallet,
-            commission_amount_decimal,
-            label=f"Commission niveau {level} pour commande {self.code}",
+        return WalletTransaction.objects.filter(
             order=self,
-            tx_type="mlm_commission",
+            type__in=("credit", "payout"),
+            direction="in",
+            wallet__owner_type="laundry",
+            amount=laundry_amount,
+        ).exists()
+
+    def _ensure_laundry_distribution_trace(self) -> bool:
+        """
+        Fallback de sécurité:
+        - Si la tx blanchisserie (credit/payout in) n'existe pas, on la crée (idempotent),
+          en créditant le wallet laundry + traçage WalletTransaction liée à la commande.
+        """
+        from decimal import Decimal, ROUND_HALF_UP
+        try:
+            from wallets.models import Wallet, WalletTransaction
+        except Exception:
+            return False
+
+        laundry_partner_id = getattr(self, "laundry_partner_id", None)
+        if not laundry_partner_id:
+            return False
+
+        amt = Decimal(str(getattr(self, "amount_laundry_partner", 0) or 0))
+        if amt <= 0:
+            return False
+
+        amt = amt.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
+        # get/create wallet blanchisserie
+        wallet, _ = Wallet.objects.get_or_create(
+            owner_type="laundry",
+            laundry_partner_id=laundry_partner_id,
+            currency="XOF",
+            defaults={},
         )
 
-        if self.pk:
-            type(self).objects.filter(pk=self.pk).update(mlm_distributed=True)
-        self.mlm_distributed = True
+        # idempotence: already traced
+        if WalletTransaction.objects.filter(
+            order=self,
+            wallet=wallet,
+            direction="in",
+            type__in=("credit", "payout"),
+            amount=amt,
+        ).exists():
+            return True
+
+        from django.db import transaction
+        with transaction.atomic():
+            wallet.balance = (wallet.balance + amt).quantize(Decimal("0.01"))
+            wallet.save(update_fields=["balance", "updated_at"])
+
+            if hasattr(WalletTransaction, "create_tx"):
+                WalletTransaction.create_tx(
+                    wallet=wallet,
+                    order=self,
+                    leg=None,
+                    type="credit",
+                    direction="in",
+                    amount=amt,
+                    description=f"ORDER#{self.pk} payout blanchisserie (repair)",
+                    allow_orphan=False,
+                )
+            else:
+                WalletTransaction.objects.create(
+                    wallet=wallet,
+                    order=self,
+                    leg=None,
+                    type="credit",
+                    direction="in",
+                    amount=amt,
+                    description=f"ORDER#{self.pk} payout blanchisserie (repair)",
+                )
+
+        return True
+
 
     def mark_as_paid_and_distribute(self):
-        """
-        À appeler quand la commande passe en statut payé.
-        Distribue dans les wallets UNIQUEMENT si cela n'a jamais été fait.
-        """
-        from wallets.services import distribute_order_revenues
-
-        if self.payment_status != "paid":
-            return
-
-        if getattr(self, "wallets_distributed", False):
-            return
-
-        distribute_order_revenues(self, recompute=True)
-
-        # Après distribute_order_revenues(self, recompute=True)
-        from orders.service_layer.payouts import trigger_driver_payout_for_leg
-
-        legs_done = DeliveryLeg.objects.filter(order=self, status="done").select_related("driver")
-        for leg in legs_done:
-            trigger_driver_payout_for_leg(leg)
-
-        self.wallets_distributed = True
-        super(Order, self).save(update_fields=["wallets_distributed"])
-    def pay_driver_if_needed(self):
-        """LEGACY (désactivé): ancien paiement 'fin de course'.
-
-        ✅ Nouveau modèle: payout PAR JAMBE via orders.service_layer.payouts.trigger_driver_payout_for_leg()
-        Cette méthode reste pour compatibilité si du code l'appelle encore, mais elle ne crée plus
-        de payout 'order-level' sans leg.
-        """
         if getattr(self, "payment_status", None) != "paid":
             return
 
+        # 1) Revenus (une seule fois)
+        if not getattr(self, "wallets_distributed", False):
+            # ✅ Si les tx existent déjà, on (re)verrouille wallets_distributed et on évite toute redist.
+            try:
+                from wallets.models import WalletTransaction
+                already = WalletTransaction.objects.filter(
+                    order=self,
+                    direction="in",
+                    type__in=("credit", "payout"),
+                ).exists()
+                if already:
+                    type(self).objects.filter(pk=self.pk).update(wallets_distributed=True)
+                    self.wallets_distributed = True
+                    # on ne tente PAS distribute_order_revenues (évite tout risque)
+                    pass
+                else:
+                    from wallets.services import distribute_order_revenues
+                    distribute_order_revenues(self)
+                    if self._has_partner_distribution():
+                        type(self).objects.filter(pk=self.pk).update(wallets_distributed=True)
+                        self.wallets_distributed = True
+            except Exception:
+                import os
+                if os.environ.get("PAYOUT_DEBUG") == "1":
+                    raise
+                pass
 
-        legs_done = DeliveryLeg.objects.filter(order=self, status="done").select_related("driver")
+
+        # 1.b) MLM (doit pouvoir se jouer même si wallets_distributed=True)
+        if not getattr(self, "mlm_distributed", False):
+            try:
+                from mlm.services import generate_mlm_commissions_for_order
+                generate_mlm_commissions_for_order(self)
+                type(self).objects.filter(pk=self.pk).update(mlm_distributed=True)
+                self.mlm_distributed = True
+            except Exception:
+                import os
+                if os.environ.get("PAYOUT_DEBUG") == "1":
+                    raise
+                pass
+
+        # 2) Payout legs DONE (idempotent)  ✅ TOUJOURS exécuter même si wallets_distributed=True
+        from orders.service_layer.payouts import trigger_driver_payout_for_leg
+
+        # ✅ Important: ne pas filtrer sur driver__isnull=False, le trigger gère le fallback sur order.delivery_partner
+        legs_done = self.legs.filter(status="done").select_related("driver").order_by("id")
         for leg in legs_done:
             trigger_driver_payout_for_leg(leg)
 
-        # Optionnel: synchroniser le flag cache en fonction des payouts leg existants
+        # 3) Optionnel: aligner driver_wallet_credited si au moins un payout leg existe
         try:
             from wallets.models import WalletTransaction
+
             has_leg_payout = WalletTransaction.objects.filter(
                 order=self, leg__isnull=False, type="payout", direction="in"
             ).exists()
+
             if has_leg_payout and not getattr(self, "driver_wallet_credited", False):
                 self.driver_wallet_credited = True
                 super(type(self), self).save(update_fields=["driver_wallet_credited"])
         except Exception:
             pass
+
 
     def financial_timeline(self):
         """
@@ -2105,7 +2513,7 @@ class Order(models.Model):
             return qs.first()
 
         # 2.a Blanchisserie (payout in)
-        laundry_tx = first_tx(owner_type="laundry", tx_type="payout", direction="in")
+        laundry_tx = (first_tx(owner_type="laundry", tx_type="payout", direction="in") or first_tx(owner_type="laundry", tx_type="credit", direction="in"))
         add_event(
             "laundry",
             "Blanchisserie créditée",
@@ -2198,6 +2606,24 @@ class Order(models.Model):
                 if old.status != "done" and self.status == "done":
                     status_just_done = True
 
+        # ✅ S'assurer que les montants (dont total_client_ttc) sont à jour
+        # MAIS: ne pas écraser un total_client_ttc déjà fourni manuellement (tests / imports)
+        # quand il n'y a pas encore de lignes (items).
+        try:
+            from decimal import Decimal
+            total_existing = Decimal(str(getattr(self, "total_client_ttc", 0) or 0))
+            has_items = False
+            try:
+                # évite une query coûteuse si relation non prête
+                has_items = bool(getattr(self, "items", None) and self.items.exists())
+            except Exception:
+                has_items = False
+
+            if not (total_existing > 0 and not has_items):
+                self.update_financials(save=False)
+        except Exception:
+            pass
+
         # ============================================================
         # 🔒 VERROUS PAIEMENT (AVANT ÉCRITURE)
         #  - paid => amount_paid=total_client_ttc + payment_date non null
@@ -2208,6 +2634,12 @@ class Order(models.Model):
             st = (getattr(self, "payment_status", "") or "unpaid").strip().lower()
 
             total_ttc = Decimal(str(getattr(self, "total_client_ttc", 0) or 0))
+            # ✅ fallback : si update_financials a ramené 0 mais qu'on avait un total existant en DB
+            if total_ttc <= 0 and old is not None:
+                try:
+                    total_ttc = Decimal(str(getattr(old, "total_client_ttc", 0) or 0))
+                except Exception:
+                    pass
             amt = Decimal(str(getattr(self, "amount_paid", 0) or 0))
 
             # borne basse
@@ -2220,8 +2652,9 @@ class Order(models.Model):
                 amt = total_ttc
 
             if st == "paid":
-                # ❌ Interdire paid sans total
-                if total_ttc <= 0:
+                # ❌ Interdire la TRANSITION vers PAID si total_client_ttc est à 0
+                # (mais ne pas bloquer les éditions d'un ordre déjà "paid" hérité / mal calculé)
+                if total_ttc <= 0 and payment_just_paid:
                     raise ValidationError({"payment_status": "Impossible de marquer PAID : total_client_ttc est à 0."})
 
                 # paid => amount_paid doit être total_ttc
@@ -2260,6 +2693,13 @@ class Order(models.Model):
             # ne pas casser une sauvegarde pour une conversion; on laisse le reste gérer
             pass
 
+        old_status_db = None
+        try:
+            if self.pk:
+                old_status_db = type(self).objects.filter(pk=self.pk).values_list("payment_status", flat=True).first()
+        except Exception:
+            old_status_db = None
+
         # ✅ Écriture DB (avec retry si collision code)
         try:
             super().save(*args, **kwargs)
@@ -2276,7 +2716,6 @@ class Order(models.Model):
                 super().save(*args, **kwargs)
             else:
                 raise
-
         # ============================================================
         # ✅ RESYNC CANONIQUE depuis Payment (SOURCE DE VÉRITÉ)
         # Objectif:
@@ -2284,6 +2723,12 @@ class Order(models.Model):
         # - recalculer paid/partial/unpaid depuis la somme des paiements
         # - respecter le verrou wallet: ne pas downgrader PAID si tx wallet existent
         # ============================================================
+        # ✅ Assurer que total_client_ttc est à jour avant de recalculer paid/partial/unpaid
+        try:
+            self.update_financials(save=False)
+        except Exception:
+            pass
+
         try:
             Payment = apps.get_model("orders", "Payment")
             if self.pk and Payment.objects.filter(order_id=self.pk).exists():
@@ -2356,10 +2801,40 @@ class Order(models.Model):
             pass
 
         # ============================================================
-        # 1) Distribution générale (blanchisseur + interne) au paiement
+        # ✅ AUTO-REPAIR: si la commande devient PAID via RESYNC Payment
+        # - sync legs (driver_id + driver_amount)
+        # - payout immédiat pour les legs déjà "done"
+        # Cas réel: leg terminé AVANT le paiement -> payout doit partir à l'instant où ça devient PAID.
         # ============================================================
-        if payment_just_paid:
-            self.mark_as_paid_and_distribute()
+        try:
+            prev_status = (old_status_db or (getattr(old, "payment_status", None) if old else None) or "unpaid")
+            became_paid_via_resync = (prev_status != "paid" and getattr(self, "payment_status", None) == "paid")
+
+            if became_paid_via_resync and self.pk:
+                from orders.models import sync_delivery_legs_for_order, DeliveryLeg
+                from orders.service_layer.payouts import trigger_driver_payout_for_leg
+
+                # 1) sync legs (remplit driver + montants par jambe)
+                try:
+                    sync_delivery_legs_for_order(self)
+                except Exception:
+                    pass
+
+                # 2) payout pour tous les legs déjà done (idempotent)
+                done_legs = (
+                    DeliveryLeg.objects
+                    .filter(order_id=self.pk, status="done")
+                    .select_related("order", "driver")
+                    .order_by("id")
+                )
+                for leg in done_legs:
+                    try:
+                        trigger_driver_payout_for_leg(leg)
+                    except Exception:
+                        pass
+
+        except Exception:
+            pass
 
         # 2) Paiement livreur (DÉSACTIVÉ : payout driver géré par legs)
         # payout driver géré par legs (orders.service_layer.payouts.trigger_driver_payout_for_leg)
@@ -2485,62 +2960,37 @@ class DeliveryLeg(models.Model):
 
 
     def save(self, *args, **kwargs):
-
-        """Lifecycle jambe de livraison.
-
-        - timestamps started_at/finished_at
-
-        - si transition -> done ET commande payée => payout driver (idempotent)
-
         """
-
+        Auto-trigger payout driver quand une jambe passe à DONE.
+        - Idempotent: trigger_driver_payout_for_leg gère l'anti-doublon par leg.
+        - Sécurise les timestamps.
+        """
         from django.utils import timezone
 
-
+        # détecter transition vers done
         old_status = None
-
         if self.pk:
-
             try:
-
-                old_status = type(self).objects.filter(pk=self.pk).values_list('status', flat=True).first()
-
+                old_status = DeliveryLeg.objects.filter(pk=self.pk).values_list("status", flat=True).first()
             except Exception:
-
                 old_status = None
 
-
-        if self.status == 'in_progress' and self.started_at is None:
-
+        # timestamps
+        if self.status == "in_progress" and not self.started_at:
             self.started_at = timezone.now()
-
-        if self.status == 'done' and self.finished_at is None:
-
+        if self.status == "done" and not self.finished_at:
             self.finished_at = timezone.now()
-
 
         super().save(*args, **kwargs)
 
-
-        try:
-
-            became_done = (old_status != 'done' and self.status == 'done')
-
-            if became_done:
-
-                order = self.order
-
-                if getattr(order, 'payment_status', None) == 'paid':
-
-                    from orders.service_layer.payouts import trigger_driver_payout_for_leg
-
-                    trigger_driver_payout_for_leg(self)
-
-        except Exception:
-
-            # ne jamais casser la sauvegarde à cause d'un payout
-
-            pass
+        # trigger payout uniquement si transition vers done
+        if (old_status != "done") and (self.status == "done"):
+            try:
+                from orders.service_layer.payouts import trigger_driver_payout_for_leg
+                trigger_driver_payout_for_leg(self)
+            except Exception:
+                # on n'empêche pas la sauvegarde de la jambe
+                pass
 
 
 # =====================
@@ -2711,53 +3161,97 @@ class Payment(models.Model):
     source = models.CharField(max_length=20, default="driver")
     created_at = models.DateTimeField(auto_now_add=True)
 
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["order", "reference"],
-                condition=~Q(reference=""),
-                name="uniq_payment_order_reference_nonempty",
-            )
-        ]
-
-    def clean(self):
-        """Verrous cohérence Payment."""
-        from django.core.exceptions import ValidationError
-        from decimal import Decimal
-
-        # montant strictement positif
-        amt = Decimal(str(self.amount or 0))
-        if amt <= 0:
-            raise ValidationError({"amount": "Le montant du paiement doit être > 0."})
-
-        # total commande doit être défini (>0) au moment du paiement
-        total_ttc = Decimal(str(getattr(self.order, "total_client_ttc", 0) or 0))
-        if total_ttc <= 0:
-            raise ValidationError({"order": "Impossible d'enregistrer un paiement : total_client_ttc de la commande est à 0 (ou non calculé)."})
-
-        # 🔒 Refuser si le paiement dépasse le reste dû
-        from django.db.models import Sum
-        paid_sum = (self.__class__.objects.filter(order=self.order).aggregate(s=Sum("amount")).get("s") or 0)
-        already_paid = Decimal(str(paid_sum))
-        remaining = total_ttc - already_paid
-        if remaining <= 0:
-            raise ValidationError({"order": "Impossible d'enregistrer un paiement : la commande est déjà soldée."})
-        if amt > remaining:
-            raise ValidationError({"amount": f"Montant trop élevé : reste dû {int(remaining)} FCFA."})
-
-    def save(self, *args, **kwargs):
-        # applique les verrous même si créé via Payment.objects.create()
-        self.full_clean()
-        res = super().save(*args, **kwargs)
-
-        # ✅ resync commande même si Payment est créé directement
-        try:
-            if self.order_id:
-                self.order.sync_payment_status_from_payments(save=True)
-        except Exception:
-            pass
-
-        return res
-
     def __str__(self):
         return f"{self.order.code} - {self.amount} FCFA"
+
+    def save(self, *args, **kwargs):
+        """
+        À chaque paiement enregistré (création):
+        - Refuse si total_client_ttc == 0
+        - Refuse si commande déjà soldée
+        - Refuse si surpaiement > reste dû (paiement direct)
+        - Puis sync order.amount_paid + order.payment_status (+ payment_date)
+        - Si devient PAID => mark_as_paid_and_distribute (idempotent)
+        """
+        from decimal import Decimal
+        from django.core.exceptions import ValidationError
+        from django.db.models import Sum
+        from django.utils import timezone
+
+        is_new = self.pk is None
+
+        # ====== GUARDS AVANT INSERT (création uniquement) ======
+        if is_new:
+            o = self.order
+
+            # total TTC depuis DB (source stable)
+            total_ttc_db = type(o).objects.filter(pk=o.pk).values_list("total_client_ttc", flat=True).first()
+            total_ttc = Decimal(str(total_ttc_db or 0))
+
+            if total_ttc <= 0:
+                raise ValidationError("Impossible d'enregistrer un paiement : total_client_ttc est à 0.")
+
+            # somme payée actuelle (sans ce paiement)
+            paid_sum = type(self).objects.filter(order=o).aggregate(s=Sum("amount")).get("s") or 0
+            paid_sum = Decimal(str(paid_sum))
+            if paid_sum < 0:
+                paid_sum = Decimal("0")
+
+            remaining = total_ttc - paid_sum
+            if remaining <= 0:
+                raise ValidationError("Paiement refusé : commande déjà soldée.")
+
+            amt = Decimal(str(getattr(self, "amount", 0) or 0))
+            if amt <= 0:
+                raise ValidationError("Paiement refusé : montant invalide.")
+
+            if amt > remaining:
+                raise ValidationError("Paiement refusé : montant supérieur au reste dû.")
+
+        # ====== INSERT ======
+        super().save(*args, **kwargs)
+
+        # On ne recalcule que sur création (sinon boucles)
+        if not is_new:
+            return
+
+        o = self.order
+
+        # total TTC depuis DB
+        total_ttc_db = type(o).objects.filter(pk=o.pk).values_list("total_client_ttc", flat=True).first()
+        total_ttc = Decimal(str(total_ttc_db or 0))
+
+        paid_sum = type(self).objects.filter(order=o).aggregate(s=Sum("amount")).get("s") or 0
+        paid_sum = Decimal(str(paid_sum))
+        if paid_sum < 0:
+            paid_sum = Decimal("0")
+
+        if total_ttc <= 0:
+            new_status = "unpaid"
+            effective_paid = Decimal("0")
+        else:
+            effective_paid = min(paid_sum, total_ttc)
+            if paid_sum <= 0:
+                new_status = "unpaid"
+            elif paid_sum < total_ttc:
+                new_status = "partial"
+            else:
+                new_status = "paid"
+
+        old_status_db = type(o).objects.filter(pk=o.pk).values_list("payment_status", flat=True).first() or "unpaid"
+        becomes_paid = (old_status_db != "paid" and new_status == "paid")
+
+        updates = {"amount_paid": effective_paid}
+        if old_status_db != new_status:
+            updates["payment_status"] = new_status
+
+        if new_status == "paid":
+            if not type(o).objects.filter(pk=o.pk, payment_date__isnull=False).exists():
+                updates["payment_date"] = timezone.now()
+
+        if updates:
+            type(o).objects.filter(pk=o.pk).update(**updates)
+
+        if becomes_paid:
+            o2 = type(o).objects.get(pk=o.pk)
+            o2.mark_as_paid_and_distribute()

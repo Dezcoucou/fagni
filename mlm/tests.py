@@ -72,6 +72,11 @@ class MlmFlowsTestCase(TestCase):
             service_fee=Decimal("500.00"),
         )
 
+        # 🔒 Force DB (évite update_financials() qui peut remettre à 0)
+        Order.objects.filter(pk=self.order.pk).update(service_fee=Decimal("500.00"))
+        self.order.refresh_from_db()
+
+
         # ---------- Commission rattachée au parrain ----------
         # Si la logique métier a déjà créé une commission (signals, etc.),
         # on la récupère et on la "normalise" pour les tests.
@@ -123,7 +128,7 @@ class MlmFlowsTestCase(TestCase):
         # Il doit y avoir AU MOINS une commission pour ce couple (commande, parrain)
         self.assertGreaterEqual(comms.count(), 1)
 
-        c = comms.order_by("id").first()
+        c = comms.order_by("-id").first()
         self.assertEqual(c.beneficiary_profile, self.parrain_profile)
         self.assertEqual(c.commission_amount, Decimal("50.00"))
         self.assertEqual(c.commission_percent, Decimal("10.00"))

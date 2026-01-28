@@ -1,4 +1,6 @@
 from django.urls import path, include
+from django.views.generic import RedirectView
+
 from . import views
 from orders import views as views_ops
 
@@ -21,6 +23,10 @@ urlpatterns = [
 
     # Tableau OPS (collecte / lavage / livraison)
     path("ops-dashboard/", views.ops_dashboard, name="ops_dashboard"),
+
+    # 📅 Planning OPS
+    path("ops-planning/", views.ops_planning, name="ops_planning"),
+
     path("ops-dashboard/<int:order_id>/<str:action>/", views.ops_update_step, name="ops_update_step"),
 
     # Dashboard global des commandes
@@ -78,6 +84,13 @@ urlpatterns = [
 
     # HUB LIVREUR
     path("driver/hub/", views.driver_hub, name="driver_hub"),
+
+    # ✅ Legacy / compat : /orders/driver/orders/ (ancienne "liste") → hub
+    path(
+        "driver/orders/",
+        RedirectView.as_view(pattern_name="orders:driver_hub", permanent=False),
+        name="driver_orders_legacy",
+    ),
 
     # Application mobile livreurs
     path("driver-app/", views.driver_app, name="driver_app"),

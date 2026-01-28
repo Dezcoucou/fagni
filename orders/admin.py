@@ -12,7 +12,16 @@ from django.utils import timezone
 from django.utils.html import format_html
 
 from orders.service_layer.payouts import trigger_driver_payout_for_leg
-from orders.service_layer.subscriptions import materialize_cycle_to_order
+try:
+    from orders.service_layer.subscriptions import materialize_cycle_to_order
+except ModuleNotFoundError:
+    # Fallback: on ne casse pas le boot Django si le module n'existe pas.
+    def materialize_cycle_to_order(*args, **kwargs):
+        raise ValidationError(
+            "Feature subscriptions: module orders.service_layer.subscriptions introuvable. "
+            "Réintègre le module ou adapte l'admin."
+        )
+
 
 from .models import (
     Customer,

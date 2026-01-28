@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import decimal
 from datetime import datetime, timedelta, time
 from django.template.loader import render_to_string
+from urllib.parse import quote
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.exceptions import ValidationError
 from django.contrib import messages
@@ -944,6 +945,161 @@ def ops_dashboard(request):
     return render(request, "orders/ops_dashboard.html", context)
 
 
+# ============================================================
+#  📅 OPS PLANNING (Next actions + échéances)
+# ============================================================
+@login_required
+def ops_planning(request):
+    """
+    Planning OPS = liste des prochaines actions à faire par commande,
+    triées et groupées par date d'échéance (SLA).
+    - pending -> pickup (SLA_PICKUP_H)
+    - pickup -> dropoff (SLA_DROPOFF_H)
+    - dropoff -> wash_done (SLA_WASH_H)
+    - wash_done -> return (SLA_RETURN_H)
+    - return -> delivered (SLA_DELIVERED_H)
+
+    Filtrable par livreur via ?driver_id=<id>
+    Fenêtre : ?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD (par défaut J à J+2)
+    """
+    # mêmes SLA que ton dashboard (cohérence)
+    SLA_PICKUP_H = 2
+    SLA_DROPOFF_H = 3
+    SLA_WASH_H = 48
+    SLA_RETURN_H = 3
+    SLA_DELIVERED_H = 6
+
+    # ---- filtres dates
+    today = timezone.localdate()
+    date_from = request.GET.get("date_from") or str(today)
+    date_to = request.GET.get("date_to") or str(today + timedelta(days=2))
+
+    df = parse_date(date_from) or today
+    dt = parse_date(date_to) or (today + timedelta(days=2))
+    if dt < df:
+        dt = df
+
+    start_dt = timezone.make_aware(datetime.combine(df, time.min))
+    end_dt = timezone.make_aware(datetime.combine(dt, time.max))
+
+    # ---- filtre driver
+    raw_driver_id = request.GET.get("driver_id")
+    selected_driver = None
+    selected_driver_id = None
+    try:
+        selected_driver_id = int(raw_driver_id) if raw_driver_id else None
+    except (TypeError, ValueError):
+        selected_driver_id = None
+
+    if selected_driver_id:
+        try:
+            selected_driver = DeliveryPartner.objects.filter(is_active=True).get(pk=selected_driver_id)
+        except DeliveryPartner.DoesNotExist:
+            selected_driver = None
+            selected_driver_id = None
+
+    qs = (
+        Order.objects
+        .select_related("customer", "laundry_partner", "delivery_partner")
+        .prefetch_related("items")
+        .filter(status__in=["pending", "in_progress"])
+        .order_by("-created_at")
+    )
+    if selected_driver_id:
+        qs = qs.filter(delivery_partner_id=selected_driver_id)
+
+    now = timezone.now()
+
+    def _next_action(o):
+        """
+        Retourne dict {action, label, due_at, stage}
+        ou None si rien à planifier.
+        """
+        if o.status == "pending" and not o.pickup_time:
+            due = o.created_at + timedelta(hours=SLA_PICKUP_H)
+            return {"action": "pickup", "label": "Collecte", "due_at": due, "stage": "pending"}
+
+        if o.pickup_time and not o.dropoff_time:
+            due = o.pickup_time + timedelta(hours=SLA_DROPOFF_H)
+            return {"action": "dropoff", "label": "Dépôt blanchisserie", "due_at": due, "stage": "in_progress"}
+
+        if o.dropoff_time and not o.wash_complete_time:
+            due = o.dropoff_time + timedelta(hours=SLA_WASH_H)
+            return {"action": "wash_done", "label": "Lavage terminé", "due_at": due, "stage": "in_progress"}
+
+        if o.wash_complete_time and not o.return_time:
+            due = o.wash_complete_time + timedelta(hours=SLA_RETURN_H)
+            return {"action": "return", "label": "Reprise livreur", "due_at": due, "stage": "in_progress"}
+
+        if o.return_time and not o.delivered_time:
+            due = o.return_time + timedelta(hours=SLA_DELIVERED_H)
+            return {"action": "delivered", "label": "Livrée au client", "due_at": due, "stage": "in_progress"}
+
+        return None
+
+    tasks = []
+    overdue_count = 0
+
+    # fenêtre large mais maîtrisée
+    for o in qs[:500]:
+        # refresh affichage sans casser DB
+        try:
+            o.compute_totals(save=False)
+        except Exception:
+            pass
+
+        info = _next_action(o)
+        if not info:
+            continue
+
+        due_at = info["due_at"]
+        if due_at < start_dt or due_at > end_dt:
+            continue
+
+        is_overdue = bool(due_at < now)
+        if is_overdue:
+            overdue_count += 1
+
+        # montants affichés (total client canon)
+        total_disp = getattr(o, "total_client_ttc", None)
+        if total_disp is None:
+            total_disp = getattr(o, "total", None)
+        total_disp = total_disp or Decimal("0")
+
+        tasks.append({
+            "order": o,
+            "action": info["action"],
+            "label": info["label"],
+            "due_at": due_at,
+            "due_date": timezone.localtime(due_at).date(),
+            "overdue": is_overdue,
+            "total_disp": total_disp,
+        })
+
+    # tri par échéance
+    tasks.sort(key=lambda x: x["due_at"])
+
+    # group by date
+    by_date = {}
+    for t in tasks:
+        by_date.setdefault(t["due_date"], []).append(t)
+
+    drivers_list = DeliveryPartner.objects.filter(is_active=True).order_by("name")
+
+    context = {
+        "date_from": df,
+        "date_to": dt,
+        "tasks": tasks,
+        "by_date": sorted(by_date.items(), key=lambda kv: kv[0]),
+        "overdue_count": overdue_count,
+        "selected_driver": selected_driver,
+        "selected_driver_id": selected_driver_id,
+        "drivers_list": drivers_list,
+    }
+    return render(request, "orders/ops_planning.html", context)
+
+
+
 @require_POST
 @login_required
 def ops_update_step(request, order_id, action):
@@ -1108,14 +1264,6 @@ def ops_update_step(request, order_id, action):
         order.status = "done"
         for leg in order.legs.exclude(status="done"):
             update_leg_status(leg, "finish", user=request.user)
-
-    # MLM à la livraison
-    if action == "delivered":
-        try:
-            if (not getattr(order, "mlm_distributed", False)) and (order.service_fee or 0) > 0:
-                order.distribute_mlm_commissions()
-        except Exception:
-            pass
 
     update_fields = {field_name, "status", "updated_at"}
     order.save(update_fields=list(update_fields))
@@ -1350,22 +1498,11 @@ def order_mark_paid(request, order_id):
     except Exception as e:
         # On ne bloque pas l'encaissement si distribution échoue, mais on le signale
         messages.warning(request, f"Paiement OK, mais distribution wallets incomplète : {e}")
-
-    # 5) Payouts livreur : UNIQUEMENT legs déjà done (si le paiement arrive après)
-    try:
-        done_legs = DeliveryLeg.objects.filter(order=order, status="done").select_related("driver")
-        count = 0
-        for leg in done_legs:
-            tx = trigger_driver_payout_for_leg(leg)
-            if tx:
-                count += 1
-        if count:
-            messages.success(request, f"Paiement OK. Payout livreur déclenché sur {count} jambe(s) terminée(s).")
-        else:
-            messages.success(request, "Paiement OK. Aucun payout livreur à déclencher (ou déjà payé).")
-    except Exception as e:
-        messages.warning(request, f"Paiement OK, mais payout livreur non déclenché : {e}")
-
+    # 5) ✅ Payout livreur
+    #    Géré automatiquement par les signals :
+    #    - DeliveryLeg -> done
+    #    - Order -> paid (si legs done avant paiement)
+    messages.success(request, "Paiement OK. Payout livreur géré automatiquement.")
     return redirect("orders:detail", order_id=order.id)
 
 
@@ -4650,7 +4787,6 @@ from decimal import Decimal as _Decimal
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.shortcuts import redirect, render
-from django.urls import reverse
 
 # ... (le reste de tes imports déjà présents)
 
@@ -5849,7 +5985,6 @@ def driver_order_detail(request, order_id):
     from decimal import Decimal
     from django.db.models import Sum
     from django.shortcuts import get_object_or_404, redirect, render
-    from django.urls import reverse
 
     order = get_object_or_404(
         Order.objects.select_related("customer", "delivery_partner", "laundry_partner"),
@@ -6333,6 +6468,15 @@ def driver_app_data(request):
         for r in income_rows_order:
             income_by_order_id[r["order_id"]] = (r["net"] or Decimal("0"))
 
+
+
+        # ✅ SAFETY: ne jamais exposer de 'paid' négatif côté UI (adjustments peuvent être < 0)
+        try:
+            for _oid, _net in list(income_by_order_id.items()):
+                if _net is None or _net < 0:
+                    income_by_order_id[_oid] = Decimal('0')
+        except Exception:
+            pass
     def _safe_float(x):
         try:
             return float(x or 0)
@@ -6461,7 +6605,7 @@ def driver_app_data(request):
         # ✅ distance
         dist_out = _safe_float(getattr(order, "driver_distance_display", 0) or 0)
 
-        detail_url = f"/orders/driver/orders/{order.id}/"
+        detail_url = reverse('orders:driver_order_detail', args=[order.id]) + '?back=' + quote(reverse('orders:driver_hub'))
         dp_id = getattr(order, "delivery_partner_id", None)
         if dp_id:
             detail_url = f"{detail_url}?driver_id={dp_id}"
@@ -8003,7 +8147,7 @@ def driver_missions_history(request):
             "customer_phone": getattr(getattr(o, "customer", None), "phone", "") or "",
             "customer_address": getattr(getattr(o, "customer", None), "address", "") or "",
             "laundry_name": getattr(getattr(o, "laundry_partner", None), "name", "") or "",
-            "detail_url": f"/orders/driver/orders/{o.id}/",
+            "detail_url": reverse('orders:driver_order_detail', args=[o.id]) + "?back=" + quote(reverse('orders:driver_hub')),
         })
 
     # 6) Filtres Python (mission_status + remaining)

@@ -3,20 +3,20 @@ from mlm.models import ReferralCommission, WalletTransaction, MLMSettings, Refer
 import random
 import string
 
+
 def generate_mlm_commissions_for_order(order):
     """
-    Génère les commissions MLM pour une commande terminée :
-    - Supprime les éventuelles commissions déjà calculées
-    - Recalcule selon le plan validé (10% / 3% / 2%)
+    Génère les commissions MLM pour une commande PAYÉE :
+    - Idempotent (ne recrée pas si déjà créé)
+    - Plan (N1/N2/N3) via MLMSettings
     """
-
-    # 1) Seulement pour les commandes terminées
-    if order.status != "done":
+    # 1) Seulement si payé (source de vérité)
+    if getattr(order, "payment_status", None) != "paid":
         return
 
-    # 2) On nettoie les anciennes commissions pour éviter les doublons
-    ReferralCommission.objects.filter(order=order).delete()
-    WalletTransaction.objects.filter(order=order, type="mlm_commission").delete()
+    # 2) Idempotence : si déjà des commissions, on sort
+    if ReferralCommission.objects.filter(order=order).exists():
+        return
 
     # 3) Profil affilié du client
     try:
@@ -46,8 +46,8 @@ def generate_mlm_commissions_for_order(order):
     ]
 
     # 7) Calcul des commissions
-    for idx, sponsor_profile in enumerate(upline):
-        percent = percent_levels[idx]
+    for idx, sponsor_profile in enumerate(upline[:3]):
+        percent = percent_levels[idx] if idx < len(percent_levels) else 0
         commission_decimal = (Decimal(fee_base) * percent / Decimal("100")).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )

@@ -310,27 +310,38 @@ class WalletTransaction(models.Model):
 
     description = models.TextField("Description", blank=True)
 
+
+    idempotency_key = models.CharField(
+        "Clé idempotence",
+        max_length=120,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
     created_at = models.DateTimeField("Créée le", auto_now_add=True)
 
+
     class Meta:
-        verbose_name = "Transaction wallet"
-        verbose_name_plural = "Transactions wallet"
-        ordering = ["-created_at"]
         constraints = [
+            # ✅ 0) Idempotence globale (si clé fournie)
             models.UniqueConstraint(
-                fields=["wallet", "leg", "type", "direction"],
-                condition=models.Q(leg__isnull=False),
-                name="uniq_wtx_wallet_leg_type_dir",
+                fields=["idempotency_key"],
+                condition=models.Q(idempotency_key__isnull=False),
+                name="uniq_wallettx_idempotency_key",
             ),
-            models.UniqueConstraint(
-                fields=["order", "leg", "type", "direction"],
-                condition=models.Q(order__isnull=False) & models.Q(leg__isnull=False),
-                name="uniq_wtx_order_leg_type_dir",
-            ),
+
+            # ✅ 1) Unicité quand leg est NULL (cas internal / laundry / etc.)
             models.UniqueConstraint(
                 fields=["wallet", "order", "type", "direction"],
-                condition=models.Q(order__isnull=False) & models.Q(leg__isnull=True),
-                name="uniq_wtx_wallet_order_type_dir",
+                condition=models.Q(leg__isnull=True),
+                name="uniq_wallet_order_type_dir_no_leg",
+            ),
+
+            # ✅ 2) Unicité par jambe quand leg est NOT NULL (cas payouts driver)
+            models.UniqueConstraint(
+                fields=["wallet", "order", "type", "direction", "leg"],
+                condition=models.Q(leg__isnull=False),
+                name="uniq_wallet_order_type_dir_leg",
             ),
         ]
 
@@ -345,8 +356,10 @@ class WalletTransaction(models.Model):
         order=None,
         leg=None,
         description: str = "",
+        idempotency_key: str | None = None,
         allow_orphan: bool = False,
     ):
+
         """
         Factory sécurisée pour créer une WalletTransaction.
 
@@ -380,6 +393,7 @@ class WalletTransaction(models.Model):
             type=type,
             direction=direction,
             amount=amount,
+              idempotency_key=idempotency_key,
             description=description or "",
         )
 

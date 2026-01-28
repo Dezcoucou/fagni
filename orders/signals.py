@@ -8,7 +8,7 @@ from django.db import transaction
 from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 
-from .models import DeliveryLeg
+from .models import DeliveryLeg, Order
 
 
 # Thread-local guard pour éviter re-entrance / boucles
@@ -20,6 +20,14 @@ def _get_pending_set() -> Set[int]:
     if s is None:
         s = set()
         _state.pending_order_ids = s
+    return s
+
+
+def _get_pending_paid_set() -> Set[int]:
+    s = getattr(_state, "pending_paid_order_ids", None)
+    if s is None:
+        s = set()
+        _state.pending_paid_order_ids = s
     return s
 
 
@@ -47,7 +55,7 @@ def _schedule_sync_order_status(order_id: int) -> None:
 
     def _run():
         try:
-            from .models import Order, sync_order_status_from_legs, sync_delivery_legs_for_order
+            from .models import sync_order_status_from_legs, sync_delivery_legs_for_order
 
             order = Order.objects.filter(pk=order_id).first()
             if not order:
@@ -93,6 +101,66 @@ def _schedule_sync_order_status(order_id: int) -> None:
     transaction.on_commit(_run)
 
 
+def _schedule_payouts_for_paid_order(order_id: int) -> None:
+    """
+    ✅ Quand une commande devient PAID, on paye automatiquement tous les legs déjà "done"
+    (idempotent via contraintes WalletTransaction + logique trigger_driver_payout_for_leg).
+    """
+    if not order_id:
+        return
+
+    pending = _get_pending_paid_set()
+    if order_id in pending:
+        return
+    pending.add(order_id)
+
+    def _run():
+        try:
+            order = Order.objects.filter(pk=order_id).first()
+            if not order:
+                return
+
+            # Ne rien faire si pas réellement paid
+            if (getattr(order, "payment_status", "") or "").lower() != "paid":
+                return
+
+            # Ne jamais toucher une commande annulée
+            if getattr(order, "status", None) == "canceled":
+                return
+
+            try:
+                from orders.service_layer.payouts import trigger_driver_payout_for_leg
+            except Exception:
+                return
+
+            legs = (
+                DeliveryLeg.objects
+                .filter(order=order, status="done")
+                .exclude(status="canceled")
+                .order_by("id")
+            )
+
+            for leg in legs:
+                try:
+                    trigger_driver_payout_for_leg(leg)
+                except Exception:
+                    # idempotent + safe
+                    pass
+
+        finally:
+            pending.discard(order_id)
+
+    try:
+        conn = transaction.get_connection()
+        if not conn.in_atomic_block:
+            _run()
+            return
+    except Exception:
+        pass
+
+    transaction.on_commit(_run)
+
+
 # ============================================================
 # ✅ CAPTURE ancien statut (pre_save) pour détecter transition -> done
 # ============================================================
@@ -107,6 +175,22 @@ def deliveryleg_pre_save_capture_old_status(sender, instance: DeliveryLeg, **kwa
         instance._old_status = old
     except Exception:
         instance._old_status = None
+
+
+# ============================================================
+# ✅ CAPTURE ancien payment_status sur Order (pre_save)
+# ============================================================
+@receiver(pre_save, sender=Order, dispatch_uid="orders_order_pre_save_capture_old_payment_status")
+def order_pre_save_capture_old_payment_status(sender, instance: Order, **kwargs):
+    if not instance or not getattr(instance, "pk", None):
+        instance._old_payment_status = None
+        return
+
+    try:
+        old = Order.objects.filter(pk=instance.pk).values_list("payment_status", flat=True).first()
+        instance._old_payment_status = old
+    except Exception:
+        instance._old_payment_status = None
 
 
 # ============================================================
@@ -160,3 +244,21 @@ def deliveryleg_post_delete_sync_order_status(sender, instance: DeliveryLeg, **k
     order_id = getattr(instance, "order_id", None)
     if order_id:
         _schedule_sync_order_status(int(order_id))
+
+
+# ============================================================
+# ✅ post_save Order : si payment_status devient "paid" -> payouts auto
+# ============================================================
+@receiver(post_save, sender=Order, dispatch_uid="orders_order_post_save_trigger_payouts_when_paid")
+def order_post_save_trigger_payouts_when_paid(sender, instance: Order, created=False, **kwargs):
+    if not instance or not getattr(instance, "pk", None):
+        return
+
+    try:
+        old_ps = (getattr(instance, "_old_payment_status", None) or "").lower()
+        new_ps = (getattr(instance, "payment_status", None) or "").lower()
+        became_paid = (new_ps == "paid" and old_ps != "paid")
+        if became_paid:
+            _schedule_payouts_for_paid_order(int(instance.pk))
+    except Exception:
+        pass

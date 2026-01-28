@@ -72,7 +72,7 @@ def get_or_create_wallet_for_relay_partner(relay_partner: RelayPointPartner) -> 
     Wallet point relais partenaire.
     """
     wallet, _ = Wallet.objects.get_or_create(
-        owner_type="laundry",  # ou un type dédié si besoin plus tard
+        owner_type="relay",  # point relais
         relay_partner=relay_partner,
         defaults={
             "currency": "XOF",
@@ -111,6 +111,7 @@ def credit_wallet(
     label: Optional[str] = None,   # compat ancienne API
     order: Optional[Order] = None,
     leg=None,
+    idempotency_key: Optional[str] = None,
     tx_type: str = "credit",
 ) -> Optional[WalletTransaction]:
     """
@@ -129,6 +130,12 @@ def credit_wallet(
 
     amount = _to_decimal(amount)
 
+    # ✅ Idempotence globale via clé (si fournie)
+    if idempotency_key:
+        existing = WalletTransaction.objects.filter(idempotency_key=idempotency_key).order_by("id").first()
+        if existing:
+            return existing
+
     # 🔒 PILOT GUARD — un payout driver lié à une commande DOIT être rattaché à une jambe (leg)
     if tx_type == "payout" and order is not None and getattr(wallet, "owner_type", None) == "driver" and leg is None:
         raise ValueError("Driver payout for order requires leg (DeliveryLeg).")
@@ -141,6 +148,25 @@ def credit_wallet(
     )
     wallet.save(update_fields=["balance", "updated_at"])
 
+    # ✅ Idempotence: si une tx identique existe déjà (contrainte unique),
+    # on la retourne au lieu de casser la distribution.
+    if order is not None:
+        qs = WalletTransaction.objects.filter(
+            wallet=wallet,
+            order=order,
+            type=tx_type,
+            direction="in",
+        )
+        # ✅ si payout et leg fourni => idempotence par jambe
+        if leg is not None:
+            qs = qs.filter(leg=leg)
+        else:
+            qs = qs.filter(leg__isnull=True)
+
+        existing = qs.order_by("id").first()
+        if existing:
+            return existing
+
     tx = WalletTransaction.create_tx(
         wallet=wallet,
         order=order,
@@ -149,6 +175,7 @@ def credit_wallet(
         direction="in",
         amount=amount,
         description=description or "",
+        idempotency_key=idempotency_key,
         allow_orphan=False,
     )
     return tx
@@ -162,6 +189,7 @@ def debit_wallet(
     label: Optional[str] = None,   # compat ancienne API
     order: Optional[Order] = None,
     leg=None,
+    idempotency_key: Optional[str] = None,
     tx_type: str = "debit",
 ) -> Optional[WalletTransaction]:
     """
@@ -200,6 +228,7 @@ def debit_wallet(
         direction="out",
         amount=amount,
         description=description or "",
+        idempotency_key=idempotency_key,
         allow_orphan=False,
     )
     return tx
@@ -242,6 +271,13 @@ def distribute_order_revenues(
             f"(payment_status = {payment_status})."
         )
 
+    # 🔒 PILOT GUARD — une commande payée DOIT avoir une blanchisserie assignée
+    # (sinon on bloque: pas de distribution "internal only" en pilote)
+    if getattr(order, "laundry_partner_id", None) is None:
+        raise ValueError(
+            f"Pilot guard: commande {order.id} payée mais sans blanchisserie (laundry_partner_id=None)."
+        )
+
     # 1) Éviter la double distribution
     if getattr(order, "wallets_distributed", False) and not force:
         return {
@@ -273,7 +309,8 @@ def distribute_order_revenues(
             amount_laundry,
             description=f"Commande {order.code} – part blanchisserie",
             order=order,
-            tx_type="payout",
+            tx_type="credit",
+            idempotency_key=f"laundry:{order.id}",
         )
     else:
         txs["laundry"] = None
@@ -291,6 +328,7 @@ def distribute_order_revenues(
             description=f"Commande {order.code} – revenu FAGNI TTC",
             order=order,
             tx_type="credit",
+            idempotency_key=f"internal:{order.id}",
         )
     else:
         txs["internal"] = None

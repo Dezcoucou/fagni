@@ -10,19 +10,6 @@ from django.db.models import Sum
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
-
-from orders.service_layer.payouts import trigger_driver_payout_for_leg
-try:
-    from orders.service_layer.subscriptions import materialize_cycle_to_order
-except ModuleNotFoundError:
-    # Fallback: on ne casse pas le boot Django si le module n'existe pas.
-    def materialize_cycle_to_order(*args, **kwargs):
-        raise ValidationError(
-            "Feature subscriptions: module orders.service_layer.subscriptions introuvable. "
-            "Réintègre le module ou adapte l'admin."
-        )
-
-
 from .models import (
     Customer,
     DeliveryLeg,
@@ -41,6 +28,16 @@ from .config_models import (
     InvoiceSettings,
     WorkflowSettings,
 )
+
+
+from orders.service_layer.payouts import trigger_driver_payout_for_leg
+
+try:
+    from orders.service_layer.subscriptions import materialize_cycle_to_order, complete_cycle_order_pricing
+except ModuleNotFoundError:
+    materialize_cycle_to_order = None
+    complete_cycle_order_pricing = None
+
 
 # ============================================================
 #  LOGISTICS CONFIG
@@ -312,6 +309,14 @@ class SubscriptionCycleAdmin(admin.ModelAdmin):
         skipped = 0
         errors = 0
 
+        if materialize_cycle_to_order is None:
+            self.message_user(
+                request,
+                "Module subscriptions manquant (orders.service_layer.subscriptions). Action désactivée.",
+                level=messages.ERROR,
+            )
+            return
+
         qs = queryset.select_related("customer", "subscription", "related_order")
         for cycle in qs:
             try:
@@ -332,7 +337,13 @@ class SubscriptionCycleAdmin(admin.ModelAdmin):
 
     @admin.action(description="✅ Compléter la commande (pricing + legs) depuis cycles")
     def action_complete_cycles(self, request, queryset):
-        from orders.service_layer.subscriptions import complete_cycle_order_pricing
+        if complete_cycle_order_pricing is None:
+            self.message_user(
+                request,
+                "❌ Module manquant: orders.service_layer.subscriptions (action indisponible).",
+                level=messages.ERROR,
+            )
+            return
 
         updated = 0
         skipped = 0

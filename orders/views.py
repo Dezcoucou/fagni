@@ -6468,15 +6468,14 @@ def driver_app_data(request):
         for r in income_rows_order:
             income_by_order_id[r["order_id"]] = (r["net"] or Decimal("0"))
 
+    # ✅ SAFETY: ne jamais exposer de 'paid' négatif côté UI (adjustments peuvent être < 0)
+    try:
+        for _oid, _net in list(income_by_order_id.items()):
+            if _net is None or _net < 0:
+                income_by_order_id[_oid] = Decimal("0")
+    except Exception:
+        pass
 
-
-        # ✅ SAFETY: ne jamais exposer de 'paid' négatif côté UI (adjustments peuvent être < 0)
-        try:
-            for _oid, _net in list(income_by_order_id.items()):
-                if _net is None or _net < 0:
-                    income_by_order_id[_oid] = Decimal('0')
-        except Exception:
-            pass
     def _safe_float(x):
         try:
             return float(x or 0)
@@ -6663,8 +6662,8 @@ def driver_app_data(request):
         pot = _order_driver_potential_from_legs(o)
         total_income_potential += pot
 
-        # ✅ règle identique à serialize(): projection = max(paid, potential)
-        total_income_display += max(paid, pot)
+        # ✅ règle identique à serialize(): paid si dispo sinon potential
+        total_income_display += (paid if paid > 0 else pot)
 
         if cs == "pending":
             pending_count += 1
@@ -6695,7 +6694,7 @@ def driver_app_data(request):
         "total_driver_income": float(total_income_paid),
 
         "source_distance": "distance_km_total",
-        "source_income": "total_driver_income_display=sum(max(paid_wallet, potential_legs)) • cards=paid_else_potential",
+        "source_income": "total_driver_income_display=sum(paid_else_potential) • cards=paid_else_potential",
         "server_time": localtime().strftime("%H:%M:%S"),
 
         "orders_pending": orders_pending_list,

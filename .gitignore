@@ -124,3 +124,7 @@ db_diagram.png
 *.html.PLAN0_*
 *.html.FIXSCRIPT0_*
 cookies.txt
+
+# Local/dev
+cookies_*.txt
+<DB_PATH>

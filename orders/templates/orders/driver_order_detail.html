@@ -578,5 +578,87 @@
       __initPayLive();
     }
   }catch(e){}
+
+/* DRIVER_LEG_AJAX_HANDLER_V1 */
+    // Toast minimal (safe)
+    function toast(msg, kind){
+      try {
+        kind = kind || "error";
+        var t = document.createElement("div");
+        t.textContent = String(msg || "Erreur");
+        t.style.cssText =
+          "position:fixed;z-index:9999;left:50%;bottom:18px;transform:translateX(-50%);" +
+          "max-width:92vw;padding:10px 12px;border-radius:12px;font-weight:700;" +
+          "box-shadow:0 10px 30px rgba(15,23,42,.18);" +
+          "background:#fff;color:#0f172a;font-size:13px;";
+        if(kind==="ok") t.style.border="2px solid #22c55e";
+        if(kind==="warn") t.style.border="2px solid #f59e0b";
+        if(kind==="error") t.style.border="2px solid #ef4444";
+        document.body.appendChild(t);
+        setTimeout(function(){ t.style.opacity="0"; }, 2500);
+        setTimeout(function(){ try{t.remove();}catch(e){} }, 3000);
+      } catch(e){}
+    }
+
+    function safeJson(text){
+      try { return JSON.parse(text); } catch(e){ return null; }
+    }
+
+    // Interception AJAX des actions sur les jambes
+    document.querySelectorAll("form.js-leg-form").forEach(function(form){
+      form.addEventListener("submit", function(ev){
+        ev.preventDefault();
+
+        var btn = form.querySelector("button[type=submit]");
+        if(btn){
+          btn.disabled = true;
+          btn.dataset.old = btn.textContent;
+          btn.textContent = "⏳ ...";
+        }
+
+        var url = form.getAttribute("action") || window.location.href;
+        if(window.location.search && url.indexOf("?") < 0){
+          url += window.location.search;
+        }
+
+        fetch(url, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json"
+          },
+          body: new FormData(form)
+        })
+        .then(function(res){
+          return res.text().then(function(txt){
+            return {status:res.status, ok:res.ok, text:txt, ct:(res.headers.get("content-type")||"")};
+          });
+        })
+        .then(function(r){
+          if(r.status===401 || r.status===403){
+            toast("Session expirée / accès refusé","warn");
+            window.location.reload();
+            return;
+          }
+
+          var data = r.ct.indexOf("application/json")>=0 ? safeJson(r.text) : null;
+
+          if(!r.ok || (data && data.ok===false)){
+            toast((data && (data.message||data.error)) || "Action impossible","error");
+            if(btn){ btn.disabled=false; btn.textContent=btn.dataset.old; }
+            return;
+          }
+
+          toast("Action effectuée","ok");
+          window.location.reload();
+        })
+        .catch(function(){
+          toast("Erreur réseau","error");
+          if(btn){ btn.disabled=false; btn.textContent=btn.dataset.old; }
+        });
+      });
+    });
+
 </script>
 {% endblock %}

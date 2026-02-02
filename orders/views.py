@@ -8617,44 +8617,29 @@ def update_leg_status(leg, action, user=None):
                 leg.finished_at = timezone.now()
 
     elif action == "cancel":
-        # ✅ Autoriser annulation même si done, mais uniquement staff (utile pour tests / admin)
-        if leg.status == "done":
-            if not user or not getattr(user, "is_staff", False):
-                return False, "Annulation impossible : leg déjà terminé (réservé au staff)."
+      # 🔒 Verrouillage backend: si payout existe, on interdit toute annulation (même staff)
+      try:
+          from wallets.models import WalletTransaction
+          has_payout = WalletTransaction.objects.filter(
+              order_id=getattr(leg, "order_id", None),
+              leg_id=getattr(leg, "id", None),
+              wallet__owner_type="driver",
+              type="payout",
+              direction="in",
+          ).exists()
+      except Exception:
+          has_payout = False
 
-        if leg.status != "canceled":
-            leg.status = "canceled"
+      if has_payout:
+          return False, "Annulation impossible : payout livreur déjà effectué."
 
-            # ✅ reverse payout s'il a déjà été payé
-            try:
-                from decimal import Decimal
-                from django.db.models import Sum
-                from wallets.models import WalletTransaction
-                from wallets.services import debit_wallet, get_or_create_wallet_for_delivery_partner
+      # ✅ Autoriser annulation si done NON payé, mais uniquement staff
+      if leg.status == "done":
+          if not user or not getattr(user, "is_staff", False):
+            return False, "Annulation impossible : leg déjà terminé (réservé au staff)."
 
-                wallet = get_or_create_wallet_for_delivery_partner(leg.driver)
-
-                paid = WalletTransaction.objects.filter(
-                    leg=leg, type="payout", direction="in"
-                ).aggregate(s=Sum("amount"))["s"] or Decimal("0")
-
-                reversed_amt = WalletTransaction.objects.filter(
-                    leg=leg, type="adjustment", direction="out"
-                ).aggregate(s=Sum("amount"))["s"] or Decimal("0")
-
-                to_reverse = paid - reversed_amt
-                if to_reverse > 0:
-                    debit_wallet(
-                        wallet,
-                        to_reverse,
-                        description=f"Annulation leg #{leg.id} – reverse payout",
-                        order=leg.order,
-                        leg=leg,  # ✅ important
-                        tx_type="adjustment",
-                    )
-            except Exception:
-                pass
-
+      if leg.status != "canceled":
+          leg.status = "canceled"
     else:
         return False, "Action inconnue"
 

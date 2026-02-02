@@ -21,10 +21,23 @@ def trigger_driver_payout_for_leg(leg):
 
     _dbg("ENTER leg_id=", getattr(leg, "id", None), "status=", getattr(leg, "status", None))
 
-    if not leg or getattr(leg, "status", None) != "done":
-        _dbg("SKIP: leg not done")
+    if not leg:
+        _dbg("SKIP: leg is None")
         return None
 
+    # 🧱 Guard rail: jambe annulée => jamais payer
+    # (utile si quelqu’un repasse status=done par erreur)
+    if getattr(leg, "is_canceled", False) or getattr(leg, "canceled_at", None):
+        _dbg(
+            "SKIP: leg canceled flag present",
+            "is_canceled=", getattr(leg, "is_canceled", None),
+            "canceled_at=", getattr(leg, "canceled_at", None),
+        )
+        return None
+
+    if getattr(leg, "status", None) != "done":
+        _dbg("SKIP: leg not done")
+        return None
     order = getattr(leg, "order", None)
     driver = getattr(leg, "driver", None)
 

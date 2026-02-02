@@ -6545,6 +6545,17 @@ def driver_app_data(request):
             legs = []
         total = Decimal("0")
         for leg in legs:
+            # 🚫 Exclure les jambes annulées du potentiel
+            try:
+                st = (getattr(leg, "status", "") or "").lower().strip()
+                if st == "canceled":
+                    continue
+                if getattr(leg, "is_canceled", False):
+                    continue
+                if getattr(leg, "canceled_at", None):
+                    continue
+            except Exception:
+                pass
             total += _leg_driver_potential(leg)
         return total
 

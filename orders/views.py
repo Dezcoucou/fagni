@@ -6604,10 +6604,12 @@ def driver_app_data(request):
         # ✅ distance
         dist_out = _safe_float(getattr(order, "driver_distance_display", 0) or 0)
 
-          detail_url = reverse('orders:driver_order_detail', args=[order.id]) + '?back=' + quote(reverse('orders:driver_hub'))
-          dp_id = getattr(order, 'delivery_partner_id', None)
-          if dp_id:
-              detail_url = f"{detail_url}&driver_id={dp_id}"
+        detail_url = reverse("orders:driver_order_detail", args=[order.id]) + "?back=" + quote(
+            reverse("orders:driver_hub")
+        )
+        dp_id = getattr(order, "delivery_partner_id", None)
+        if dp_id:
+            detail_url = f"{detail_url}&driver_id={dp_id}"
         return {
             "id": order.id,
             "code": order.code,

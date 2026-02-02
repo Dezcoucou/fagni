@@ -3,6 +3,7 @@ import uuid
 import math
 from orders.utils.distances import haversine_distance_km
 from django.db import models
+from django.db import transaction
 from django.db.models import Sum, F, DecimalField
 from django.conf import settings
 from django.utils import timezone
@@ -178,9 +179,35 @@ def sync_delivery_legs_for_order(order):
             if getattr(order, "delivery_partner_id", None):
                 leg.driver_id = order.delivery_partner_id
 
-            # ne pas rétrograder
-            if (getattr(leg, "status", None) or "").lower() not in {"done", "canceled", "in_progress"}:
-                leg.status = desired_status
+            cur = (getattr(leg, "status", None) or "").lower()
+
+            # 0) Si payout existe, ne jamais toucher au statut (on protège l'historique)
+            status_changed = False
+
+            if _has_payout_tx(leg):
+
+                # 🔒 Statut VERROUILLÉ: une jambe payée doit rester DONE
+
+                # (sinon incohérence: payout existant + jambe repassée pending/assigned)
+
+                if cur != "done":
+
+                    leg.status = "done"
+
+                    status_changed = True
+            # 1) Si leg est finalisé/démarré, on ne le touche pas
+            elif cur in {"done", "canceled", "in_progress"}:
+                pass
+
+            # 2) Sync métier autorisé : seulement pending/assigned (jamais done)
+            else:
+                # règle return : pending tant que pickup pas done
+                # => peut downgrade assigned->pending (autorisé métier)
+                allowed = {"pending", "assigned"}
+                if desired_status in allowed and cur in allowed:
+                    if cur != desired_status:
+                        leg.status = desired_status
+                        status_changed = True
 
             leg.distance_km = distance_one_way
             leg.client_fee_share = client_part
@@ -192,9 +219,13 @@ def sync_delivery_legs_for_order(order):
             else:
                 leg.driver_amount = driver_part
 
-            update_fields = ["status", "distance_km", "client_fee_share", "driver_amount", "fagni_margin"]
+            update_fields = ["distance_km", "client_fee_share", "driver_amount", "fagni_margin"]
+
+            if status_changed:
+                update_fields.insert(0, "status")
+
             if getattr(order, "delivery_partner_id", None):
-                update_fields.insert(0, "driver")  # driver_id modifie le champ FK
+                update_fields.insert(0, "driver")
 
             leg.save(update_fields=update_fields)
 
@@ -285,10 +316,9 @@ def sync_legs_status_from_order(order, save: bool = True) -> int:
                 changed += 1
 
         elif target == "done":
-            if st != "done":
-                leg.status = "done"
-                leg.save(update_fields=["status"])
-                changed += 1
+            # ❌ Ne jamais forcer done depuis Order.status
+            # done doit venir de l'action livreur uniquement
+            pass
 
     return changed
 
@@ -2362,8 +2392,6 @@ class Order(models.Model):
             amount=amt,
         ).exists():
             return True
-
-        from django.db import transaction
         with transaction.atomic():
             wallet.balance = (wallet.balance + amt).quantize(Decimal("0.01"))
             wallet.save(update_fields=["balance", "updated_at"])
@@ -2397,6 +2425,11 @@ class Order(models.Model):
         if getattr(self, "payment_status", None) != "paid":
             return
 
+        with transaction.atomic():
+            # 🔒 lock DB pour éviter double distribution en concurrence
+            type(self).objects.select_for_update().filter(pk=self.pk).values('id').first()
+            self.refresh_from_db(fields=['wallets_distributed'])
+
         # 1) Revenus (une seule fois)
         if not getattr(self, "wallets_distributed", False):
             # ✅ Si les tx existent déjà, on (re)verrouille wallets_distributed et on évite toute redist.
@@ -2405,7 +2438,9 @@ class Order(models.Model):
                 already = WalletTransaction.objects.filter(
                     order=self,
                     direction="in",
-                    type__in=("credit", "payout"),
+                    type="credit",
+                    wallet__owner_type__in=("laundry", "internal"),
+                    leg__isnull=True,
                 ).exists()
                 if already:
                     type(self).objects.filter(pk=self.pk).update(wallets_distributed=True)
@@ -2432,11 +2467,15 @@ class Order(models.Model):
                 generate_mlm_commissions_for_order(self)
                 type(self).objects.filter(pk=self.pk).update(mlm_distributed=True)
                 self.mlm_distributed = True
-            except Exception:
+            except Exception as e:
                 import os
                 if os.environ.get("PAYOUT_DEBUG") == "1":
                     raise
-                pass
+                # log soft en console serveur (utile en dev)
+                try:
+                    print(f"[MLM] Order {self.id} failed: {e}")
+                except Exception:
+                    pass
 
         # 2) Payout legs DONE (idempotent)  ✅ TOUJOURS exécuter même si wallets_distributed=True
         from orders.service_layer.payouts import trigger_driver_payout_for_leg
@@ -2446,20 +2485,36 @@ class Order(models.Model):
         for leg in legs_done:
             trigger_driver_payout_for_leg(leg)
 
-        # 3) Optionnel: aligner driver_wallet_credited si au moins un payout leg existe
+        # 3) driver_wallet_credited = True uniquement si le livreur a reçu 100% du montant attendu
+        # ✅ basé UNIQUEMENT sur les payouts des legs DONE (réversible si un leg repasse pending/canceled)
         try:
+            from decimal import Decimal
+            from django.db.models import Sum
             from wallets.models import WalletTransaction
 
-            has_leg_payout = WalletTransaction.objects.filter(
-                order=self, leg__isnull=False, type="payout", direction="in"
-            ).exists()
+            target = Decimal(str(getattr(self, "amount_driver_partner", 0) or 0))
 
-            if has_leg_payout and not getattr(self, "driver_wallet_credited", False):
-                self.driver_wallet_credited = True
-                super(type(self), self).save(update_fields=["driver_wallet_credited"])
+            # total payouts driver UNIQUEMENT sur les jambes "done"
+            total_paid_done = WalletTransaction.objects.filter(
+                order_id=self.id,
+                wallet__owner_type="driver",
+                type="payout",
+                direction="in",
+                leg__isnull=False,
+                leg__status="done",
+            ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+
+            # si target>0: credited seulement si total_paid_done >= target
+            # si target==0: credited si au moins 1 payout done existe
+            should = (total_paid_done > 0) if (target <= 0) else (total_paid_done >= target)
+
+            if bool(getattr(self, "driver_wallet_credited", False)) != bool(should):
+                type(self).objects.filter(pk=self.pk).update(driver_wallet_credited=should)
+                self.driver_wallet_credited = should
+
         except Exception:
+            # pas critique pour le flux
             pass
-
 
     def financial_timeline(self):
         """
@@ -2966,6 +3021,24 @@ class DeliveryLeg(models.Model):
         - Sécurise les timestamps.
         """
         from django.utils import timezone
+
+
+        # 🔒 Guard anti-downgrade: si payout existe déjà, garder status='done'
+        # Empêche: leg payé -> save(update_fields=['status']) -> pending/assigned
+        try:
+            if self.pk:
+                from wallets.models import WalletTransaction
+                has_payout = WalletTransaction.objects.filter(
+                    order_id=self.order_id,
+                    leg_id=self.pk,
+                    wallet__owner_type="driver",
+                    type="payout",
+                    direction="in",
+                ).exists()
+                if has_payout and self.status != "done":
+                    self.status = "done"
+        except Exception:
+            pass
 
         # détecter transition vers done
         old_status = None

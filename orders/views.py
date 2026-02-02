@@ -6521,20 +6521,33 @@ def driver_app_data(request):
         Retourne la part livreur potentielle d'un leg.
         On essaie plusieurs noms de champs possibles pour rester robuste.
         """
+        # IMPORTANT: certains champs peuvent être "niveau commande" et se répéter sur chaque jambe.
+        # => on protège pour éviter un potentiel multiplié par nb de legs.
+
         for attr in (
             "amount_driver",
             "driver_amount",
             "driver_share",
             "driver_fee",
             "driver_income",
-            "amount_driver_partner",
             "amount_driver_potential",
             "driver_logistic_cost",
+            "amount_driver_partner",
         ):
             if hasattr(leg, attr):
                 v = getattr(leg, attr, None)
                 d = _dec0(v)
                 if d > 0:
+                    # 🚫 Guard anti-multiplication: amount_driver_partner est souvent un champ "commande"
+                    if attr == "amount_driver_partner":
+                        try:
+                            order = getattr(leg, "order", None)
+                            if order:
+                                nb = order.legs.exclude(status="canceled").count()
+                                if nb > 1:
+                                    continue
+                        except Exception:
+                            continue
                     return d
         return Decimal("0")
 

@@ -3022,6 +3022,21 @@ class DeliveryLeg(models.Model):
         """
         from django.utils import timezone
 
+        # détecter l'ancien status AVANT guards
+        old_status = None
+        if self.pk:
+            try:
+                old_status = DeliveryLeg.objects.filter(pk=self.pk).values_list("status", flat=True).first()
+            except Exception:
+                old_status = None
+
+        # 🔒 Freeze: une jambe annulée ne peut pas être "réouverte"
+        # canceled -> pending/assigned/in_progress/done : interdit
+        try:
+            if old_status == "canceled" and self.status != "canceled":
+                self.status = "canceled"
+        except Exception:
+            pass
 
         # 🔒 Guard anti-downgrade: si payout existe déjà, garder status='done'
         # Empêche: leg payé -> save(update_fields=['status']) -> pending/assigned

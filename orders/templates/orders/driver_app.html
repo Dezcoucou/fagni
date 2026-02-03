@@ -761,17 +761,32 @@
     }
     return `<span class="pay-pill pay-due"><span class="dot"></span>À ENCAISSER</span>`;
   }
+    // ✅ revenu livreur: compatible cartes (driver_*) et KPI (total_*)
+    function incomeParts(obj){
+      const hasTotal = (obj && (obj.total_driver_income_paid !== undefined || obj.total_driver_income_potential !== undefined));
+      const paidRaw = hasTotal ? (obj.total_driver_income_paid ?? 0) : (obj.driver_income_paid ?? 0);
+      const potRaw  = hasTotal ? (obj.total_driver_income_potential ?? 0) : (obj.driver_income_potential ?? 0);
+
+      const paid = Math.max(0, Number(paidRaw || 0));
+      const pot  = Math.max(0, Number(potRaw  || 0));
+
+      const display = (paid > 0)
+        ? paid
+        : (hasTotal ? Number(obj.total_driver_income_display ?? obj.total_driver_income ?? 0) : pot);
+
+      return { paid, pot, display };
+    }
+
+
 
   function incomePill(o){
-    const paidRaw = Number(data.total_driver_income_paid ?? 0);
-    const potRaw  = Number(data.total_driver_income_potential ?? 0);
-    const paid = Math.max(0, paidRaw);
-    const pot  = Math.max(0, potRaw); 
-
-    // cas 1: payé partiel
+      const inc = incomeParts(o || {});
+      const paid = inc.paid;
+      const pot  = inc.pot;
+// cas 1: payé partiel
     if (paid > 0 && pot > 0 && paid < pot){
       const tip = `PAYÉ PARTIEL (wallet) • payé=${money(paid)} • potentiel=${money(pot)}`;
-      return `<span class="income-pill income-partial" title="${escapeHtml(tip)}"><span class="dot"></span>PAYÉ PARTIEL</span>`;
+      return `<span class="income-pill income-partial" title="${escapeHtml(tip)}"><span class="dot"></span>PARTIEL</span>`;
     }
 
     // cas 2: payé (wallet)
@@ -926,9 +941,8 @@
             ${tags.join("")}
           </div>
           <a class="btn ${cta.cls}" href="${detailUrl}">${escapeHtml(cta.label)}</a>
-        </div>
-      </div>
-    `;
+          </div>
+      `;
     }
 
 
@@ -979,7 +993,30 @@
     if(empty) empty.remove();
 
     const next = new Map();
-    for(const o of (items || [])){
+    // 🔥 Tri: basé sur "reste à payer au livreur" (paid vs potentiel)
+      const arr = Array.isArray(items) ? [...items] : [];
+      function payRank(o){
+        const inc = incomeParts(o || {});
+        const paid = inc.paid;
+        const pot  = inc.pot;
+        // 0: partiel (reste)
+        if (paid > 0 && pot > 0 && paid < pot) return 0;
+        // 1: non payé mais potentiel > 0
+        if (paid <= 0 && pot > 0) return 1;
+        // 2: payé
+        if (paid > 0) return 2;
+        // 3: rien
+        return 3;
+      }
+      arr.sort((a,b) => {
+        const ra = payRank(a), rb = payRank(b);
+        if (ra !== rb) return ra - rb;
+        const ia = Number(a?.id || 0), ib = Number(b?.id || 0);
+        return ib - ia; // récent d'abord
+      });
+
+      for(const o of arr){
+
       const id = Number(o.id);
       next.set(id, cardHTML(o));
     }

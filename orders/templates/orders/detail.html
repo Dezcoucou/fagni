@@ -785,10 +785,13 @@
                         Aucune note spécifique n'a été enregistrée pour cette commande.
                     </div>
                 {% endif %}
-
-                <!-- TOTAUX -->
-                {% include "orders/_payments_block.html" %}
             </section>
+
+              <!-- FINANCES & PAIEMENTS -->
+              <section class="card">
+                  <h2 class="card-title"><span class="emoji">💰</span> Finances & paiements</h2>
+                  {% include "orders/_payments_block.html" %}
+              </section>
 
             <!-- PHOTOS GLOBALES -->
             <section class="card">

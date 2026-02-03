@@ -25,6 +25,16 @@ def trigger_driver_payout_for_leg(leg):
         _dbg("SKIP: leg is None")
         return None
 
+    # 🧱 Guard rail: status annulé => jamais payer
+    # (utile si quelqu’un repasse status=done par erreur ailleurs)
+    try:
+        st = (getattr(leg, "status", "") or "").lower().strip()
+        if st == "canceled":
+            _dbg("SKIP: leg status=canceled")
+            return None
+    except Exception:
+        pass
+
     # 🧱 Guard rail: jambe annulée => jamais payer
     # (utile si quelqu’un repasse status=done par erreur)
     if getattr(leg, "is_canceled", False) or getattr(leg, "canceled_at", None):

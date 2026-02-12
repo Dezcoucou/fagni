@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% load money_filters %}
+
+{% block title %}Nouvelle commande – Étape 4{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root{
+    --text:#0f172a;
+    --muted:#64748b;
+    --line:#e5e7eb;
+    --soft:#f8fafc;
+    --shadow:0 1px 6px rgba(15,23,42,.06);
+    --ok:#16a34a;
+  }
+
+  .page{ max-width:1000px; margin:0 auto 28px; padding:14px 10px 24px; }
+  .title{ margin:0; font-size:22px; font-weight:950; letter-spacing:-.2px; color:var(--text); }
+  .subtitle{ margin:6px 0 0; font-size:13px; color:var(--muted); line-height:1.35; }
+
+  .card{ background:#fff; border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); overflow:hidden; }
+  .card-head{ padding:14px; background:var(--soft); border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  .card-head strong{ font-weight:950; color:#111827; }
+
+  .section{ padding:14px; border-top:1px solid var(--line); }
+  .section:first-of-type{ border-top:none; }
+
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media(max-width:820px){ .grid2{ grid-template-columns:1fr; } }
+
+  .kv{ border:1px solid var(--line); border-radius:16px; padding:12px; background:#fff; }
+  .kv .k{ color:var(--muted); font-size:12px; font-weight:900; }
+  .kv .v{ font-size:14px; font-weight:950; color:var(--text); margin-top:4px; }
+
+  .items{ display:flex; flex-direction:column; gap:10px; }
+  .item{
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:12px;
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    background:#fff;
+  }
+  .item .name{ font-weight:950; color:#111827; }
+  .item .meta{ margin-top:6px; color:var(--muted); font-weight:800; font-size:12px; }
+  .item .right{ text-align:right; min-width:130px; }
+  .item .total{ font-weight:950; color:#0f172a; }
+  .item .qtypill{
+    display:inline-flex; align-items:center; justify-content:center;
+    padding:4px 10px; border-radius:999px;
+    border:1px solid var(--line);
+    background:var(--soft);
+    font-weight:950; font-size:12px; color:#334155;
+    margin-top:8px;
+  }
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center;
+    padding:12px 14px; border-radius:999px; border:1px solid var(--line);
+    background:#fff; color:var(--text); text-decoration:none;
+    font-weight:950; font-size:13px; cursor:pointer;
+    transition:transform .12s ease, opacity .12s ease;
+    white-space:nowrap;
+  }
+  .btn:active{ transform:translateY(1px); }
+  .btn-dark{ border-color:#0f172a; background:#0f172a; color:#fff; }
+  .btn-ghost:hover{ background:#f9fafb; }
+
+  .sticky{
+    position:sticky; bottom:10px; z-index:20;
+    margin-top:14px;
+    border:1px solid var(--line); border-radius:18px;
+    background:#fff; box-shadow:var(--shadow);
+    padding:12px 14px;
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+  }
+  .sticky .spacer{ flex:1; }
+  .sticky .big{ font-size:16px; font-weight:950; color:#0f172a; }
+  .sticky .muted{ color:var(--muted); font-size:12px; font-weight:900; }
+
+  .warn{
+    border:1px solid rgba(245,158,11,.35);
+    background:rgba(245,158,11,.08);
+    color:#92400e;
+    border-radius:16px;
+    padding:12px;
+    font-weight:850;
+    font-size:13px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+  <h1 class="title">Récapitulatif</h1>
+  <p class="subtitle">Étape 4/4 — Vérifier puis confirmer</p>
+
+  <div class="card" style="margin-top:14px">
+    <div class="card-head">
+      <strong>Articles sélectionnés</strong>
+      <span style="color:var(--muted);font-weight:900;font-size:12px">
+        {{ items|length }} ligne(s)
+      </span>
+    </div>
+
+    <div class="section">
+      <div class="items">
+        {% for it in items %}
+          <div class="item">
+            <div>
+              <div class="name">{{ it.designation }}</div>
+              <div class="meta">
+                {{ it.quantity }} × {{ it.unit_price|floatformat:0 }} FCFA
+              </div>
+              <div class="qtypill">Qté: {{ it.quantity }}</div>
+            </div>
+            <div class="right">
+              <div class="muted">Total</div>
+              <div class="total">{{ it.total|floatformat:0 }} FCFA</div>
+            </div>
+          </div>
+        {% empty %}
+          <div class="warn">Aucun article ajouté. Retourne à l’étape 3 pour sélectionner au moins un article.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="grid2">
+        <div class="kv">
+          <div class="k">Prestation</div>
+          <div class="v">{{ amounts.prestation_total|floatformat:0 }} FCFA</div>
+        </div>
+        <div class="kv">
+          <div class="k">Total TTC</div>
+          <div class="v">{{ amounts.total_ttc|floatformat:0 }} FCFA</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="grid2">
+        <div class="kv">
+          <div class="k">Client</div>
+          <div class="v">
+            {% if order.customer %}
+              {{ order.customer }}
+            {% else %}
+              —
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="kv">
+          <div class="k">Adresse</div>
+          <div class="v">
+            {% if order.customer and order.customer.address %}
+              {{ order.customer.address }}
+            {% else %}
+              —
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      {% if order.notes %}
+        <div class="kv" style="margin-top:10px">
+          <div class="k">Notes</div>
+          <div class="v">{{ order.notes }}</div>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="section" style="display:flex;gap:10px;flex-wrap:wrap">
+      <a class="btn btn-ghost" href="{% url 'orders:client_new_order_step3' order.id %}">← Modifier les articles</a>
+      <div style="flex:1"></div>
+      <form method="post" style="margin:0">
+        {% csrf_token %}
+        <button class="btn btn-dark" type="submit">Confirmer la commande</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="sticky">
+    <div>
+      <div class="muted">Total TTC</div>
+      <div class="big">{{ amounts.total_ttc|floatformat:0 }} FCFA</div>
+    </div>
+    <div class="spacer"></div>
+    <form method="post" style="margin:0">
+      {% csrf_token %}
+      <button class="btn btn-dark" type="submit">Confirmer</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

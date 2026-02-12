@@ -66,7 +66,7 @@ INSTALLED_APPS = [
     'mlm',
     'api',
     'portal',
-    'wallets',
+    'wallets.apps.WalletsConfig',
     'bonuses',
 ]
 
@@ -147,7 +147,17 @@ STATICFILES_DIRS = [
 ]
 
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# Django >= 4.2/5.x: STORAGES remplace STATICFILES_STORAGE (deprecated)
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+}
+# STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"  # (deprecated, remplacé par STORAGES)
 WHITENOISE_SKIP_COMPRESS_EXTENSIONS = ('.map',)
 
 MEDIA_URL = '/media/'

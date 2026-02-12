@@ -1,7 +1,17 @@
+import os
+import sys
 from django.db import migrations
+
+def _running_tests():
+    # pytest-django sets PYTEST_CURRENT_TEST; also sys.argv contains 'pytest'
+    return bool(os.environ.get("PYTEST_CURRENT_TEST")) or any("pytest" in a for a in sys.argv)
+
 
 
 def create_default_users(apps, schema_editor):
+    if _running_tests():
+        return
+
     # ✅ IMPORTANT: ne pas seed en environnement de test
     from django.conf import settings
     if getattr(settings, "TESTING", False):

@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}App Blanchisseur – FAGNI{% endblock %}
+
+{% block content %}
+<div style="max-width:1100px;margin:0 auto;padding:14px;">
+  <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;">
+    <div>
+      <h1 style="margin:0;font-size:20px;">🧺 App Blanchisseur</h1>
+      <div style="margin-top:6px;color:#64748b;font-size:13px;">
+        {% if laundry %}{{ laundry.name|default:"Blanchisserie" }}{% else %}Blanchisserie non détectée{% endif %}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        {% if laundry %}
+          <a class="btn btn-light btn-sm" href="{% url 'wallets:laundry_wallet_dashboard' %}?laundry_id={{ laundry.id }}">💳 Wallet</a>
+          <a class="btn btn-light btn-sm" href="{% url 'orders:laundry_app' %}?laundry_id={{ laundry.id }}">🔄 Actualiser</a>
+        {% else %}
+          <a class="btn btn-light btn-sm" href="{% url 'orders:laundry_app' %}">🔄 Actualiser</a>
+        {% endif %}
+          <a class="btn btn-light btn-sm" href="/accounts/logout/">🚪 Déconnexion</a>
+      </div>
+  </div>
+
+  {% if error %}
+    <div class="alert alert-warning" style="margin-top:12px;">{{ error }}</div>
+  {% endif %}
+
+  <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="btn btn-light btn-sm" type="button" data-filter="todo">✅ À traiter</button>
+    <button class="btn btn-light btn-sm" type="button" data-filter="doing">🧺 En cours</button>
+    <button class="btn btn-light btn-sm" type="button" data-filter="done">🏁 Terminé</button>
+    <button class="btn btn-primary btn-sm" type="button" id="btn-voice-help">🔊 Écouter</button>
+  </div>
+
+  <section class="card" style="margin-top:12px;">
+    <div style="font-weight:800;">Mes commandes</div>
+
+    {% if orders and laundry %}
+      <div id="orders-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:10px;">
+        {% for o in orders %}
+          <div class="card" style="border:1px solid rgba(0,0,0,.08);padding:12px;border-radius:14px;"
+               data-status="{{ o.status|default:'' }}"
+               data-wash-ready="{% if o.wash_complete_time %}1{% else %}0{% endif %}">
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">
+              <div>
+                <div style="font-weight:900;">Commande #{{ o.id }}</div>
+                <div style="margin-top:3px;color:#64748b;font-size:12px;">
+                  🧺 Atelier: {{ laundry.name|default:"Blanchisserie" }}
+                </div>
+              </div>
+              <div style="font-size:12px;color:#64748b;">{{ o.created_at|date:"d/m H:i" }}</div>
+            </div>
+
+            <div style="margin-top:8px;font-size:13px;">
+              Statut: <strong>{{ o.status|default:"—" }}</strong><br>
+              Prêt: <strong>{% if o.wash_complete_time %}✅ Oui{% else %}⏳ Non{% endif %}</strong>
+            </div>
+
+            <div style="margin-top:10px;font-size:13px;">
+              <div style="font-weight:800;margin-bottom:6px;">Articles</div>
+              {% if o.items.all %}
+                <ul style="margin:0;padding-left:18px;">
+                  {% for it in o.items.all %}
+                    <li>{{ it.designation }} × {{ it.quantity|default:1 }}</li>
+                  {% endfor %}
+                </ul>
+              {% else %}
+                <div style="color:#64748b;">Aucun article.</div>
+              {% endif %}
+            </div>
+
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+              <a class="btn btn-primary btn-sm" href="{% url 'orders:laundry_order_detail' o.id %}{% if laundry %}?laundry_id={{ laundry.id }}{% endif %}">📄 Détails</a>
+              <button class="btn btn-light btn-sm" type="button"
+                      onclick="window.FAGNI_SPEAK && window.FAGNI_SPEAK('Commande {{ o.id }}. {% for it in o.items.all %} {{ it.designation }} fois {{ it.quantity|default:1 }}. {% endfor %}');">
+                🔊 Lire
+              </button>
+            </div>
+
+            <div style="margin-top:8px;color:#94a3b8;font-size:11px;">
+              ⚠️ Aucune information client n’est affichée (règle de confidentialité).
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p style="margin-top:10px;color:#64748b;">Aucune commande attribuée.</p>
+    {% endif %}
+  </section>
+</div>
+
+<script>
+(function(){
+  function speak(text){
+    try{
+      if(!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = "fr-FR";
+      window.speechSynthesis.speak(u);
+    }catch(e){}
+  }
+  window.FAGNI_SPEAK = speak;
+
+  function statusToBucket(el){
+    var washReady = el.getAttribute("data-wash-ready") === "1";
+    var st = (el.getAttribute("data-status") || "").toLowerCase();
+    if(washReady) return "done";
+    if(st.includes("progress") || st.includes("wash") || st.includes("laundry")) return "doing";
+    return "todo";
+  }
+
+  document.addEventListener("DOMContentLoaded", function(){
+    var btnHelp = document.getElementById("btn-voice-help");
+    if(btnHelp){
+      btnHelp.addEventListener("click", function(){
+        speak("Bienvenue. Voici vos commandes. Appuyez sur ouvrir pour voir la commande. Appuyez sur lire pour entendre la liste des articles.");
+      });
+    }
+
+    document.querySelectorAll("[data-filter]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var filter = btn.getAttribute("data-filter");
+        document.querySelectorAll("#orders-list > .card").forEach(function(card){
+          var bucket = statusToBucket(card);
+          card.style.display = (bucket === filter) ? "" : "none";
+        });
+        if(filter === "todo") speak("Commandes à traiter.");
+        if(filter === "doing") speak("Commandes en cours.");
+        if(filter === "done") speak("Commandes terminées.");
+      });
+    });
+  });
+})();
+</script>
+{% endblock %}

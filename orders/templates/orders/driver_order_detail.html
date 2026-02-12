@@ -123,7 +123,7 @@
   </div>
 
   {# ✅ Bandeau UX : course non chiffrée #}
-  {% with tc=total_client_ttc|default:0 di=driver_income|default:0 %}
+  {% with tc=total_client_ttc|default:0 di=driver_leg_amount_all|default:driver_leg_amount|default:0 %}
     {% if tc <= 0 or di <= 0 %}
       <div class="card pricing-alert" style="margin-top:14px">
         <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
@@ -377,9 +377,17 @@
                 <div class="muted" style="margin-top:10px">En attente de validation prestataire. Livraison disponible uniquement après confirmation “prêt”.</div>
               {% else %}
                 <div class="leg-actions">
+                  <a class="btn-xxs btn-xxs-soft"
+                     href="{% url 'orders:driver_weighing' order.id %}?leg_id={{ leg.id }}&back={{ request.path|urlencode }}">
+                    📷 Ajouter preuve
+                  </a>
+
                   {% if st == "pending" %}
                     <form method="post" class="js-leg-form" data-leg="{{ leg.leg_type }}" data-action="accept" style="margin:0">
                       {% csrf_token %}
+                        <input type="hidden" name="back" value="{{ request.path }}">
+                        <input type="hidden" name="leg" value="{{ leg.leg_type }}">
+                        <input type="hidden" name="action" value="accept">
                       <button type="submit" class="btn-xxs btn-xxs-primary">✅ Accepter</button>
                     </form>
                   {% endif %}
@@ -387,6 +395,9 @@
                   {% if st == "assigned" %}
                     <form method="post" class="js-leg-form js-geo-action" data-leg="{{ leg.leg_type }}" data-action="start" style="margin:0">
                       {% csrf_token %}
+                        <input type="hidden" name="back" value="{{ request.path }}">
+                        <input type="hidden" name="leg" value="{{ leg.leg_type }}">
+                        <input type="hidden" name="action" value="start">
                       <button type="submit" class="btn-xxs btn-xxs-primary">🚴 Démarrer</button>
                     </form>
                   {% endif %}
@@ -394,6 +405,9 @@
                   {% if st == "in_progress" %}
                     <form method="post" class="js-leg-form js-geo-action" data-leg="{{ leg.leg_type }}" data-action="finish" style="margin:0">
                       {% csrf_token %}
+                        <input type="hidden" name="back" value="{{ request.path }}">
+                        <input type="hidden" name="leg" value="{{ leg.leg_type }}">
+                        <input type="hidden" name="action" value="finish">
                       <button type="submit" class="btn-xxs btn-xxs-primary">✅ Terminer</button>
                     </form>
                   {% endif %}
@@ -401,6 +415,8 @@
                   {% if st != "done" and st != "canceled" %}
                     <form method="post" class="js-leg-form" data-leg="{{ leg.leg_type }}" data-action="cancel" style="margin:0">
                       {% csrf_token %}
+                        <input type="hidden" name="leg" value="{{ leg.leg_type }}">
+                        <input type="hidden" name="action" value="cancel">
                       <button type="submit" class="btn-xxs btn-xxs-danger">❌ Annuler</button>
                     </form>
                   {% endif %}
@@ -643,6 +659,12 @@
           }
 
           var data = r.ct.indexOf("application/json")>=0 ? safeJson(r.text) : null;
+
+            // Si le backend renvoie une URL de redirection (ex: preuve requise), on navigue
+            if(data && data.redirect_url){
+              window.location.href = data.redirect_url;
+              return;
+            }
 
           if(!r.ok || (data && data.ok===false)){
             toast((data && (data.message||data.error)) || "Action impossible","error");

@@ -63,3 +63,11 @@ def fcfa0(value):
     """
     dec = _to_decimal(value)
     return _format_int_spaces(dec)
+
+
+@register.filter
+def get_item(d, k):
+    try:
+        return d.get(k)
+    except Exception:
+        return None

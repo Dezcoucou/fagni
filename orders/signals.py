@@ -58,6 +58,7 @@ def _schedule_sync_order_status(order_id: int) -> None:
             from .models import sync_order_status_from_legs, sync_delivery_legs_for_order
 
             order = Order.objects.filter(pk=order_id).first()
+
             if not order:
                 return
 

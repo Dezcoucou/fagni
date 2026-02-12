@@ -2,7 +2,7 @@
 {% load static %}
 {% load money_filters %}
 
-{% block title %}Mon wallet chauffeur – FAGNI{% endblock %}
+{% block title %}Mon wallet blanchisserie – FAGNI{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -120,15 +120,15 @@
 
   <div class="page-header">
     <div>
-      <h1 class="page-title">Mon wallet chauffeur</h1>
+      <h1 class="page-title">Mon wallet blanchisserie</h1>
       <p class="page-subtitle">
-        Vos gains FAGNI sur les courses livrées. Solde disponible = montant que vous pouvez demander en retrait.
+        Vos gains FAGNI sur les commandes traitées. Solde disponible = montant que vous pouvez demander en retrait.
       </p>
     </div>
     <div style="text-align:right;">
       {% if driver %}
         <div class="tag-driver">
-          🚴‍♂️ Livreur connecté : <strong>{{ driver.name|default:"Livreur FAGNI" }}</strong>
+          🚴‍♂️ Blanchisserie connectée : <strong>{{ laundry.name|default:"Blanchisserie FAGNI" }}</strong>
         </div>
       {% endif %}
     </div>
@@ -153,7 +153,7 @@
 
           <div class="pill-info">
             <span class="dot"></span>
-            <span>Montant prêt à être retiré (courses déjà comptabilisées).</span>
+            <span>Montant prêt à être retiré (commandes déjà comptabilisées).</span>
           </div>
         </div>
 
@@ -176,8 +176,8 @@
           <button type="button" class="btn btn-primary" id="btn-withdraw-open">
             ⬇️ Demander un retrait
           </button>
-          <a href="{% url 'orders:driver_app' %}?driver_id={{ driver.id }}" class="btn btn-light btn-sm">
-            ← Retour à mes courses
+          <a href="{% url 'orders:laundry_app' %}?laundry_id={{ laundry.id }}" class="btn btn-light btn-sm">
+            ← Retour à mes commandes
           </a>
         </div>
 
@@ -185,7 +185,7 @@
         <div id="withdraw-panel"
              style="display:none; margin-top:10px; padding:12px; border-radius:14px; border:1px solid rgba(0,0,0,.10); background:rgba(0,0,0,.03);">
           <form id="withdraw-form" method="post" 
-                action="{% url 'wallets:driver_wallet_dashboard' %}?driver_id={{ driver.id }}" 
+                action="{% url 'wallets:laundry_wallet_dashboard' %}?laundry_id={{ laundry.id }}" 
                 style="display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
             {% csrf_token %}
             <div style="min-width:220px; flex:1;">
@@ -215,7 +215,7 @@
         </div>
 
         <p style="font-size:11px; color:#9ca3af; margin-top:10px;">
-          Les montants sont exprimés en FCFA. Les demandes de retrait sont traitées par l’équipe FAGNI selon les conditions du contrat livreur.
+          Les montants sont exprimés en FCFA. Les demandes de retrait sont traitées par l’équipe FAGNI selon les conditions du contrat blanchisserie.
         </p>
       </section>
 
@@ -265,7 +265,7 @@
                   </td>
                   <td>
                     {% if tx.order_id %}
-                      <a href="{% url 'orders:driver_order_detail' tx.order_id %}?driver_id={{ driver.id }}" class="order-link">
+                      <a href="#" class="order-link">
                         {{ tx.order.code|default:tx.order_id }}
                       </a>
                     {% else %}
@@ -281,8 +281,8 @@
           </table>
         {% else %}
           <p class="history-empty">
-            Aucun mouvement encore enregistré sur votre wallet chauffeur.
-            Vos gains apparaîtront ici au fur et à mesure de vos courses.
+            Aucun mouvement encore enregistré sur votre wallet blanchisserie.
+            Vos gains apparaîtront ici au fur et à mesure de vos commandes.
           </p>
         {% endif %}
       </section>
@@ -293,10 +293,10 @@
     <section class="card">
       <h2 class="card-title"><span class="emoji">💳</span> Wallet non trouvé</h2>
       <p style="font-size:13px; color:#4b5563; margin-top:4px;">
-        Aucun wallet chauffeur n’est encore associé à votre profil.
+        Aucun wallet blanchisserie n’est encore associé à votre profil.
       </p>
-      <a href="{% url 'orders:driver_app' %}?driver_id={{ driver.id }}" class="btn btn-light btn-sm" style="margin-top:10px;">
-        ← Retour à mes courses
+      <a href="{% url 'orders:laundry_app' %}?laundry_id={{ laundry.id }}" class="btn btn-light btn-sm" style="margin-top:10px;">
+        ← Retour à mes commandes
       </a>
     </section>
   {% endif %}

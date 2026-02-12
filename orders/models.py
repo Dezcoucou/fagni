@@ -13,15 +13,8 @@ from .services import recompute_order_distance_from_legs
 
 
 def _round_fcfa(value):
-    """
-    Petit helper pour arrondir proprement en FCFA (entier).
-    """
-    if value is None:
-        return Decimal("0")
-    if not isinstance(value, Decimal):
-        value = Decimal(str(value))
-    return value.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-
+    value = Decimal(str(value or 0))
+    return value.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 
 # ============================
 #  SYNC DES JAMBES DE LIVRAISON
@@ -50,18 +43,16 @@ def sync_delivery_legs_for_order(order):
 
     # Config de répartition
     delivery_fee = Decimal(str(getattr(order, "delivery_fee", 0) or 0))
-    driver_total = Decimal(str(getattr(order, "driver_logistic_cost", 0) or 0))
+
+    # ✅ source de vérité driver total: amount_driver_partner (fallback legacy driver_logistic_cost)
+    driver_total = Decimal(str(getattr(order, "amount_driver_partner", None) or 0))
+    if driver_total <= 0:
+        driver_total = Decimal(str(getattr(order, "driver_logistic_cost", 0) or 0))
+
     margin_total = Decimal(str(getattr(order, "logistic_margin", 0) or 0))
 
     distance_total = Decimal(str(getattr(order, "distance_km", 0) or 0))
     distance_one_way = (distance_total / Decimal("2")).quantize(Decimal("0.01")) if distance_total else Decimal("0.00")
-
-    def _round_fcfa(value):
-        if value is None:
-            return Decimal("0")
-        if not isinstance(value, Decimal):
-            value = Decimal(str(value))
-        return value.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
     client_share_1 = _round_fcfa(delivery_fee / 2)
     client_share_2 = _round_fcfa(delivery_fee - client_share_1)
@@ -146,9 +137,18 @@ def sync_delivery_legs_for_order(order):
                 # Ne pas annuler un leg déjà payé; on annule l'autre
                 if _has_payout_tx(leg):
                     continue
+
                 if (getattr(leg, "status", None) or "").lower() != "canceled":
                     leg.status = "canceled"
-                    leg.save(update_fields=["status"])
+                    # ✅ neutraliser les montants (jambe annulée = hors calcul + jamais payée)
+                    try:
+                        from decimal import Decimal
+                        leg.client_fee_share = Decimal("0")
+                        leg.driver_amount = Decimal("0")
+                        leg.fagni_margin = Decimal("0")
+                    except Exception:
+                        pass
+                    leg.save(update_fields=["status", "client_fee_share", "driver_amount", "fagni_margin"])
 
     # CANCEL legs legacy/protégés (autres types)
     for leg in legs_existing:
@@ -156,17 +156,28 @@ def sync_delivery_legs_for_order(order):
         if lt not in {"pickup", "return"}:
             if (getattr(leg, "status", None) or "").lower() != "canceled":
                 # si payé (rare) on évite de casser l'historique
+                # Ne pas annuler un leg déjà payé; on annule l'autre
                 if _has_payout_tx(leg):
                     continue
-                leg.status = "canceled"
-                leg.save(update_fields=["status"])
 
-    # RÈGLE: return pending tant que pickup pas done
+                if (getattr(leg, "status", None) or "").lower() != "canceled":
+                    leg.status = "canceled"
+                    # ✅ neutraliser les montants (jambe annulée = hors calcul + jamais payée)
+                    try:
+                        from decimal import Decimal
+                        leg.client_fee_share = Decimal("0")
+                        leg.driver_amount = Decimal("0")
+                        leg.fagni_margin = Decimal("0")
+                    except Exception:
+                        pass
+                    leg.save(update_fields=["status", "client_fee_share", "driver_amount", "fagni_margin"])
+
+    # RÈGLE (STRICTE): le return reste PENDING tant que le livreur n'a pas "accept"
     pickup_leg = existing_by_type.get("pickup")
     pickup_done = bool(pickup_leg and (getattr(pickup_leg, "status", None) or "").lower() == "done")
-    base_status_return = base_status if pickup_done else "pending"
+    # Important: on n'auto-upgrade JAMAIS le return (même si pickup_done / wash_ready).
+    base_status_return = "done" if st == "done" else "pending"
 
-    # Create / Update
     for leg_type, client_part, driver_part, margin_part in legs_data:
         leg = existing_by_type.get(leg_type)
 
@@ -195,8 +206,11 @@ def sync_delivery_legs_for_order(order):
                     leg.status = "done"
 
                     status_changed = True
-            # 1) Si leg est finalisé/démarré, on ne le touche pas
-            elif cur in {"done", "canceled", "in_progress"}:
+            # 1) Si leg est finalisé/démarré: on ne change PAS le statut,
+            #    mais on peut recalculer les montants tant qu'il n'y a pas de payout.
+            elif cur in {"done", "in_progress"}:
+                pass
+            elif cur in {"canceled"}:
                 pass
 
             # 2) Sync métier autorisé : seulement pending/assigned (jamais done)
@@ -205,10 +219,19 @@ def sync_delivery_legs_for_order(order):
                 # => peut downgrade assigned->pending (autorisé métier)
                 allowed = {"pending", "assigned"}
                 if desired_status in allowed and cur in allowed:
-                    if cur != desired_status:
-                        leg.status = desired_status
-                        status_changed = True
-
+                      # ✅ RÈGLE: ne jamais rétrograder un leg (ex: pickup assigned -> pending)
+                      # Exception métier UNIQUE:
+                      #   return peut repasser pending tant que pickup n'est pas done.
+                      if (leg_type == "return") and (not pickup_done) and (cur == "assigned") and (desired_status == "pending"):
+                          leg.status = "pending"
+                          status_changed = True
+                      else:
+                          # Pas de downgrade: on applique seulement si upgrade
+                          cur_rank = _status_rank.get(cur, 0)
+                          des_rank = _status_rank.get(desired_status, 0)
+                          if des_rank > cur_rank:
+                              leg.status = desired_status
+                              status_changed = True
             leg.distance_km = distance_one_way
             leg.client_fee_share = client_part
             leg.fagni_margin = margin_part
@@ -325,38 +348,31 @@ def sync_legs_status_from_order(order, save: bool = True) -> int:
 
 def sync_order_status_from_legs(order, save=False):
     """
-    Synchronise le statut de la commande à partir des DeliveryLeg.
+    Synchronise Order.status à partir des DeliveryLeg.
 
-    Règles :
-    - 0 leg actif        → pending
-    - tous les legs done → done
-    - au moins un leg assigned / in_progress / done → in_progress
+    Règles (FAGNI) :
+    - ✅ DONE uniquement si pickup DONE ET return DONE
+    - Sinon :
+      - si au moins un leg non-canceled est assigned/in_progress/done => in_progress
+      - sinon => pending
     """
 
-    
-    legs = (
-        DeliveryLeg.objects
-        .filter(order=order)
-        .exclude(status="canceled")
-    )
+    # Ne jamais toucher une commande annulée
+    if getattr(order, "status", None) == "canceled":
+        return getattr(order, "status", None) or "canceled"
 
-    # Aucun leg actif
-    if not legs.exists():
-        new_status = "pending"
+    legs_all = DeliveryLeg.objects.filter(order=order)
 
-    # Tous les legs terminés
-    elif not legs.exclude(status="done").exists():
+    # Condition stricte pour DONE : pickup + return doivent être DONE
+    pickup_done = legs_all.filter(leg_type="pickup", status="done").exists()
+    return_done = legs_all.filter(leg_type="return", status="done").exists()
+
+    if pickup_done and return_done:
         new_status = "done"
-
     else:
-        any_started = legs.filter(
-            status__in=["assigned", "in_progress", "done"]
-        ).exists()
-
-        if any_started:
-            new_status = "in_progress"
-        else:
-            new_status = "pending"
+        legs_active = legs_all.exclude(status="canceled")
+        any_started = legs_active.filter(status__in=["assigned", "in_progress", "done"]).exists()
+        new_status = "in_progress" if any_started else "pending"
 
     if getattr(order, "status", None) != new_status:
         order.status = new_status
@@ -364,9 +380,6 @@ def sync_order_status_from_legs(order, save=False):
             order.save(update_fields=["status"])
 
     return new_status
-
-
-
 # =====================
 #  ABONNEMENTS (PILOTE COCODY) — ADDITIF (NE SUPPRIME RIEN)
 # =====================
@@ -521,6 +534,14 @@ class SubscriptionCycle(models.Model):
 
     bag_size = models.CharField("Taille sac", max_length=2, default="M")
     status = models.CharField("Statut", max_length=20, choices=STATUS_CHOICES, default="COLLECTE")
+
+    # Brouillon (Wizard client) : n’apparaît pas dans OPS tant que non validé
+    is_draft = models.BooleanField(
+        "Brouillon",
+        default=False,
+        db_index=True,
+        help_text="Commande en cours de création côté client (wizard).",
+    )
 
     # lien optionnel vers une commande existante si un jour tu veux "matérialiser" en Order
     related_order = models.ForeignKey(
@@ -1321,55 +1342,46 @@ class Order(models.Model):
         self.prestation_total = data.get("prestation_total", Decimal("0"))
 
         # 2) Livraison (transport facturé au client, hors express)
-        self.delivery_fee = data.get("delivery_fee_client", Decimal("0"))
-        self.driver_logistic_cost = data.get("delivery_cost_driver", Decimal("0"))
-
-        # 3) Service FAGNI & express
-        prev_service_fee = self.service_fee
-        computed_service_fee = data.get("service_fee_ht", Decimal("0"))
-
-        # ✅ Ne pas écraser un service_fee déjà fixé (tests/imports/admin)
-        # quand le moteur sort 0 et qu'il n'y a aucune ligne (items).
-        has_items = False
+        # ------------------------------------------------------------
+        # ✅ LOCK POOL (Option A)
+        # Si delivery_fee == amount_driver_partner + logistic_margin et amount_driver_partner>0,
+        # alors amount_driver_partner/logistic_margin/driver_logistic_cost deviennent source de vérité
+        # et update_financials ne les écrase plus.
+        # ------------------------------------------------------------
         try:
-            has_items = bool(getattr(self, "items", None) and self.items.exists())
+            _df_cur = Decimal(str(getattr(self, 'delivery_fee', 0) or 0))
+            _dt_cur = Decimal(str(getattr(self, 'amount_driver_partner', 0) or 0))
+            _mt_cur = Decimal(str(getattr(self, 'logistic_margin', 0) or 0))
+            lock_pool = bool(_dt_cur > 0 and _df_cur > 0 and (_dt_cur + _mt_cur) == _df_cur)
         except Exception:
-            has_items = False
+            lock_pool = False
 
-        if (
-            Decimal(str(computed_service_fee or 0)) <= 0
-            and Decimal(str(prev_service_fee or 0)) > 0
-            and not has_items
-        ):
-            self.service_fee = prev_service_fee
+        if lock_pool:
+            # Pool verrouillé: on garde driver/margin et on recolle delivery_fee
+            try:
+                self.delivery_fee = Decimal(str(getattr(self, 'amount_driver_partner', 0) or 0)) + Decimal(str(getattr(self, 'logistic_margin', 0) or 0))
+                # mirror legacy (utile si du code lit encore driver_logistic_cost)
+                self.driver_logistic_cost = Decimal(str(getattr(self, 'amount_driver_partner', 0) or 0))
+            except Exception:
+                pass
         else:
-            self.service_fee = computed_service_fee
-
-        # ✅ IMPORTANT : express_extra_fee = montant facturé au client pour l'option express
-        if hasattr(self, "express_extra_fee"):
-            self.express_extra_fee = data.get("express_for_client", data.get("express_extra_fee_client", Decimal("0")))
-
-        # 4) Commissions partenaires
-        self.commission_laundry_ht = data.get("commission_laundry_ht", Decimal("0"))
-        self.commission_delivery_ht = data.get("commission_delivery_ht", Decimal("0"))
-
-        # 4.b Montants à payer aux partenaires (SOURCE WALLETS)
-        self.amount_laundry_partner = (
-            data.get("commission_laundry_ht", Decimal("0"))
-        ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-
-        self.amount_driver_partner = (
-            data.get("delivery_cost_driver", Decimal("0"))
-        ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-
-        # 5) Marge logistique FAGNI
-        margin_delivery = data.get("margin_delivery", Decimal("0"))
-        try:
-            self.logistic_margin = int(margin_delivery)
-        except (TypeError, ValueError):
-            self.logistic_margin = 0
-
-        # 6) Revenus FAGNI & TVA
+            # Calcul normal (auto)
+            self.delivery_fee = data.get('delivery_fee_client', Decimal('0'))
+            self.driver_logistic_cost = data.get('delivery_cost_driver', Decimal('0'))
+            # conserve la logique existante si data fournit amount_driver_partner
+            try:
+                if data.get('amount_driver_partner', None) is not None:
+                    self.amount_driver_partner = data.get('amount_driver_partner')
+                else:
+                    self.amount_driver_partner = data.get('delivery_cost_driver', Decimal('0'))
+            except Exception:
+                self.amount_driver_partner = data.get('delivery_cost_driver', Decimal('0'))
+        
+            try:
+                margin_delivery = data.get('margin_delivery', 0)
+                self.logistic_margin = int(margin_delivery)
+            except Exception:
+                self.logistic_margin = 0
         self.fagni_revenue_ht = data.get("fagni_revenue_ht", Decimal("0"))
         self.vat_fagni = data.get("vat_fagni", Decimal("0"))
 
@@ -2005,7 +2017,7 @@ class Order(models.Model):
                     if save_legs:
                         leg.save(update_fields=["client_fee_share", "driver_amount", "fagni_margin"])
 
-        legs = list(self.legs.exclude(status__in=["canceled", "pending"]).order_by("id"))
+        legs = list(self.legs.exclude(status__in=["canceled"]).order_by("id"))
         if not legs:
             return
 
@@ -2212,8 +2224,8 @@ class Order(models.Model):
 
         # 7) Agrégats commande (legs actifs)
         if save_order:
-            total_driver = sum([Decimal(str(l.driver_amount or 0)) for l in legs]).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-            total_margin = sum([Decimal(str(l.fagni_margin or 0)) for l in legs]).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            total_driver = sum([Decimal(str(l.driver_amount or 0)) for l in legs]).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            total_margin = sum([Decimal(str(l.fagni_margin or 0)) for l in legs]).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             total_dist2 = sum([l.distance_km or 0 for l in legs])
 
             self.amount_driver_partner = total_driver
@@ -2222,13 +2234,20 @@ class Order(models.Model):
             self.driver_logistic_cost = total_driver
 
             # ⚠️ IMPORTANT: ne PAS appeler Order.save() ici (risque de recalcul/écrasement)
-            type(self).objects.filter(pk=self.pk).update(
-                amount_driver_partner=total_driver,
-                logistic_margin=total_margin,
-                distance_km=total_dist2 or None,
-                driver_logistic_cost=total_driver,
-            )
-
+            update_kwargs = {
+                'amount_driver_partner': total_driver,
+                'logistic_margin': total_margin,
+                'distance_km': total_dist2 or None,
+                'driver_logistic_cost': total_driver,
+            }
+            # Si on a reconstruit delivery_fee (legacy), on l’enregistre aussi
+            try:
+                if 'delivery_fee_changed' in locals() and delivery_fee_changed:
+                    self.delivery_fee = delivery_fee
+                    update_kwargs['delivery_fee'] = delivery_fee
+            except Exception:
+                pass
+            type(self).objects.filter(pk=self.pk).update(**update_kwargs)
     # ---------- Photos ----------
     @property
     def total_photos(self):
@@ -2757,6 +2776,34 @@ class Order(models.Model):
 
         # ✅ Écriture DB (avec retry si collision code)
         try:
+            # ✅ Si save(update_fields=...) ne contient pas les montants, ils ne seront pas persistés.
+            # Donc en cas d'annulation, on élargit update_fields pour inclure les champs neutralisés.
+            try:
+                if getattr(self, "status", None) == "canceled":
+                    uf = kwargs.get("update_fields", None)
+                    if uf is not None:
+                        uf = set(list(uf))
+                        for f in ("client_fee_share", "driver_amount", "fagni_margin"):
+                            if hasattr(self, f):
+                                uf.add(f)
+                        kwargs["update_fields"] = list(uf)
+            except Exception:
+                pass
+
+            # ✅ Jambe annulée => neutraliser montants (source-of-truth DB)
+            # Peu importe d'où vient l'annulation (views, admin, scripts, normalizers)
+            try:
+                from decimal import Decimal
+                if getattr(self, "status", None) == "canceled":
+                    if hasattr(self, "client_fee_share"):
+                        self.client_fee_share = Decimal("0")
+                    if hasattr(self, "driver_amount"):
+                        self.driver_amount = Decimal("0")
+                    if hasattr(self, "fagni_margin"):
+                        self.fagni_margin = Decimal("0")
+            except Exception:
+                pass
+
             super().save(*args, **kwargs)
         except IntegrityError as e:
             # Collision code unique (rare mais possible)
@@ -2765,7 +2812,6 @@ class Order(models.Model):
                     self.code = None
                 # regen + retry 1 fois
                 import secrets, string
-
                 alphabet = string.ascii_uppercase + string.digits
                 self.code = "ODR" + "".join(secrets.choice(alphabet) for _ in range(11))
                 super().save(*args, **kwargs)
@@ -3009,6 +3055,9 @@ class DeliveryLeg(models.Model):
         verbose_name = "Jambe de livraison"
         verbose_name_plural = "Jambes de livraison"
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["order", "leg_type"], name="uniq_leg_per_order_type"),
+        ]
 
     def __str__(self):
         return f"{self.get_leg_type_display()} - {self.order.code} - {self.driver}"
@@ -3029,6 +3078,13 @@ class DeliveryLeg(models.Model):
                 old_status = DeliveryLeg.objects.filter(pk=self.pk).values_list("status", flat=True).first()
             except Exception:
                 old_status = None
+
+        # 🔒 Guard: un leg ne peut pas passer "assigned/in_progress/done" sans driver
+        try:
+            if self.driver_id is None and (self.status or "").lower() in ("assigned", "in_progress", "done"):
+                self.status = "pending"
+        except Exception:
+            pass
 
         # 🔒 Freeze: une jambe annulée ne peut pas être "réouverte"
         # canceled -> pending/assigned/in_progress/done : interdit
@@ -3055,6 +3111,33 @@ class DeliveryLeg(models.Model):
         except Exception:
             pass
 
+        # 🔒 Si payout existe : geler aussi les montants (driver_amount / margin / client_share)
+        try:
+            if self.pk:
+                from wallets.models import WalletTransaction
+                tx = WalletTransaction.objects.filter(
+                    order_id=self.order_id,
+                    leg_id=self.pk,
+                    wallet__owner_type="driver",
+                    type="payout",
+                    direction="in",
+                ).order_by("-id").first()
+                if tx:
+                    # On recolle driver_amount sur le payout (source-of-truth)
+                    try:
+                        self.driver_amount = tx.amount
+                    except Exception:
+                        pass
+
+                    # Et on empêche update_fields de dropper driver_amount si quelqu’un ne voulait sauver que status
+                    uf = kwargs.get("update_fields", None)
+                    if uf is not None:
+                        uf = set(list(uf))
+                        uf.add("driver_amount")
+                        kwargs["update_fields"] = list(uf)
+        except Exception:
+            pass
+
         # détecter transition vers done
         old_status = None
         if self.pk:
@@ -3062,6 +3145,34 @@ class DeliveryLeg(models.Model):
                 old_status = DeliveryLeg.objects.filter(pk=self.pk).values_list("status", flat=True).first()
             except Exception:
                 old_status = None
+
+        # ✅ Jambe annulée => neutraliser montants + garantir persistance même avec update_fields=["status"]
+        try:
+            if (getattr(self, "status", None) or "").lower() == "canceled":
+                from decimal import Decimal
+
+                if hasattr(self, "client_fee_share"):
+                    self.client_fee_share = Decimal("0")
+                if hasattr(self, "driver_amount"):
+                    self.driver_amount = Decimal("0")
+                if hasattr(self, "fagni_margin"):
+                    self.fagni_margin = Decimal("0")
+
+                uf = kwargs.get("update_fields", None)
+                if uf is not None:
+                    uf = set(list(uf))
+                    uf.update({"client_fee_share", "driver_amount", "fagni_margin"})
+                    kwargs["update_fields"] = list(uf)
+        except Exception:
+            pass
+
+        # 🔒 Guard: un return ne peut pas démarrer/finir sans driver
+        try:
+            if (self.leg_type == "return") and (self.driver_id is None) and (self.status in ("assigned", "in_progress", "done")):
+                # on ramène à pending (ou on laisse canceled si déjà canceled)
+                self.status = "pending"
+        except Exception:
+            pass
 
         # timestamps
         if self.status == "in_progress" and not self.started_at:
@@ -3161,6 +3272,109 @@ class OrderItemPhoto(models.Model):
 
     def __str__(self):
         return f"Photo {self.id} - {self.order_item}"
+
+
+# --- MVP pressing: preuves & pesée ---
+
+class OrderEvidencePhoto(models.Model):
+    ACTOR_CHOICES = [
+        ("client", "Client"),
+        ("driver", "Livreur"),
+        ("laundry", "Blanchisserie"),
+        ("ops", "Ops/FAGNI"),
+    ]
+
+    KIND_CHOICES = [
+        ("pickup_items", "Articles au départ (preuve)"),
+        ("bag_before_seal", "Sac avant scellage"),
+        ("bag_sealed", "Sac scellé"),
+        ("weighing_scale", "Photo balance (pesée)"),
+        ("dropoff_to_laundry", "Dépôt chez blanchisseur"),
+        ("return_from_laundry", "Retour depuis blanchisseur"),
+        ("delivery_to_client", "Livraison au client"),
+        ("issue", "Litige / anomalie"),
+    ]
+
+    order = models.ForeignKey("orders.Order", on_delete=models.CASCADE, related_name="evidence_photos")
+    leg = models.ForeignKey("orders.DeliveryLeg", on_delete=models.SET_NULL, null=True, blank=True, related_name="evidence_photos")
+
+    actor_type = models.CharField(max_length=16, choices=ACTOR_CHOICES)
+    actor_id = models.PositiveIntegerField(null=True, blank=True)  # driver_id ou laundry_partner_id (simple)
+    kind = models.CharField(max_length=32, choices=KIND_CHOICES)
+
+    image = models.ImageField(upload_to="orders/evidence/", verbose_name="Photo")
+    caption = models.CharField(max_length=200, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["order", "kind", "created_at"]),
+            models.Index(fields=["actor_type", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Evidence #{self.id} {self.kind} order={self.order_id}"
+
+
+class OrderWeighing(models.Model):
+    STATUS_CHOICES = [
+        ("draft", "Brouillon"),
+        ("confirmed", "Confirmée"),
+        ("disputed", "Contestée"),
+        ("resolved", "Résolue OPS"),
+    ]
+
+    order = models.OneToOneField("orders.Order", on_delete=models.CASCADE, related_name="weighing")
+    weight_kg = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    scale_photo = models.ImageField(upload_to="orders/weighing/", null=True, blank=True)
+
+    entered_by_type = models.CharField(max_length=16, choices=[("driver","Livreur"),("laundry","Blanchisserie"),("ops","Ops/FAGNI")])
+    entered_by_id = models.PositiveIntegerField(null=True, blank=True)
+
+    confirmed_by_other = models.BooleanField(default=False)
+    confirmed_by_type = models.CharField(max_length=16, blank=True, default="")
+    confirmed_by_id = models.PositiveIntegerField(null=True, blank=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="draft")
+    notes = models.CharField(max_length=250, blank=True, default="")
+    # --- Résolution OPS (litige pesée) ---
+    final_weight_kg = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="resolved_weighings",
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolution_notes = models.CharField(max_length=250, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Weighing order={self.order_id} {self.weight_kg}kg {self.status}"
+
+
+
+# --- MVP pressing: avis client (rating) ---
+class OrderRating(models.Model):
+    order = models.OneToOneField("orders.Order", on_delete=models.CASCADE, related_name="rating")
+
+    # 1 à 5 étoiles
+    score = models.PositiveSmallIntegerField(default=0)
+    comment = models.CharField(max_length=500, blank=True, default="")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["score", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Rating order={self.order_id} score={self.score}"
 
 
 # =====================

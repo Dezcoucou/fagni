@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Commande blanchisserie – FAGNI{% endblock %}
+
+{% block content %}
+<div style="max-width:820px;margin:0 auto;padding:16px;">
+  <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;">
+    <div>
+      <h1 style="margin:0;font-size:20px;font-weight:900;">🧺 Détail commande</h1>
+      <div style="margin-top:6px;color:#64748b;font-size:13px;font-weight:700;">
+        ⚠️ Aucune info client affichée (confidentialité).
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a class="btn btn-light btn-sm" href="{% url 'orders:laundry_app' %}{% if laundry_id %}?laundry_id={{ laundry_id }}{% endif %}">← Retour</a>
+      <a class="btn btn-light btn-sm" href="/accounts/logout/">🚪 Déconnexion</a>
+    </div>
+  </div>
+
+  {% if error %}
+    <div class="alert alert-warning" style="margin-top:12px;">{{ error }}</div>
+  {% endif %}
+
+  {% if not order %}
+    <div style="margin-top:12px;padding:12px;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc;color:#64748b;font-weight:800;">
+      Commande non disponible.
+    </div>
+  {% else %}
+    <div style="margin-top:12px;padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#fff;">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div style="font-weight:900;">Commande #{{ order.id }}</div>
+        <div style="color:#64748b;font-size:12px;">{{ order.created_at|date:"d/m/Y H:i" }}</div>
+      </div>
+
+      <div style="margin-top:10px;color:#0f172a;font-weight:800;">
+        Statut : <span style="font-weight:900;">{{ order.status|default:"—" }}</span><br>
+        Prêt : <span style="font-weight:900;">{% if order.wash_complete_time %}✅ Oui{% else %}⏳ Non{% endif %}</span>
+      </div>
+
+      <div style="margin-top:12px;">
+        <div style="font-weight:900;margin-bottom:6px;">Articles</div>
+        {% if items %}
+          <ul style="margin:0;padding-left:18px;">
+            {% for it in items %}
+              <li style="margin:4px 0;">{{ it.designation }} × {{ it.quantity|default:1 }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div style="color:#64748b;font-weight:700;">Aucun article.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;">
+      <form method="post" style="flex:1;min-width:220px;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="start">
+        <button class="btn btn-light btn-sm" style="width:100%;" {% if is_start_disabled %}disabled{% endif %}>
+          🧺 Marquer “En cours”
+        </button>
+      </form>
+
+      <form method="post" style="flex:1;min-width:220px;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="ready">
+        <button class="btn btn-light btn-sm" style="width:100%;" {% if is_ready_disabled %}disabled{% endif %}>
+          ✅ Marquer “Prêt”
+        </button>
+      </form>
+
+      <form method="post" style="flex:1;min-width:220px;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="done">
+
+        {% if not is_done_disabled %}
+          <button class="btn btn-primary btn-sm" style="width:100%;">🏁 Marquer “Terminé”</button>
+        {% else %}
+          <button class="btn btn-primary btn-sm" style="width:100%;" disabled>🏁 Marquer “Terminé”</button>
+          {% if not order.wash_complete_time %}
+            <div style="margin-top:6px;color:#64748b;font-size:12px;font-weight:700;">
+              ℹ️ Tu dois d’abord marquer “Prêt”.
+            </div>
+          {% endif %}
+        {% endif %}
+      </form>
+    </div>
+
+    <div style="margin-top:10px;color:#94a3b8;font-size:11px;font-weight:700;">
+      ⚠️ Aucune information client n’est affichée (règle de confidentialité).
+    </div>
+  {% endif %}
+
+<style>
+  button[disabled]{
+    opacity:.55 !important;
+    cursor:not-allowed !important;
+    pointer-events:none !important;
+  }
+</style>
+
+</div>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Résoudre litige pesée – OPS{% endblock %}
+
+{% block content %}
+<div style="max-width:900px;margin:20px auto;padding:16px;">
+  <h1 style="margin:0 0 10px;">⚖️ Résoudre litige de pesée</h1>
+  <p style="color:#64748b;margin-top:0;">
+    Commande <strong>{{ order.code }}</strong>
+    {% if order.customer %} · Client: <strong>{{ order.customer.name }}</strong>{% endif %}
+  </p>
+
+  <div style="border:1px solid #e5e7eb;border-radius:14px;padding:14px;background:#fff;margin:12px 0;">
+    <p style="margin:0 0 8px;">
+      Statut pesée: <strong>{{ ow.get_status_display }}</strong><br>
+      Poids retenu actuel: <strong>{{ ow.weight_kg }} kg</strong>
+      {% if ow.final_weight_kg %}<br>Poids final (déjà tranché): <strong>{{ ow.final_weight_kg }} kg</strong>{% endif %}
+    </p>
+
+    <form method="post" style="display:grid;gap:10px;">
+      {% csrf_token %}
+      <label>
+        <div style="font-size:12px;color:#475569;margin-bottom:4px;">Poids final (kg) — laisse vide pour reprendre le poids retenu</div>
+        <input name="final_weight_kg" placeholder="ex: 13.50" inputmode="decimal"
+               style="width:220px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;">
+      </label>
+
+      <label>
+        <div style="font-size:12px;color:#475569;margin-bottom:4px;">Notes OPS (optionnel)</div>
+        <input name="resolution_notes" maxlength="250" placeholder="Motif de la décision (ex: photo balance valide, etc.)"
+               style="width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;">
+      </label>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;">
+        <button type="submit" style="padding:10px 14px;border-radius:10px;border:0;background:#0ea5e9;color:#fff;font-weight:700;">
+          ✅ Trancher / Marquer résolu
+        </button>
+        <a href="{% url 'orders:ops_dashboard' %}" style="padding:10px 14px;border-radius:10px;border:1px solid #e5e7eb;text-decoration:none;color:#111827;">
+          ← Retour OPS
+        </a>
+        <a href="{% url 'orders:detail' order.id %}" style="padding:10px 14px;border-radius:10px;border:1px solid #e5e7eb;text-decoration:none;color:#111827;">
+          👁️ Détail commande
+        </a>
+      </div>
+    </form>
+  </div>
+
+  {% if scale_photos %}
+    <h3 style="margin:16px 0 8px;">📷 Photos balance</h3>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      {% for p in scale_photos %}
+        <a href="{{ p.image.url }}" target="_blank">
+          <img src="{{ p.image.url }}" style="width:140px;height:140px;object-fit:cover;border-radius:12px;border:1px solid #e5e7eb;">
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if issue_photos %}
+    <h3 style="margin:16px 0 8px;">🧷 Photos litige</h3>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      {% for p in issue_photos %}
+        <a href="{{ p.image.url }}" target="_blank">
+          <img src="{{ p.image.url }}" style="width:140px;height:140px;object-fit:cover;border-radius:12px;border:1px solid #e5e7eb;">
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

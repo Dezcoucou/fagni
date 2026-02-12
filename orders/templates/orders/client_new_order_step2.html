@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Nouvelle commande – Étape 2{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root{
+    --fagni-orange:#ff7a00;
+    --fagni-blue:#0056b3;
+    --text:#0f172a;
+    --muted:#64748b;
+    --line:#e5e7eb;
+    --soft:#f8fafc;
+    --shadow:0 1px 6px rgba(15,23,42,.06);
+  }
+  .page{max-width:920px;margin:0 auto;padding:16px}
+  .header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px}
+  .title{margin:0;font-size:22px;font-weight:950;letter-spacing:-.2px;color:var(--text)}
+  .subtitle{margin:4px 0 0;color:var(--muted);font-size:13px}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;
+    padding:10px 14px;border-radius:999px;border:1px solid var(--line);
+    background:#fff;color:var(--text);text-decoration:none;font-weight:900;font-size:13px;
+  }
+  .btn:active{transform:translateY(1px)}
+  .card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
+  .section{padding:14px}
+  .section + .section{border-top:1px solid var(--line)}
+  .h3{margin:0 0 10px 0;font-size:14px;font-weight:950;color:#111827}
+  .help{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.35}
+  .input, .select{
+    width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);
+    outline:none;font-weight:700;background:#fff;
+  }
+  .input:focus, .select:focus{border-color:rgba(0,86,179,.35);box-shadow:0 0 0 4px rgba(0,86,179,.10)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:760px){.grid{grid-template-columns:1fr}}
+  .radio{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--soft)}
+  .radio strong{display:block}
+  .radio small{display:block;color:var(--muted);margin-top:2px}
+  .radio input{margin-top:2px}
+  .footer{padding:14px}
+  .cta{
+    width:100%;padding:12px 14px;border-radius:999px;border:none;
+    background:linear-gradient(90deg,var(--fagni-orange),var(--fagni-blue));
+    color:#fff;font-weight:950;cursor:pointer;
+  }
+  .alert{padding:12px;border-radius:12px;margin-bottom:12px;border:1px solid #fecaca;background:#fff1f2}
+  .muted{color:var(--muted)}
+  .disabled{opacity:.55;pointer-events:none}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+
+  <div class="header">
+    <div>
+      <h1 class="title">Nouvelle commande</h1>
+      <p class="subtitle">Étape 2/4 — Choisis une catégorie, puis ton mode de livraison.</p>
+    </div>
+    <a class="btn" href="{% url 'orders:client_new_order' %}">← Retour étape 1</a>
+  </div>
+
+  {% if error %}
+    <div class="alert">{{ error }}</div>
+  {% endif %}
+
+  <div class="card">
+    <form method="post">
+      {% csrf_token %}
+
+      <div class="section">
+        <div class="h3">1) Catégorie</div>
+
+        <select name="category_id" required class="select">
+          <option value="">— Sélectionner —</option>
+          {% for c in categories %}
+            <option value="{{ c.id }}"
+              {% if selected_category_id|stringformat:"s" == c.id|stringformat:"s" %}selected{% endif %}>
+              {{ c.name }}
+            </option>
+          {% endfor %}
+        </select>
+
+        <div class="help">La catégorie détermine la liste des articles disponibles (ex : Blanchisserie, Repassage, etc.).</div>
+      </div>
+
+      <div class="section">
+        <div class="h3">2) Mode de livraison</div>
+
+        <div class="grid">
+          <label class="radio">
+            <input type="radio" name="delivery_mode" value="standard"
+              {% if order.delivery_mode == "standard" or not order.delivery_mode %}checked{% endif %}>
+            <div>
+              <strong>Standard</strong>
+              <small>Collecte + livraison sous 48h (par défaut)</small>
+            </div>
+          </label>
+
+          <label class="radio">
+            <input type="radio" name="delivery_mode" value="express"
+              {% if order.delivery_mode == "express" %}checked{% endif %}>
+            <div>
+              <strong>Express</strong>
+              <small>Collecte + livraison sous 24h</small>
+            </div>
+          </label>
+
+          <label class="radio" style="grid-column:1 / -1">
+            <input type="radio" name="delivery_mode" value="scheduled"
+              {% if order.delivery_mode == "scheduled" %}checked{% endif %}>
+            <div style="flex:1">
+              <strong>Programmée</strong>
+              <small>Tu choisis une date/heure de livraison</small>
+
+              <div style="margin-top:10px">
+                <input id="scheduledInput"
+                       type="datetime-local"
+                       name="scheduled_delivery_at"
+                       class="input"
+                       value="{% if order.scheduled_delivery_at %}{{ order.scheduled_delivery_at|date:'Y-m-d\\TH:i' }}{% endif %}">
+                <div class="help">Choisis une date/heure (format automatique).</div>
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="footer">
+        <button type="submit" class="cta">Continuer → Étape 3</button>
+        <div class="help muted" style="margin-top:10px">
+          À l’étape suivante, tu choisis les articles et les quantités.
+        </div>
+      </div>
+
+    </form>
+  </div>
+
+</div>
+
+<script>
+  (function(){
+    const scheduledInput = document.getElementById("scheduledInput");
+    const radios = document.querySelectorAll('input[name="delivery_mode"]');
+
+    function refresh(){
+      const mode = (document.querySelector('input[name="delivery_mode"]:checked') || {}).value || "standard";
+      if(mode === "scheduled"){
+        scheduledInput.removeAttribute("disabled");
+        scheduledInput.parentElement.classList.remove("disabled");
+        scheduledInput.focus();
+      }else{
+        scheduledInput.setAttribute("disabled","disabled");
+        scheduledInput.value = "";
+        scheduledInput.parentElement.classList.add("disabled");
+      }
+    }
+
+    radios.forEach(r => r.addEventListener("change", refresh));
+    refresh();
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Pesée – Blanchisserie{% endblock %}
+{% block content %}
+<div style="max-width:720px;margin:0 auto;padding:16px;">
+  <h1 style="margin:0 0 8px;font-size:20px;font-weight:900;">🧺 Pesée (commande {{ order.code }})</h1>
+  <p style="margin:0 0 12px;color:#64748b;font-weight:700;">
+    ⚠️ Aucune info client affichée ici (confidentialité).
+  </p>
+
+  <div style="padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#fff;margin-bottom:12px;">
+    <div style="font-weight:900;">Poids saisi :</div>
+    <div style="font-size:18px;font-weight:900;margin-top:4px;">
+      {{ weighing.weight_kg|default:"—" }} kg
+    </div>
+    <div style="margin-top:6px;">Statut : {{ weighing.status|default:"—" }}</div>
+    {% if weighing.confirmed_by_other %}
+      <div style="margin-top:8px;color:#166534;font-weight:900;">✅ Pesée confirmée</div>
+    {% endif %}
+    {% if weighing.status == "disputed" %}
+      <div style="margin-top:8px;color:#b45309;font-weight:900;">⚠️ Pesée contestée</div>
+    {% endif %}
+  </div>
+
+  {% if weighing.status == "confirmed" %}
+    <div style="margin:0 0 12px;padding:10px;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:12px;font-weight:800;color:#166534;">
+      ✅ Déjà confirmée. (Tu peux toujours laisser une note si besoin.)
+    </div>
+  {% endif %}
+
+  <form method="post" style="margin:0 0 12px;padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#fff;">
+    {% csrf_token %}
+    <label style="display:block;font-weight:800;margin-bottom:6px;">Note (optionnel)</label>
+    <input name="notes" type="text" maxlength="250"
+           value="{{ weighing.notes|default:'' }}"
+           style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:12px;">
+    <button style="margin-top:10px;width:100%;padding:10px;border:0;border-radius:12px;background:#0ea5e9;color:#fff;font-weight:900;">
+      Enregistrer la note
+    </button>
+  </form>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+    <form method="post" action="{% url 'orders:laundry_weighing_confirm' order.id %}" style="flex:1;min-width:220px;">
+      {% csrf_token %}
+      <input type="hidden" name="laundry_id" value="{{ laundry_id }}">
+      <button {% if weighing.status == "confirmed" %}disabled{% endif %}
+              style="width:100%;padding:12px;border:0;border-radius:12px;background:#22c55e;color:#fff;font-weight:900;{% if weighing.status == "confirmed" %}opacity:.6;cursor:not-allowed;{% endif %}">
+        ✅ Confirmer
+      </button>
+    </form>
+  </div>
+
+  <div style="padding:12px;border:1px solid #fecaca;border-radius:14px;background:#fff;margin-bottom:12px;">
+    <div style="font-weight:900;margin-bottom:8px;color:#991b1b;">❌ Contester la pesée</div>
+    <div style="color:#64748b;font-weight:700;margin-bottom:10px;font-size:13px;">
+      Utilise ce formulaire si ton poids est différent : renseigne le poids constaté, explique, et ajoute une photo de la balance.
+    </div>
+
+    <form method="post" action="{% url 'orders:laundry_weighing_dispute' order.id %}" enctype="multipart/form-data">
+      {% csrf_token %}
+      <input type="hidden" name="laundry_id" value="{{ laundry_id }}">
+
+      <label style="display:block;font-weight:800;margin-bottom:6px;">Poids constaté (kg)</label>
+      <input name="weight_kg" type="number" step="0.01" min="0.01" required
+             style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:10px;">
+
+      <label style="display:block;font-weight:800;margin-bottom:6px;">Raison (obligatoire)</label>
+      <input name="reason" type="text" maxlength="250" required
+             value="Pesée contestée"
+             style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:10px;">
+
+      <label style="display:block;font-weight:800;margin-bottom:6px;">Photo balance (obligatoire)</label>
+      <input name="image" type="file" accept="image/*" required style="margin-bottom:10px;">
+
+      <button style="width:100%;padding:12px;border:0;border-radius:12px;background:#ef4444;color:#fff;font-weight:900;">
+        ❌ Envoyer la contestation
+      </button>
+    </form>
+  </div>
+
+  <hr style="margin:16px 0;border:none;border-top:1px solid #e5e7eb;">
+
+  <h2 style="margin:0 0 10px;font-size:16px;font-weight:900;">📷 Preuves (lecture)</h2>
+
+  {% if evidence %}
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">
+      {% for p in evidence %}
+        <a href="{{ p.image.url }}" target="_blank"
+           style="display:block;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;background:#fff;text-decoration:none;">
+          <div style="height:140px;background:#0f172a0d;">
+            <img src="{{ p.image.url }}" alt="{{ p.kind }}" style="width:100%;height:100%;object-fit:cover;">
+          </div>
+          <div style="padding:10px;">
+            <div style="font-weight:900;font-size:13px;">{{ p.get_kind_display|default:p.kind }}</div>
+            {% if p.caption %}
+              <div style="margin-top:4px;color:#64748b;font-size:13px;">{{ p.caption }}</div>
+            {% endif %}
+            <div style="margin-top:6px;color:#94a3b8;font-size:12px;">
+              {{ p.created_at }}
+            </div>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div style="padding:12px;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc;color:#64748b;font-weight:700;">
+      Aucune preuve photo pour le moment.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

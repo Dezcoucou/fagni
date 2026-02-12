@@ -347,6 +347,27 @@
     border:1px solid #e5e7eb;
   }
 
+
+    /* Tags premium */
+    .tag-privacy{
+      background:#eef2ff;
+      border-color:#c7d2fe;
+      color:#3730a3;
+      font-weight:900;
+    }
+    .tag-weigh{
+      background:#f0fdf4;
+      border-color:#bbf7d0;
+      color:#166534;
+      font-weight:850;
+    }
+    .tag-evidence{
+      background:#fff7ed;
+      border-color:#fed7aa;
+      color:#9a3412;
+      font-weight:850;
+    }
+
   /* =============================
      BOUTONS – UNIFORMISATION
      ============================= */
@@ -467,6 +488,7 @@
 
 {% block content %}
 <div class="page">
+  <div id="click-toast" style="position:sticky;top:8px;z-index:9999;background:#111827;color:#fff;padding:8px 10px;border-radius:12px;font-size:12px;display:none;margin-bottom:10px;"></div>
 
   <div class="page-header">
 
@@ -873,6 +895,44 @@
     if(phone) tags.push(`<span class="tag-small">📞 ${phone}</span>`);
     if(addr) tags.push(`<span class="tag-small">📍 ${addr}</span>`);
 
+
+      // 🔒 Privacy: phase laverie => infos client masquées
+      const masked = !!(o && o.privacy_masked);
+      if (masked){
+        tags.unshift(`<span class="tag-small tag-privacy">🔒 Phase laverie</span>`);
+      }
+
+      // ⚖️ Pesée
+      const w = (o && o.weighing) ? o.weighing : null;
+      if (w){
+        const wkg = Number(w.weight_kg || 0);
+        const confirmed = !!w.confirmed;
+        const st = String(w.status || "");
+        if (Number.isFinite(wkg) && wkg > 0){
+          const kgTxt = (wkg % 1 === 0) ? String(wkg.toFixed(0)) : String(wkg.toFixed(1));
+          tags.push(`<span class="tag-small tag-weigh">⚖️ ${kgTxt} kg${confirmed ? " ✅" : " ⏳"}</span>`);
+        } else if (st){
+          tags.push(`<span class="tag-small tag-weigh">⚖️ ${escapeHtml(st)}</span>`);
+        }
+      }
+
+      // 📎 Preuves (compteur + détail en tooltip)
+      const ec = (o && o.evidence_counts) ? o.evidence_counts : null;
+      if (ec && typeof ec === "object"){
+        let total = 0;
+        const parts = [];
+        for (const k in ec){
+          const v = Number(ec[k] || 0);
+          if (Number.isFinite(v) && v > 0){
+            total += v;
+            parts.push(`${k}:${v}`);
+          }
+        }
+        if (total > 0){
+          const tip = parts.join(" • ");
+          tags.push(`<span class="tag-small tag-evidence" title="${escapeHtml(tip)}">📎 Preuves ${total}</span>`);
+        }
+      }
     const created = o.created_at ? `Créée le ${escapeHtml(o.created_at)}` : "";
     const name = escapeHtml(o.customer_name || "Client");
     const code = escapeHtml(o.code || "");
@@ -940,8 +1000,10 @@
           <div class="course-tags">
             ${tags.join("")}
           </div>
-          <a class="btn ${cta.cls}" href="${detailUrl}">${escapeHtml(cta.label)}</a>
+          <a class="btn btn-light" href="${escapeHtml((() => { const u = withQuery(`/orders/driver/weighing/${Number(o.id)}/`); return u + (u.includes('?') ? '&' : '?') + 'back=' + back; })())}">📎 Preuves / Pesée</a>
+<a class="btn ${cta.cls}" href="${detailUrl}">${escapeHtml(cta.label)}</a>
           </div>
+        </div>
       `;
     }
 
@@ -1170,8 +1232,47 @@
       busy = false;
     }
   }
+    // DEBUG CLICK (à retirer après)
+    function showToast(msg){
+      const t = document.getElementById("click-toast");
+      if(!t) return;
+      t.textContent = msg;
+      t.style.display = "block";
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(()=>{ t.style.display="none"; }, 2000);
+    }
 
-  document.addEventListener("click", function(ev){
+    document.addEventListener("click", function(ev){
+      const a = ev.target.closest("a.btn");
+      if(a){
+        showToast("CLICK BTN: " + a.textContent.trim());
+        console.log("[CLICK] btn:", a.textContent.trim(), "href=", a.getAttribute("href"));
+      }
+      const card = ev.target.closest(".card-course.is-clickable");
+      if(card){
+        showToast("CLICK CARD #" + card.getAttribute("data-order-id"));
+        console.log("[CLICK] card id=", card.getAttribute("data-order-id"), "href=", card.getAttribute("data-href"));
+          // Backup navigation (si un overlay empêche le clic natif)
+          const href = a && a.getAttribute("href");
+          if(href && href !== "#" && href !== "javascript:void(0)"){
+            setTimeout(()=>{ window.location.href = href; }, 0);
+          }
+
+      }
+    }, {passive:true});
+
+    document.addEventListener("click", function(ev){
+      const a = ev.target.closest("a.btn");
+      if(a){
+        showToast("CLICK BTN: " + a.textContent.trim());
+      }
+      const card = ev.target.closest(".card-course.is-clickable");
+      if(card){
+        showToast("CLICK CARD #" + card.getAttribute("data-order-id"));
+      }
+    }, {passive:true});
+
+    document.addEventListener("click", function(ev){
     const card = ev.target.closest(".card-course.is-clickable");
     if(!card) return;
     if(ev.target.closest("a, button, input, select, textarea, label")) return;

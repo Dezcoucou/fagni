@@ -27,6 +27,8 @@ urlpatterns = [
     # 📅 Planning OPS
     path("ops-planning/", views.ops_planning, name="ops_planning"),
 
+    path("ops-weighing/<int:order_id>/resolve/", views.ops_weighing_resolve, name="ops_weighing_resolve"),
+
     path("ops-dashboard/<int:order_id>/<str:action>/", views.ops_update_step, name="ops_update_step"),
 
     # Dashboard global des commandes
@@ -53,8 +55,13 @@ urlpatterns = [
     path("client/logout/", views.client_logout, name="client_logout"),
     path("client/home/", views.client_home, name="client_home"),
     path("client/new/", views.client_new_order, name="client_new_order"),
+    path("client/new/step-2/<int:order_id>/", views.client_new_order_step2, name="client_new_order_step2"),
+    path("client/new/step-3/<int:order_id>/", views.client_new_order_step3, name="client_new_order_step3"),
+    path("client/new/step-4/<int:order_id>/", views.client_new_order_step4, name="client_new_order_step4"),
     path("client/orders/<int:order_id>/", views.client_order_detail, name="client_order_detail"),
     path("client/orders/<int:order_id>/live/", views.client_order_live_status, name="client_order_live"),
+    path("client/orders/<int:order_id>/rating/", views.client_order_rating, name="client_order_rating"),
+    path("client/orders/<int:order_id>/evidence/upload/", views.client_order_evidence_upload, name="client_order_evidence_upload"),
 
     # --- Items (lignes de commande) côté client ---
     path("client/orders/<int:order_id>/items/new/", views.client_order_item_new, name="client_order_item_new"),
@@ -130,4 +137,28 @@ urlpatterns = [
 
     # LIVE JSON pour la map OPS (Lot 4.9)
     path("ops-dashboard/drivers-live/", views.ops_drivers_live, name="ops_drivers_live"),
+
+
+    # ============================
+    # ✅ MVP PRESSING — Pesée + preuves photo (LIVREUR)
+    # ============================
+
+    # Livreur (saisie pesée + upload photos preuves)
+    path("driver/weighing/<int:order_id>/", views.driver_weighing, name="driver_weighing"),
+    path("driver/evidence/<int:order_id>/upload/", views.driver_evidence_upload, name="driver_evidence_upload"),
+
+    # ============================
+    # ✅ MVP BLANCHISSERIE V1 — Prix par article (zéro pesée)
+    # ============================
+
+    # App blanchisseur (liste)
+    path("laundry/app/", views.laundry_app, name="laundry_app"),
+
+    # Détail commande blanchisseur (sans infos client)
+    path("laundry/order/<int:order_id>/", views.laundry_order_detail, name="laundry_order_detail"),
+
+    # Blanchisserie (validation / contestation pesée)
+        path("laundry/weighing/<int:order_id>/", views.laundry_weighing, name="laundry_weighing"),
+    path("laundry/weighing/<int:order_id>/confirm/", views.laundry_weighing_confirm, name="laundry_weighing_confirm"),
+    path("laundry/weighing/<int:order_id>/dispute/", views.laundry_weighing_dispute, name="laundry_weighing_dispute"),
 ]

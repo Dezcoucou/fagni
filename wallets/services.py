@@ -129,6 +129,22 @@ def credit_wallet(
         description = label
 
     amount = _to_decimal(amount)
+    if amount <= 0:
+        return None
+
+    # 🔒 PILOT GUARD — un payout driver lié à une commande DOIT être rattaché à une jambe (leg)
+    if tx_type == "payout" and order is not None and getattr(wallet, "owner_type", None) == "driver" and leg is None:
+        raise ValueError("Driver payout for order requires leg (DeliveryLeg).")
+
+    # ✅ Auto-idempotency: payout driver par jambe => clé déterministe si absente
+    if (
+        not idempotency_key
+        and tx_type == "payout"
+        and order is not None
+        and leg is not None
+        and getattr(wallet, "owner_type", None) == "driver"
+    ):
+        idempotency_key = f"driver_payout:{getattr(leg, 'id', leg)}"
 
     # ✅ Idempotence globale via clé (si fournie)
     if idempotency_key:
@@ -136,36 +152,30 @@ def credit_wallet(
         if existing:
             return existing
 
-    # 🔒 PILOT GUARD — un payout driver lié à une commande DOIT être rattaché à une jambe (leg)
-    if tx_type == "payout" and order is not None and getattr(wallet, "owner_type", None) == "driver" and leg is None:
-        raise ValueError("Driver payout for order requires leg (DeliveryLeg).")
+    # ✅ Idempotence AVANT solde:
+    # - si leg fourni => lookup global par (order, leg, type, direction)
+    # - sinon => lookup par wallet (cas internal/laundry/etc.)
+    if order is not None:
+        qs = WalletTransaction.objects.filter(
+            order=order,
+            type=tx_type,
+            direction="in",
+        )
+        if leg is not None:
+            qs = qs.filter(leg=leg)
+        else:
+            qs = qs.filter(wallet=wallet, leg__isnull=True)
 
-    if amount <= 0:
-        return None
+        existing = qs.order_by("id").first()
+        if existing:
+            return existing
 
+    # ✅ maintenant seulement on crédite réellement
     wallet.balance = (wallet.balance + amount).quantize(
         Decimal("0.01"), rounding=ROUND_HALF_UP
     )
     wallet.save(update_fields=["balance", "updated_at"])
 
-    # ✅ Idempotence: si une tx identique existe déjà (contrainte unique),
-    # on la retourne au lieu de casser la distribution.
-    if order is not None:
-        qs = WalletTransaction.objects.filter(
-            wallet=wallet,
-            order=order,
-            type=tx_type,
-            direction="in",
-        )
-        # ✅ si payout et leg fourni => idempotence par jambe
-        if leg is not None:
-            qs = qs.filter(leg=leg)
-        else:
-            qs = qs.filter(leg__isnull=True)
-
-        existing = qs.order_by("id").first()
-        if existing:
-            return existing
 
     tx = WalletTransaction.create_tx(
         wallet=wallet,

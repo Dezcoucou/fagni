@@ -128,3 +128,15 @@ cookies.txt
 # Local/dev
 cookies_*.txt
 <DB_PATH>
+# backups / snapshots
+backups*/
+*.bak*
+*.old*
+*~ 
+
+# python caches
+__pycache__/
+*.pyc
+
+# venv
+venv/

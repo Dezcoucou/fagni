@@ -16,9 +16,25 @@ class DeliveryLegPayoutTests(TestCase):
             amount_paid=Decimal("1000"),
             payment_status="paid",
         )
+
+        # ✅ Pilot guard: une commande payée doit avoir une blanchisserie
+        try:
+            from partners.models import LaundryPartner
+            lp = LaundryPartner.objects.order_by("id").first()
+            if not lp:
+                lp = LaundryPartner.objects.create(name="Laundry", phone="0700001777")
+            o.laundry_partner = lp
+            o.save(update_fields=["laundry_partner"])
+        except Exception as e:
+            raise AssertionError(f"Failed to assign LaundryPartner for paid order: {e}")
+
+        # ✅ IMPORTANT: supprimer les legs auto-créés (sinon UNIQUE order_id+leg_type)
+        DeliveryLeg.objects.filter(order=o).delete()
+
         return o, driver
 
     def _mk_unpaid_order_and_driver(self):
+
         c = Customer.objects.create(name="C", phone="0700000999")
         driver = DeliveryPartner.objects.create(name="Driver", phone="0700000888")
         o = Order.objects.create(
@@ -305,7 +321,7 @@ class DeliveryLegPayoutTests(TestCase):
         canceled = DeliveryLeg.objects.create(
             order=o,
             driver=driver,
-            leg_type="return",
+            leg_type="aux",
             status="canceled",
             driver_amount=Decimal("333.00"),
             client_fee_share=Decimal("10.00"),

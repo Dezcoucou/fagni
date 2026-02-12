@@ -10,9 +10,11 @@ from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpResponse, JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
+from django.http import HttpResponse, JsonResponse, HttpResponseBadRequest, HttpResponseForbidden, Http404
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.contrib.auth.decorators import login_required
 from django.db.models import (
     Count,
     Q,
@@ -37,7 +39,6 @@ from django.views.decorators.http import require_POST, require_http_methods
 from django.contrib.admin.views.decorators import staff_member_required
 from django.urls import reverse
 from django.utils import timezone
-from django.contrib.auth.decorators import login_required
 from django.utils.dateparse import parse_date
 from django.utils.encoding import smart_str
 
@@ -169,6 +170,7 @@ def client_order_live_status(request, order_id: int):
     Règle d'accès: le cookie client_phone doit matcher le customer.phone (ou autre logique).
     """
     from orders.models import Order
+    from collections import Counter
 
     phone = _client_phone(request)
 
@@ -201,14 +203,17 @@ def client_order_live_status(request, order_id: int):
         })
 
     legs = []
+    legs_by_id = {}
     for leg in o.legs.all().order_by("id"):
-        legs.append({
+        row = {
             "id": leg.id,
             "leg_type": leg.leg_type,
             "status": leg.status,
             "driver_amount": float(leg.driver_amount or 0),
             "driver_id": leg.driver_id,
-        })
+        }
+        legs.append(row)
+        legs_by_id[leg.id] = row
 
     # ✅ Source unique de vérité pour les montants
     pricing = _compute_order_pricing(o)
@@ -240,6 +245,80 @@ def client_order_live_status(request, order_id: int):
         "amount_remaining": float(remaining_dec),
     }
 
+    # =========================
+    # ✅ PREUVES / PHOTOS (OrderEvidencePhoto)
+    # =========================
+    evidence_photos = []
+    evidence_counts = {}
+    try:
+        from .models import OrderEvidencePhoto
+
+        # mapping label (KIND_CHOICES)
+        kind_labels = {k: lbl for (k, lbl) in getattr(OrderEvidencePhoto, "KIND_CHOICES", [])}
+
+        qs = (
+            OrderEvidencePhoto.objects
+            .filter(order=o)
+            .select_related("leg")
+            .order_by("-created_at")[:50]
+        )
+
+        kinds = []
+        for p in qs:
+            kind = getattr(p, "kind", "") or ""
+            kinds.append(kind)
+
+            url = ""
+            try:
+                if getattr(p, "image", None) and getattr(p.image, "url", None):
+                    url = p.image.url
+            except Exception:
+                url = ""
+
+            leg_id = getattr(p, "leg_id", None)
+            leg_info = None
+            if leg_id and leg_id in legs_by_id:
+                leg_info = {
+                    "id": leg_id,
+                    "leg_type": legs_by_id[leg_id].get("leg_type"),
+                    "status": legs_by_id[leg_id].get("status"),
+                }
+
+            evidence_photos.append({
+                "id": p.id,
+                "kind": kind,
+                "kind_label": kind_labels.get(kind, kind or "Photo"),
+                "caption": getattr(p, "caption", "") or "",
+                "created_at": p.created_at.isoformat() if getattr(p, "created_at", None) else None,
+                "url": url,
+                "leg_id": leg_id,
+                "leg": leg_info,
+            })
+
+        evidence_counts = dict(Counter(kinds))
+    except Exception:
+        # safe: endpoint continue même si modèle indispo
+        evidence_photos = []
+        evidence_counts = {}
+
+    # =========================
+    # ✅ RATING (OrderRating)
+    # =========================
+    rating = None
+    try:
+        from .models import OrderRating
+        r = OrderRating.objects.filter(order=o).first()
+        if r:
+            rating = {
+                "score": int(getattr(r, "score", 0) or 0),
+                "comment": (getattr(r, "comment", "") or "").strip(),
+                "created_at": r.created_at.isoformat() if getattr(r, "created_at", None) else None,
+            }
+        else:
+            rating = None
+    except Exception:
+        rating = None
+
     return JsonResponse({
         "ok": True,
         "order": {
@@ -256,6 +335,247 @@ def client_order_live_status(request, order_id: int):
         },
         "amounts": amounts,
         "legs": legs,
+
+        # ✅ AJOUTS MVP PILOTE
+        "evidence_photos": evidence_photos,
+        "evidence_counts": evidence_counts,
+        "rating": rating,
+    })
+
+
+
+@require_http_methods(["POST"])
+@client_login_required
+def client_order_rating(request, order_id: int):
+    """
+    Enregistre (ou met à jour) l'évaluation client pour une commande.
+    Règles:
+    - Accès: cookie client_phone doit matcher le customer.phone
+    - Autorisé seulement si commande terminée (status=done) OU delivered_time non null
+    - Idempotent: upsert (update si existe)
+    - Réponse JSON si AJAX, sinon redirect vers détail commande
+    """
+    from orders.models import Order, OrderRating
+
+    phone = _normalize_phone((_client_phone(request) or ""))
+    o = (
+        Order.objects
+        .select_related("customer")
+        .filter(pk=order_id)
+        .first()
+    )
+    if not o:
+        return JsonResponse({"ok": False, "error": "not_found"}, status=404)
+
+    customer_phone = _normalize_phone(getattr(o.customer, "phone", "") or "")
+    if not customer_phone or not phone or customer_phone != phone:
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+
+    # Autoriser seulement si terminé/livré
+    if (getattr(o, "status", "") != "done") and (getattr(o, "delivered_time", None) is None):
+        return JsonResponse({"ok": False, "error": "not_allowed"}, status=400)
+
+    # Payload
+    score_raw = (request.POST.get("score") or request.POST.get("rating") or "").strip()
+    comment = (request.POST.get("comment") or request.POST.get("review") or "").strip()
+
+    try:
+        score = int(score_raw)
+    except Exception:
+        score = 0
+
+    if score < 1 or score > 5:
+        return JsonResponse({"ok": False, "error": "invalid_score"}, status=400)
+
+    if len(comment) > 500:
+        comment = comment[:500]
+
+    r, created = OrderRating.objects.get_or_create(order=o, defaults={"score": score, "comment": comment})
+    if not created:
+        r.score = score
+        r.comment = comment
+        r.save(update_fields=["score", "comment", "updated_at"])
+
+    payload = {
+        "ok": True,
+        "rating": {
+            "score": int(r.score or 0),
+            "comment": (r.comment or "").strip(),
+            "created_at": r.created_at.isoformat() if getattr(r, "created_at", None) else None,
+        }
+    }
+
+    if _is_json_request(request):
+        return JsonResponse(payload)
+
+    return redirect("orders:client_order_detail", order_id=o.id)
+
+
+# =========================
+# ✅ CLIENT — Evidence upload (preuves photos)
+# =========================
+@require_http_methods(["POST"])
+@client_login_required
+def client_order_evidence_upload(request, order_id: int):
+    """
+    Upload preuve(s) photo côté client.
+    - Auth: cookie client_phone
+    - Règle: client_phone doit matcher order.customer.phone
+    - Input: kind (pickup|laundry|dropoff) + files[] (ou photos)
+    - Output: {"ok": True, "created": n, "evidence_photos": [...], "evidence_counts": {...}, ...}
+    """
+    from collections import Counter
+    from orders.models import Order, OrderEvidencePhoto
+
+    phone = _normalize_phone(_client_phone(request) or "")
+
+    from datetime import timedelta
+    from django.utils import timezone
+
+    # 🔒 RÈGLE MÉTIER: upload preuves client
+    # - interdit si annulée
+    # - interdit après livraison, sauf 24h et uniquement kind=dropoff
+    status_raw = (getattr(o, "status", "") or "").lower()
+
+    if status_raw == "canceled":
+        return JsonResponse({"ok": False, "error": "order_canceled"}, status=403)
+
+    # On essaie de détecter "livrée" de façon robuste
+    delivered_at = getattr(o, "delivered_at", None)
+    is_delivered = False
+
+    # 1) si champ delivered_at existe
+    if delivered_at:
+        is_delivered = True
+    else:
+        # 2) fallback : si status = done (ou assimilé)
+        if status_raw in {"done", "delivered"}:
+            is_delivered = True
+            # fallback timestamp (au pire)
+            delivered_at = getattr(o, "updated_at", None) or getattr(o, "created_at", None)
+
+    # Si livré => on limite
+    if is_delivered:
+        # sécurité timestamp
+        delivered_at = delivered_at or timezone.now()
+
+        # fenêtre 24h
+        if timezone.now() - delivered_at > timedelta(hours=24):
+            return JsonResponse({"ok": False, "error": "evidence_window_closed"}, status=403)
+
+    o = (
+        Order.objects
+        .select_related("customer")
+        .filter(pk=order_id)
+        .first()
+    )
+    if not o:
+        return JsonResponse({"ok": False, "error": "not_found"}, status=404)
+
+    customer_phone = _normalize_phone(getattr(o.customer, "phone", "") or "")
+    if not customer_phone or not phone or customer_phone != phone:
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+
+    kind_raw = (request.POST.get("kind") or "").strip().lower()
+    kind = kind_raw if kind_raw in {"pickup", "laundry", "dropoff"} else "pickup"
+
+    # Si livré, seul dropoff autorisé
+    if is_delivered and kind != "dropoff":
+        return JsonResponse({"ok": False, "error": "only_dropoff_allowed_after_delivery"}, status=403)
+
+    # Support: input name "files" (multiple) ou "photos" (multiple)
+    files = []
+    files += list(request.FILES.getlist("files"))
+    files += list(request.FILES.getlist("photos"))
+    f1 = request.FILES.get("file")
+    if f1:
+        files.append(f1)
+
+    files = [f for f in files if f]
+    if not files:
+        return JsonResponse({"ok": False, "error": "no_files"}, status=400)
+
+    # ✅ Guards premium: type MIME + taille max
+    allowed_mimes = {"image/jpeg", "image/png", "image/webp"}
+    max_mb = int(getattr(settings, "FAGNI_EVIDENCE_MAX_MB", 5) or 5)
+    max_bytes = max_mb * 1024 * 1024
+
+    created = 0
+    rejected = 0
+    rejected_reasons = {"too_large": 0, "bad_type": 0, "error": 0}
+    created_ids = []
+
+    for f in files:
+        try:
+            ct = (getattr(f, "content_type", "") or "").lower().strip()
+            size = int(getattr(f, "size", 0) or 0)
+
+            if size > max_bytes:
+                rejected += 1
+                rejected_reasons["too_large"] += 1
+                continue
+
+            # Si content_type absent, on laisse passer (certains clients/curl),
+            # mais si présent, on le valide.
+            if ct and ct not in allowed_mimes:
+                rejected += 1
+                rejected_reasons["bad_type"] += 1
+                continue
+
+            obj = OrderEvidencePhoto.objects.create(
+                order=o,
+                kind=kind,
+                image=f,
+                created_at=timezone.now(),
+            )
+            created += 1
+            created_ids.append(obj.id)
+
+        except Exception:
+            rejected += 1
+            rejected_reasons["error"] += 1
+            continue
+
+    # Renvoie la galerie à jour (derniers 50)
+    qs = OrderEvidencePhoto.objects.filter(order=o).order_by("-created_at")[:50]
+
+    # Labels (si ton modèle a KIND_CHOICES, on mappe)
+    kind_labels = {}
+    try:
+        kind_labels = {k: lbl for (k, lbl) in getattr(OrderEvidencePhoto, "KIND_CHOICES", [])}
+    except Exception:
+        kind_labels = {}
+
+    evidence_photos = []
+    kinds = []
+
+    for e in qs:
+        try:
+            url = e.image.url if getattr(e, "image", None) else ""
+        except Exception:
+            url = ""
+
+        k = getattr(e, "kind", "") or ""
+        evidence_photos.append({
+            "id": e.id,
+            "kind": k,
+            "kind_label": kind_labels.get(k, k),
+            "url": url,
+            "created_at": (getattr(e, "created_at", None).isoformat() if getattr(e, "created_at", None) else None),
+        })
+        kinds.append(k)
+
+    evidence_counts = dict(Counter(kinds))
+
+    return JsonResponse({
+        "ok": True,
+        "created": created,
+        "rejected": rejected,
+        "rejected_reasons": rejected_reasons,
+        "count_total": len(evidence_photos),
+        "evidence_photos": evidence_photos,
+        "evidence_counts": evidence_counts,
+        "last_added_ids": created_ids,
     })
 
 
@@ -814,8 +1134,10 @@ def ops_dashboard(request):
         highlight_order_id = None
 
     # ============================================================
-    #  Lot 4.9 — ALERTES (SLA) (filtrées si driver actif)
+    #  Lot 4.9 — ALERTES (SLA) + LITIGES PESÉE (filtrées si driver actif)
     # ============================================================
+
+    from .models import OrderWeighing, OrderEvidencePhoto
 
     SLA_PICKUP_H = 2        # pending -> pickup
     SLA_DROPOFF_H = 3       # pickup -> dropoff
@@ -823,7 +1145,90 @@ def ops_dashboard(request):
     SLA_RETURN_H = 3        # wash_done -> return
     SLA_DELIVERED_H = 6     # return -> delivered
 
-    alerts_orders = []
+    alerts_disputes = []   # 🧷 litiges / pesées contestées
+    alerts_sla = []        # 🚨 retards SLA
+
+    def _hours(dt_from, dt_to):
+        if not dt_from or not dt_to:
+            return None
+        return (dt_to - dt_from).total_seconds() / 3600.0
+
+    now = timezone.now()
+
+    # -----------------------------
+    # A) LITIGES : PESÉE CONTESTÉE
+    # -----------------------------
+    weigh_qs = (
+        OrderWeighing.objects
+        .select_related(
+            "order",
+            "order__customer",
+            "order__laundry_partner",
+            "order__delivery_partner",
+        )
+        .filter(status="disputed")
+        .order_by("-confirmed_at", "-updated_at", "-id")
+    )
+
+    if selected_driver_id:
+        weigh_qs = weigh_qs.filter(order__delivery_partner_id=selected_driver_id)
+
+    weigh_qs = weigh_qs[:200]
+
+    seen_order_ids = set()
+
+    for ow in weigh_qs:
+        o = ow.order
+        if not o:
+            continue
+
+        seen_order_ids.add(o.id)
+
+        latest_issue = (
+            OrderEvidencePhoto.objects
+            .filter(order=o, kind="issue")
+            .order_by("-created_at", "-id")
+            .first()
+        )
+
+        latest_scale = (
+            OrderEvidencePhoto.objects
+            .filter(order=o, kind__in=["weighing_scale", "issue"])
+            .order_by("-created_at", "-id")
+            .first()
+        )
+
+        has_scale_photo = bool(latest_scale and getattr(latest_scale, "image", None))
+        scale_photo_url = ""
+        if has_scale_photo:
+            try:
+                scale_photo_url = latest_scale.image.url
+            except Exception:
+                scale_photo_url = ""
+
+        issue_txt = ""
+        if latest_issue and getattr(latest_issue, "caption", ""):
+            issue_txt = str(latest_issue.caption).strip()
+
+        age_h = _hours(getattr(ow, "confirmed_at", None) or getattr(ow, "updated_at", None), now) or 0
+
+        reason = f"⚠️ Pesée contestée : poids retenu {ow.weight_kg} kg"
+        if issue_txt:
+            reason += f" — {issue_txt}"
+
+        alerts_disputes.append({
+            "order": o,
+            "reason": reason,
+            "age_h": round(age_h, 1),
+            "next_step": "weighing_disputed",
+              "resolve_url": reverse("orders:ops_weighing_resolve", args=[o.id]),
+            "has_scale_photo": has_scale_photo,
+            "scale_photo_url": scale_photo_url,
+        })
+
+    # -----------------------------
+    # B) ALERTES SLA (pending / in_progress)
+    # -----------------------------
     scan_qs = (
         Order.objects
         .select_related("customer", "laundry_partner", "delivery_partner")
@@ -835,54 +1240,55 @@ def ops_dashboard(request):
 
     scan_qs = scan_qs[:250]
 
-    def _hours(dt_from, dt_to):
-        if not dt_from or not dt_to:
-            return None
-        return (dt_to - dt_from).total_seconds() / 3600.0
-
     for o in scan_qs:
+        # si déjà litige pesée => pas de doublon
+        if o.id in seen_order_ids:
+            continue
+
         reason = None
         age_h = None
         next_step = None
 
         if o.status == "pending" and not o.pickup_time:
-            age_h = _hours(o.created_at, timezone.now()) or 0
+            age_h = _hours(o.created_at, now) or 0
             if age_h >= SLA_PICKUP_H:
                 reason = f"Collecte en retard (>{SLA_PICKUP_H}h)"
                 next_step = "pickup"
 
         if o.status == "in_progress":
             if o.pickup_time and not o.dropoff_time:
-                age_h = _hours(o.pickup_time, timezone.now()) or 0
+                age_h = _hours(o.pickup_time, now) or 0
                 if age_h >= SLA_DROPOFF_H:
                     reason = f"Dépôt blanchisserie en retard (>{SLA_DROPOFF_H}h après collecte)"
                     next_step = "dropoff"
 
             elif o.dropoff_time and not o.wash_complete_time:
-                age_h = _hours(o.dropoff_time, timezone.now()) or 0
+                age_h = _hours(o.dropoff_time, now) or 0
                 if age_h >= SLA_WASH_H:
                     reason = f"Lavage trop long (>{SLA_WASH_H}h après dépôt)"
                     next_step = "wash_done"
 
             elif o.wash_complete_time and not o.return_time:
-                age_h = _hours(o.wash_complete_time, timezone.now()) or 0
+                age_h = _hours(o.wash_complete_time, now) or 0
                 if age_h >= SLA_RETURN_H:
                     reason = f"Reprise livreur en retard (>{SLA_RETURN_H}h après lavage)"
                     next_step = "return"
 
             elif o.return_time and not o.delivered_time:
-                age_h = _hours(o.return_time, timezone.now()) or 0
+                age_h = _hours(o.return_time, now) or 0
                 if age_h >= SLA_DELIVERED_H:
                     reason = f"Livraison client en retard (>{SLA_DELIVERED_H}h après reprise)"
                     next_step = "delivered"
 
         if reason:
-            alerts_orders.append({
+            alerts_sla.append({
                 "order": o,
                 "reason": reason,
                 "age_h": round(age_h or 0, 1),
                 "next_step": next_step,
             })
+
+
 
     # Alertes drivers (offline > 10min) — global
     ACTIVE_MS = 10 * 60  # 10 minutes en secondes
@@ -932,8 +1338,16 @@ def ops_dashboard(request):
         "ops_reset_url": reset_url,
 
         # ALERTES
-        "alerts_orders": alerts_orders[:20],
-        "alerts_orders_count": len(alerts_orders),
+        "alerts_sla_orders": alerts_sla[:20],
+        "alerts_sla_count": len(alerts_sla),
+
+        "alerts_disputes_orders": alerts_disputes[:20],
+        "alerts_disputes_count": len(alerts_disputes),
+
+        # (optionnel) rétro-compat si tu veux garder l'ancien nom ailleurs
+        "alerts_orders": (alerts_disputes + alerts_sla)[:20],
+        "alerts_orders_count": (len(alerts_disputes) + len(alerts_sla)), 
+
         "drivers_offline": drivers_offline[:20],
         "drivers_offline_count": len(drivers_offline),
 
@@ -943,6 +1357,89 @@ def ops_dashboard(request):
         "displayed_total_count": displayed_total_count,
     }
     return render(request, "orders/ops_dashboard.html", context)
+
+
+@login_required
+def ops_weighing_resolve(request, order_id: int):
+    from decimal import Decimal
+    """
+    OPS — Trancher un litige de pesée (OrderWeighing.status = disputed)
+    - choisit un poids final (final_weight_kg)
+    - marque la pesée comme "resolved"
+    """
+    from django.contrib import messages
+    from django.shortcuts import get_object_or_404, redirect, render
+    from django.urls import reverse
+    from django.utils import timezone
+
+    from .models import Order, OrderWeighing, OrderEvidencePhoto
+
+    order = get_object_or_404(Order, pk=order_id)
+
+
+    ow, _ = OrderWeighing.objects.get_or_create(order=order)
+    # Garde-fou : page de résolution seulement pour les pesées "contestées"
+    if request.method != "POST" and ow.status != "disputed":
+        messages.info(request, "Aucun litige de pesée à trancher pour cette commande.")
+        return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}&focus=order")
+
+    # Evidence (dernier "issue" et dernier "weighing_scale" si dispo)
+    latest_issue = (OrderEvidencePhoto.objects
+                    .filter(order=order, kind="issue")
+                    .order_by("-created_at", "-id")
+                    .first())
+    latest_scale = (OrderEvidencePhoto.objects
+                    .filter(order=order, kind="weighing_scale")
+                    .order_by("-created_at", "-id")
+                    .first())
+
+    issue_url = ""
+    scale_url = ""
+    if latest_issue and getattr(latest_issue, "image", None):
+        try:
+            issue_url = latest_issue.image.url
+        except Exception:
+            issue_url = ""
+    if latest_scale and getattr(latest_scale, "image", None):
+        try:
+            scale_url = latest_scale.image.url
+        except Exception:
+            scale_url = ""
+
+    if request.method == "POST":
+        w_raw = (request.POST.get("final_weight_kg") or "").strip().replace(",", ".")
+        note = (request.POST.get("resolution_notes") or "").strip()
+
+        try:
+            w = Decimal(w_raw)
+        except Exception:
+            messages.error(request, "Poids final invalide.")
+            return redirect(reverse("orders:ops_weighing_resolve", args=[order.id]))
+
+        if w <= 0:
+            messages.error(request, "Le poids final doit être > 0.")
+            return redirect(reverse("orders:ops_weighing_resolve", args=[order.id]))
+
+        ow.final_weight_kg = w
+        ow.status = "resolved"
+        ow.resolved_by = getattr(request, "user", None)
+        ow.resolved_at = timezone.now()
+        ow.resolution_notes = note
+        ow.save(update_fields=["final_weight_kg", "status", "resolved_by", "resolved_at", "resolution_notes", "updated_at"])
+
+        messages.success(request, f"Litige pesée résolu : poids final retenu = {w} kg.")
+        return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}&focus=order")
+
+    ctx = {
+        "order": order,
+        "weighing": ow,
+        "issue_url": issue_url,
+        "scale_url": scale_url,
+        "latest_issue": latest_issue,
+        "latest_scale": latest_scale,
+    }
+    return render(request, "orders/ops_weighing_resolve.html", ctx)
+
 
 
 # ============================================================
@@ -1115,6 +1612,11 @@ def ops_update_step(request, order_id, action):
     """
     order = get_object_or_404(Order, pk=order_id)
 
+    # POST only (évite clic direct / appels GET)
+    if request.method != "POST":
+        messages.error(request, "Action refusée (méthode invalide).")
+        return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}")
+
     allowed = {"pickup", "dropoff", "wash_done", "return", "delivered"}
     if action not in allowed:
         messages.error(request, "Action OPS invalide.")
@@ -1138,15 +1640,17 @@ def ops_update_step(request, order_id, action):
     }
 
     # Déjà fait ?
-    if getattr(order, field_name, None):
+    already_done = bool(getattr(order, field_name, None))
+    if already_done and action != "wash_done":
         messages.warning(request, f"Déjà fait : {label}.")
         return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}")
-
     # Ordre des étapes
     missing = [f for f in prerequisites[action] if not getattr(order, f, None)]
     if missing:
         messages.error(request, "Impossible : étape précédente non validée.")
         return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}")
+
+    skip_pricing_guard = (action == "wash_done")
 
     # ------------------------------------------------------------
     # 1) 🔁 SYNC FINANCIER (DB doit être la source de vérité)
@@ -1185,28 +1689,28 @@ def ops_update_step(request, order_id, action):
 
     has_driver = bool(order.delivery_partner_id)
 
-    if not has_items:
+    if (not skip_pricing_guard) and (not has_items):
         messages.error(
             request,
             "Commande non chiffrée (aucun article / prestation). Ajoute au moins 1 prestation avant de valider l’OPS."
         )
         return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}")
 
-    if total_client <= 0:
+    if (not skip_pricing_guard) and (total_client <= 0):
         messages.error(
             request,
             "Commande non chiffrée (total client = 0). Ajoute au moins 1 prestation / recalcule les montants."
         )
         return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}")
 
-    if has_driver and delivery_fee <= 0:
+    if (not skip_pricing_guard) and has_driver and delivery_fee <= 0:
         messages.error(
             request,
             "Commande non chiffrée (livreur assigné mais frais de livraison = 0). Recalcule/ajuste la livraison."
         )
         return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}")
 
-    if (not has_driver) and delivery_fee > 0:
+    if (not skip_pricing_guard) and (not has_driver) and delivery_fee > 0:
         messages.error(
             request,
             "Commande incohérente (frais de livraison > 0 sans livreur). Assigne un livreur ou remets la livraison à 0."
@@ -1226,8 +1730,9 @@ def ops_update_step(request, order_id, action):
     # ------------------------------------------------------------
     # 4) ✅ VALIDER L’ÉTAPE
     # ------------------------------------------------------------
-    setattr(order, field_name, timezone.now())
-
+    # Ne pas écraser wash_complete_time si déjà renseigné (cas wash_done)
+    if (action != "wash_done") or (not already_done):
+        setattr(order, field_name, timezone.now())
     # Status + legs
     if action == "pickup":
         if order.status == "pending":
@@ -1236,39 +1741,78 @@ def ops_update_step(request, order_id, action):
         for leg in order.legs.filter(leg_type="pickup"):
             update_leg_status(leg, "start", user=request.user)
 
-        for leg in order.legs.filter(leg_type="return").exclude(status="done"):
-            if leg.status == "pending":
-                update_leg_status(leg, "accept", user=request.user)
-
     elif action == "dropoff":
         for leg in order.legs.filter(leg_type="pickup"):
             update_leg_status(leg, "finish", user=request.user)
 
-        for leg in order.legs.filter(leg_type="return").exclude(status="done"):
-            if leg.status == "pending":
-                update_leg_status(leg, "accept", user=request.user)
-
     elif action == "wash_done":
-        if order.delivery_partner:
-            for leg in order.legs.filter(
+        # OPS: wash_done => activer / réactiver la jambe return (pending), sans auto-start
+        try:
+            from orders.models import DeliveryLeg
+    
+            # 1) s’assurer qu’un return existe
+            DeliveryLeg.objects.get_or_create(
+                order=order,
                 leg_type="return",
-                status="pending",
-            ):
-                update_leg_status(leg, "accept", user=request.user)
+                defaults={
+                    "status": "pending",
+                    "driver": order.delivery_partner if getattr(order, "delivery_partner_id", None) else None,
+                },
+            )
+    
+            # 2) assigner driver si besoin
+            if getattr(order, "delivery_partner_id", None):
+                DeliveryLeg.objects.filter(order=order, leg_type="return", driver__isnull=True).update(driver=order.delivery_partner)
+    
+            # 3) protéger legs payés (si wallets dispo)
+            paid_leg_ids = set()
+            try:
+                from wallets.models import WalletTransaction
+                paid_leg_ids = set(
+                    WalletTransaction.objects.filter(
+                        order_id=order.id,
+                        wallet__owner_type="driver",
+                        type="payout",
+                        direction="in",
+                    )
+                    .exclude(leg_id__isnull=True)
+                    .values_list("leg_id", flat=True)
+                )
+            except Exception:
+                paid_leg_ids = set()
+    
+            # 4) forcer return => pending (sauf done, sauf payé)
+            qs = DeliveryLeg.objects.filter(order=order, leg_type="return").exclude(id__in=paid_leg_ids).exclude(status="done")
+            n = qs.update(status="pending")
+            logger.info("OPS wash_done: forced return pending n=%s order=%s", n, getattr(order, "id", None))
+        except Exception:
+            logger.exception("OPS wash_done failed order=%s", getattr(order, "id", None))
 
     elif action == "return":
         for leg in order.legs.filter(leg_type="return"):
             update_leg_status(leg, "start", user=request.user)
 
     elif action == "delivered":
-        order.status = "done"
-        for leg in order.legs.exclude(status="done"):
+        # 1) Tenter de finir toutes les jambes non terminées
+        for leg in order.legs.exclude(status__in=("done", "canceled")):
             update_leg_status(leg, "finish", user=request.user)
+
+        # 2) Statut commande: source de vérité = sync_order_status_from_legs (pickup+return)
+        try:
+            from orders.models import sync_order_status_from_legs
+            sync_order_status_from_legs(order, save=False)
+        except Exception:
+            # fallback safe: ne pas forcer DONE ici
+            if order.status == "pending":
+                order.status = "in_progress"
 
     update_fields = {field_name, "status", "updated_at"}
     order.save(update_fields=list(update_fields))
+    if action == "wash_done" and already_done:
+        messages.success(request, "✅ Return réactivé (pending).")
+    else:
+        messages.success(request, label)
 
-    messages.success(request, label)
     return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}")
 
 
@@ -4042,6 +4586,8 @@ def order_live_status(request, order_id: int):
 # + UI: total client + paiement (safe fallbacks)
 # -------------------------------------------------------------------
 
+@ensure_csrf_cookie
+@client_login_required
 def client_home(request):
     """
     Page Accueil Client:
@@ -4218,48 +4764,12 @@ def client_new_order(request):
 
             DeliveryLeg.objects.get_or_create(order=order, leg_type="pickup", defaults={"status":"pending"})
             DeliveryLeg.objects.get_or_create(order=order, leg_type="return", defaults={"status":"pending"})
-
-            # ----------------------------------------------------------------
-            # V1: crée au moins 1 ligne OrderItem (estimation au kg)
-            # ----------------------------------------------------------------
-            try:
-                from decimal import Decimal
-                from django.conf import settings
-
-                estimated_kg = (request.POST.get("estimated_kg") or "").strip()
-                try:
-                    qty = Decimal(estimated_kg) if estimated_kg else Decimal("5")
-                except Exception:
-                    qty = Decimal("5")
-
-                price_per_kg = getattr(settings, "FAGNI_DEFAULT_PRICE_PER_KG", 1500)
-                try:
-                    unit_price = Decimal(str(price_per_kg))
-                except Exception:
-                    unit_price = Decimal("1500")
-
-                # total ligne
-                line_total = (qty * unit_price)
-
-                # ⚠️ service: on met None si nullable; sinon on prendra un service par défaut (étape A)
-                OrderItem.objects.create(
-                    order=order,
-                    service=None,
-                    designation="Linge (estimation au kg)",
-                    quantity=qty,
-                    unit_price=unit_price,
-                    total=line_total,
-                )
-            except Exception:
-                # on ne bloque pas la commande si item échoue
-                pass
-
             try:
                 order.update_financials(save=True)
             except Exception:
                 pass
 
-            return redirect("orders:client_order_detail", order_id=order.id)
+            return redirect("orders:client_new_order_step2", order_id=order.id)
 
     return render(request, "orders/client_new_order.html", {
         "phone": phone,
@@ -4331,8 +4841,9 @@ def _client_order_timeline(order: Order) -> list:
 # Détail client ✅ FIX: sécurisation par phone, pas customer_id
 # -------------------------------------------------------------------
 
-@client_required
-def client_order_detail(request, order_id):
+@ensure_csrf_cookie
+@client_login_required
+def client_order_detail(request, order_id: int):
     """
     Détail côté client : statut + timeline + legs + paiement/montants.
     Sécurisé : seulement si la commande appartient au téléphone session.
@@ -4368,6 +4879,10 @@ def client_order_detail(request, order_id):
     timeline = _client_order_timeline(order)
 
     items = order.items.all().order_by("id")
+
+    items = order.items.all().order_by("id")
+
+
 
     return render(request, "orders/client_order_detail.html", {
         "phone": phone,
@@ -4784,7 +5299,6 @@ def order_invoice_pdf(request, order_id):
 
 
 from decimal import Decimal as _Decimal
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.shortcuts import redirect, render
 
@@ -5464,17 +5978,8 @@ def driver_order_timeline_action(request, order_id, action):
 
         # ✅ Déclencheur : linge prêt → assigne le 2e tronçon (prestataire → client)
         # On ne touche QUE les legs pending du même livreur assigné à la commande.
-        if action == "wash_done" and getattr(order, "delivery_partner_id", None):
-            try:
-                DeliveryLeg.objects.filter(
-                    order=order,
-                    driver=order.delivery_partner,
-                    leg_type__in=["delivery", "return"],  # legacy support
-                    status="pending",
-                ).update(status="assigned")
-            except Exception:
-                # On ne bloque jamais la timeline sur une erreur de synchro legs
-                pass
+        if action == "wash_done":
+            pass
 
     next_url = request.POST.get("next") or reverse(
         "orders:driver_order_detail",
@@ -5666,55 +6171,12 @@ def driver_performance(request, driver_id):
 
 @login_required
 def driver_wallet(request):
-    """
-    Dashboard du wallet livreur :
-    - solde actuel
-    - total gagné ce mois-ci (entrées)
-    - dernières transactions
-    """
-
-    user = request.user
-
-    # 1) Retrouver le livreur lié à l'utilisateur
-    # Ici on part sur le mapping par email (le plus simple & propre)
-    driver = DeliveryPartner.objects.filter(email=user.email).first()
-
-    if not driver:
-        messages.error(
-            request,
-            "Aucun profil livreur n'est lié à ce compte (email). "
-            "Merci de vérifier l'adresse e-mail du livreur."
-        )
-        return redirect("orders:driver_app")
-
-    # 2) Récupérer / créer le wallet du livreur
-    wallet = get_or_create_wallet_for_delivery_partner(driver)
-
-    # 3) Transactions récentes
-    tx_qs = wallet.transactions.all().order_by("-created_at")[:50]
-
-    # 4) Total gagné ce mois-ci (entrées)
-    month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-    month_in_qs = wallet.transactions.filter(
-        created_at__gte=month_start,
-        direction="in",
-    )
-    month_earnings = (
-        month_in_qs.aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
-    )
-
-    context = {
-        "driver": driver,
-        "wallet": wallet,
-        "transactions": tx_qs,
-        "month_earnings": month_earnings,
-        "month_start": month_start,
-    }
-
-    return render(request, "orders/driver_wallet.html", context)
-
-
+    """LEGACY: redirige vers le nouveau wallet livreur (app wallets)."""
+    driver_id = (request.GET.get("driver_id") or "").strip()
+    url = "/wallets/driver/wallet/"
+    if driver_id:
+        url = f"{url}?driver_id={driver_id}"
+    return redirect(url)
 def _get_connected_driver(request, order=None):
     """
     Résout le livreur "connecté" (profil DeliveryPartner) de façon robuste.
@@ -5806,7 +6268,21 @@ def normalize_order_legs(order, driver=None):
                 .exclude(driver=assigned)
                 .exclude(status__in=["done", "canceled"])
             )
-            other_active.update(status="canceled")
+            # 🔒 Ne jamais annuler un leg déjà payé (payout existe)
+            try:
+                from wallets.models import WalletTransaction
+                paid_leg_ids = set(
+                    WalletTransaction.objects.filter(
+                        order_id=order.id,
+                        wallet__owner_type="driver",
+                        type="payout",
+                        direction="in",
+                    ).exclude(leg_id__isnull=True).values_list("leg_id", flat=True)
+                )
+            except Exception:
+                paid_leg_ids = set()
+
+            other_active.exclude(id__in=paid_leg_ids).update(status="canceled")
 
         # 2) Pour le driver cible : garder 1 pickup + 1 return actifs (le plus récent)
         if target_driver:
@@ -5820,24 +6296,36 @@ def normalize_order_legs(order, driver=None):
                 )
                 keep = qs.first()
                 if keep:
-                    qs.exclude(id=keep.id).update(status="canceled")
+                    qs_to_cancel = qs.exclude(id=keep.id)
 
-            # 3) Sync statut return selon wash_complete_time (sur le return actif)
-            wash_ready = bool(getattr(order, "wash_complete_time", None))
-            qs_return = (
-                DeliveryLeg.objects
-                .select_for_update()
-                .filter(order=order, driver=target_driver, leg_type="return")
-                .exclude(status__in=["done", "canceled"])
-            )
+                    # 🔒 Ne jamais annuler un leg déjà payé
+                    try:
+                        from wallets.models import WalletTransaction
+                        paid_leg_ids = set(
+                            WalletTransaction.objects.filter(
+                                order_id=order.id,
+                                wallet__owner_type="driver",
+                                type="payout",
+                                direction="in",
+                            ).exclude(leg_id__isnull=True).values_list("leg_id", flat=True)
+                        )
+                    except Exception:
+                        paid_leg_ids = set()
 
-            if wash_ready:
-                # ✅ upgrade only
-                qs_return.filter(status="pending").update(status="assigned")
-            else:
-                # ✅ ne JAMAIS rétrograder (sinon ça casse les tests + l’état réel côté livreur)
-                # (on bloque juste l'auto-upgrade tant que wash_complete_time est NULL)
-                pass
+                    qs_to_cancel.exclude(id__in=paid_leg_ids).update(status="canceled")
+
+        # 3) Sync statut return selon wash_complete_time (sur le return actif)
+        wash_ready = bool(getattr(order, "wash_complete_time", None))
+        qs_return = (
+            DeliveryLeg.objects
+            .select_for_update()
+            .filter(order=order, driver=target_driver, leg_type="return")
+            .exclude(status__in=["done", "canceled"])
+        )
+        # ✅ IMPORTANT : on n'auto-upgrade plus le return.
+        # Le return reste 'pending' tant que le livreur n'a pas "accept".
+        # (Le blocage métier wash_complete_time est déjà géré dans update_leg_status.)
+        pass
 
 
 def ensure_default_driver_legs(order, driver):
@@ -5895,8 +6383,8 @@ def ensure_default_driver_legs(order, driver):
         base_return = "done"
     elif getattr(order, "status", None) == "in_progress":
         base_pickup = "assigned"
-        # return ne peut être assigned que si linge prêt
-        base_return = "assigned" if getattr(order, "wash_complete_time", None) else "pending"
+        # 🔒 IMPORTANT : return reste toujours pending jusqu'au "accept" du livreur
+        base_return = "pending"
     else:
         base_pickup = "pending"
         base_return = "pending"
@@ -5960,10 +6448,9 @@ def ensure_default_driver_legs(order, driver):
         wash_ready = bool(getattr(order, "wash_complete_time", None))
         r = qs.filter(leg_type="return").exclude(status__in=["done", "canceled"]).order_by("-id").first()
         if r:
-            if wash_ready and r.status == "pending":
-                DeliveryLeg.objects.filter(pk=r.pk).update(status="assigned")
-            elif (not wash_ready) and r.status in {"assigned", "in_progress"}:
-                DeliveryLeg.objects.filter(pk=r.pk).update(status="pending")
+            # ✅ IMPORTANT : pas d'auto-upgrade du return.
+            # Il reste pending jusqu'au "accept" du livreur.
+            pass
         qs = DeliveryLeg.objects.filter(order=order, driver=driver).exclude(status="canceled").order_by("id")
     except Exception:
         pass
@@ -6058,6 +6545,60 @@ def driver_order_detail(request, order_id):
             normalize_order_legs(order, driver=driver)
         except Exception:
             pass
+
+        # ==========================================
+        # DRIVER_LEG_POST_JSON_V1 (AJAX actions)
+        # ==========================================
+        if request.method == "POST":
+            leg_type = (request.POST.get("leg") or "").strip()
+            action = (request.POST.get("action") or "").strip()
+
+            # Détection AJAX (le JS envoie X-Requested-With + Accept: application/json)
+            try:
+                is_ajax_req = is_ajax(request)
+            except Exception:
+                acc = (request.headers.get("Accept") or "").lower()
+                is_ajax_req = (request.headers.get("X-Requested-With") == "XMLHttpRequest") or ("application/json" in acc)
+
+            if not leg_type or not action:
+                if is_ajax_req:
+                    from django.http import JsonResponse
+                    return JsonResponse({"ok": False, "error": "Paramètres manquants (leg/action)."}, status=400)
+
+            # Sécurité : il faut un driver résolu (non legacy)
+            if driver is None:
+                if is_ajax_req:
+                    from django.http import JsonResponse
+                    return JsonResponse({"ok": False, "error": "Accès refusé : driver introuvable."}, status=403)
+
+            # Charger la jambe concernée
+            leg = (
+                DeliveryLeg.objects
+                .filter(order=order, driver=driver, leg_type=leg_type)
+                .exclude(status="canceled")
+                .order_by("id")
+                .first()
+            )
+
+            if not leg:
+                if is_ajax_req:
+                    from django.http import JsonResponse
+                    return JsonResponse({"ok": False, "error": f"Leg introuvable: {leg_type}."}, status=404)
+
+            changed, msg = update_leg_status(leg, action, user=request.user)
+
+            if is_ajax_req:
+                from django.http import JsonResponse
+                return JsonResponse(
+                    {
+                        "ok": bool(changed),
+                        "message": msg or ("OK" if changed else "Aucune modification"),
+                        "leg_type": leg_type,
+                        "action": action,
+                        "new_status": getattr(leg, "status", None),
+                    },
+                    status=(200 if changed else 400),
+                )
 
         # 1) On charge les legs (pour le driver de la vue)
         driver_legs_qs = DeliveryLeg.objects.filter(order=order, driver=driver).exclude(status="canceled").order_by("id")
@@ -8432,7 +8973,8 @@ def ensure_delivery_legs_for_order(order):
 
         if wash_ready:
             # pending -> assigned
-            qs_return.filter(status="pending").update(status="assigned")
+            # 🔒 auto-upgrade désactivé: le livreur doit "accept"
+            pass
         else:
             # assigned/in_progress -> pending (linge pas prêt)
             qs_return.filter(status__in=["assigned", "in_progress"]).update(status="pending")
@@ -8591,8 +9133,46 @@ def update_leg_status(leg, action, user=None):
     if getattr(leg, "leg_type", None) == "return":
         if getattr(leg, "status", None) not in {"done", "canceled"}:
             if not getattr(getattr(leg, "order", None), "wash_complete_time", None):
-                if action in {"accept", "start", "finish"}:
-                    return False, "Retour impossible : linge pas prêt (wash_complete_time manquant)."
+                if action in {"start", "finish"}:
+                    return False, "Retour impossible : le linge n\'est pas encore prêt."
+    # 🔒 Verrouillage transitions LIVREUR :
+    #    pickup doit être DONE avant d'autoriser le RETURN (accept/start/finish)
+    try:
+        from orders.models import DeliveryLeg
+
+        order = getattr(leg, "order", None)
+        driver = getattr(leg, "driver", None)
+
+        pickup_leg = (
+            DeliveryLeg.objects
+            .filter(order=order, driver=driver, leg_type="pickup")
+            .exclude(status="canceled")
+            .order_by("-id")
+            .first()
+        )
+
+        return_leg = (
+            DeliveryLeg.objects
+            .filter(order=order, driver=driver, leg_type="return")
+            .exclude(status="canceled")
+            .order_by("-id")
+            .first()
+        )
+
+        pickup_done = bool(pickup_leg and pickup_leg.status == "done")
+        return_started = bool(return_leg and return_leg.status in {"assigned", "in_progress", "done"})
+
+        # 1) Interdire toute avancée du RETURN si le PICKUP n'est pas terminé
+        if getattr(leg, "leg_type", None) == "return":
+            if action in {"accept", "start", "finish"} and not pickup_done:
+                return False, "Impossible : le pickup doit être terminé avant le retour."
+
+        # 2) Interdire d'annuler le pickup si le return a déjà démarré/terminé
+        if getattr(leg, "leg_type", None) == "pickup":
+            if action == "cancel" and return_started:
+                return False, "Annulation pickup impossible : le retour a déjà démarré."
+    except Exception:
+        pass
 
     # 🔒 Normalisation anti-doublons avant transition
     try:
@@ -8603,43 +9183,84 @@ def update_leg_status(leg, action, user=None):
     if action == "accept":
         if leg.status == "pending":
             leg.status = "assigned"
+        elif leg.status == "assigned":
+            return True, "Mission déjà acceptée."
 
     elif action == "start":
-        if leg.status in {"pending", "assigned"}:
+        # 🔒 Le livreur doit d’abord ACCEPT (pending → assigned)
+        if leg.status == "assigned":
             leg.status = "in_progress"
             if not getattr(leg, "started_at", None):
                 leg.started_at = timezone.now()
+        elif leg.status == "in_progress":
+            return True, "Mission déjà démarrée."
+        elif leg.status == "pending":
+            return False, "Vous devez d'abord accepter la mission."
 
     elif action == "finish":
+        if leg.status == "done":
+            return True, "Mission déjà terminée."
         if leg.status in {"assigned", "in_progress"}:
+            # 🔒 Verrou logique : on ne finit pas un pickup si un return est déjà actif
+            if getattr(leg, "leg_type", None) == "pickup":
+                try:
+                    r = (
+                        DeliveryLeg.objects
+                        .filter(order=getattr(leg, "order", None), leg_type="return")
+                        .exclude(status__in=("canceled", "pending"))
+                        .exists()
+                    )
+                except Exception:
+                    r = False
+                if r:
+                    return False, "Impossible : le retour est déjà actif, terminez la séquence proprement."
+
             leg.status = "done"
             if not getattr(leg, "finished_at", None):
                 leg.finished_at = timezone.now()
 
     elif action == "cancel":
-      # 🔒 Verrouillage backend: si payout existe, on interdit toute annulation (même staff)
-      try:
-          from wallets.models import WalletTransaction
-          has_payout = WalletTransaction.objects.filter(
-              order_id=getattr(leg, "order_id", None),
-              leg_id=getattr(leg, "id", None),
-              wallet__owner_type="driver",
-              type="payout",
-              direction="in",
-          ).exists()
-      except Exception:
-          has_payout = False
+        # ✅ Idempotent: si déjà annulé, on valide sans erreur
+        if leg.status == "canceled":
+            return True, "Mission déjà annulée."
 
-      if has_payout:
-          return False, "Annulation impossible : payout livreur déjà effectué."
+        # 🔒 Verrouillage backend: si payout existe, on interdit toute annulation (même staff)
+        try:
+            from wallets.models import WalletTransaction
+            has_payout = WalletTransaction.objects.filter(
+                order_id=getattr(leg, "order_id", None),
+                leg_id=getattr(leg, "id", None),
+                wallet__owner_type="driver",
+                type="payout",
+                direction="in",
+            ).exists()
+        except Exception:
+            has_payout = False
 
-      # ✅ Autoriser annulation si done NON payé, mais uniquement staff
-      if leg.status == "done":
-          if not user or not getattr(user, "is_staff", False):
-            return False, "Annulation impossible : leg déjà terminé (réservé au staff)."
+        if has_payout:
+            return False, "Annulation impossible : payout livreur déjà effectué."
 
-      if leg.status != "canceled":
-          leg.status = "canceled"
+        # ✅ Autoriser annulation si done NON payé, mais uniquement staff
+        if leg.status == "done":
+            if not user or not getattr(user, "is_staff", False):
+                return False, "Annulation impossible : leg déjà terminé (réservé au staff)."
+
+        if leg.status != "canceled":
+            leg.status = "canceled"
+            # ✅ Cohérence: une annulation ne doit pas garder des timestamps de progression
+            if hasattr(leg, "started_at"):
+                leg.started_at = None
+            if hasattr(leg, "finished_at"):
+                leg.finished_at = None
+
+            # ✅ Neutraliser montants côté view (sécurité + cohérence immédiate UI)
+            try:
+                from decimal import Decimal
+                leg.client_fee_share = Decimal("0")
+                leg.driver_amount = Decimal("0")
+                leg.fagni_margin = Decimal("0")
+            except Exception:
+                pass
     else:
         return False, "Action inconnue"
 
@@ -8647,12 +9268,33 @@ def update_leg_status(leg, action, user=None):
         return False, f"Aucune transition valide depuis le statut '{old_status}'"
 
     update_fields = ["status"]
+    # ✅ Si annulation: persister aussi la neutralisation des montants
+    if leg.status == "canceled":
+        if hasattr(leg, "client_fee_share"):
+            update_fields.append("client_fee_share")
+        if hasattr(leg, "driver_amount"):
+            update_fields.append("driver_amount")
+        if hasattr(leg, "fagni_margin"):
+            update_fields.append("fagni_margin")
     if hasattr(leg, "started_at"):
         update_fields.append("started_at")
     if hasattr(leg, "finished_at"):
         update_fields.append("finished_at")
 
-    leg.save(update_fields=update_fields)
+    # ✅ Sauvegarde leg
+    try:
+        # évite doublons dans update_fields
+        update_fields = list(dict.fromkeys(update_fields))
+        leg.save(update_fields=update_fields)
+    except Exception:
+        # fallback safe
+        try:
+            leg.save()
+        except Exception:
+            pass
+
+
+
 
     # ✅ Auto-sync après transition
     try:
@@ -8667,71 +9309,6 @@ def update_leg_status(leg, action, user=None):
                     order.wash_complete_time = leg.finished_at or timezone.now()
                     order.save(update_fields=["wash_complete_time"])
 
-            # 2) Payout + reconcile UNIQUEMENT si commande payée (évite paiements fantômes)
-            try:
-                if leg.status == "done":
-                    if getattr(order, "payment_status", "unpaid") == "paid":
-                        trigger_driver_payout_for_leg(leg)
-
-                        # ✅ RECONCILE: si payouts existants != driver_amount => adjustment correctif
-                        from decimal import Decimal
-                        from django.db.models import Sum
-                        from wallets.models import WalletTransaction
-                        from wallets.services import (
-                            credit_wallet,
-                            debit_wallet,
-                            get_or_create_wallet_for_delivery_partner,
-                        )
-
-                        target = Decimal(str(leg.driver_amount or 0))
-
-                        paid_in = (
-                            WalletTransaction.objects.filter(leg=leg, type="payout", direction="in")
-                            .aggregate(s=Sum("amount"))["s"]
-                            or Decimal("0")
-                        )
-                        adj_in = (
-                            WalletTransaction.objects.filter(leg=leg, type="adjustment", direction="in")
-                            .aggregate(s=Sum("amount"))["s"]
-                            or Decimal("0")
-                        )
-                        adj_out = (
-                            WalletTransaction.objects.filter(leg=leg, type="adjustment", direction="out")
-                            .aggregate(s=Sum("amount"))["s"]
-                            or Decimal("0")
-                        )
-
-                        net = Decimal(str(paid_in)) + Decimal(str(adj_in)) - Decimal(str(adj_out))
-                        diff = target - net
-
-                        if diff != 0:
-                            wallet = get_or_create_wallet_for_delivery_partner(leg.driver)
-                            if diff > 0:
-                                credit_wallet(
-                                    wallet,
-                                    diff,
-                                    description=f"Correction payout leg #{leg.id} (diff +)",
-                                    order=order,
-                                    leg=leg,
-                                    tx_type="adjustment",
-                                )
-                            else:
-                                debit_wallet(
-                                    wallet,
-                                    -diff,
-                                    description=f"Correction payout leg #{leg.id} (diff -)",
-                                    order=order,
-                                    leg=leg,
-                                    tx_type="adjustment",
-                                )
-            except Exception as e:
-                import logging
-                logging.getLogger(__name__).exception(
-                    "Driver payout failed for leg #%s: %s",
-                    getattr(leg, "id", None),
-                    e,
-                )
-
     except Exception:
         pass
 
@@ -8743,8 +9320,6 @@ def update_leg_status(leg, action, user=None):
 
     return True, f"Statut mis à jour : {old_status} → {leg.status}"
 
-
-from orders.service_layer.payouts import trigger_driver_payout_for_leg
 
 
 
@@ -8781,8 +9356,92 @@ def driver_leg_action(request, leg_id, action):
         messages.error(request, "Action inconnue.")
         return _redirect_back(request, "orders:driver_order_detail", order_id=order.id)
 
-    # ⚙️ Transition + auto-payout (gérée dans update_leg_status)
-    changed, msg = update_leg_status(leg=leg, action=action, user=request.user)
+    # 🔒 Verrouillage transitions : pickup → return → done
+    # Règles:
+    # - Retour (return) interdit tant que pickup n'est pas DONE
+    # - Retour (return) interdit tant que linge pas "Prêt" (wash_complete_time)
+    # - Une mission canceled ne peut pas être relancée via l'app livreur
+    try:
+        # Si commande déjà terminée : aucune action
+        if getattr(order, "status", None) == "done":
+            messages.info(request, "Commande déjà terminée.")
+            return _redirect_back(request, "orders:driver_order_detail", order_id=order.id)
+
+        # Si la jambe est annulée, on bloque accept/start/finish (freeze côté model)
+        if (leg.status or "").strip() in ("canceled", "cancelled") and action in {"accept", "start", "finish"}:
+            messages.error(request, "Cette mission est annulée.")
+            return _redirect_back(request, "orders:driver_order_detail", order_id=order.id)
+
+        # Verrou sur RETURN
+        if (leg.leg_type or "").strip() == "return" and action in {"accept", "start", "finish"}:
+            if not getattr(order, "wash_complete_time", None):
+                messages.error(request, "Retour impossible : linge pas encore marqué prêt par la blanchisserie.")
+                return _redirect_back(request, "orders:driver_order_detail", order_id=order.id)
+
+            pickup_done = DeliveryLeg.objects.filter(
+                order=order,
+                leg_type="pickup",
+                status="done",
+            ).exists()
+            if not pickup_done:
+                messages.error(request, "Retour impossible : la collecte (pickup) n'est pas terminée.")
+                return _redirect_back(request, "orders:driver_order_detail", order_id=order.id)
+
+    except Exception:
+        logger.exception("driver_leg_action: transition guard failed (leg_id=%s action=%s)", leg_id, action)
+
+    # ⚙️ Transition (payout géré par orders/signals.py)
+    try:
+        # 📸 Verrou métier: FINISH interdit sans preuve photo
+        # Règle:
+        # - preuve liée au leg (idéal) OU fallback preuve au niveau commande (leg=None)
+        # - on refuse 'issue' (litige) comme preuve de finish
+        if action == "finish" and (leg.status or "").strip() != "done":
+            try:
+                from orders.models import OrderEvidencePhoto
+                qs = OrderEvidencePhoto.objects.filter(order=order, actor_type="driver").exclude(kind="issue")
+                has_leg_proof = qs.filter(leg=leg).exists()
+                has_order_proof = qs.filter(leg__isnull=True).exists()
+
+                if not (has_leg_proof or has_order_proof):
+                    from django.contrib import messages
+                    messages.error(request, "Impossible de terminer : ajoute au moins une photo preuve (non-litige) avant de valider.")
+
+                    from django.urls import reverse
+                    from urllib.parse import quote
+
+                    back_src = (request.POST.get("back") or request.GET.get("back") or "")
+                    back = quote((back_src or ""), safe="")
+                    url = reverse("orders:driver_weighing", kwargs={"order_id": order.id})
+
+                    full_url = f"{url}?leg_id={leg.id}&back={back}"
+
+                    # Si submit via fetch/AJAX, renvoyer JSON pour que le front navigue
+                    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                        try:
+                            from django.http import JsonResponse
+                            return JsonResponse({"ok": False, "redirect_url": full_url, "message": "Preuve photo requise avant de terminer."}, status=409)
+                        except Exception:
+                            pass
+
+                    full_url = f"{url}?leg_id={leg.id}&back={back}"
+                    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                        try:
+                            from django.http import JsonResponse
+                            return JsonResponse({"ok": False, "redirect_url": full_url, "message": "Preuve photo requise avant de terminer."}, status=409)
+                        except Exception:
+                            pass
+                    return redirect(full_url)
+            except Exception:
+                # permissif si modèle/migration pas dispo (évite de casser)
+                pass
+
+        changed, msg = update_leg_status(leg=leg, action=action, user=request.user)
+    except Exception:
+        logger.exception("driver_leg_action: update_leg_status failed (leg_id=%s action=%s)", leg_id, action)
+        messages.error(request, "Erreur interne : action impossible pour le moment.")
+        return _redirect_back(request, "orders:driver_order_detail", order_id=order.id)
+
     from django.contrib import messages
     if changed:
         messages.success(request, msg)
@@ -9318,3 +9977,1071 @@ def driver_map_data(request):
 
     return JsonResponse({"drivers": drivers})
 
+
+# ============================================================
+#  WEIGHING (driver / laundry)
+# ============================================================
+
+
+def _can_driver_touch_order(request, order):
+    """
+    Sécurité MVP:
+    - Autorise staff/superuser
+    - Autorise le livreur assigné (order.delivery_partner_id) si comparable à request.user.id
+    """
+    u = getattr(request, "user", None)
+    if not u or not getattr(u, "is_authenticated", False):
+        return False
+
+    if getattr(u, "is_superuser", False) or getattr(u, "is_staff", False):
+        return True
+
+    order_driver_id = getattr(order, "delivery_partner_id", None)
+    user_id = getattr(u, "id", None)
+
+    if order_driver_id and user_id:
+        try:
+            if int(order_driver_id) == int(user_id):
+                return True
+        except Exception:
+            pass
+
+    dp_id = getattr(u, "delivery_partner_id", None) or getattr(u, "driver_id", None)
+    if order_driver_id and dp_id:
+        try:
+            if int(order_driver_id) == int(dp_id):
+                return True
+        except Exception:
+            pass
+
+    return False
+
+
+def _sanitize_evidence_kind(kind, OrderEvidencePhoto):
+    allowed = {k for (k, _lbl) in getattr(OrderEvidencePhoto, "KIND_CHOICES", [])}
+    kind = (kind or "").strip() or "pickup_items"
+    return kind if kind in allowed else "pickup_items"
+
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def driver_weighing(request, order_id):
+    """
+    Page de pesée côté livreur.
+    - Enregistre OrderWeighing.weight_kg + scale_photo + notes
+    - Ajoute une preuve photo (OrderEvidencePhoto) si scale_photo uploadée
+    Template: orders/driver_weighing.html
+    """
+    from decimal import Decimal
+    from .models import OrderWeighing, OrderEvidencePhoto
+
+    order = get_object_or_404(Order, pk=order_id)
+
+    # 🔐 Sécurité: seul le livreur assigné (ou staff) peut accéder
+
+    if not _can_driver_touch_order(request, order):
+
+        try:
+
+            messages.warning(request, "Accès refusé (commande non assignée).")
+
+        except Exception:
+
+            pass
+
+        return redirect("orders:driver_hub")
+
+    ow, _created = OrderWeighing.objects.get_or_create(order=order)
+
+    # Si déjà confirmé, on bloque l'édition côté livreur
+    is_locked = (ow.status == "confirmed")
+    if is_locked:
+        messages.info(request, "Pesée déjà confirmée par la blanchisserie (lecture seule).")
+
+    if request.method == "POST":
+        if is_locked:
+            messages.warning(request, "Pesée confirmée : modification désactivée.")
+            return redirect("orders:driver_weighing", order_id=order.id)
+
+        raw_weight = (request.POST.get("weight_kg") or "").strip()
+        notes = (request.POST.get("notes") or "").strip()
+        scale_photo = request.FILES.get("scale_photo")
+
+        weight = None
+        if raw_weight:
+            try:
+                weight = Decimal(raw_weight.replace(" ", "").replace(",", "."))
+            except Exception:
+                weight = None
+
+        if weight is None:
+            messages.warning(request, "Poids invalide. Exemple attendu : 3.50")
+            return redirect("orders:driver_weighing", order_id=order.id)
+
+        # Update weighing
+        ow.weight_kg = weight
+        if notes:
+            ow.notes = notes
+        if scale_photo:
+            ow.scale_photo = scale_photo
+
+        ow.entered_by_type = "driver"
+        ow.entered_by_id = getattr(request.user, "id", None)
+        ow.status = "draft"
+        ow.save()
+
+        # Evidence scale photo
+        if scale_photo:
+            OrderEvidencePhoto.objects.create(
+                order=order,
+                leg=leg_obj,
+                actor_type="driver",
+                actor_id=getattr(request.user, "id", None),
+                kind="weighing_scale",
+                image=scale_photo,
+                caption="Photo balance (pesée) – livreur",
+            )
+
+        messages.success(request, "Pesée livreur enregistrée.")
+        return redirect("orders:driver_weighing", order_id=order.id)
+
+    evidence = OrderEvidencePhoto.objects.filter(order=order).order_by("-created_at")[:50]
+
+    latest_issue = (
+        OrderEvidencePhoto.objects
+        .filter(order=order, kind="issue")
+        .order_by("-created_at")
+        .first()
+    )
+
+    return render(
+        request,
+        "orders/driver_weighing.html",
+        {
+            "order": order,
+            "weighing": ow,
+            "evidence": evidence,
+            "driver_id": getattr(request.user, "id", None),
+            "is_locked": is_locked,
+            "latest_issue": latest_issue,
+        },
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def driver_evidence_upload(request, order_id):
+    """
+    Upload preuve(s) photo côté livreur.
+
+    Attendus:
+    - files: image (single) OU images (multiple)
+    - kind: une valeur de OrderEvidencePhoto.KIND_CHOICES (default pickup_items)
+    - caption: texte optionnel
+    - leg_id: optionnel (lier la preuve à une mission pickup/dropoff/return)
+    - back: optionnel (redirige si URL sûre)
+    """
+    from .models import OrderEvidencePhoto
+    from .models import DeliveryLeg
+
+    order = get_object_or_404(Order, pk=order_id)
+
+    # 🔐 Sécurité: seul le livreur assigné (ou staff) peut uploader
+    if not _can_driver_touch_order(request, order):
+        try:
+            messages.warning(request, "Accès refusé (commande non assignée).")
+        except Exception:
+            pass
+        return redirect("orders:driver_hub")
+
+    kind = _sanitize_evidence_kind(request.POST.get("kind"), OrderEvidencePhoto)
+    caption = (request.POST.get("caption") or "").strip()
+
+    # Optionnel: lier la preuve à un leg (pickup/dropoff/return)
+    leg_obj = None
+    raw_leg_id = (request.POST.get("leg_id") or "").strip()
+    if raw_leg_id.isdigit():
+        try:
+            leg_obj = DeliveryLeg.objects.filter(pk=int(raw_leg_id), order=order).first()
+        except Exception:
+            leg_obj = None
+    files = []
+    if "images" in request.FILES:
+        files = request.FILES.getlist("images")
+    elif "image" in request.FILES:
+        f = request.FILES.get("image")
+        if f:
+            files = [f]
+
+    if not files:
+        messages.warning(request, "Aucune photo reçue.")
+        return redirect("orders:driver_weighing", order_id=order.id)
+
+    for f in files:
+        OrderEvidencePhoto.objects.create(
+            order=order,
+            leg=leg_obj,  # ✅ on lie au leg si fourni
+            actor_type="driver",
+            actor_id=getattr(request.user, "id", None),
+            kind=kind,
+            image=f,
+            caption=caption,
+        )
+
+    messages.success(request, f"{len(files)} photo(s) ajoutée(s).")
+
+    # ↩️ Redirect back si sûr, sinon fallback
+    back = (request.GET.get("back") or request.POST.get("back") or "").strip()
+    if back and url_has_allowed_host_and_scheme(back, allowed_hosts={request.get_host()}):
+        return redirect(back)
+
+    return redirect("orders:driver_weighing", order_id=order.id)
+
+def _safe_decimal(v, default="0"):
+    try:
+        if v is None:
+            return Decimal(default)
+        return Decimal(str(v))
+    except (InvalidOperation, ValueError, TypeError):
+        return Decimal(default)
+
+
+def _item_unit_price_fcfa(item) -> Decimal:
+    """
+    Essaye de trouver un prix unitaire (FCFA) sur l'item.
+    On teste plusieurs champs possibles pour être robuste.
+    """
+    for attr in ("unit_price", "price", "unit_price_fcfa", "price_fcfa", "amount_fcfa", "unit_amount"):
+        if hasattr(item, attr):
+            val = getattr(item, attr)
+            d = _safe_decimal(val, default="0")
+            if d >= 0:
+                return d
+    return Decimal("0")
+
+
+def _resolve_laundry_for_user(request):
+    """
+    Même logique que laundry_app:
+    - non-staff: déduction via email/username
+    - staff: ?laundry_id=XX
+    """
+    laundry = None
+    error = None
+
+    if not getattr(request.user, "is_staff", False):
+        user_email = (getattr(request.user, "email", "") or "").strip().lower()
+        user_name = (getattr(request.user, "username", "") or "").strip().lower()
+
+        q = LaundryPartner.objects.all()
+        if user_email:
+            laundry = q.filter(email__iexact=user_email).first()
+        if laundry is None and user_name:
+            laundry = q.filter(email__iexact=user_name).first() or q.filter(name__iexact=user_name).first()
+
+        if laundry is None:
+            error = "Aucune blanchisserie liée à ce compte. Contacte l’admin pour associer ton compte à une blanchisserie."
+    else:
+        laundry_id = (request.GET.get("laundry_id") or "").strip()
+        if not laundry_id:
+            error = "laundry_id manquant. Exemple: /orders/laundry/app/?laundry_id=1"
+        else:
+            try:
+                lid = int(laundry_id)
+                laundry = LaundryPartner.objects.filter(id=lid).first()
+                if not laundry:
+                    error = "Blanchisserie introuvable (laundry_id invalide)."
+            except Exception:
+                error = "laundry_id invalide (doit être un entier)."
+
+    return laundry, error
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def laundry_weighing(request, order_id):
+    """
+    ✅ MVP V1 (prix par article) — Détails commande côté blanchisserie.
+    - Zéro infos client
+    - Actions: note interne, démarrer lavage, marquer prêt
+    (On garde le nom/URL 'weighing' pour compat sans casser les liens.)
+    """
+    laundry, error = _resolve_laundry_for_user(request)
+
+    # Si pas de laundry, on affiche une page propre
+    if not laundry:
+        return render(request, "orders/laundry_order_detail.html", {
+            "laundry": None,
+            "order": None,
+            "items": [],
+            "totals": {"total_fcfa": 0},
+            "error": error,
+            "laundry_id": (request.GET.get("laundry_id") or "").strip(),
+            "evidence": [],
+        })
+
+    order = get_object_or_404(Order, id=order_id)
+
+    # Sécurité: la commande doit appartenir à cette blanchisserie
+    if getattr(order, "laundry_partner_id", None) != laundry.id:
+        return render(request, "orders/laundry_order_detail.html", {
+            "laundry": laundry,
+            "order": None,
+            "items": [],
+            "totals": {"total_fcfa": 0},
+            "error": "Accès refusé : cette commande n’est pas attribuée à ta blanchisserie.",
+            "laundry_id": str(laundry.id),
+            "evidence": [],
+        })
+
+    # Items
+    items_qs = order.items.all().order_by("id") if hasattr(order, "items") else []
+    items = []
+    total = Decimal("0")
+
+    for it in items_qs:
+        qty = getattr(it, "quantity", 1) or 1
+        try:
+            qty = int(qty)
+        except Exception:
+            qty = 1
+
+        unit = _item_unit_price_fcfa(it)
+        line_total = unit * Decimal(qty)
+        total += line_total
+
+        items.append({
+            "obj": it,
+            "designation": getattr(it, "designation", "Article"),
+            "quantity": qty,
+            "unit_price_fcfa": unit,
+            "line_total_fcfa": line_total,
+        })
+
+    # Evidence (si modèle dispo)
+    evidence = []
+    try:
+        from orders.models import EvidencePhoto  # adapte si ton modèle s'appelle autrement
+        evidence = list(EvidencePhoto.objects.filter(order=order).order_by("-id")[:50])
+    except Exception:
+        evidence = []
+
+    # POST: note/démarrer
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        note = (request.POST.get("notes") or "").strip()[:250]
+
+        # Note interne (on la met dans un champ "laundry_notes" si existe, sinon on ignore)
+        if note:
+            if hasattr(order, "laundry_notes"):
+                order.laundry_notes = note
+                try:
+                    order.save(update_fields=["laundry_notes"])
+                except Exception:
+                    try:
+                        order.save()
+                    except Exception:
+                        pass
+
+        if action == "start":
+            # Passe en "en cours" (sans casser si status n’existe pas)
+            if hasattr(order, "status"):
+                try:
+                    order.status = "laundry_in_progress"
+                    order.save(update_fields=["status"])
+                except Exception:
+                    try:
+                        order.save()
+                    except Exception:
+                        pass
+
+        return redirect("orders:laundry_weighing", order_id=order.id) + f"?laundry_id={laundry.id}"
+
+    return render(request, "orders/laundry_order_detail.html", {
+        "laundry": laundry,
+        "order": order,
+        "items": items,
+        "totals": {"total_fcfa": int(total)},
+        "error": error,
+        "laundry_id": str(laundry.id),
+        "evidence": evidence,
+    })
+
+
+@login_required
+@require_http_methods(["POST"])
+def laundry_weighing_confirm(request, order_id):
+    """
+    ✅ MVP V1 — Marquer 'Prêt' (wash_complete_time) + créer/activer mission return.
+    """
+    laundry, _error = _resolve_laundry_for_user(request)
+    if not laundry:
+        return redirect("orders:laundry_app")
+
+    order = get_object_or_404(Order, id=order_id)
+    if getattr(order, "laundry_partner_id", None) != laundry.id:
+        return HttpResponseRedirect(f"{reverse('orders:laundry_app')}?laundry_id={laundry.id}")
+
+    # Déjà prêt ? => idempotent
+    if hasattr(order, "wash_complete_time") and not getattr(order, "wash_complete_time", None):
+        order.wash_complete_time = timezone.now()
+        try:
+            order.save(update_fields=["wash_complete_time"])
+        except Exception:
+            try:
+                order.save()
+            except Exception:
+                pass
+
+    # ✅ Dès que c'est prêt, on crée/active la mission RETOUR
+    try:
+        DeliveryLeg.objects.get_or_create(
+            order=order,
+            leg_type="return",
+            defaults={
+                "status": "pending",
+                "driver": order.delivery_partner if getattr(order, "delivery_partner_id", None) else None,
+            },
+        )
+
+        # Auto-assign driver sur return sans driver
+        if getattr(order, "delivery_partner_id", None):
+            DeliveryLeg.objects.filter(
+                order=order, leg_type="return", driver__isnull=True
+            ).update(driver=order.delivery_partner)
+
+        # Ne réactiver que les returns annulés NON payés
+        qs_reactivate = DeliveryLeg.objects.filter(
+            order=order,
+            leg_type="return",
+            status__in=("canceled", "cancelled"),
+        )
+        try:
+            from wallets.models import WalletTransaction
+            paid_leg_ids = set(
+                WalletTransaction.objects.filter(
+                    order_id=order.id,
+                    wallet__owner_type="driver",
+                    type="payout",
+                    direction="in",
+                )
+                .exclude(leg_id__isnull=True)
+                .values_list("leg_id", flat=True)
+            )
+        except Exception:
+            paid_leg_ids = set()
+
+        qs_reactivate.exclude(id__in=paid_leg_ids).update(status="pending")
+
+    except Exception:
+        logger.exception("laundry_weighing_confirm: return leg activation failed order=%s", getattr(order, "id", None))
+
+    # redirect propre
+    url = reverse("orders:laundry_weighing", kwargs={"order_id": order.id})
+    return HttpResponseRedirect(f"{url}?laundry_id={laundry.id}")
+
+
+@login_required
+@require_http_methods(["POST"])
+def laundry_weighing_dispute(request, order_id):
+    """
+    ⚠️ MVP V1 — Signaler un problème (raison + photo optionnelle) => OrderEvidencePhoto.
+    """
+    laundry, _error = _resolve_laundry_for_user(request)
+    if not laundry:
+        return redirect("orders:laundry_app")
+
+    order = get_object_or_404(Order, id=order_id)
+    if getattr(order, "laundry_partner_id", None) != laundry.id:
+        return HttpResponseRedirect(f"{reverse('orders:laundry_app')}?laundry_id={laundry.id}")
+
+    reason = (request.POST.get("reason") or "").strip()[:250]
+    image = request.FILES.get("image")
+
+    # ✅ On standardise sur OrderEvidencePhoto
+    try:
+        from .models import OrderEvidencePhoto
+        if reason or image:
+            # kind: on met "issue" si dispo, sinon "laundry"
+            allowed = {k for (k, _lbl) in getattr(OrderEvidencePhoto, "KIND_CHOICES", [])}
+            kind = "issue" if "issue" in allowed else ("laundry" if "laundry" in allowed else "pickup_items")
+
+            OrderEvidencePhoto.objects.create(
+                order=order,
+                leg=leg_obj,
+                actor_type="laundry",
+                actor_id=getattr(request.user, "id", None),
+                kind=kind,
+                image=image if image else None,
+                caption=reason or "Problème signalé par la blanchisserie",
+            )
+    except Exception:
+        logger.exception("laundry_weighing_dispute: cannot create evidence for order=%s", getattr(order, "id", None))
+
+    url = reverse("orders:laundry_weighing", kwargs={"order_id": order.id})
+    return HttpResponseRedirect(f"{url}?laundry_id={laundry.id}")
+
+
+# ============================================================
+# Wizard Client V1 (Step2/3/4) — ajout safe (anti-crash URLs)
+# ============================================================
+
+@require_http_methods(["GET", "POST"])
+@client_required
+def client_new_order_step2(request, order_id: int):
+    """
+    Step 2/4:
+    - choix catégorie (stockée en session)
+    - mode livraison (standard/express/scheduled)
+    - scheduled_delivery_at accepte datetime-local (YYYY-MM-DDTHH:MM) ou "YYYY-MM-DD HH:MM"
+    """
+    from orders.models import ServiceCategory
+    from django.utils import timezone
+    from django.utils.dateparse import parse_datetime
+
+    phone = _client_phone(request)
+    order = (
+        Order.objects
+        .select_related("customer")
+        .filter(pk=order_id, customer__phone=phone)
+        .first()
+    )
+    if not order:
+        return redirect("orders:client_new_order")
+
+    categories = ServiceCategory.objects.all().order_by("name")
+    error = None
+
+    if request.method == "POST":
+        # 1) catégorie
+        cat_id = (request.POST.get("category_id") or "").strip()
+        if not cat_id.isdigit():
+            error = "Merci de choisir une catégorie."
+        else:
+            request.session["client_wizard_category_id"] = int(cat_id)
+
+        # 2) mode livraison
+        delivery_mode = (request.POST.get("delivery_mode") or "").strip() or "standard"
+        scheduled_raw = (request.POST.get("scheduled_delivery_at") or "").strip()
+
+        if delivery_mode not in ("standard", "express", "scheduled"):
+            delivery_mode = "standard"
+
+        if not error:
+            order.delivery_mode = delivery_mode
+
+            if delivery_mode == "scheduled":
+                # datetime-local => souvent "YYYY-MM-DDTHH:MM"
+                dt = parse_datetime(scheduled_raw) if scheduled_raw else None
+                if dt is None and scheduled_raw and "T" in scheduled_raw:
+                    dt = parse_datetime(scheduled_raw.replace("T", " ", 1))
+
+                if not dt:
+                    error = "Merci de choisir une date/heure de livraison programmée."
+                else:
+                    if timezone.is_naive(dt):
+                        dt = timezone.make_aware(dt, timezone.get_current_timezone())
+                    order.scheduled_delivery_at = dt
+            else:
+                order.scheduled_delivery_at = None
+
+        if not error:
+            order.save(update_fields=["delivery_mode", "scheduled_delivery_at", "updated_at"])
+            return redirect("orders:client_new_order_step3", order_id=order.id)
+
+    return render(request, "orders/client_new_order_step2.html", {
+        "order": order,
+        "categories": categories,
+        "selected_category_id": request.session.get("client_wizard_category_id"),
+        "error": error,
+    })
+
+
+@require_http_methods(["GET", "POST"])
+@client_required
+def client_new_order_step3(request, order_id: int):
+    from django.contrib import messages
+    from orders.models import ServiceCategory, ServiceItem, OrderItem
+
+    phone = _client_phone(request)
+    order = (
+        Order.objects
+        .select_related("customer")
+        .filter(pk=order_id, customer__phone=phone)
+        .first()
+    )
+    if not order:
+        return redirect("orders:client_new_order")
+
+    # Catégorie choisie en step2 (stockée en session)
+    categories = ServiceCategory.objects.order_by("name")
+    selected_id = request.session.get("client_wizard_category_id")
+    category = None
+    if selected_id:
+        category = categories.filter(id=selected_id).first()
+    if not category:
+        category = categories.first()
+
+    services = ServiceItem.objects.none()
+    if category:
+        services = ServiceItem.objects.filter(category=category, is_active=True).order_by("name")
+
+    existing_items = order.items.all().order_by("id")
+
+    # Pré-remplissage des quantités par service (pour l'UI step3)
+    qty_by_service = {}
+    try:
+        for it in existing_items:
+            sid = getattr(it, "service_id", None)
+            if sid:
+                quantities[sid] = it.quantity
+    except Exception:
+        qty_by_service = {}
+
+    error = None
+
+    if request.method == "POST":
+        if not category:
+            error = "Aucune catégorie de service n’est disponible. Ajoute une catégorie dans l’admin."
+        elif not services.exists():
+            error = "Aucun article actif dans cette catégorie. Ajoute des articles dans l’admin."
+        else:
+            changed = False
+
+            for svc in services:
+                raw = (request.POST.get(f"qty_{svc.id}") or "").strip()
+                try:
+                    qty = int(raw) if raw != "" else 0
+                except Exception:
+                    qty = 0
+
+                it = (
+                    OrderItem.objects
+                    .filter(order=order, service=svc)
+                    .order_by("-id")
+                    .first()
+                )
+
+                if qty <= 0:
+                    if it:
+                        it.delete()
+                        changed = True
+                    continue
+
+                # qty > 0 : create / update
+                if it:
+                    it.designation = svc.name
+                    it.quantity = qty
+                    it.unit_price = svc.default_price
+                    it.save()
+                    changed = True
+                else:
+                    OrderItem.objects.create(
+                        order=order,
+                        service=svc,
+                        designation=svc.name,
+                        quantity=qty,
+                        unit_price=svc.default_price,
+                    )
+                    changed = True
+
+            if changed:
+                try:
+                    order.update_financials(save=True)
+                except Exception:
+                    pass
+
+            action = (request.POST.get("action") or "").strip()
+            if action == "add_more":
+                messages.success(request, "Articles ajoutés. Tu peux continuer à compléter la liste.")
+                return redirect("orders:client_new_order_step3", order_id=order.id)
+
+            return redirect("orders:client_new_order_step4", order_id=order.id)
+
+    # Pré-remplissage des quantités déjà ajoutées
+    qty_by_service = {}
+    for it in existing_items:
+        if it.service_id:
+            qty_by_service[it.service_id] = it.quantity
+
+    return render(request, "orders/client_new_order_step3.html", {
+        "order": order,
+        "category": category,
+        "services": services,
+        "existing_items": existing_items,
+        "qty_by_service": qty_by_service,
+        "error": error,
+    })
+
+
+@require_http_methods(["GET", "POST"])
+@client_required
+def client_new_order_step4(request, order_id: int):
+    phone = _client_phone(request)
+    order = (
+        Order.objects
+        .select_related("customer")
+        .filter(pk=order_id, customer__phone=phone)
+        .first()
+    )
+    if not order:
+        return redirect("orders:client_new_order")
+
+    amounts = _client_order_amounts(order)
+    items = order.items.all().order_by("id")
+
+
+    # Si aucun article, on renvoie vers Step3 (évite le recap vide)
+    if not items.exists():
+        try:
+            from django.contrib import messages
+            messages.error(request, "Ajoute au moins un article avant de confirmer la commande.")
+        except Exception:
+            pass
+        return redirect("orders:client_new_order_step3", order_id=order.id)
+
+    if request.method == "POST":
+        from orders.models import DeliveryLeg
+
+        DeliveryLeg.objects.get_or_create(order=order, leg_type="pickup", defaults={"status":"pending"})
+        DeliveryLeg.objects.get_or_create(order=order, leg_type="return", defaults={"status":"pending"})
+
+        # Si is_draft existe, on finalise
+        if hasattr(order, "is_draft"):
+            order.is_draft = False
+
+        try:
+            order.save()
+        except Exception:
+            pass
+
+        try:
+            order.update_financials(save=True)
+        except Exception:
+            pass
+
+        return redirect("orders:client_order_detail", order_id=order.id)
+
+    return render(request, "orders/client_new_order_step4.html", {
+        "order": order,
+        "items": items,
+        "amounts": amounts,
+    })
+
+
+# ============================================================
+# App Blanchisseur (MVP V1) — zéro infos client
+# ============================================================
+@login_required
+@require_http_methods(["GET"])
+def laundry_app(request):
+    """
+    App Blanchisseur (MVP V1): liste des commandes attribuées à une blanchisserie.
+    Règle: le partenaire ne voit JAMAIS les infos client (nom/tel/adresse).
+    Auth: compte Django requis.
+    Ciblage:
+      - staff: peut passer ?laundry_id=XX
+      - non-staff: on essaie de déduire la blanchisserie via email/username
+    """
+    laundry = None
+    error = None
+
+    # 1) Déduire blanchisserie pour utilisateur non-staff (sécurité)
+    if not getattr(request.user, "is_staff", False):
+        user_email = (getattr(request.user, "email", "") or "").strip().lower()
+        user_name = (getattr(request.user, "username", "") or "").strip().lower()
+
+        q = LaundryPartner.objects.all()
+        # On tente email puis username si ton modèle a un champ email/name
+        if user_email:
+            laundry = q.filter(email__iexact=user_email).first()
+        if laundry is None and user_name:
+            # fallback: match sur email OU name
+            laundry = q.filter(email__iexact=user_name).first() or q.filter(name__iexact=user_name).first()
+
+        if laundry is None:
+            error = "Aucune blanchisserie liée à ce compte. Contacte l’admin pour associer ton compte à une blanchisserie."
+    else:
+        # 2) Staff: peut cibler n’importe quelle blanchisserie via querystring
+        laundry_id = (request.GET.get("laundry_id") or "").strip()
+        if not laundry_id:
+            error = "laundry_id manquant. Exemple: /orders/laundry/app/?laundry_id=1"
+        else:
+            try:
+                lid = int(laundry_id)
+                laundry = LaundryPartner.objects.filter(id=lid).first()
+                if not laundry:
+                    error = "Blanchisserie introuvable (laundry_id invalide)."
+            except Exception:
+                error = "laundry_id invalide (doit être un entier)."
+
+    orders_qs = Order.objects.none()
+    if laundry:
+        # ✅ IMPORTANT: pas de select_related("customer") ici pour éviter toute tentation côté template
+        orders_qs = (
+            Order.objects
+            .select_related("laundry_partner")
+            .prefetch_related("items")
+            .filter(laundry_partner_id=laundry.id)
+            .order_by("-id")
+        )
+
+    return render(
+        request,
+        "orders/laundry_app.html",
+        {
+            "laundry": laundry,
+            "orders": list(orders_qs[:200]),
+            "error": error,
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET","POST"])
+def laundry_order_detail(request, order_id):
+    """
+    Détail commande côté Blanchisserie (MVP V1 = prix par article, zéro pesée).
+    Règle: AUCUNE info client (nom/tel/adresse).
+    """
+
+    laundry = None
+    error = None
+    laundry_id = None
+
+    # 1) Déduire blanchisserie pour utilisateur non-staff
+    if not getattr(request.user, "is_staff", False):
+        user_email = (getattr(request.user, "email", "") or "").strip().lower()
+        user_name = (getattr(request.user, "username", "") or "").strip().lower()
+
+        q = LaundryPartner.objects.all()
+        if user_email:
+            laundry = q.filter(email__iexact=user_email).first()
+        if laundry is None and user_name:
+            laundry = q.filter(email__iexact=user_name).first() or q.filter(name__iexact=user_name).first()
+
+        if laundry is None:
+            error = "Aucune blanchisserie liée à ce compte. Contacte l’admin pour associer ton compte à une blanchisserie."
+    else:
+        # 2) Staff : peut cibler via ?laundry_id=XX (facultatif)
+        laundry_id = (request.GET.get("laundry_id") or "").strip()
+        if laundry_id:
+            try:
+                lid = int(laundry_id)
+                laundry = LaundryPartner.objects.filter(id=lid).first()
+                if not laundry:
+                    error = "Blanchisserie introuvable (laundry_id invalide)."
+            except Exception:
+                error = "laundry_id invalide (doit être un entier)."
+
+    # Si pas de laundry, on affiche une page propre
+    if not laundry:
+        return render(request, "orders/laundry_order_detail.html", {
+            "order": None,
+            "laundry": None,
+            "items": [],
+            "error": error or "Blanchisserie non détectée.",
+            "laundry_id": laundry_id or "",
+        })
+
+    # Récupère la commande uniquement si elle appartient à cette blanchisserie
+    order = (
+        Order.objects
+        .select_related("laundry_partner")
+        .prefetch_related("items")
+        .filter(pk=order_id, laundry_partner_id=laundry.id)
+        .first()
+    )
+    if not order:
+        raise Http404("Commande introuvable pour cette blanchisserie.")
+
+    # Auto-réparation:
+    # - Si status=done et pas prêt => on remplit wash_complete_time
+    # - Si prêt (wash_complete_time existe) => on réactive la mission RETOUR si elle est canceled
+    try:
+        if (order.status == "done") and (not getattr(order, "wash_complete_time", None)):
+            order.wash_complete_time = timezone.now()
+            order.save(update_fields=["wash_complete_time"])
+
+        if getattr(order, "wash_complete_time", None):
+            DeliveryLeg.objects.get_or_create(
+                order=order,
+                leg_type="return",
+                defaults={
+                    "status": "pending",
+                    "driver": order.delivery_partner if getattr(order, "delivery_partner_id", None) else None,
+                },
+            )
+
+            # ✅ Auto-assign driver sur les legs return existants sans driver
+            try:
+                if getattr(order, "delivery_partner_id", None):
+                    DeliveryLeg.objects.filter(
+                        order=order,
+                        leg_type="return",
+                        driver__isnull=True,
+                    ).update(driver=order.delivery_partner)
+            except Exception:
+                pass
+
+            # 🔒 Ne jamais réactiver un return déjà payé (payout existe)
+            qs_reactivate = DeliveryLeg.objects.filter(
+                order=order,
+                leg_type="return",
+                status__in=("canceled", "cancelled"),
+            )
+
+            try:
+                from wallets.models import WalletTransaction
+                paid_leg_ids = set(
+                    WalletTransaction.objects.filter(
+                        order_id=order.id,
+                        wallet__owner_type="driver",
+                        type="payout",
+                        direction="in",
+                    ).exclude(leg_id__isnull=True).values_list("leg_id", flat=True)
+                )
+            except Exception:
+                paid_leg_ids = set()
+
+            qs_reactivate.exclude(id__in=paid_leg_ids).update(status="pending") 
+
+    except Exception:
+        logger.exception("laundry_order_detail auto-repair failed for order %s", getattr(order, "id", None))
+
+    items = order.items.all().order_by("id")
+
+    # Actions V1 (bloquées par règles)
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        choices = getattr(Order._meta.get_field("status"), "choices", []) or []
+        allowed_values = {c[0] for c in choices if isinstance(c, (list, tuple)) and c}
+
+        cur = (order.status or "").strip()
+        already_ready = bool(getattr(order, "wash_complete_time", None))
+
+        def set_status(value: str):
+            if value in allowed_values:
+                order.status = value
+
+        # 0) Si déjà done => on bloque tout
+        if cur == "done":
+            return redirect(f"{request.path}?laundry_id={laundry.id}")
+
+        # 1) START : une seule fois (pas prêt, pas done)
+        if action == "start":
+            if (not already_ready) and ("in_progress" in allowed_values) and (cur not in ("in_progress", "done")):
+                try:
+                    set_status("in_progress")
+                    order.save(update_fields=["status"])
+                except Exception:
+                    pass
+
+        # 2) READY : une seule fois (piloté par wash_complete_time)
+        elif action == "ready":
+            if not already_ready:
+                try:
+                    order.wash_complete_time = timezone.now()
+
+                    # optionnel: si in_progress existe et pas encore démarré
+                    if ("in_progress" in allowed_values) and (cur not in ("in_progress", "done")):
+                        set_status("in_progress")
+                        order.save(update_fields=["status", "wash_complete_time"])
+                    else:
+                        order.save(update_fields=["wash_complete_time"])
+
+                    # ✅ Dès que c'est "Prêt", on crée/active la mission RETOUR
+                    DeliveryLeg.objects.get_or_create(
+                        order=order,
+                        leg_type="return",
+                        defaults={
+                            "status": "pending",
+                            "driver": order.delivery_partner if getattr(order, "delivery_partner_id", None) else None,
+                        },
+                    )
+
+                    # ✅ Auto-assign driver sur les legs return existants sans driver
+                    try:
+                        if getattr(order, "delivery_partner_id", None):
+                            DeliveryLeg.objects.filter(
+                                order=order,
+                                leg_type="return",
+                                driver__isnull=True,
+                            ).update(driver=order.delivery_partner)
+                    except Exception:
+                        pass
+
+                    # 🔒 Réactiver uniquement les returns annulés NON payés
+                    qs_reactivate = DeliveryLeg.objects.filter(
+                        order=order,
+                        leg_type="return",
+                        status__in=("canceled", "cancelled"),
+                    )
+
+                    try:
+                        from wallets.models import WalletTransaction
+                        paid_leg_ids = set(
+                            WalletTransaction.objects.filter(
+                                order_id=order.id,
+                                wallet__owner_type="driver",
+                                type="payout",
+                                direction="in",
+                            )
+                            .exclude(leg_id__isnull=True)
+                            .values_list("leg_id", flat=True)
+                        )
+                    except Exception:
+                        paid_leg_ids = set()
+
+                    qs_reactivate.exclude(id__in=paid_leg_ids).update(status="pending")
+
+                    # Bonus safe: s’assurer qu’un pickup existe
+                    DeliveryLeg.objects.get_or_create(
+                        order=order,
+                        leg_type="pickup",
+                        defaults={"status": "done"},
+                    )
+                except Exception:
+                    logger.exception("READY action failed for order %s", getattr(order, "id", None))
+
+        # 3) DONE : autorisé seulement si prêt
+        elif action == "done":
+            # ✅ Côté blanchisserie, "DONE" = lavage terminé (pas livraison terminée)
+            if already_ready and (cur != "done"):
+                try:
+                    if not order.wash_complete_time:
+                        order.wash_complete_time = timezone.now()
+                        order.save(update_fields=["wash_complete_time"])
+
+                    # Ne PAS forcer order.status="done" ici.
+                    # On garde in_progress (ou pending) et on laisse le sync via legs décider.
+                    from orders.models import sync_order_status_from_legs
+                    sync_order_status_from_legs(order, save=True)
+
+                except Exception:
+                    pass
+
+        return redirect(f"{request.path}?laundry_id={laundry.id}")
+
+    cur = (order.status or "").strip()
+    already_ready = bool(getattr(order, "wash_complete_time", None))
+
+    choices = getattr(Order._meta.get_field("status"), "choices", []) or []
+    allowed_values = {c[0] for c in choices if isinstance(c, (list, tuple)) and c}
+
+    is_start_disabled = already_ready or (cur in ("in_progress", "done")) or ("in_progress" not in allowed_values)
+    is_ready_disabled = already_ready or (cur == "done")
+    is_done_disabled = (cur == "done") or (not already_ready) or ("done" not in allowed_values)
+
+    return render(request, "orders/laundry_order_detail.html", {
+        "order": order,
+        "laundry": laundry,
+        "items": list(items),
+        "error": error,
+        "laundry_id": str(laundry.id),
+        "is_start_disabled": is_start_disabled,
+        "is_ready_disabled": is_ready_disabled,
+        "is_done_disabled": is_done_disabled,
+    })

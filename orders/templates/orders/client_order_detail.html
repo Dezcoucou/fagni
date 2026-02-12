@@ -192,6 +192,90 @@
   .legId{ color:#6b7280;font-size:12px; }
   .muted{ color:#6b7280; }
 
+  /* ✅ preuves photos */
+  .gallery{
+    display:grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap:10px;
+  }
+  @media (max-width:860px){
+    .gallery{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+  }
+  .ph{
+    border:1px solid var(--line);
+    border-radius:14px;
+    overflow:hidden;
+    background:#fff;
+    box-shadow:0 1px 3px rgba(15,23,42,0.05);
+  }
+  .ph img{
+    width:100%;
+    height:140px;
+    object-fit:cover;
+    display:block;
+    background:#f8fafc;
+  }
+
+  .ph.phNew{
+    box-shadow: 0 0 0 3px rgba(255,122,0,0.22);
+    transform: translateY(-1px);
+  }
+
+  .phBtn{
+    display:block;
+    padding:0;
+    border:0;
+    background:transparent;
+    width:100%;
+    cursor: zoom-in;
+  }
+  .phBtn:focus{ outline: 2px solid rgba(0,86,179,0.45); outline-offset: 2px; border-radius: 14px; }
+
+  .phMeta{
+    padding:8px 10px;
+    font-size:12px;
+    color:#334155;
+  }
+  .phTag{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:4px 8px;border-radius:999px;
+    border:1px solid var(--line);
+    font-weight:950;
+    background:#fff;
+    margin-bottom:6px;
+  }
+  .phTag .dot{ width:7px;height:7px;border-radius:999px;background:#94a3b8; }
+  .phTag.pickup .dot{ background:#2563eb; }
+  .phTag.laundry .dot{ background:#a855f7; }
+  .phTag.dropoff .dot{ background:#16a34a; }
+
+  /* ✅ rating */
+  .ratingRow{ display:flex;align-items:center;gap:10px;flex-wrap:wrap; }
+  .stars{ display:inline-flex; gap:4px; }
+  .star{
+    width:18px;height:18px;
+    display:inline-flex;align-items:center;justify-content:center;
+    font-size:16px;line-height:1;
+  }
+  .star.on{ filter: brightness(1.05); }
+  .ratingNote{ font-size:12px;color:#64748b; }
+
+  .stars .star{ transition: transform .12s ease, filter .12s ease, opacity .12s ease; }
+  .stars .star:hover{ transform: translateY(-1px) scale(1.03); }
+  .ratingActions{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+  .btn-primary{
+    background: var(--fagni-blue);
+    color:#fff;
+    border-color: rgba(0,0,0,0.04);
+  }
+  .btn-primary:hover{ opacity:.92; }
+  .toastOk{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:8px 10px;border-radius:999px;
+    background:#ecfdf3;border:1px solid #bbf7d0;color:#166534;
+    font-weight:900;font-size:12px;
+  }
+
   /* micro-animations premium */
   .pulse{ animation: pulse 520ms ease; }
   @keyframes pulse{
@@ -331,7 +415,11 @@
     <div class="row" style="align-items:center;">
       <h3 class="section-title" style="margin:0;">Prestations</h3>
       <div class="actions">
-        {% if not locked %}<a class="btn btn-ghost" href="{% url 'orders:client_order_item_new' order.id %}">➕ Ajouter</a>{% else %}<span class="meta" style="font-weight:800;">🔒 Prestations verrouillées (commande payée / mission créée)</span>{% endif %}
+        {% if not locked %}
+          <a class="btn btn-ghost" href="{% url 'orders:client_order_item_new' order.id %}">➕ Ajouter</a>
+        {% else %}
+          <span class="meta" style="font-weight:800;">🔒 Prestations verrouillées (commande payée / mission créée)</span>
+        {% endif %}
       </div>
     </div>
 
@@ -348,8 +436,10 @@
               <div style="font-weight:900;color:#0f172a;">
                 {{ it.designation|default:"—" }}
                 <div class="meta" style="margin-top:3px;">
-                  {% if not locked %}<a class="btn btn-ghost" style="padding:6px 10px;font-size:12px;" href="{% url 'orders:client_order_item_edit' order.id it.id %}">Modifier</a>
-                  <a class="btn btn-ghost" style="padding:6px 10px;font-size:12px;border-color:#fecaca;color:#991b1b;" href="{% url 'orders:client_order_item_delete' order.id it.id %}">Supprimer</a>{% endif %}
+                  {% if not locked %}
+                    <a class="btn btn-ghost" style="padding:6px 10px;font-size:12px;" href="{% url 'orders:client_order_item_edit' order.id it.id %}">Modifier</a>
+                    <a class="btn btn-ghost" style="padding:6px 10px;font-size:12px;border-color:#fecaca;color:#991b1b;" href="{% url 'orders:client_order_item_delete' order.id it.id %}">Supprimer</a>
+                  {% endif %}
                 </div>
               </div>
               <div style="font-weight:900;">{{ it.quantity }}</div>
@@ -412,12 +502,164 @@
     </div>
   </div>
 
+  <!-- ✅ PREUVES / PHOTOS -->
+  <div class="card panel" style="margin-top:12px;">
+    <div class="row" style="align-items:center;">
+      <h3 class="section-title" style="margin:0;">Preuves & photos</h3>
+      <div class="meta" id="evidenceHint" style="margin:0;">Sécurise la commande (collecte / laverie / livraison).</div>
+    </div>
+
+    <div id="evidenceBox" style="margin-top:10px;">
+      <div class="muted">Aucune preuve photo pour le moment.</div>
+    </div>
+  </div>
+
+    <!-- ✅ PREUVES — actions -->
+    <div class="ratingActions" style="margin-top:10px;">
+      <button class="btn btn-primary" id="btnEvidenceOpen" type="button">📸 Ajouter une preuve</button>
+      <span class="ratingNote" id="evidenceMsg" style="display:none;"></span>
+    </div>
+
+    <!-- ✅ Modal Evidence -->
+    <div id="evidenceModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:9999; padding:18px;">
+      <div class="card panel" style="max-width:520px; margin:8vh auto 0; border-radius:18px; box-shadow: var(--shadow2);">
+        <div class="row" style="align-items:center;">
+          <div>
+            <div style="font-weight:950; font-size:14px;">Ajouter une preuve photo</div>
+            <div class="meta">Choisis l’étape + ajoute une ou plusieurs photos.</div>
+          </div>
+          <button class="btn btn-ghost" id="btnEvidenceClose" type="button">✕</button>
+        </div>
+
+        <div style="margin-top:12px;">
+          <div class="kv">
+            <div class="k">Étape</div>
+            <div class="v">
+              <select id="evidenceKind" style="padding:8px 10px;border-radius:12px;border:1px solid var(--line);font-weight:800;">
+                <option value="pickup">Collecte</option>
+                <option value="laundry">Laverie</option>
+                <option value="dropoff">Livraison</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-top:10px;">
+            <input id="evidenceFiles" type="file" accept="image/*" multiple
+                   style="width:100%; padding:10px; border:1px dashed rgba(0,86,179,0.35); border-radius:14px; background:#f8fafc;">
+            <div class="meta" style="margin-top:6px;">Astuce: tu peux sélectionner plusieurs photos.</div>
+          </div>
+
+          <div class="ratingActions">
+            <button class="btn btn-primary" id="btnEvidenceSend" type="button">Envoyer</button>
+            <button class="btn btn-ghost" id="btnEvidenceCancel" type="button">Annuler</button>
+          </div>
+
+          <div class="meta" id="evidenceErr" style="display:none; color:#991b1b; font-weight:800;"></div>
+          <div class="meta" id="evidenceOk" style="display:none; color:#166534; font-weight:800;"></div>
+        </div>
+      </div>
+    </div>
+
+    
+    <!-- ✅ PREUVES — actions -->
+    <div class="ratingActions" style="margin-top:10px;">
+      <button class="btn btn-primary" id="btnEvidenceOpen" type="button">📸 Ajouter une preuve</button>
+      <span class="ratingNote" id="evidenceMsg" style="display:none;"></span>
+    </div>
+
+    <!-- ✅ Modal Evidence -->
+    <div id="evidenceModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:9999; padding:18px;">
+      <div class="card panel" style="max-width:520px; margin:8vh auto 0; border-radius:18px; box-shadow: var(--shadow2);">
+        <div class="row" style="align-items:center;">
+          <div>
+            <div style="font-weight:950; font-size:14px;">Ajouter une preuve photo</div>
+            <div class="meta">Choisis l’étape + ajoute une ou plusieurs photos.</div>
+          </div>
+          <button class="btn btn-ghost" id="btnEvidenceClose" type="button">✕</button>
+        </div>
+
+        <div style="margin-top:12px;">
+          <div class="kv">
+            <div class="k">Étape</div>
+            <div class="v">
+              <select id="evidenceKind" style="padding:8px 10px;border-radius:12px;border:1px solid var(--line);font-weight:800;">
+                <option value="pickup">Collecte</option>
+                <option value="laundry">Laverie</option>
+                <option value="dropoff">Livraison</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-top:10px;">
+            <input id="evidenceFiles" type="file" accept="image/*" multiple
+                   style="width:100%; padding:10px; border:1px dashed rgba(0,86,179,0.35); border-radius:14px; background:#f8fafc;">
+            <div class="meta" style="margin-top:6px;">Astuce: tu peux sélectionner plusieurs photos.</div>
+          </div>
+
+          <div class="ratingActions">
+            <button class="btn btn-primary" id="btnEvidenceSend" type="button">Envoyer</button>
+            <button class="btn btn-ghost" id="btnEvidenceCancel" type="button">Annuler</button>
+          </div>
+
+          <div class="meta" id="evidenceErr" style="display:none; color:#991b1b; font-weight:800;"></div>
+          <div class="meta" id="evidenceOk" style="display:none; color:#166534; font-weight:800;"></div>
+        </div>
+      </div>
+    </div>
+
+
+  <!-- ✅ ÉVALUATION -->
+  <div class="card panel" style="margin-top:12px;">
+    <div class="row" style="align-items:center;">
+      <h3 class="section-title" style="margin:0;">Évaluation</h3>
+      <div class="meta" style="margin:0;">Ton avis aide à améliorer le service (pilote Riviera).</div>
+    </div>
+
+    <div id="ratingBox" style="margin-top:10px;">
+      <div class="muted">Évaluation non disponible pour le moment.</div>
+    </div>
+  </div>
+
+  <!-- ✅ SUPPORT PILOTE (optionnel) -->
+  <div class="card panel" style="margin-top:12px;">
+    <div class="row" style="align-items:center;">
+      <h3 class="section-title" style="margin:0;">Besoin d’aide ?</h3>
+      <div class="meta" style="margin:0;">Support pilote (Riviera) – réponse rapide.</div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">
+      {# Remplace le lien WhatsApp si tu veux un vrai numéro #}
+      <a class="btn btn-ghost" href="#" onclick="return false;">💬 WhatsApp support</a>
+      <a class="btn btn-ghost" href="#" onclick="return false;">📞 Appeler</a>
+    </div>
+  </div>
+
 </div>
 
 <script>
 (function(){
   const liveUrl = "{% url 'orders:client_order_live' order.id %}";
   const orderId = {{ order.id|default:0 }};
+
+  const ratingPostUrl = `/orders/client/orders/${orderId}/rating/`;
+
+    const evidencePostUrl = `/orders/client/orders/${orderId}/evidence/upload/`;
+
+  function getCookie(name){
+    const parts = (`; ${document.cookie}`).split(`; ${name}=`);
+    if(parts.length === 2) return parts.pop().split(";").shift();
+    return "";
+  }
+
+  function isPaidStatus(ps){
+    const s = String(ps || "").toLowerCase();
+    return (s === "paid" || s.includes("payé") || s.includes("paye") || s.includes("paid"));
+  }
+
+  function isDeliveredFromLive(data){
+    const tl = data?.timeline || [];
+    const delivered = tl.find(s => String(s.key||"") === "delivered");
+    return !!delivered?.done;
+  }
 
   const statusTextEl = document.getElementById("orderStatus");
   const statusPillEl = document.getElementById("orderStatusPill");
@@ -430,7 +672,7 @@
   const lastSync = document.getElementById("lastSync");
 
   const payTxt = document.getElementById("payTxt");
-    const payDetails = document.getElementById("payDetails");
+  const payDetails = document.getElementById("payDetails");
   const payPill = document.getElementById("payPill");
 
   const phasePill = document.getElementById("phasePill");
@@ -448,6 +690,141 @@
 
   const timelineBox = document.getElementById("timelineBox");
   let estBox = document.getElementById("estBox");
+
+  const evidenceBox = document.getElementById("evidenceBox");
+  const ratingBox = document.getElementById("ratingBox");
+
+    // =========================
+    // ✅ CLIENT Evidence modal + upload
+    // =========================
+    const evModal = document.getElementById("evidenceModal");
+    const btnEvOpen = document.getElementById("btnEvidenceOpen");
+    const btnEvClose = document.getElementById("btnEvidenceClose");
+    const btnEvSend = document.getElementById("btnEvidenceSend");
+    const btnEvCancel = document.getElementById("btnEvidenceCancel");
+    const evKind = document.getElementById("evidenceKind");
+    const evFiles = document.getElementById("evidenceFiles");
+    const evErr = document.getElementById("evidenceErr");
+    const evOk = document.getElementById("evidenceOk");
+
+    function evShowErr(msg){
+      if(!evErr) return;
+      evErr.textContent = msg || "Erreur.";
+      evErr.style.display = "";
+      if(evOk) evOk.style.display = "none";
+    }
+    function evShowOk(msg){
+      if(!evOk) return;
+      evOk.textContent = msg || "OK.";
+      evOk.style.display = "";
+      if(evErr) evErr.style.display = "none";
+    }
+
+    function openEvidence(){
+      if(evErr) evErr.style.display = "none";
+      if(evOk) evOk.style.display = "none";
+      if(evFiles) evFiles.value = "";
+      if(evModal) evModal.style.display = "";
+    }
+    function closeEvidence(){
+      if(evModal) evModal.style.display = "none";
+    }
+
+    if(btnEvOpen) btnEvOpen.addEventListener("click", openEvidence);
+    if(btnEvClose) btnEvClose.addEventListener("click", closeEvidence);
+    if(btnEvCancel) btnEvCancel.addEventListener("click", closeEvidence);
+
+    // Fermer la modale si on clique sur le fond sombre
+    evModal?.addEventListener("click", (e) => {
+      if(e.target === evModal) closeEvidence();
+    });
+
+    async function sendEvidence(){
+      if(!evFiles || !evFiles.files || evFiles.files.length === 0){
+        evShowErr("Sélectionne au moins une photo.");
+        return;
+      }
+
+      const kind = (evKind && evKind.value) ? String(evKind.value) : "pickup";
+
+      const fd = new FormData();
+      fd.append("kind", kind);
+      for(const f of evFiles.files){
+        fd.append("files", f);
+      }
+
+      // UI lock
+      if(btnEvSend){
+        btnEvSend.disabled = true;
+        btnEvSend.style.opacity = "0.75";
+      }
+      if(evErr) evErr.style.display = "none";
+      if(evOk) evOk.style.display = "none";
+
+      try{
+        const csrf = getCookie("csrftoken");
+
+        const r = await fetch(evidencePostUrl, {
+          method: "POST",
+          headers: {
+            ...(csrf ? {"X-CSRFToken": csrf} : {}),
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json",
+          },
+          body: fd,
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+
+        const ct = (r.headers.get("content-type") || "").toLowerCase();
+        const data = ct.includes("application/json") ? await r.json() : null;
+
+        // Cas CSRF/403 HTML ou autre HTML
+        if(!data){
+          evShowErr(`Upload impossible : HTTP ${r.status}`);
+          return;
+        }
+
+        if(!r.ok || data.ok !== true){
+          const err = data.error ? String(data.error) : ("HTTP " + r.status);
+          evShowErr("Upload impossible : " + err);
+          return;
+        }
+
+        const created = Number(data.created || 0);
+        evShowOk(`✅ ${created} photo(s) ajoutée(s).`);
+
+        // refresh immédiat galerie + highlight les nouvelles
+        renderEvidence(data.evidence_photos || [], { new_ids: (data.last_added_ids || []) });
+
+        // 🔒 UX: si livré => on bloque l'ajout (sauf fenêtre serveur)
+        const delivered = isDeliveredFromLive(data);
+        if(btnEvOpen){
+          btnEvOpen.disabled = delivered;
+          btnEvOpen.style.opacity = delivered ? "0.55" : "1";
+        }
+        if(delivered){
+          // petit message (optionnel)
+          // evShowErr("Commande livrée : ajout de preuves bloqué (sauf litige livraison sous 24h).");
+        }
+
+        // reset input
+        if(evFiles) evFiles.value = "";
+
+        // ferme après mini délai (laisser l’œil voir le ✅)
+        setTimeout(() => closeEvidence(), 550);
+
+      }catch(e){
+        evShowErr("Erreur réseau. Réessaie.");
+      }finally{
+        if(btnEvSend){
+          btnEvSend.disabled = false;
+          btnEvSend.style.opacity = "1";
+        }
+      }
+    }
+
+    if(btnEvSend) btnEvSend.addEventListener("click", sendEvidence);
 
   const refreshMs = 7000;
   let busy = false;
@@ -508,19 +885,6 @@
     return {cls:"", label: ps || "non renseigné"};
   }
 
-    // ✅ payé
-    if(s.includes("paid") || s.includes("paye") || s.includes("payé")) return {cls:"pay-ok", label:"Payé"};
-
-    // ✅ en attente / impayé
-    if(s.includes("pending") || s.includes("attente") || s.includes("unpaid")) return {cls:"pay-wait", label:"En attente"};
-
-    // ✅ échec
-    if(s.includes("failed") || s.includes("echec") || s.includes("échoué")) return {cls:"pay-bad", label:"Échec"};
-
-    if(!ps) return {cls:"", label:"non renseigné"};
-    return {cls:"", label: ps};
-  }
-
   function setPayment(ps, amounts){
     const p = paymentLabel(ps);
     if(payTxt) payTxt.textContent = p.label;
@@ -529,28 +893,26 @@
       if(p.cls) payPill.classList.add(p.cls);
     }
 
-      // ✅ détails paiement (payPaid / payTotal / payRemain)
-      try{
-        const total = Number(String(amounts?.total_ttc ?? 0).replace(",", "."));
-        const paid  = Number(String(amounts?.amount_paid ?? 0).replace(",", "."));
-        const rest  = Number(String(amounts?.amount_remaining ?? Math.max(0, total - paid)).replace(",", "."));
+    // ✅ détails paiement (payPaid / payTotal / payRemain)
+    try{
+      const total = Number(String(amounts?.total_ttc ?? 0).replace(",", "."));
+      const paid  = Number(String(amounts?.amount_paid ?? 0).replace(",", "."));
+      const rest  = Number(String(amounts?.amount_remaining ?? Math.max(0, total - paid)).replace(",", "."));
 
-        const elPaid = document.getElementById("payPaid");
-        const elTotal = document.getElementById("payTotal");
-        const elRemain = document.getElementById("payRemain");
+      const elPaid = document.getElementById("payPaid");
+      const elTotal = document.getElementById("payTotal");
+      const elRemain = document.getElementById("payRemain");
 
-        if(elPaid)  elPaid.textContent  = formatMoney(paid);
-        if(elTotal) elTotal.textContent = formatMoney(total);
-        if(elRemain)elRemain.textContent= formatMoney(rest);
+      if(elPaid)  elPaid.textContent  = formatMoney(paid);
+      if(elTotal) elTotal.textContent = formatMoney(total);
+      if(elRemain)elRemain.textContent= formatMoney(rest);
 
-        if(payDetails){
-          // On affiche seulement si on a un total > 0
-          payDetails.style.display = (total > 0) ? "" : "none";
-        }
-      }catch(e){
-        // en cas d’erreur, on masque
-        if(payDetails) payDetails.style.display = "none";
+      if(payDetails){
+        payDetails.style.display = (total > 0) ? "" : "none";
       }
+    }catch(e){
+      if(payDetails) payDetails.style.display = "none";
+    }
   }
 
   function formatMoney(n){
@@ -573,12 +935,10 @@
   function setExpress(amounts){
     const ex = Number(amounts?.express_extra_fee || 0);
 
-    // badge en haut
     if(expressPill){
       expressPill.style.display = (ex > 0) ? "inline-flex" : "none";
     }
 
-    // ligne dans les montants
     if(rowExpress){
       rowExpress.style.display = (ex > 0) ? "" : "none";
     }
@@ -705,7 +1065,6 @@
     if(amtVat && amtVat.textContent !== next.vat){ amtVat.textContent = next.vat; pulse(amtVat); }
     if(amtTotal && amtTotal.textContent !== next.total){ amtTotal.textContent = next.total; pulse(amtTotal); }
 
-    // Express (badge + ligne + montant)
     setExpress(a);
   }
 
@@ -789,6 +1148,491 @@
     phasePill.classList.add("on");
   }
 
+  // ✅ preuves photos (safe si endpoint n’envoie rien)
+  function tagClass(t){
+    const s = String(t||"").toLowerCase();
+    if(s.includes("pickup")) return "pickup";
+    if(s.includes("laundry")) return "laundry";
+    if(s.includes("drop") || s.includes("deliver")) return "dropoff";
+    return "";
+  }
+
+  function tagLabel(t){
+    const s = String(t||"").toLowerCase();
+    if(s.includes("pickup")) return "Collecte";
+    if(s.includes("laundry")) return "Laverie";
+    if(s.includes("drop") || s.includes("deliver")) return "Livraison";
+    return t || "Photo";
+  }
+
+  function renderEvidence(photos, opts){
+    if(!evidenceBox) return;
+
+    const newly = new Set((opts && opts.new_ids) ? opts.new_ids.map(String) : []);
+
+    if(!photos || !photos.length){
+      evidenceBox.innerHTML = '<div class="muted">Aucune preuve photo pour le moment.</div>';
+      return;
+    }
+
+    evidenceBox.innerHTML = `
+      <div class="gallery">
+        ${photos.map((p) => {
+          const id  = (p.id != null) ? String(p.id) : "";
+          const url = escapeHtml(p.url || p.image_url || "");
+          const typ = escapeHtml(tagLabel(p.kind || p.type || p.stage || ""));
+          const cls = escapeHtml(tagClass(p.kind || p.type || p.stage || ""));
+          const ts  = p.created_at ? escapeHtml(formatDate(p.created_at)) : "";
+          const note = escapeHtml(p.note || p.comment || "");
+
+          const isNew = id && newly.has(id);
+
+          const tag = `<span class="phTag ${cls}"><span class="dot"></span>${typ}</span>`;
+          const meta = `
+            <div class="phMeta">
+              ${tag}
+              ${ts ? `<div class="ratingNote">📅 ${ts}</div>` : ``}
+              ${note ? `<div class="ratingNote">📝 ${note}</div>` : ``}
+            </div>
+          `;
+
+          return `
+            <div class="ph ${isNew ? "phNew" : ""}" data-evi-id="${escapeHtml(id)}">
+              ${url
+                ? `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="preuve photo"></a>`
+                : `<img src="" alt="preuve photo">`
+              }
+              ${meta}
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+
+    // Retire l’effet "new" après 1.2s (sans casser le layout)
+    if(newly.size){
+      setTimeout(() => {
+        try{
+          evidenceBox.querySelectorAll(".ph.phNew").forEach(el => el.classList.remove("phNew"));
+        }catch(e){}
+      }, 1200);
+    }
+  }
+
+  // ✅ Lightbox premium (plein écran)
+  function ensureEvidenceLightbox(){
+    if(document.getElementById("eviModal")) return;
+
+    const modal = document.createElement("div");
+    modal.id = "eviModal";
+    modal.style.cssText = [
+      "position:fixed",
+      "inset:0",
+      "z-index:9999",
+      "display:none",
+      "align-items:center",
+      "justify-content:center",
+      "background:rgba(15,23,42,0.72)",
+      "backdrop-filter: blur(3px)",
+      "padding:18px"
+    ].join(";");
+
+    modal.innerHTML = `
+      <div id="eviModalInner" style="
+        width:min(980px, 96vw);
+        max-height:92vh;
+        background:#0b1220;
+        border:1px solid rgba(255,255,255,0.12);
+        border-radius:18px;
+        box-shadow: 0 24px 64px rgba(0,0,0,0.35);
+        overflow:hidden;
+        position:relative;
+      ">
+        <button type="button" id="eviClose" aria-label="Fermer" style="
+          position:absolute; top:10px; right:10px;
+          width:40px; height:40px; border-radius:999px;
+          border:1px solid rgba(255,255,255,0.18);
+          background:rgba(255,255,255,0.08);
+          color:#fff; cursor:pointer; font-weight:950;
+        ">✕</button>
+
+        <div style="padding:10px 12px; color:#cbd5e1; font-size:12px; display:flex; gap:10px; align-items:center;">
+          <span style="font-weight:900;">Preuve photo</span>
+          <span style="opacity:.8">•</span>
+          <span style="opacity:.85">Clique dehors ou appuie sur ESC pour fermer</span>
+        </div>
+
+        <div style="background:#000; display:flex; align-items:center; justify-content:center;">
+          <img id="eviImg" alt="preuve photo" style="
+            max-width:100%;
+            max-height:calc(92vh - 58px);
+            display:block;
+            object-fit:contain;
+            background:#000;
+          ">
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = () => closeEvidenceLightbox();
+    modal.addEventListener("click", (e) => {
+      // clic sur fond sombre => ferme
+      if(e.target && e.target.id === "eviModal") close();
+    });
+    modal.querySelector("#eviClose")?.addEventListener("click", close);
+
+    document.addEventListener("keydown", (e) => {
+      if(e.key === "Escape") closeEvidenceLightbox();
+    }, { passive: true });
+  }
+
+  function openEvidenceLightbox(url){
+    const modal = document.getElementById("eviModal");
+    const img = document.getElementById("eviImg");
+    if(!modal || !img) return;
+
+    img.setAttribute("src", url);
+    modal.style.display = "flex";
+    try{ document.body.style.overflow = "hidden"; }catch(e){}
+  }
+
+  function closeEvidenceLightbox(){
+    const modal = document.getElementById("eviModal");
+    const img = document.getElementById("eviImg");
+    if(!modal) return;
+
+    modal.style.display = "none";
+    if(img) img.setAttribute("src", "");
+    try{ document.body.style.overflow = ""; }catch(e){}
+  }
+
+  // ✅ rating (premium + safe)
+  function isPaidStatus(ps){
+    const s = String(ps || "").toLowerCase();
+    return (s === "paid" || s.includes("payé") || s.includes("paye") || s.includes("paid"));
+  }
+
+  function renderStars(n){
+    const v = Math.max(0, Math.min(5, Number(n || 0)));
+    let out = "";
+    for(let i=1;i<=5;i++){
+      out += `<span class="star ${i<=v ? "on" : ""}">${i<=v ? "★" : "☆"}</span>`;
+    }
+    return out;
+  }
+
+  function renderStarsInteractive(selected, hover){
+    const s = Math.max(0, Math.min(5, Number(selected || 0)));
+    const h = Math.max(0, Math.min(5, Number(hover || 0)));
+    const v = h || s;
+
+    let out = "";
+    for(let i=1;i<=5;i++){
+      const on = (i<=v);
+      out += `<span class="star ${on ? "on" : ""}" data-v="${i}" style="cursor:pointer;user-select:none;">${on ? "★" : "☆"}</span>`;
+    }
+    return out; 
+  }
+
+  function showRatingReadonly(r){
+    const score = Number(r?.score ?? r?.rating ?? 0);
+    const comment = escapeHtml(r?.comment || r?.note || "");
+    const ts = r?.created_at ? escapeHtml(formatDate(r.created_at)) : "";
+
+    ratingBox.innerHTML = `
+      <div class="ratingRow">
+        <div class="stars">${renderStars(score)}</div>
+        <div style="font-weight:950;">${escapeHtml(String(score))}/5</div>
+        ${ts ? `<div class="ratingNote">• ${ts}</div>` : ``}
+      </div>
+      ${comment ? `<div class="ratingNote" style="margin-top:8px;">📝 ${comment}</div>` : ``}
+
+      <div class="ratingActions" style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btn-ghost" id="rateEditBtn" type="button">✏️ Modifier mon avis</button>
+        <span class="meta" id="rateSaved" style="margin:0;"></span>
+      </div>
+
+      <div id="rateEditBox" style="display:none;margin-top:10px;"></div>
+    `;
+
+    ratingBox.dataset.hasRating = "1";
+    ratingBox.dataset.formOpen = "0";
+
+    const editBtn = document.getElementById("rateEditBtn");
+    const editBox = document.getElementById("rateEditBox");
+    const savedEl = document.getElementById("rateSaved");
+
+    editBtn?.addEventListener("click", () => {
+      if(!editBox) return;
+
+      const open = (editBox.style.display !== "none");
+      editBox.style.display = open ? "none" : "block";
+      ratingBox.dataset.formOpen = open ? "0" : "1";
+      if(open) return;
+
+      let selected = score;
+      let hover = 0;
+
+      editBox.innerHTML = `
+        <div style="display:grid;gap:10px;max-width:640px;">
+          <div class="ratingRow">
+            <div class="stars" id="rateStarsEdit"></div>
+            <div style="font-weight:950;" id="rateValueEdit">${selected}/5</div>
+            <div class="ratingNote" id="rateHintEdit">Survole puis clique</div>
+          </div>
+
+          <textarea id="rateCommentEdit"
+            rows="3"
+            style="width:100%;border:1px solid var(--line);border-radius:14px;padding:10px;font-size:13px;outline:none;"
+          >${escapeHtml(r?.comment || r?.note || "")}</textarea>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <button class="btn btn-ghost" id="rateUpdate" type="button">Mettre à jour</button>
+            <button class="btn btn-ghost" id="rateCancel" type="button">Annuler</button>
+            <span class="meta" id="rateMsgEdit" style="margin:0;"></span>
+          </div>
+        </div>
+      `;
+
+      const starsEl = document.getElementById("rateStarsEdit");
+      const valEl = document.getElementById("rateValueEdit");
+      const msgEl = document.getElementById("rateMsgEdit");
+      const commentEl = document.getElementById("rateCommentEdit");
+      const btnUpdate = document.getElementById("rateUpdate");
+      const btnCancel = document.getElementById("rateCancel");
+
+      function draw(){
+        if(!starsEl) return;
+        starsEl.innerHTML = renderStarsInteractive(selected, hover);
+        if(valEl) valEl.textContent = `${(hover || selected)}/5`;
+      }
+      draw();
+
+      starsEl?.addEventListener("mousemove", (e) => {
+        const v = Number(e.target?.dataset?.v || 0);
+        if(v){ hover = v; draw(); }
+      });
+      starsEl?.addEventListener("mouseleave", () => {
+        hover = 0; draw();
+      });
+      starsEl?.addEventListener("click", (e) => {
+        const v = Number(e.target?.dataset?.v || 0);
+        if(v){ selected = v; hover = 0; draw(); }
+      });
+
+      btnCancel?.addEventListener("click", () => {
+        editBox.style.display = "none";
+        ratingBox.dataset.formOpen = "0";
+      });
+
+      btnUpdate?.addEventListener("click", async () => {
+        if(!msgEl) return;
+        msgEl.textContent = "Envoi…";
+        if(savedEl) savedEl.textContent = "";
+
+        try{
+          const csrftoken = getCookie("csrftoken");
+          const body = new URLSearchParams();
+          body.set("score", String(selected));
+          body.set("comment", String(commentEl?.value || "").trim());
+
+          const res = await fetch(ratingPostUrl, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "Accept": "application/json",
+              "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+              "X-CSRFToken": csrftoken,
+            },
+            body: body.toString(),
+            cache: "no-store",
+          });
+
+          const ct = (res.headers.get("content-type") || "").toLowerCase();
+          const data = ct.includes("application/json") ? await res.json() : null;
+
+          if(!res.ok || !data || !data.ok){
+            const err = (data && data.error) ? data.error : `HTTP ${res.status}`;
+            msgEl.textContent = `Erreur: ${err}`;
+            return;
+          }
+
+          msgEl.textContent = "";
+          if(savedEl){
+            savedEl.innerHTML = '<span class="toastOk">✅ Avis mis à jour</span>';
+            setTimeout(() => { try{ savedEl.textContent = ""; }catch(e){} }, 2500);
+          }
+          ratingBox.classList.remove("pulse"); void ratingBox.offsetWidth; ratingBox.classList.add("pulse");
+          ratingBox.dataset.formOpen = "0";
+
+          // Re-affiche lecture seule avec la réponse serveur
+          showRatingReadonly(data.rating);
+
+        }catch(e){
+          msgEl.textContent = "Erreur réseau. Réessaie.";
+        }
+      });
+    });
+  }
+
+  function showRatingCreateForm(){
+    // évite d’écraser si l’utilisateur est en train d’écrire
+    if(ratingBox.dataset.formOpen === "1") return;
+
+    ratingBox.dataset.formOpen = "1";
+
+    ratingBox.innerHTML = `
+      <div style="display:grid;gap:10px;max-width:640px;">
+        <div class="meta" style="font-weight:900;">
+          Note le service (1 à 5) puis laisse un commentaire.
+        </div>
+
+        <div class="ratingRow">
+          <div class="stars" id="rateStars" aria-label="Choisir une note"></div>
+          <div style="font-weight:950;" id="rateValue">—/5</div>
+          <div class="ratingNote" id="rateHint">Clique sur les étoiles</div>
+        </div>
+
+        <textarea id="rateComment"
+          rows="3"
+          style="width:100%;border:1px solid var(--line);border-radius:14px;padding:10px;font-size:13px;outline:none;"
+          placeholder="Ex: Service nickel, livraison rapide."></textarea>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <button class="btn btn-ghost" id="rateSend" type="button">Envoyer</button>
+          <span class="meta" id="rateMsg" style="margin:0;"></span>
+        </div>
+      </div>
+    `;
+
+    const starsEl = document.getElementById("rateStars");
+    const valEl   = document.getElementById("rateValue");
+    const msgEl   = document.getElementById("rateMsg");
+    const sendBtn = document.getElementById("rateSend");
+    const commentEl = document.getElementById("rateComment");
+
+    let selected = 0;
+    let hover = 0;
+
+    function draw(){
+      if(!starsEl) return;
+      starsEl.innerHTML = renderStarsInteractive(selected, hover);
+      if(valEl) valEl.textContent = (hover || selected) ? `${(hover || selected)}/5` : "—/5";
+      // ✅ premium: bouton inactif tant que note=0
+      if(sendBtn){
+        const ok = (selected > 0);
+        sendBtn.disabled = !ok;
+        sendBtn.style.opacity = ok ? "1" : "0.55";
+      }
+    }
+    draw();
+
+    starsEl?.addEventListener("mousemove", (e) => {
+      const v = Number(e.target?.dataset?.v || 0);
+      if(v){ hover = v; draw(); }
+    });
+    starsEl?.addEventListener("mouseleave", () => {
+      hover = 0; draw();
+    });
+    starsEl?.addEventListener("click", (e) => {
+      const v = Number(e.target?.dataset?.v || 0);
+      if(v){ selected = v; hover = 0; draw(); }
+    });
+
+    sendBtn?.addEventListener("click", async () => {
+      if(!msgEl) return;
+      if(selected <= 0){
+        msgEl.textContent = "Choisis une note (1 à 5).";
+        return;
+      }
+
+      sendBtn.disabled = true;
+      sendBtn.style.opacity = "0.7";
+      msgEl.textContent = "Envoi…";
+
+      try{
+        const csrftoken = getCookie("csrftoken");
+        const body = new URLSearchParams();
+        body.set("score", String(selected));
+        body.set("comment", String(commentEl?.value || "").trim());
+
+        const res = await fetch(ratingPostUrl, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+            "X-CSRFToken": csrftoken,
+          },
+          body: body.toString(),
+          cache: "no-store",
+        });
+
+        const ct = (res.headers.get("content-type") || "").toLowerCase();
+        const data = ct.includes("application/json") ? await res.json() : null;
+
+        if(!res.ok || !data || !data.ok){
+          const err = (data && data.error) ? data.error : `HTTP ${res.status}`;
+          msgEl.textContent = `Erreur: ${err}`;
+          sendBtn.disabled = false;
+          sendBtn.style.opacity = "1";
+          return;
+        }
+
+        ratingBox.classList.remove("pulse"); void ratingBox.offsetWidth; ratingBox.classList.add("pulse");
+        ratingBox.dataset.formOpen = "0";
+
+        // ✅ toast premium
+        if(msgEl){
+          msgEl.innerHTML = '<span class="toastOk">✅ Merci pour ton avis</span>';
+          setTimeout(() => { try{ msgEl.textContent = ""; }catch(e){} }, 2500);
+        }
+
+        // Re-affiche lecture seule
+        showRatingReadonly(data.rating);
+
+      }catch(e){
+        msgEl.textContent = "Erreur réseau. Réessaie.";
+        sendBtn.disabled = false;
+        sendBtn.style.opacity = "1";
+      }
+    });
+  }
+
+  function renderRating(r, status, paymentStatus){
+    if(!ratingBox) return;
+
+    const st = String(status || "").toLowerCase();
+    const ps = String(paymentStatus || "").toLowerCase();
+
+    const terminal = isTerminalStatus(st);
+    const paid = isPaidStatus(ps);
+
+    const score = Number(r?.score ?? r?.rating ?? 0);
+    const hasRating = (score > 0);
+
+    // ✅ si note existe → lecture seule + édition possible
+    if(hasRating){
+      showRatingReadonly(r);
+      return;
+    }
+
+    // ✅ sinon : seulement après livraison + paiement
+    if(!(terminal && paid)){
+      ratingBox.dataset.formOpen = "0";
+      ratingBox.innerHTML = '<div class="muted">Tu pourras évaluer après la livraison et le paiement.</div>';
+      return;
+    }
+
+    showRatingCreateForm();
+  }
+
+
+
   async function tick(){
     if(busy) return;
     busy = true;
@@ -803,7 +1647,6 @@
         cache: "no-store"
       });
 
-      // Auth / droits
       if(res.status === 401 || res.status === 403){
         setLive(false, "Session expirée (reconnecte-toi)");
         if(legsBox){
@@ -827,7 +1670,6 @@
         return;
       }
 
-      // Sécurisation JSON
       const ct = (res.headers.get("content-type") || "").toLowerCase();
       if(!ct.includes("application/json")){
         setLive(false, "Erreur serveur (réponse non JSON)");
@@ -844,14 +1686,26 @@
       setStatus(status);
 
       setPayment(data.order?.payment_status || "", data.amounts);
-
       setAmounts(data.amounts);
 
       renderLegs(data.legs || []);
       renderItems(data.order?.items || []);
       renderTimeline(data.timeline || []);
-
       setPhase(data.timeline || []);
+
+      // ✅ preuves/évaluation (si le backend les envoie)
+      renderEvidence(data.evidence_photos || data.evidence || []);
+      const rb = document.getElementById("ratingBox");
+      const formOpen = (rb && rb.dataset && rb.dataset.formOpen === "1");
+
+      if(!formOpen){
+        const rb = document.getElementById("ratingBox");
+      const formOpen = (rb && rb.dataset && rb.dataset.formOpen === "1");
+
+      if(!formOpen){
+        renderRating(data.rating || data.review || null, status, data.order?.payment_status || "");
+      }
+      }     
 
       const total = parseTotal(data.amounts);
       const active = isActiveStatus(status);
@@ -863,14 +1717,14 @@
       }
 
       if(isTerminalStatus(status)){
-          const ps = String(data.order?.payment_status || "").toLowerCase();
-          const isPaid = (ps.includes("paid") || ps.includes("paye") || ps.includes("payé"));
-          if(isPaid){
-            setLive(true, "Terminé");
-            stop();
-            return;
-          }
+        const ps = String(data.order?.payment_status || "").toLowerCase();
+        const isPaid = (ps.includes("paid") || ps.includes("paye") || ps.includes("payé"));
+        if(isPaid){
+          setLive(true, "Terminé");
+          stop();
+          return;
         }
+      }
 
       setLive(true, "Connecté");
     }catch(e){

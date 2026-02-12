@@ -56,6 +56,18 @@ def auto_assign_delivery(order) -> Optional[DeliveryPartner]:
             update_fields.append("delivery_partner_unassigned_reason")
 
         order.save(update_fields=update_fields)
+
+        # ✅ Propager le driver aux legs existants (pickup/return) si vides
+        try:
+            from orders.models import DeliveryLeg
+            DeliveryLeg.objects.filter(
+                order=order,
+                leg_type__in=("pickup", "return"),
+                driver__isnull=True,
+            ).update(driver=dp)
+        except Exception:
+            pass
+
         return dp
 
     # Aucun livreur: stocker la raison uniquement si le champ existe

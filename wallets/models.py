@@ -418,11 +418,10 @@ class WalletTransaction(models.Model):
 
 class WithdrawalRequest(models.Model):
     """
-    Demande de retrait d'un livreur sur son wallet.
+    Demande de retrait sur un wallet (driver / laundry / customer / relay / internal).
 
     Règle :
-    - Le débit réel du wallet + création de WalletTransaction se font
-      UNIQUEMENT quand la demande passe à 'paid'.
+    - Le débit réel du wallet + création de WalletTransaction se font UNIQUEMENT quand status passe à 'paid'.
     - Idempotent : si déjà traité (processed_at) ou si la tx existe déjà → on ne refait rien.
     """
 
@@ -437,14 +436,7 @@ class WithdrawalRequest(models.Model):
         Wallet,
         on_delete=models.CASCADE,
         related_name="withdrawals",
-        verbose_name="Wallet livreur",
-    )
-
-    delivery_partner = models.ForeignKey(
-        DeliveryPartner,
-        on_delete=models.CASCADE,
-        related_name="withdrawals",
-        verbose_name="Livreur",
+        verbose_name="Wallet",
     )
 
     requested_by = models.ForeignKey(
@@ -484,14 +476,26 @@ class WithdrawalRequest(models.Model):
     admin_notes = models.TextField("Notes internes", blank=True)
 
     class Meta:
-        verbose_name = "Demande de retrait livreur"
-        verbose_name_plural = "Demandes de retrait livreur"
+        verbose_name = "Demande de retrait"
+        verbose_name_plural = "Demandes de retrait"
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"[{self.get_status_display()}] {self.delivery_partner} – {self.amount} {self.wallet.currency}"
+        return f"[{self.get_status_display()}] {self.get_beneficiary_display()} – {self.amount} {self.wallet.currency}"
 
-    # ---------- LOGIQUE MÉTIER ----------
+    # ---------- HELPERS ----------
+    def get_beneficiary_display(self) -> str:
+        w = self.wallet
+        if not w:
+            return "—"
+        # On affiche selon le owner_type et les FK existantes du Wallet
+        if getattr(w, "delivery_partner_id", None):
+            return f"Livraison: {getattr(w.delivery_partner, 'name', '—')}"
+        if getattr(w, "laundry_partner_id", None):
+            return f"Blanchisserie: {getattr(w.laundry_partner, 'name', '—')}"
+        if getattr(w, "customer_id", None):
+            return f"Client: {getattr(w.customer, 'name', '—')}"
+        return f"{getattr(w, 'owner_type', 'wallet')} #{w.id}"
 
     def _tx_exists(self) -> bool:
         """
@@ -514,7 +518,7 @@ class WithdrawalRequest(models.Model):
     def _can_debit_wallet(self) -> bool:
         if self.status != "paid":
             return False
-        if self.processed_at is not None:
+        if self.processed_at is not None and self._tx_exists():
             return False
         amount = self.amount or Decimal("0.00")
         if amount <= 0:
@@ -538,8 +542,6 @@ class WithdrawalRequest(models.Model):
             wallet = Wallet.objects.select_for_update().get(pk=self.wallet_id)
 
             # Re-check sous lock
-            if self.processed_at is not None:
-                return
             if self._tx_exists():
                 return
             if (wallet.balance or Decimal("0.00")) < amount:
@@ -553,11 +555,11 @@ class WithdrawalRequest(models.Model):
             WalletTransaction.objects.create(
                 wallet=wallet,
                 order=None,
-                leg=None,  # ✅ explicite
+                leg=None,
                 type="payout",
                 direction="out",
                 amount=amount,
-                description=f"Retrait #{self.id} – livreur {getattr(self.delivery_partner, 'name', '—')}",
+                description=f"Retrait #{self.id} – {self.get_beneficiary_display()}",
             )
 
             # 3) Marquer traité

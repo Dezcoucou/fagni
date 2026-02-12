@@ -7,10 +7,10 @@ from django.urls import reverse
 from orders.models import Customer
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from .models import Wallet, WalletTransaction, WithdrawalRequest
-from partners.models import DeliveryPartner
+from partners.models import DeliveryPartner, LaundryPartner
 from django.contrib import messages
 from django.utils import timezone
-from .services import get_or_create_wallet_for_delivery_partner
+from .services import get_or_create_wallet_for_delivery_partner, get_or_create_wallet_for_laundry_partner
 
 
 DEC = DecimalField(max_digits=12, decimal_places=2)
@@ -140,7 +140,6 @@ def driver_wallet_dashboard(request):
 
         WithdrawalRequest.objects.create(
             wallet=wallet,
-            delivery_partner=driver,
             requested_by=request.user if request.user.is_authenticated else None,
             amount=amount,
             status="pending",
@@ -179,3 +178,94 @@ def driver_wallet_dashboard(request):
         "total_debited": total_debited,
     }
     return render(request, "orders/driver_wallet.html", context)
+
+
+@login_required
+def laundry_wallet_dashboard(request):
+    """
+    Dashboard du wallet blanchisserie.
+    On se base sur ?laundry_id= pour déterminer la blanchisserie.
+    Staff : peut choisir n'importe quel laundry_id
+    Non-staff : verrouillage par email si possible (même logique que driver).
+    """
+    user = request.user
+    selected_laundry_id = (request.GET.get("laundry_id") or "").strip()
+
+    laundry = None
+    if selected_laundry_id:
+        laundry = LaundryPartner.objects.filter(pk=selected_laundry_id).first()
+
+    if not laundry:
+        context = {
+            "error_message": (
+                "Blanchisserie non identifiée. Ouvre d’abord l’espace blanchisserie, puis clique sur Wallet "
+                "(le lien doit contenir ?laundry_id=...)."
+            )
+        }
+        return render(request, "orders/laundry_wallet.html", context)
+
+    # Verrouillage (optionnel) par email si tu as laundry.email
+    if not request.user.is_staff:
+        user_email = (getattr(request.user, "email", "") or "").strip().lower()
+        laundry_email = (getattr(laundry, "email", "") or "").strip().lower()
+        if (not user_email) or (not laundry_email) or (user_email != laundry_email):
+            return render(request, "orders/laundry_wallet.html", {
+                "error_message": "Accès refusé : ce wallet n’est pas associé à ton compte."
+            })
+
+    wallet = get_or_create_wallet_for_laundry_partner(laundry)
+
+    # POST : demande de retrait
+    if request.method == "POST":
+        amount_str = request.POST.get("amount", "").strip() or "0"
+        try:
+            amount = Decimal(amount_str)
+        except Exception:
+            messages.error(request, "Montant invalide.")
+            return redirect(f"{reverse('wallets:laundry_wallet_dashboard')}?laundry_id={laundry.id}")
+
+        if amount <= 0:
+            messages.error(request, "Le montant doit être strictement positif.")
+            return redirect(f"{reverse('wallets:laundry_wallet_dashboard')}?laundry_id={laundry.id}")
+
+        if amount > wallet.balance:
+            messages.error(request, "Le montant demandé dépasse ton solde disponible.")
+            return redirect(f"{reverse('wallets:laundry_wallet_dashboard')}?laundry_id={laundry.id}")
+
+        WithdrawalRequest.objects.create(
+            wallet=wallet,
+            requested_by=request.user if request.user.is_authenticated else None,
+            amount=amount,
+            status="pending",
+        )
+
+        messages.success(request, "Ta demande de retrait a été enregistrée. Elle sera traitée par l'équipe FAGNI.")
+        return redirect(f"{reverse('wallets:laundry_wallet_dashboard')}?laundry_id={laundry.id}")
+
+    # GET
+    tx_qs = wallet.transactions.all().order_by("-created_at")[:50]
+
+    now = timezone.now()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_in_qs = wallet.transactions.filter(created_at__gte=month_start, direction="in")
+    month_earnings = (month_in_qs.aggregate(s=Sum("amount"))["s"] or Decimal("0.00")).quantize(Decimal("0.01"))
+
+    pending_withdrawals = wallet.withdrawals.filter(status="pending").order_by("-created_at")
+    last_withdrawals = wallet.withdrawals.all().order_by("-created_at")[:10]
+
+    total_credited = wallet.transactions.filter(direction="in").aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+    total_debited  = wallet.transactions.filter(direction="out").aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+
+    context = {
+        "laundry": laundry,
+        "wallet": wallet,
+        "transactions": tx_qs,
+        "month_earnings": month_earnings,
+        "month_start": month_start,
+        "pending_withdrawals": pending_withdrawals,
+        "last_withdrawals": last_withdrawals,
+        "selected_laundry_id": selected_laundry_id,
+        "total_credited": total_credited,
+        "total_debited": total_debited,
+    }
+    return render(request, "orders/laundry_wallet.html", context)

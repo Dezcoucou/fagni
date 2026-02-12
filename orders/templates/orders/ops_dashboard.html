@@ -175,16 +175,6 @@
 
 <div class="ops-page">
 
-  {% if messages %}
-    <div class="ops-flashes">
-      {% for message in messages %}
-        <div class="ops-flash {{ message.tags|default:'' }}">
-          {{ message }}
-        </div>
-      {% endfor %}
-    </div>
-  {% endif %}
-
   {# Bandeau filtre driver #}
   {% if selected_driver_id and selected_driver %}
     <div class="ops-card" style="border-left:6px solid var(--fagni-orange);">
@@ -206,33 +196,76 @@
 
   {# ===== Alertes OPS ===== #}
   <div class="ops-alerts-grid">
+
     <div class="ops-alert-box">
       <div class="ops-alert-head">
-        <p class="ops-alert-title">🚨 Commandes à surveiller (SLA)</p>
-        <span class="ops-alert-count">{{ alerts_orders_count|default:0 }}</span>
+        <p class="ops-alert-title">🚨 Retards SLA</p>
+        <span class="ops-alert-count">{{ alerts_sla_count|default:0 }}</span>
       </div>
 
-      {% if alerts_orders %}
+      {% if alerts_sla_orders %}
         <ul class="ops-alert-list">
-          {% for a in alerts_orders %}
+          {% for a in alerts_sla_orders %}
+
             <li class="ops-alert-item">
-              <strong>{{ a.order.code }}</strong> · {{ a.reason }}
+              <strong>{{ a.order.code }}</strong>
+
+              <br>
+              <span style="display:block;margin-top:4px;">{{ a.reason }}</span>
+
               <small>
                 ⏱️ {{ a.age_h }}h
-                {% if a.order.customer %} · 👤 {{ a.order.customer.name }}{% endif %}
                 · <a class="ops-link-detail" href="{% url 'orders:detail' a.order.id %}">Détail</a>
                 · <a class="ops-link-detail" href="{% url 'orders:ops_dashboard' %}?highlight={{ a.order.id }}&focus=order">🎯 Focus</a>
-                {% if a.order.delivery_partner %}
-                  · <a class="ops-link-detail" href="{% url 'orders:ops_dashboard' %}?focus=driver&driver_id={{ a.order.delivery_partner.id }}">🎯 Voir sur la carte</a>
-                {% else %}
-                  · <span class="ops-subtext" style="display:inline;">🛵 Livreur ?</span>
+                · <a class="ops-link-detail" href="{% url 'orders:driver_weighing' a.order.id %}">📦 Pesée livreur</a>
+                {% url 'orders:laundry_weighing' a.order.id as laundry_url %}
+                  {% if laundry_url %}· <a class="ops-link-detail" href="{{ laundry_url }}">🧺 Pesée blanchisserie</a>{% endif %}
+              </small>
+            </li>
+
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="ops-alert-empty">✅ Aucun retard SLA pour le moment.</div>
+      {% endif %}
+    </div>
+
+    <div class="ops-alert-box">
+      <div class="ops-alert-head">
+        <p class="ops-alert-title">🧷 Litiges – Pesées contestées</p>
+        <span class="ops-alert-count">{{ alerts_disputes_count|default:0 }}</span>
+      </div>
+
+      {% if alerts_disputes_orders %}
+        <ul class="ops-alert-list">
+          
+{% for a in alerts_disputes_orders %}
+            <li class="ops-alert-item">
+              <strong>{{ a.order.code }}</strong>
+ {% if a.has_scale_photo %}
+   · <span class="ops-badge-status ops-badge-done">📷 Balance OK</span>
+   {% if a.scale_photo_url %}
+     · <a class="ops-link-detail" href="{{ a.scale_photo_url }}" target="_blank">📷 Voir photo balance</a>
+   {% endif %}
+ {% else %}
+   · <span class="ops-badge-status ops-badge-danger">📷 Balance manquante</span>
+ {% endif %}
+ · {{ a.reason }}
+              <small>
+                ⏱️ {{ a.age_h }}h
+                · <a class="ops-link-detail" href="{% url 'orders:detail' a.order.id %}">Détail</a>
+                · <a class="ops-link-detail" href="{% url 'orders:ops_dashboard' %}?highlight={{ a.order.id }}&focus=order">🎯 Focus</a>
+                  · <a class="ops-link-detail" href="{% url 'orders:ops_weighing_resolve' a.order.id %}">⚖️ Trancher</a>
+                · <a class="ops-link-detail" href="{% url 'orders:driver_weighing' a.order.id %}">📦 Pesée livreur</a>
+                {% if laundry_url %}
+                · <a class="ops-link-detail" href="{{ laundry_url }}">🧺 Pesée blanchisserie</a>
                 {% endif %}
               </small>
             </li>
           {% endfor %}
         </ul>
       {% else %}
-        <div class="ops-alert-empty">✅ Rien à signaler pour le moment.</div>
+        <div class="ops-alert-empty">✅ Aucun litige de pesée.</div>
       {% endif %}
     </div>
 

@@ -889,3 +889,21 @@ class AssignmentSettingsAdmin(admin.ModelAdmin):
 @admin.register(InvoiceSettings)
 class InvoiceSettingsAdmin(admin.ModelAdmin):
     list_display = ("id",)
+
+
+# === Enregistrement catalogue pressing (catégories + articles) ===
+from django.contrib import admin
+from .models import ServiceCategory, ServiceItem
+
+@admin.register(ServiceCategory)
+class ServiceCategoryAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug")
+    search_fields = ("name", "slug")
+    prepopulated_fields = {"slug": ("name",)}
+
+@admin.register(ServiceItem)
+class ServiceItemAdmin(admin.ModelAdmin):
+    list_display = ("name", "category", "default_price", "is_active")
+    list_filter = ("category", "is_active")
+    search_fields = ("name", "code", "category__name")
+    ordering = ("category__name", "name")

@@ -1,7 +1,6 @@
-from decimal import Decimal, ROUND_HALF_UP
-
 from django.contrib import admin, messages
 from django.db import transaction
+from django.utils import timezone
 
 from .models import Wallet, WalletTransaction, WithdrawalRequest
 
@@ -44,6 +43,7 @@ class WalletTransactionAdmin(admin.ModelAdmin):
         "amount",
         "created_at",
         "order",
+        "leg",
     )
     list_filter = ("type", "direction", "created_at")
     search_fields = (
@@ -62,71 +62,160 @@ class WalletTransactionAdmin(admin.ModelAdmin):
 @admin.register(WithdrawalRequest)
 class WithdrawalRequestAdmin(admin.ModelAdmin):
     """
-    Demandes de retrait de wallets livreurs.
-    Le modèle WithdrawalRequest n'a PAS de champ `driver` ni `updated_at`,
-    donc on dérive le livreur via wallet.delivery_partner.
+    Demandes de retrait.
+    Objectif: payer / rejeter proprement + tracer processed_by + anti-doublon.
     """
 
-    list_display = ("id", "wallet", "get_driver", "amount", "status", "created_at")
-    list_filter = ("status", "created_at")
+    list_display = (
+        "id",
+        "wallet",
+        "get_beneficiary",
+        "amount",
+        "status",
+        "created_at",
+        "processed_at",
+        "processed_by",
+    )
+    list_filter = ("status", "created_at", "processed_at")
     search_fields = (
         "wallet__delivery_partner__name",
         "wallet__delivery_partner__email",
+        "admin_notes",
+        "wallet__laundry_partner__name",
+        "wallet__customer__name",
     )
-    # On ne met que des champs qui existent vraiment sur le modèle
-    readonly_fields = ("wallet", "created_at")
-
     ordering = ("-created_at",)
 
-    def get_driver(self, obj):
-        """
-        Affiche le nom du livreur lié au wallet (si présent).
-        """
-        if obj.wallet and obj.wallet.delivery_partner:
-            return obj.wallet.delivery_partner.name
-        return "—"
+    # On évite de modifier wallet & montant après création (sécurité)
+    readonly_fields = ("wallet", "requested_by", "amount", "created_at", "processed_at", "processed_by")
 
-    get_driver.short_description = "Livreur"
+    fieldsets = (
+        ("Demande", {
+            "fields": ("wallet", "requested_by", "amount", "status", "created_at")
+        }),
+        ("Traitement", {
+            "fields": ("processed_at", "processed_by", "admin_notes")
+        }),
+    )
+
+    actions = ("action_mark_approved", "action_mark_paid", "action_mark_rejected")
+
+    def get_beneficiary(self, obj):
+        return obj.get_beneficiary_display() if obj else "—"
+
+    get_beneficiary.short_description = "Bénéficiaire"
+
+    # ---------- ACTIONS ADMIN (LISTE) ----------
+
+    @admin.action(description="✅ Approuver (status=approved)")
+    def action_mark_approved(self, request, queryset):
+        n = 0
+        for obj in queryset.select_related("wallet", "wallet__delivery_partner", "wallet__laundry_partner", "wallet__customer"):
+            if obj.status in ("paid", "rejected"):
+                continue
+            obj.status = "approved"
+            obj.processed_by = request.user
+            # On garde processed_at vide pour approved (optionnel) — tu peux le mettre si tu veux tracer
+            obj.save(update_fields=["status", "processed_by"])
+            n += 1
+        if n:
+            messages.success(request, f"{n} demande(s) approuvée(s).")
+        else:
+            messages.info(request, "Aucune demande approuvée (déjà payée/rejetée ?).")
+
+    @admin.action(description="💸 Payer (status=paid + débit wallet + tx payout OUT)")
+    def action_mark_paid(self, request, queryset):
+        ok = 0
+        skipped = 0
+        errors = 0
+
+        for obj in queryset.select_related("wallet", "wallet__delivery_partner", "wallet__laundry_partner", "wallet__customer"):
+            try:
+                if obj.status == "paid" or obj.processed_at is not None:
+                    skipped += 1
+                    continue
+
+                # Sécurité: si tx existe déjà, on ne repaye pas
+                if obj._tx_exists():
+                    skipped += 1
+                    continue
+
+                # Passage à paid + trace du user
+                obj.status = "paid"
+                obj.processed_by = request.user
+                obj.save(update_fields=["status", "processed_by"])
+
+                # Applique payout (idempotent + atomic + lock wallet)
+                obj.apply_payout()
+                obj.refresh_from_db()
+
+                if obj.processed_at:
+                    ok += 1
+                else:
+                    # cas solde insuffisant / tx déjà existante / déjà traité
+                    skipped += 1
+            except Exception as e:
+                errors += 1
+                messages.error(request, f"Erreur paiement retrait #{obj.id} : {e}")
+
+        if ok:
+            messages.success(request, f"{ok} retrait(s) payé(s) avec succès.")
+        if skipped:
+            messages.warning(request, f"{skipped} retrait(s) ignoré(s) (déjà traité/tx existante/solde insuffisant).")
+        if not ok and not errors and skipped == 0:
+            messages.info(request, "Aucun retrait traité.")
+
+    @admin.action(description="❌ Rejeter (status=rejected)")
+    def action_mark_rejected(self, request, queryset):
+        n = 0
+        for obj in queryset.select_related("wallet", "wallet__delivery_partner", "wallet__laundry_partner", "wallet__customer"):
+            if obj.status == "paid":
+                continue
+            obj.status = "rejected"
+            obj.processed_by = request.user
+            # ici on met processed_at pour tracer que c'est “traité” (mais pas payé)
+            obj.processed_at = timezone.now()
+            obj.save(update_fields=["status", "processed_by", "processed_at"])
+            n += 1
+
+        if n:
+            messages.success(request, f"{n} demande(s) rejetée(s).")
+        else:
+            messages.info(request, "Aucune demande rejetée (déjà payée ?).")
+
+    # ---------- EDIT (FORM) : si on change status à la main ----------
 
     def save_model(self, request, obj, form, change):
         """
-        Source unique : le modèle (obj.apply_payout) gère TOUT :
-        - lock wallet
-        - anti-doublon
-        - création de WalletTransaction
-        - processed_at
-        L'admin ne fait que déclencher au bon moment.
+        Si on édite une demande et qu'on met status=paid:
+        - on trace processed_by
+        - on applique payout (idempotent)
         """
-        # Ancien statut avant sauvegarde
         old_status = None
         if obj.pk:
-            old = WithdrawalRequest.objects.filter(pk=obj.pk).only("status").first()
+            old = WithdrawalRequest.objects.filter(pk=obj.pk).only("status", "processed_at").first()
             if old:
                 old_status = old.status
 
+        # Trace l'admin qui traite (sur changement de statut)
+        if change and "status" in form.changed_data:
+            obj.processed_by = request.user
+
+            # Pour rejected: processed_at = now (trace)
+            if obj.status == "rejected" and not obj.processed_at:
+                obj.processed_at = timezone.now()
+
         super().save_model(request, obj, form, change)
 
-        # On recharge en base après super().save_model()
+        # Déclenchement payout uniquement sur transition vers paid
         obj.refresh_from_db()
-
-        # Ne déclencher que lors d'un passage vers "paid"
-        if obj.status != "paid":
-            return
-        if old_status == "paid":
-            return
-
-        try:
-            obj.apply_payout()
-            obj.refresh_from_db()
-            if obj.processed_at:
-                messages.success(
-                    request,
-                    f"Retrait #{obj.id} payé : wallet débité de {obj.amount} XOF."
-                )
-            else:
-                messages.warning(
-                    request,
-                    f"Retrait #{obj.id} : paiement non appliqué (déjà traité, tx existante ou solde insuffisant)."
-                )
-        except Exception as e:
-            messages.error(request, f"Erreur paiement retrait #{obj.id} : {e}")
+        if obj.status == "paid" and old_status != "paid":
+            try:
+                obj.apply_payout()
+                obj.refresh_from_db()
+                if obj.processed_at:
+                    messages.success(request, f"Retrait #{obj.id} payé : wallet débité de {obj.amount} XOF.")
+                else:
+                    messages.warning(request, f"Retrait #{obj.id} : paiement non appliqué (déjà traité/tx existante/solde insuffisant).")
+            except Exception as e:
+                messages.error(request, f"Erreur paiement retrait #{obj.id} : {e}")

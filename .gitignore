@@ -144,3 +144,7 @@ venv/
 # temp debug
 Mismatch
 
+
+# github actions (added via GitHub web)
+.github/
+

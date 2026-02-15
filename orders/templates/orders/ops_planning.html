@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load money_filters %}
+{% block title %}OPS – Planning | FAGNI{% endblock %}
+
+{% block content %}
+<div class="page" style="max-width:1150px;margin:0 auto;padding:16px">
+  <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">
+    <div>
+      <h1 style="margin:0;font-size:22px;font-weight:900">🗓️ OPS — Planning</h1>
+      <div style="color:#64748b;margin-top:4px">Du {{ date_from }} au {{ date_to }}</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="btn btn-light" href="{% url 'orders:ops_dashboard' %}">← Retour OPS</a>
+      <a class="btn btn-light" href="{% url 'orders:driver_map' %}">🗺️ Carte livreurs</a>
+    </div>
+  </div>
+
+  <div style="margin-top:14px;padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#fff">
+    <form method="get" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+      <div>
+        <label style="font-size:12px;color:#64748b">Date début</label><br/>
+        <input type="date" name="date_from" value="{{ date_from|date:'Y-m-d' }}" style="padding:8px 10px;border:1px solid #e5e7eb;border-radius:10px">
+      </div>
+      <div>
+        <label style="font-size:12px;color:#64748b">Date fin</label><br/>
+        <input type="date" name="date_to" value="{{ date_to|date:'Y-m-d' }}" style="padding:8px 10px;border:1px solid #e5e7eb;border-radius:10px">
+      </div>
+      <div>
+        <label style="font-size:12px;color:#64748b">Livreur</label><br/>
+        <select name="driver_id" style="padding:8px 10px;border:1px solid #e5e7eb;border-radius:10px;min-width:240px">
+          <option value="">Tous</option>
+          {% for d in drivers_list %}
+            <option value="{{ d.id }}" {% if selected_driver_id|stringformat:"s" == d.id|stringformat:"s" %}selected{% endif %}>
+              {{ d.name }}{% if d.city %} ({{ d.city }}){% endif %}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <button class="btn btn-primary" type="submit">Filtrer</button>
+      </div>
+    </form>
+  </div>
+
+  <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+    <div style="padding:10px 12px;border:1px solid #e5e7eb;border-radius:999px;background:#fff">
+      En retard : <strong>{{ overdue_count }}</strong>
+    </div>
+    <div style="padding:10px 12px;border:1px solid #e5e7eb;border-radius:999px;background:#fff">
+      Tâches : <strong>{{ tasks|length }}</strong>
+    </div>
+  </div>
+
+  {% if by_date %}
+    <div style="margin-top:14px;display:grid;gap:12px">
+      {% for day, items in by_date %}
+        <div style="border:1px solid #e5e7eb;border-radius:14px;background:#fff;overflow:hidden">
+          <div style="padding:10px 12px;background:#f8fafc;font-weight:900">
+            {{ day|date:"l d/m/Y" }}
+          </div>
+          <div style="padding:10px 12px">
+            {% for t in items %}
+              <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #f1f5f9">
+                <div>
+                  <div style="font-weight:800">{{ t.label }}</div>
+                  <div style="color:#64748b;font-size:12px;margin-top:2px">
+                    Cmd: <strong>{{ t.order.code }}</strong> —
+                    Client: {{ t.order.customer_name|default:"—" }}
+                  </div>
+                  <div style="color:#64748b;font-size:12px;margin-top:2px">
+                    Échéance: {{ t.due_at|date:"d/m/Y H:i" }} {% if t.overdue %}<strong style="color:#ef4444">• EN RETARD</strong>{% endif %}
+                  </div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <div style="font-weight:900">{{ t.total_disp|money }} FCFA</div>
+                  <a class="btn btn-light" href="{% url 'orders:detail' t.order.id %}">Ouvrir</a>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div style="margin-top:14px;color:#64748b">Aucune tâche sur la période.</div>
+  {% endif %}
+</div>
+{% endblock %}

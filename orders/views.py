@@ -6036,7 +6036,7 @@ def driver_performance(request, driver_id):
         days = 30
 
     end = timezone.now()
-    start = end - datetime.timedelta(days=days)
+    start = end - timedelta(days=days)
 
     # 3) Query de base : toutes les commandes du livreur sur la période
     orders_qs = (

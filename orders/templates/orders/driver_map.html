@@ -5,7 +5,7 @@
 {% block title %}OPS – Carte des livreurs | FAGNI{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
+<link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}?v=20260215a">
 <style>
   :root{
     --fagni-orange:#ff7a00;
@@ -269,7 +269,32 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+<script src="{% static 'vendor/leaflet/leaflet.js' %}?v=20260215a"></script>
+
+<script>
+(function(){
+  if (!window.L || !L.Icon || !L.Icon.Default) return;
+
+  const ABS = {
+    iconUrl: "{% static 'vendor/leaflet/images/marker-icon.png' %}",
+    iconRetinaUrl: "{% static 'vendor/leaflet/images/marker-icon-2x.png' %}",
+    shadowUrl: "{% static 'vendor/leaflet/images/marker-shadow.png' %}",
+  };
+
+  // 1) force options partout
+  L.Icon.Default.mergeOptions(ABS);
+  try { Object.assign(L.Icon.Default.prototype.options, ABS); } catch (e) {}
+
+  // 2) interdit tout fallback/guess (la source du doublon)
+  L.Icon.Default.prototype._getIconUrl = function(name){
+    if (name === "icon") return this.options.iconUrl;
+    if (name === "iconRetina") return this.options.iconRetinaUrl;
+    if (name === "shadow") return this.options.shadowUrl;
+    return null;
+  };
+})();
+</script>
+
 <script>
 (function(){
   "use strict";

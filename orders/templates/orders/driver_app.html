@@ -1284,4 +1284,112 @@
   setInterval(refreshAll, refreshMs);
 })();
 </script>
+
+<script>
+(function(){
+  const ENDPOINT = "/orders/driver/me/update-location/";
+  const PING_EVERY_MS = 15000; // 15s (ajuste si besoin)
+  const MAX_AGE_MS = 30000;    // position pas plus vieille que 30s
+  const TIMEOUT_MS = 10000;
+
+  let timer = null;
+  let lastSentKey = null;
+  let running = false;
+
+  function getCookie(name){
+    const m = document.cookie.match(new RegExp("(^|; )" + name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&") + "=([^;]*)"));
+    return m ? decodeURIComponent(m[2]) : null;
+  }
+  function csrf(){
+    return getCookie("csrftoken");
+  }
+
+  function log(msg, obj){
+    // optionnel: si tu ajoutes un div#gps-status, on écrit dedans
+    const el = document.getElementById("gps-status");
+    if (el) el.textContent = obj ? (msg + " " + JSON.stringify(obj)) : msg;
+    // console aussi
+    // eslint-disable-next-line no-console
+    console.log("[GPS]", msg, obj || "");
+  }
+
+  async function send(lat, lng){
+    // anti-spam: si variation minime, ne renvoie pas
+    const key = lat.toFixed(6) + "," + lng.toFixed(6);
+    if (key === lastSentKey) return;
+    lastSentKey = key;
+
+    const token = csrf();
+    if (!token){
+      log("CSRF manquant (pas connecté ou cookie absent)");
+      return;
+    }
+
+    const resp = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": token,
+      },
+      credentials: "same-origin",
+      body: JSON.stringify({lat, lng}),
+    });
+
+    const data = await resp.json().catch(()=>null);
+    if (!resp.ok){
+      log("Erreur API update-location", {status: resp.status, data});
+      return;
+    }
+    log("Position envoyée ✅", data);
+  }
+
+  function getPosition(){
+    return new Promise((resolve, reject)=>{
+      if (!navigator.geolocation) return reject(new Error("geolocation_not_supported"));
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: TIMEOUT_MS,
+        maximumAge: MAX_AGE_MS,
+      });
+    });
+  }
+
+  async function tick(){
+    if (running) return;
+    running = true;
+    try{
+      const pos = await getPosition();
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      log("Position obtenue", {lat, lng, acc: pos.coords.accuracy});
+      await send(lat, lng);
+    }catch(e){
+      // erreurs fréquentes: Permission denied, timeout
+      log("GPS erreur", {message: e && e.message ? e.message : String(e)});
+    }finally{
+      running = false;
+    }
+  }
+
+  // API simple pour boutons Start/Stop si tu veux
+  window.FAGNI_GPS = {
+    start(){
+      if (timer) return;
+      log("GPS: démarrage…");
+      tick();
+      timer = setInterval(tick, PING_EVERY_MS);
+    },
+    stop(){
+      if (!timer) return;
+      clearInterval(timer);
+      timer = null;
+      log("GPS: stoppé.");
+    }
+  };
+
+  // auto start
+  window.FAGNI_GPS.start();
+})();
+</script>
+
 {% endblock %}

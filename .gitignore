@@ -153,3 +153,9 @@ Mismatch
 *.BACKUP_*
 *.bak_*
 *.backup
+
+# local scratch / drafts
+driver_map.html
+login.html
+post_login.html
+jar.txt

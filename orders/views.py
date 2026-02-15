@@ -9816,12 +9816,23 @@ def driver_update_location(request):
     """
     Reçoit la position GPS du livreur connecté et met à jour
     les champs latitude / longitude de son DeliveryPartner.
-    Appelée en AJAX depuis la driver app.
+
+    Supporte:
+    - JSON: {"lat": ..., "lng": ...}
+    - Form: lat=...&lng=...
+    - QueryString: ?lat=...&lng=...
+    - Fallback keys: latitude/longitude
+
+    En cas d'erreur lat/lng manquants, renvoie debug (content_type, body_len, preview).
     """
+    from decimal import Decimal
+    import json
+    from urllib.parse import parse_qs
+
     if request.method != "POST":
         return JsonResponse({"error": "Méthode non autorisée"}, status=405)
 
-    user_email = (request.user.email or "").strip()
+    user_email = (getattr(request.user, "email", "") or "").strip()
     if not user_email:
         return JsonResponse(
             {"error": "Utilisateur sans email, impossible de lier un livreur"},
@@ -9836,11 +9847,63 @@ def driver_update_location(request):
             status=404,
         )
 
-    lat = request.POST.get("lat")
-    lng = request.POST.get("lng")
+    ct = (request.content_type or "").lower()
+    raw_bytes = request.body or b""
+    raw_text = raw_bytes.decode("utf-8", errors="replace").strip()
 
-    if not lat or not lng:
-        return JsonResponse({"error": "lat et lng sont requis"}, status=400)
+    payload = {}
+
+    # 1) JSON (même si ct a un charset)
+    if raw_text and ("application/json" in ct or raw_text[:1] in "{["):
+        try:
+            payload = json.loads(raw_text)
+            if not isinstance(payload, dict):
+                payload = {}
+        except Exception:
+            payload = {}
+
+    # 2) urlencoded body
+    if raw_text and not payload and ("application/x-www-form-urlencoded" in ct or "=" in raw_text):
+        try:
+            qs = parse_qs(raw_text, keep_blank_values=True)
+            payload = {k: (v[-1] if isinstance(v, list) and v else v) for k, v in qs.items()}
+        except Exception:
+            payload = {}
+
+    def pick(*vals):
+        for v in vals:
+            if v is None:
+                continue
+            if isinstance(v, str) and v.strip() == "":
+                continue
+            return v
+        return None
+
+    lat = pick(
+        payload.get("lat"), payload.get("latitude"),
+        request.POST.get("lat"), request.POST.get("latitude"),
+        request.GET.get("lat"), request.GET.get("latitude"),
+    )
+    lng = pick(
+        payload.get("lng"), payload.get("longitude"),
+        request.POST.get("lng"), request.POST.get("longitude"),
+        request.GET.get("lng"), request.GET.get("longitude"),
+    )
+
+    if lat is None or lng is None:
+        return JsonResponse(
+            {
+                "error": "lat et lng sont requis",
+                "debug": {
+                    "content_type": ct,
+                    "body_len": len(raw_bytes),
+                    "body_preview": raw_text[:200],
+                    "post_keys": list(request.POST.keys()),
+                    "get_keys": list(request.GET.keys()),
+                },
+            },
+            status=400,
+        )
 
     try:
         dp.latitude = Decimal(str(lat))
@@ -9849,9 +9912,7 @@ def driver_update_location(request):
     except Exception as e:
         return JsonResponse({"error": f"Erreur lors de la sauvegarde : {e}"}, status=400)
 
-    return JsonResponse({"ok": True})
-
-
+    return JsonResponse({"ok": True, "lat": str(dp.latitude), "lng": str(dp.longitude)})
 @login_required
 def driver_map(request):
     """

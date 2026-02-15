@@ -24,6 +24,9 @@ urlpatterns = [
     # Tableau OPS (collecte / lavage / livraison)
     path("ops-dashboard/", views.ops_dashboard, name="ops_dashboard"),
 
+    path("ops/map/", views.driver_map, name="ops_driver_map"),
+    path("ops/map/data/", views.driver_map_data, name="ops_driver_map_data"),
+
     # 📅 Planning OPS
     path("ops-planning/", views.ops_planning, name="ops_planning"),
 

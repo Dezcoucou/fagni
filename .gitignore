@@ -147,3 +147,9 @@ Mismatch
 
 # github actions (added via GitHub web)
 
+# backups templates
+*.bak
+*.BAK_*
+*.BACKUP_*
+*.bak_*
+*.backup

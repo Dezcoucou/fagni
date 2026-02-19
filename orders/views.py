@@ -676,7 +676,7 @@ def _qr_png_base64(data: str) -> str:
     )
     qr.add_data(data or "")
     qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
+    img = qr.make_image(fill_color="black", back_color="white").convert("RGB").convert("RGB")
 
     buf = BytesIO()
     img.save(buf, format="PNG")
@@ -5338,26 +5338,42 @@ def client_order_pay_wave_page(request, order_id: int):
             # On ne casse pas la page: fallback ci-dessous
             pay_link = ""
             checkout_id = ""
-
     # Fallback: lien marchand Wave (si pas de pay_link API)
     base_link = (getattr(settings, "WAVE_MERCHANT_LINK_BASE", "") or "").strip()
-    if (not pay_link) and base_link and amount_xof != "0":
-        sep = "&" if "?" in base_link else "?"
-        pay_link = f"{base_link}{sep}amount={amount_xof}"
-
-    # QR local (SVG) via segno
-    # -> si pay_link OK : QR encode le lien (lisible par téléphone)
-    # -> sinon : fallback encode le numéro
-    import segno
+    if (not pay_link) and base_link:
+        # Toujours fournir un lien scannable
+        try:
+            ax = str(amount_xof).strip()
+        except Exception:
+            ax = ""
+        if ax and ax != "0":
+            sep = "&" if "?" in base_link else "?"
+            pay_link = f"{base_link}{sep}amount={ax}"
+        else:
+            pay_link = base_link
+    # - attention: éviter border-radius sur l'image côté template
+    import qrcode
     from io import BytesIO
     import base64
-    qr_data = (pay_link or "").strip() or wave_phone
-    buf = BytesIO()
-    segno.make(qr_data).save(buf, kind="svg", scale=6, border=2)
-    qr_svg_bytes = buf.getvalue()
-    qr_b64 = base64.b64encode(qr_svg_bytes).decode("ascii")
-    qr_data_uri = "data:image/svg+xml;base64," + qr_b64
+    # QR: encode toujours un URL Wave scannable
+    pl = (pay_link or "").strip()
+    qr_data = pl if pl else "https://pay.wave.com/"
 
+
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=8,
+        border=4,
+    )
+    qr.add_data(qr_data)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    qr_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    qr_data_uri = "data:image/png;base64," + qr_b64
     return render(request, "orders/client_pay_wave.html", {
         "order": order,
         "amounts": amounts,

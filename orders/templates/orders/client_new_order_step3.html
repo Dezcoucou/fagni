@@ -292,9 +292,9 @@
       const any = count > 0;
       [stickyContinue, continueBtn].forEach(btn=>{
         if(!btn) return;
-        btn.disabled = !any;
-        btn.style.opacity = any ? "1" : ".55";
-        btn.style.pointerEvents = any ? "auto" : "none";
+        btn.disabled = false;
+        btn.style.opacity = "1";
+        btn.style.pointerEvents = "auto";
       });
     }
 

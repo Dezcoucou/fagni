@@ -264,19 +264,20 @@
                       <span class="badge-status">{{ o.status|default:"—" }}</span>
                     {% endif %}
 
+                    {% with paid=o.amount_paid|default:0 %}
+                    {% with paid0=paid|floatformat:0 %}
+                    {% with tot0=tot|floatformat:0 %}
                     {% with p=o.payment_status %}
-                      {% if p == "paid" %}
-                        <span class="badge-status badge-status--paid">Payé</span>
-                      {% elif p == "pending" or p == "unpaid" %}
-                        <span class="badge-status badge-status--pay-pending">Paiement en attente</span>
-                      {% elif p == "failed" %}
-                        <span class="badge-status badge-status--pay-failed">Paiement échoué</span>
-                      {% elif p %}
-                        <span class="badge-status">{{ p }}</span>
-                      {% else %}
+                      {% if tot0 == "0" %}
                         <span class="badge-status badge-status--pay-unknown">Non renseigné</span>
-                      {% endif %} 
-                    {% endwith %}
+                      {% elif paid0 == "0" %}
+                        <span class="badge-status badge-status--pay-pending">Paiement en attente</span>
+                      {% elif paid0 == tot0 %}
+                        <span class="badge-status badge-status--paid">Payé</span>
+                      {% else %}
+                        <span class="badge-status badge-status--pay-pending">Paiement partiel</span>
+                      {% endif %}
+                    {% endwith %}{% endwith %}{% endwith %}{% endwith %}
                     {% if o.express_extra_fee and o.express_extra_fee|floatformat:0 != "0" %}
                       <span class="badge-status badge-status--express">⚡ Express</span>
                     {% endif %}

@@ -162,3 +162,4 @@ jar.txt
 
 # backups auto
 *.bak.*
+data.json

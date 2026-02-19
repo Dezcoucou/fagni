@@ -65,6 +65,11 @@ urlpatterns = [
     path("client/orders/<int:order_id>/live/", views.client_order_live_status, name="client_order_live"),
     path("client/orders/<int:order_id>/rating/", views.client_order_rating, name="client_order_rating"),
     path("client/orders/<int:order_id>/evidence/upload/", views.client_order_evidence_upload, name="client_order_evidence_upload"),
+    # ✅ Paiement client (V1)
+    path("client/orders/<int:order_id>/pay/simulate/", views.client_order_pay_simulate, name="client_order_pay_simulate"),
+    path("client/orders/<int:order_id>/pay/cash/", views.client_order_pay_cash, name="client_order_pay_cash"),
+    path("client/orders/<int:order_id>/pay/wave/", views.client_order_pay_wave_page, name="client_order_pay_wave_page"),
+
 
     # --- Items (lignes de commande) côté client ---
     path("client/orders/<int:order_id>/items/new/", views.client_order_item_new, name="client_order_item_new"),

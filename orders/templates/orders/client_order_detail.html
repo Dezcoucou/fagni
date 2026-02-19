@@ -362,15 +362,36 @@
           <div class="meta">Montant estimé (V1) + statut de paiement.</div>
         </div>
 
-        <span id="payPill" class="payPill">
+        {% with total=amounts.total_ttc|default:0 %}
+        {% with total0=total|floatformat:0 %}
+        {% with paid=order.amount_paid|default:0 %}
+        {% with paid0=paid|floatformat:0 %}
+        <span id="payPill" class="payPill
+          {% if total0 == '0' or paid0 == '0' %}
+            pay-wait
+          {% elif paid0 == total0 %}
+            pay-ok
+          {% else %}
+            pay-wait
+          {% endif %}">
+        {% endwith %}{% endwith %}{% endwith %}{% endwith %}
           <span class="payDot"></span>
+          {% with total=amounts.total_ttc|default:0 %}
+          {% with total0=total|floatformat:0 %}
+          {% with paid=order.amount_paid|default:0 %}
+          {% with paid0=paid|floatformat:0 %}
           <span id="payTxt">
-            {% if amounts.total_ttc|default:0|floatformat:0 == "0" %}
+            {% if total0 == "0" %}
               En attente
+            {% elif paid0 == "0" %}
+              Paiement en attente
+            {% elif paid0 == total0 %}
+              Payé
             {% else %}
-              {{ payment_status|default:"non renseigné" }}
+              Paiement partiel
             {% endif %}
           </span>
+          {% endwith %}{% endwith %}{% endwith %}{% endwith %}
         </span>
       </div>
 
@@ -389,10 +410,66 @@
         <div class="kv"><div class="k">Total client</div><div class="v" id="amtTotal">{{ amounts.total_ttc|fcfa }}</div></div>
 
         <div class="meta" id="payDetails" style="margin-top:6px;font-weight:800;">
-          Payé : <span id="payPaid">0</span> / <span id="payTotal">0</span> — Reste : <span id="payRemain">0</span>
+          Payé : <span id="payPaid">{{ paid_amount|default:0|fcfa }}</span> / <span id="payTotal">{{ total_amount|default:0|fcfa }}</span> — Reste : <span id="payRemain">{{ remain_amount|default:0|fcfa }}</span>
         </div>
 
+        <div class="meta" id="payOverRow" style="display:none; margin-top:6px; font-weight:900; color:#991b1b;">
+          Trop-perçu : <span id="payOver">0</span>
+        </div>
         <div class="meta">NB : les montants peuvent évoluer si la livraison change (distance/express).</div>
+        <!-- ✅ ACTIONS PAIEMENT (V1) -->
+        {% with total=total_amount|default:0 %}
+        {% with total0=total|floatformat:0 %}
+        {% with remain=remain_amount|default:0 %}
+        {% with remain0=remain|floatformat:0 %}
+        {% if total0 != "0" and remain0 != "0" %}
+          <div class="ratingActions" style="margin-top:10px;">
+            <button class="btn btn-primary" id="btnPaySimulate" type="button">💳 Payer maintenant</button>
+              <a class="btn btn-ghost" href="{% url 'orders:client_order_pay_wave_page' order.id %}">🌊 Payer par Wave (QR)</a>
+            <button class="btn btn-ghost" id="btnPayCashOpen" type="button">💵 Déclarer cash</button>
+            <span class="ratingNote" id="payMsg" style="display:none;"></span>
+          </div>
+
+          <!-- ✅ MODAL CASH -->
+          <div id="payCashModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:9999; padding:18px;">
+            <div class="card panel" style="max-width:520px; margin:10vh auto 0; border-radius:18px; box-shadow: var(--shadow2);">
+              <div class="row" style="align-items:center;">
+                <div>
+                  <div style="font-weight:950; font-size:14px;">Déclarer un paiement cash</div>
+                  <div class="meta">Saisis le montant encaissé (acompte possible).</div>
+                </div>
+                <button class="btn btn-ghost" id="btnPayCashClose" type="button">✕</button>
+              </div>
+
+              <div style="margin-top:12px;">
+                <div class="kv">
+                  <div class="k">Montant</div>
+                  <div class="v">
+                    <input id="payCashAmount" type="number" min="0" step="1"
+                           style="width:180px; padding:8px 10px;border-radius:12px;border:1px solid var(--line);font-weight:900;">
+                    <span class="meta">FCFA</span>
+                  </div>
+                </div>
+
+                <div style="margin-top:10px;">
+                  <div class="k" style="margin-bottom:6px;">Note (optionnel)</div>
+                  <input id="payCashNote" type="text" placeholder="Ex: reçu par livreur / main à main"
+                         style="width:100%; padding:10px;border-radius:12px;border:1px solid var(--line);font-weight:800;">
+                </div>
+
+                <div class="ratingActions" style="margin-top:12px;">
+                  <button class="btn btn-primary" id="btnPayCashSend" type="button">Valider</button>
+                  <button class="btn btn-ghost" id="btnPayCashCancel" type="button">Annuler</button>
+                </div>
+
+                <div class="meta" id="payCashErr" style="display:none; color:#991b1b; font-weight:900;"></div>
+                <div class="meta" id="payCashOk" style="display:none; color:#166534; font-weight:900;"></div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+        {% endwith %}{% endwith %}{% endwith %}{% endwith %}
+
 
         {% if order.status == "pending" or order.status == "in_progress" %}
           {% with prest=amounts.prestation_total|default:0 %}
@@ -560,36 +637,6 @@
       </div>
     </div>
 
-    
-    <!-- ✅ PREUVES — actions -->
-    <div class="ratingActions" style="margin-top:10px;">
-      <button class="btn btn-primary" id="btnEvidenceOpen" type="button">📸 Ajouter une preuve</button>
-      <span class="ratingNote" id="evidenceMsg" style="display:none;"></span>
-    </div>
-
-    <!-- ✅ Modal Evidence -->
-    <div id="evidenceModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:9999; padding:18px;">
-      <div class="card panel" style="max-width:520px; margin:8vh auto 0; border-radius:18px; box-shadow: var(--shadow2);">
-        <div class="row" style="align-items:center;">
-          <div>
-            <div style="font-weight:950; font-size:14px;">Ajouter une preuve photo</div>
-            <div class="meta">Choisis l’étape + ajoute une ou plusieurs photos.</div>
-          </div>
-          <button class="btn btn-ghost" id="btnEvidenceClose" type="button">✕</button>
-        </div>
-
-        <div style="margin-top:12px;">
-          <div class="kv">
-            <div class="k">Étape</div>
-            <div class="v">
-              <select id="evidenceKind" style="padding:8px 10px;border-radius:12px;border:1px solid var(--line);font-weight:800;">
-                <option value="pickup">Collecte</option>
-                <option value="laundry">Laverie</option>
-                <option value="dropoff">Livraison</option>
-              </select>
-            </div>
-          </div>
-
           <div style="margin-top:10px;">
             <input id="evidenceFiles" type="file" accept="image/*" multiple
                    style="width:100%; padding:10px; border:1px dashed rgba(0,86,179,0.35); border-radius:14px; background:#f8fafc;">
@@ -641,6 +688,167 @@
   const orderId = {{ order.id|default:0 }};
 
   const ratingPostUrl = `/orders/client/orders/${orderId}/rating/`;
+
+  // =========================
+  // ✅ PAIEMENT CLIENT (V1) — simulate + cash
+  // =========================
+  const paySimUrl  = "{% url 'orders:client_order_pay_simulate' order.id %}";
+  const payCashUrl = "{% url 'orders:client_order_pay_cash' order.id %}";
+
+  const btnPaySim = document.getElementById("btnPaySimulate");
+  const btnPayCashOpen = document.getElementById("btnPayCashOpen");
+  const payMsg = document.getElementById("payMsg");
+
+  const payCashModal = document.getElementById("payCashModal");
+  const btnPayCashClose = document.getElementById("btnPayCashClose");
+  const btnPayCashCancel = document.getElementById("btnPayCashCancel");
+  const btnPayCashSend = document.getElementById("btnPayCashSend");
+  const payCashAmount = document.getElementById("payCashAmount");
+  const payCashNote = document.getElementById("payCashNote");
+  const payCashErr = document.getElementById("payCashErr");
+  const payCashOk = document.getElementById("payCashOk");
+
+  function payShowMsg(msg, ok){
+    if(!payMsg) return;
+    payMsg.textContent = msg || "";
+    payMsg.style.display = msg ? "" : "none";
+    payMsg.style.color = ok ? "#166534" : "#991b1b";
+    payMsg.style.fontWeight = "900";
+  }
+
+  function openCash(){
+    if(payCashErr) payCashErr.style.display = "none";
+    if(payCashOk) payCashOk.style.display = "none";
+    if(payCashAmount) payCashAmount.value = "";
+    if(payCashNote) payCashNote.value = "";
+    if(payCashModal) payCashModal.style.display = "";
+  }
+  function closeCash(){
+    if(payCashModal) payCashModal.style.display = "none";
+  }
+
+  if(btnPayCashOpen) btnPayCashOpen.addEventListener("click", openCash);
+  if(btnPayCashClose) btnPayCashClose.addEventListener("click", closeCash);
+  if(btnPayCashCancel) btnPayCashCancel.addEventListener("click", closeCash);
+
+  payCashModal?.addEventListener("click", (e) => {
+    if(e.target === payCashModal) closeCash();
+  });
+
+  async function doPaySimulate(){
+    try{
+      if(btnPaySim){
+        btnPaySim.disabled = true;
+        btnPaySim.style.opacity = "0.7";
+      }
+      payShowMsg("Traitement du paiement…", true);
+
+      const csrf = getCookie("csrftoken");
+      const r = await fetch(paySimUrl, {
+        method: "POST",
+        headers: {
+          ...(csrf ? {"X-CSRFToken": csrf} : {}),
+          "X-Requested-With": "XMLHttpRequest",
+          "Accept": "application/json",
+        },
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+
+      const ct = (r.headers.get("content-type") || "").toLowerCase();
+      const data = ct.includes("application/json") ? await r.json() : null;
+
+      if(!data || !r.ok || data.ok !== true){
+        payShowMsg("Paiement impossible.", false);
+        return;
+      }
+
+      payShowMsg("✅ Paiement confirmé.", true);
+      // le plus safe (vu que le live refresh existe déjà chez toi) : reload rapide
+      setTimeout(() => window.location.reload(), 450);
+
+    }catch(e){
+      payShowMsg("Erreur réseau. Réessaie.", false);
+    }finally{
+      if(btnPaySim){
+        btnPaySim.disabled = false;
+        btnPaySim.style.opacity = "1";
+      }
+    }
+  }
+
+  async function doPayCash(){
+    try{
+      if(payCashErr) payCashErr.style.display = "none";
+      if(payCashOk) payCashOk.style.display = "none";
+
+      const amt = Number(payCashAmount?.value || 0);
+      if(!amt || amt <= 0){
+        if(payCashErr){
+          payCashErr.textContent = "Montant invalide.";
+          payCashErr.style.display = "";
+        }
+        return;
+      }
+
+      if(btnPayCashSend){
+        btnPayCashSend.disabled = true;
+        btnPayCashSend.style.opacity = "0.7";
+      }
+
+      const csrf = getCookie("csrftoken");
+      const fd = new FormData();
+      fd.append("amount", String(Math.round(amt)));
+      fd.append("note", String(payCashNote?.value || ""));
+
+      const r = await fetch(payCashUrl, {
+        method: "POST",
+        headers: {
+          ...(csrf ? {"X-CSRFToken": csrf} : {}),
+          "X-Requested-With": "XMLHttpRequest",
+          "Accept": "application/json",
+        },
+        body: fd,
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+
+      const ct = (r.headers.get("content-type") || "").toLowerCase();
+      const data = ct.includes("application/json") ? await r.json() : null;
+
+      if(!data || !r.ok || data.ok !== true){
+        const err = data?.error ? String(data.error) : ("HTTP " + r.status);
+        if(payCashErr){
+          payCashErr.textContent = "Paiement impossible : " + err;
+          payCashErr.style.display = "";
+        }
+        return;
+      }
+
+      if(payCashOk){
+        payCashOk.textContent = "✅ Paiement enregistré.";
+        payCashOk.style.display = "";
+      }
+
+      setTimeout(() => window.location.reload(), 500);
+
+    }catch(e){
+      if(payCashErr){
+        payCashErr.textContent = "Erreur réseau. Réessaie.";
+        payCashErr.style.display = "";
+      }
+    }finally{
+      if(btnPayCashSend){
+        btnPayCashSend.disabled = false;
+        btnPayCashSend.style.opacity = "1";
+      }
+    }
+  }
+
+  if(btnPaySim) btnPaySim.addEventListener("click", doPaySimulate);
+  if(btnPayCashSend) btnPayCashSend.addEventListener("click", doPayCash);
+
+
 
     const evidencePostUrl = `/orders/client/orders/${orderId}/evidence/upload/`;
 
@@ -899,6 +1107,18 @@
       const paid  = Number(String(amounts?.amount_paid ?? 0).replace(",", "."));
       const rest  = Number(String(amounts?.amount_remaining ?? Math.max(0, total - paid)).replace(",", "."));
 
+      // ✅ Trop-perçu (surpaiement) — info comptable, UI propre
+      const over = Number(String(amounts?.overpaid ?? 0).replace(",", "."));
+      const overRow = document.getElementById("payOverRow");
+      const overEl  = document.getElementById("payOver");
+      if(overRow && overEl){
+        if(isFinite(over) && over > 0){
+          overEl.textContent = formatMoney(over);
+          overRow.style.display = "";
+        }else{
+          overRow.style.display = "none";
+        }
+      }
       const elPaid = document.getElementById("payPaid");
       const elTotal = document.getElementById("payTotal");
       const elRemain = document.getElementById("payRemain");

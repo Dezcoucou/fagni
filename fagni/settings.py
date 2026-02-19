@@ -11,8 +11,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ========================
 #  CONFIG DE BASE
 # ========================
-SECRET_KEY = os.getenv('SECRET_KEY', 'changeme-dev-key')
-DEBUG = True  # ⚠️ à mettre à False en prod
+SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-change-me")
+DEBUG = (os.getenv("DEBUG", "1").strip() in ("1","true","True","yes","on"))  # 1=dev, 0=prod
 
 CLIENT_SESSION_KEY = "fagni_client_phone"
 
@@ -34,17 +34,10 @@ ALLOWED_HOSTS = [
 # Si tu veux une règle "dev only" (moins strict) :
 if os.environ.get("DJANGO_DEBUG_ALLOW_ALL_HOSTS") == "1":
     ALLOWED_HOSTS = ["*"]
-
-CSRF_TRUSTED_ORIGINS = [
-    "https://dezcoucou80.pythonanywhere.com",
-    "https://fagni-t1s8.onrender.com",
-]
-
-SITE_BASE_URL = "https://fagni-t1s8.onrender.com"
-
+SITE_BASE_URL = (os.getenv("SITE_BASE_URL", "http://127.0.0.1:8000") or "").strip().rstrip("/")
+CSRF_TRUSTED_ORIGINS = [SITE_BASE_URL] if SITE_BASE_URL.startswith("https://") else []
 # Pour les QR codes FAGNI (tickets PDF)
 FAGNI_QR_BASE_URL = SITE_BASE_URL
-
 # ========================
 #  APPS
 # ========================
@@ -130,6 +123,7 @@ else:
             "NAME": BASE_DIR / "db.sqlite3",
         }
     }
+
 AUTH_PASSWORD_VALIDATORS = []
 
 # ========================
@@ -287,3 +281,16 @@ WAVE_MERCHANT_LINK_BASE = (os.getenv("WAVE_MERCHANT_LINK_BASE", "") or "").strip
 # URL publique (pour success/error)
 SITE_BASE_URL = (os.getenv("SITE_BASE_URL", "") or "").strip().rstrip("/")
 
+# --- Security (prod) ---
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    # HSTS (active quand tu es sûr d'être en HTTPS partout)
+    SECURE_HSTS_SECONDS = 31536000  # 1 an
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    # Met True seulement si tu vises le preload (optionnel)
+    SECURE_HSTS_PRELOAD = False
+
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

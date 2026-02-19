@@ -197,7 +197,14 @@
 
     <div class="statusbar">
       <span class="status-pill" id="livePill"><span class="dot warn" id="liveDot"></span><span id="liveText">Chargement…</span></span>
-      <span class="pill">Livreurs visibles : <strong id="driversCount">0</strong></span>
+
+      <span class="pill">Visibles : <strong id="driversCount">0</strong></span>
+      <span class="pill">Actifs : <strong id="countActive">0</strong></span>
+      <span class="pill">Idle : <strong id="countIdle">0</strong></span>
+      <span class="pill">Offline : <strong id="countOffline">0</strong></span>
+
+      <span class="pill" id="focusPill" style="display:none;">🎯 Focus : <strong id="focusName">—</strong></span>
+
       <span class="pill">Auto-refresh : <strong id="refreshEvery">15s</strong></span>
     </div>
   </div>
@@ -281,11 +288,9 @@
     shadowUrl: "{% static 'vendor/leaflet/images/marker-shadow.png' %}",
   };
 
-  // 1) force options partout
   L.Icon.Default.mergeOptions(ABS);
   try { Object.assign(L.Icon.Default.prototype.options, ABS); } catch (e) {}
 
-  // 2) interdit tout fallback/guess (la source du doublon)
   L.Icon.Default.prototype._getIconUrl = function(name){
     if (name === "icon") return this.options.iconUrl;
     if (name === "iconRetina") return this.options.iconRetinaUrl;
@@ -304,6 +309,10 @@
   // ----------------------------
   var REFRESH_MS = 15000;
 
+  // seuils en secondes (pour classer Actif/Idle/Offline)
+  var ACTIVE_SEC = 10 * 60;   // <= 10 min
+  var IDLE_SEC   = 30 * 60;   // <= 30 min
+
   // ----------------------------
   // DOM
   // ----------------------------
@@ -316,13 +325,41 @@
   var driversCountEl = document.getElementById("driversCount");
   var refreshEveryEl = document.getElementById("refreshEvery");
 
+  var countActiveEl = document.getElementById("countActive");
+  var countIdleEl = document.getElementById("countIdle");
+  var countOfflineEl = document.getElementById("countOffline");
+
+  var focusPill = document.getElementById("focusPill");
+  var focusNameEl = document.getElementById("focusName");
+
+  var focusedDriverId = null;
+
   if (refreshEveryEl) refreshEveryEl.textContent = Math.round(REFRESH_MS/1000) + "s";
 
   function setLive(state, text){
-    // state: ok|warn|err
     if (!liveDot || !liveText) return;
     liveDot.className = "dot " + (state === "ok" ? "" : (state === "err" ? "err" : "warn"));
     liveText.textContent = text || "";
+  }
+
+  function setCounts(visible, active, idle, offline){
+    if (driversCountEl) driversCountEl.textContent = String(visible || 0);
+    if (countActiveEl) countActiveEl.textContent = String(active || 0);
+    if (countIdleEl) countIdleEl.textContent = String(idle || 0);
+    if (countOfflineEl) countOfflineEl.textContent = String(offline || 0);
+  }
+
+  function setFocus(driver){
+    if (!focusPill || !focusNameEl) return;
+    if (!driver){
+      focusPill.style.display = "none";
+      focusNameEl.textContent = "—";
+      focusedDriverId = null;
+      return;
+    }
+    focusedDriverId = String(driver.id);
+    focusNameEl.textContent = driver.name || ("ID #" + driver.id);
+    focusPill.style.display = "inline-flex";
   }
 
   // ----------------------------
@@ -354,7 +391,7 @@
 
   function fitDrivers(drivers){
     if (!drivers || drivers.length === 0) {
-      map.setView([5.35, -4.02], 12); // Abidjan default (safe)
+      map.setView([5.35, -4.02], 12);
       return;
     }
     var b = L.latLngBounds([]);
@@ -364,18 +401,47 @@
   }
 
   function popupHtml(d){
-    var orderLine = d.active_order_id
-      ? ("<div style='margin-top:6px;font-size:12px;'><strong>Commande active :</strong> " +
-         (d.active_order_code ? d.active_order_code : ("#" + d.active_order_id)) +
-         "</div>")
-      : "<div style='margin-top:6px;font-size:12px;color:#64748b;'>Aucune commande active</div>";
+    var perfBaseUrl = "{% url 'orders:driver_performance' 99999 %}";
+    var perfUrl = perfBaseUrl.replace("/99999/", "/" + d.id + "/");
 
-    var updated = d.updated_at ? ("<div style='margin-top:6px;font-size:11px;color:#64748b;'>MAJ : " + d.updated_at + "</div>") : "";
+    var statusLabel = (d.status === "busy") ? "🟠 En course" : (d.status === "stale" ? "🔴 Hors ligne" : "🟢 Dispo");
+
+    var gpsInfo = "GPS : —";
+    if (typeof d.age_seconds === "number") {
+      gpsInfo = (d.age_seconds <= 900) ? "GPS : ✅ récent" : "GPS : ⚠️ ancien";
+    }
+    var gpsLine = "<div style='margin-top:6px;font-size:12px;'><strong>" + gpsInfo + "</strong></div>";
+
+    var orderLine = d.active_order_id
+      ? ("<div style='margin-top:8px;font-size:12px;'>" +
+         "<strong>Commande active :</strong> " +
+         "<a href='/orders/" + d.active_order_id + "/' style='text-decoration:none;font-weight:800;'>" +
+         (d.active_order_code ? d.active_order_code : ("#" + d.active_order_id)) +
+         "</a>" +
+         "</div>")
+      : "<div style='margin-top:8px;font-size:12px;color:#64748b;'>Aucune commande active</div>";
+
+    var updated = "<div style='margin-top:8px;font-size:11px;color:#64748b;'>" +
+      "MAJ : " + (d.age_label || "—") +
+      (d.updated_at ? (" <span style='opacity:.7'>(" + d.updated_at + ")</span>") : "") +
+      "</div>";
+
+    var links =
+      "<div style='margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;'>" +
+        "<a href='" + perfUrl + "' " +
+          "style='display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid #e5e7eb;text-decoration:none;font-size:11px;color:#374151;background:#fff;'>" +
+          "📊 Performance</a>" +
+        "<a href='https://www.google.com/maps?q=" + d.latitude + "," + d.longitude + "' target='_blank' rel='noopener' " +
+          "style='display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid #e5e7eb;text-decoration:none;font-size:11px;color:#374151;background:#fff;'>" +
+          "📍 Ouvrir Maps</a>" +
+      "</div>";
 
     return (
-      "<div style='font-size:13px;line-height:1.35;min-width:220px;'>" +
+      "<div style='font-size:13px;line-height:1.35;min-width:240px;'>" +
         "<div style='font-weight:800;color:#0f172a;'>" + (d.name || "Livreur") + "</div>" +
         "<div style='font-size:11px;color:#64748b;margin-top:2px;'>" + (d.city || "—") + "</div>" +
+        "<div style='margin-top:8px;font-size:12px;'><strong>Status :</strong> " + statusLabel + "</div>" +
+          gpsLine +
         "<div style='margin-top:8px;font-size:12px;display:flex;justify-content:space-between;gap:10px;'>" +
           "<span>Cmds semaine</span><strong>" + (d.week_orders || 0) + "</strong>" +
         "</div>" +
@@ -384,32 +450,90 @@
         "</div>" +
         orderLine +
         updated +
+        links +
       "</div>"
     );
   }
 
+  function classifyDriver(d){
+    // priorité au "stale" si présent
+    if (d && d.status === "stale") return "offline";
+    var s = (typeof d.age_seconds === "number") ? d.age_seconds : null;
+    if (s === null){
+      // fallback simple si pas de age_seconds
+      if (d && d.status === "busy") return "active";
+      return "active";
+    }
+    if (s <= ACTIVE_SEC) return "active";
+    if (s <= IDLE_SEC) return "idle";
+    return "offline";
+  }
+
+  function updateCounts(drivers){
+    var active = 0, idle = 0, offline = 0;
+    (drivers || []).forEach(function(d){
+      var k = classifyDriver(d);
+      if (k === "active") active++;
+      else if (k === "idle") idle++;
+      else offline++;
+    });
+    setCounts((drivers || []).length, active, idle, offline);
+  }
+
   function renderDrivers(drivers){
     clearMarkers();
-
-    if (driversCountEl) driversCountEl.textContent = drivers.length;
+    updateCounts(drivers);
 
     if (!drivers || drivers.length === 0){
       if (overlay) overlay.style.display = "flex";
       setLive("warn", "Aucun livreur GPS");
       fitDrivers([]);
+      setFocus(null);
       return;
     }
 
     if (overlay) overlay.style.display = "none";
 
     drivers.forEach(function(d){
-      var m = L.marker([d.latitude, d.longitude]).addTo(layerGroup);
+      var pos = [d.latitude, d.longitude];
+
+      var m = L.marker(pos).addTo(layerGroup);
       m.bindPopup(popupHtml(d));
-      markersById[String(d.id)] = { marker: m, data: d };
+
+      var fill = "#22c55e";
+      if (d.status === "busy") fill = "#f59e0b";
+      if (d.status === "stale") fill = "#ef4444";
+
+      var c = L.circleMarker(pos, {
+        radius: 14,
+        weight: 2,
+        opacity: 0.9,
+        fillOpacity: 0.25,
+        color: fill,
+        fillColor: fill,
+      }).addTo(layerGroup);
+
+      c.on("click", function(){
+        m.openPopup();
+        setFocus(d);
+      });
+
+      m.on("popupopen", function(){
+        setFocus(d);
+      });
+
+      markersById[String(d.id)] = { marker: m, circle: c, data: d };
     });
 
     fitDrivers(drivers);
     setLive("ok", "OK — " + drivers.length + " livreur(s)");
+
+    // Si un focus existait, on le restaure si possible
+    if (focusedDriverId && markersById[focusedDriverId]){
+      setFocus(markersById[focusedDriverId].data);
+    } else if (focusedDriverId) {
+      setFocus(null);
+    }
   }
 
   function focusDriver(driverId){
@@ -419,6 +543,7 @@
     var d = obj.data;
     map.setView([d.latitude, d.longitude], 16);
     obj.marker.openPopup();
+    setFocus(d);
   }
 
   // ----------------------------
@@ -459,7 +584,7 @@
   // ----------------------------
   function fetchDrivers(){
     setLive("warn", "Rafraîchissement…");
-    return fetch("{% url 'orders:driver_map_data' %}", { credentials: "same-origin" })
+    return fetch("{% url 'orders:ops_driver_map_data' %}", { credentials: "same-origin" })
       .then(function(r){
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
@@ -484,8 +609,6 @@
   // ----------------------------
   renderDrivers(getInitialDrivers());
   applyFilter();
-
-  // Auto-refresh loop
   setInterval(fetchDrivers, REFRESH_MS);
 
 })();

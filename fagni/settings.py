@@ -17,17 +17,31 @@ DEBUG = (os.getenv("DEBUG", "1").strip() in ("1","true","True","yes","on"))  # 1
 CLIENT_SESSION_KEY = "fagni_client_phone"
 
 ADMINS = [("Admin", "admin@example.com")]
-
-# --- Hosts autorisés (DEV) ---
+# --- Hosts autorisés ---
+# DEV par défaut, mais en prod Render on pilote via ALLOWED_HOSTS="a.com,b.onrender.com"
 ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "0.0.0.0",
     "100.115.92.198",  # ton IP actuelle (Chromebook)
-    "dezcoucou80.pythonanywhere.com",  # tu peux le laisser si tu utilises encore PythonAnywhere
+    "dezcoucou80.pythonanywhere.com",
     "fagni-t1s8.onrender.com",
 ]
 
+# Override via env (Render/Prod)
+_env_hosts = (os.getenv("ALLOWED_HOSTS", "") or "").strip()
+if _env_hosts:
+    ALLOWED_HOSTS = [h.strip() for h in _env_hosts.split(",") if h.strip()]
+
+# Ajoute automatiquement le host de SITE_BASE_URL (si défini)
+try:
+    from urllib.parse import urlparse
+    _u = urlparse((os.getenv("SITE_BASE_URL", "") or "").strip())
+    _host = (_u.hostname or "").strip()
+    if _host and _host not in ALLOWED_HOSTS and ALLOWED_HOSTS != ["*"]:
+        ALLOWED_HOSTS.append(_host)
+except Exception:
+    pass
 # Optionnel: si tu as besoin de tester depuis d'autres IP du LAN/VPN
 # ALLOWED_HOSTS += ["192.168.0.0/16"]  # (Django ne supporte pas les CIDR ici)
 
@@ -276,10 +290,6 @@ WAVE_RECEIVER_PHONE   = (os.getenv("WAVE_RECEIVER_PHONE", "") or "").strip()
 
 # Lien marchand Wave (ex: https://pay.wave.com/m/.../c/ci/)
 WAVE_MERCHANT_LINK_BASE = (os.getenv("WAVE_MERCHANT_LINK_BASE", "") or "").strip()
-
-# URL publique (pour success/error)
-SITE_BASE_URL = (os.getenv("SITE_BASE_URL", "") or "").strip().rstrip("/")
-
 # ========================
 #  SECURITY (PROD)
 # ========================

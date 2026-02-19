@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.views.generic import RedirectView
 from django.http import HttpResponse
 from django.contrib.staticfiles.storage import staticfiles_storage
@@ -12,20 +12,20 @@ def chrome_devtools_wellknown(_request):
 
 
 # ============================
-#  VUE HOME (redirige)
+#  VUE HOME (menu MVP)
 # ============================
 def home(request):
     """
-    Page d'accueil FAGNI :
-    - Utilisateur staff → dashboard
-    - Autres / anonymes → liste des commandes
+    Page d'accueil FAGNI (MVP) :
+    - Staff → dashboard
+    - Sinon → menu (Client / Blanchisseur / Livreur)
     """
     user = getattr(request, "user", None)
-
     if user and user.is_authenticated and user.is_staff:
         return redirect("dashboard:index")
 
-    return redirect("orders:list")
+    return render(request, "home.html")
+
 
 urlpatterns = [
     # Admin Django

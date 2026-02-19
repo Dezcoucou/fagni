@@ -1,27 +1,94 @@
-mkdir -p templates
-cat > templates/home.html <<'HTML'
 <!doctype html>
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Plateforme FAGNI</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FAGNI – Accueil</title>
   <style>
-    body { max-width: 700px; margin: 3rem auto; text-align: center; }
-    h1 { background: #1e3a8a; color: white; padding: 1rem; border-radius: 10px; }
-    a[role="button"] { display: block; margin: 1rem auto; width: 80%; }
+    :root{
+      --orange:#ff7a00; --blue:#0056b3;
+      --bg:#0b1220; --card:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --line:rgba(148,163,184,.18);
+      --shadow: 0 18px 55px rgba(0,0,0,.45);
+    }
+    body{margin:0;background:radial-gradient(1200px 700px at 15% 10%, rgba(255,122,0,.22), transparent 45%),
+                     radial-gradient(1100px 650px at 85% 15%, rgba(0,86,179,.22), transparent 45%),
+                     var(--bg);
+         color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;}
+    .wrap{max-width:980px;margin:0 auto;padding:24px}
+    .hero{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:flex-end;margin-top:18px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:46px;height:46px;border-radius:16px;background:linear-gradient(135deg,var(--orange),#ffb100);
+          box-shadow:0 10px 30px rgba(255,122,0,.25)}
+    h1{margin:0;font-size:28px;letter-spacing:.2px}
+    .sub{margin-top:6px;color:var(--muted);font-weight:700}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px;margin-top:18px}
+    .card{grid-column:span 12;background:rgba(15,23,42,.75);border:1px solid var(--line);
+          border-radius:20px;padding:16px;box-shadow:var(--shadow);backdrop-filter: blur(10px)}
+    @media(min-width:820px){ .card{grid-column:span 4} }
+    .title{font-weight:950;font-size:14px}
+    .desc{color:var(--muted);font-weight:750;margin-top:6px;font-size:13px;line-height:1.35}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    a.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+          padding:10px 12px;border-radius:999px;text-decoration:none;font-weight:900;font-size:13px}
+    .primary{background:linear-gradient(90deg,var(--orange),#ffb100);color:#111827}
+    .ghost{background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--text)}
+    .pillrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    .pill{padding:8px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid var(--line);
+          color:var(--muted);font-weight:850;font-size:12px}
+    .footer{margin-top:18px;color:var(--muted);font-weight:750;font-size:12px}
+    code{background:rgba(255,255,255,.06);padding:2px 6px;border-radius:8px;border:1px solid var(--line)}
   </style>
 </head>
 <body>
-  <h1>Bienvenue sur la plateforme FAGNI</h1>
-  <h3>Actions disponibles :</h3>
+  <div class="wrap">
+    <div class="hero">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h1>FAGNI</h1>
+          <div class="sub">Choisis ton espace</div>
+        </div>
+      </div>
 
-  <a href="/orders/" role="button" class="contrast">📦 Voir les commandes</a>
-  <a href="/orders/export-csv/" role="button">📑 Exporter en CSV</a>
-  <a href="/orders/export-xlsx/" role="button">📊 Exporter en Excel</a>
-  <a href="/admin/" role="button">🔐 Accès à l'administration</a>
-  <a href="/dashboard/" role="button" class="secondary">📈 Tableau de bord</a>
+      <div class="pillrow">
+        <span class="pill">MVP V1</span>
+        <span class="pill">Client • Blanchisseur • Livreur</span>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="title">👤 Espace Client</div>
+        <div class="desc">Créer une commande, suivre l’état, payer (Wave / cash / simulate), noter.</div>
+        <div class="actions">
+          <a class="btn primary" href="/orders/client/">Entrer</a>
+          <a class="btn ghost" href="/orders/client/new/">Nouvelle commande</a>
+          <a class="btn ghost" href="/orders/client/home/">Mes commandes</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="title">🧺 Espace Blanchisseur</div>
+        <div class="desc">Voir les commandes, peser, confirmer, contester, suivre le process.</div>
+        <div class="actions">
+          <a class="btn primary" href="/accounts/login/?next=/orders/laundry/app/">Se connecter</a>
+          <a class="btn ghost" href="/orders/laundry/app/">Ouvrir (si déjà connecté)</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="title">🛵 Espace Livreur</div>
+        <div class="desc">Mes courses, actions par étape, preuve, wallet, suivi.</div>
+        <div class="actions">
+          <a class="btn primary" href="/accounts/login/?next=/orders/driver-app/">Se connecter</a>
+          <a class="btn ghost" href="/orders/driver-app/">Ouvrir (si déjà connecté)</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      Astuce : pour accéder au back-office, utilise <code>/admin/</code> ou <code>/dashboard/</code>.
+    </div>
+  </div>
 </body>
 </html>
-HTML

@@ -203,7 +203,6 @@ LOGGING = {
 #  SÉCURITÉ HTTPS
 # ========================
 # HSTS seulement si DEBUG = False
-SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 
@@ -281,16 +280,16 @@ WAVE_MERCHANT_LINK_BASE = (os.getenv("WAVE_MERCHANT_LINK_BASE", "") or "").strip
 # URL publique (pour success/error)
 SITE_BASE_URL = (os.getenv("SITE_BASE_URL", "") or "").strip().rstrip("/")
 
-# --- Security (prod) ---
+# ========================
+#  SECURITY (PROD)
+# ========================
 if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_SSL_REDIRECT = True
+
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-
-    # HSTS (active quand tu es sûr d'être en HTTPS partout)
-    SECURE_HSTS_SECONDS = 31536000  # 1 an
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    # Met True seulement si tu vises le preload (optionnel)
-    SECURE_HSTS_PRELOAD = False
-
-    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

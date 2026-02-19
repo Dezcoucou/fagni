@@ -159,3 +159,6 @@ driver_map.html
 login.html
 post_login.html
 jar.txt
+
+# backups auto
+*.bak.*

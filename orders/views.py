@@ -219,20 +219,50 @@ def client_order_live_status(request, order_id: int):
     pricing = _compute_order_pricing(o)
 
     # (optionnel mais recommandé) sync sans effet DB pour refléter Payments
-    try:
-        o.sync_payment_status_from_payments(save=False)
-    except Exception:
-        pass
 
-    # Paiement (UI)
+    # ✅ Paiement CANONIQUE (APP CLIENT)
+    # IMPORTANT: ne pas appeler sync_payment_status_from_payments() ici,
+    # car même save=False peut MUTER o.amount_paid / o.payment_status en mémoire.
     from decimal import Decimal
+
     total_ttc_dec = Decimal(str(pricing.get("total_client", 0) or 0))
-    paid_dec = Decimal(str(getattr(o, "amount_paid", 0) or 0))
+
+    # ✅ On lit la DB (Order.amount_paid) comme source de vérité
+    paid_raw = getattr(o, "amount_paid", None)
+    try:
+        paid_dec = Decimal(str(paid_raw or 0))
+    except Exception:
+        paid_dec = Decimal("0")
     if paid_dec < 0:
         paid_dec = Decimal("0")
-    remaining_dec = total_ttc_dec - paid_dec
+
+    # ✅ Clamp UI : surpaiement => on affiche max = total
+    paid_ui_dec = paid_dec
+    if paid_ui_dec > total_ttc_dec:
+        paid_ui_dec = total_ttc_dec
+
+    remaining_dec = total_ttc_dec - paid_ui_dec
     if remaining_dec < 0:
         remaining_dec = Decimal("0")
+
+    # ✅ statut paiement canonique
+    if total_ttc_dec <= 0:
+        payment_ui = "waiting_amount"
+        payment_status_ui = "unpaid"
+    else:
+        if paid_ui_dec <= 0:
+            payment_ui = "unpaid"
+            payment_status_ui = "unpaid"
+        elif paid_ui_dec >= total_ttc_dec:
+            payment_ui = "paid"
+            payment_status_ui = "paid"
+        else:
+            payment_ui = "partial"
+            payment_status_ui = "partial"
+
+    overpaid_dec = paid_dec - total_ttc_dec
+    if overpaid_dec < 0:
+        overpaid_dec = Decimal("0")
 
     amounts = {
         "prestation_total": float(pricing["items_total"]),
@@ -241,7 +271,9 @@ def client_order_live_status(request, order_id: int):
         "express_extra_fee": float(pricing.get("express_extra_fee", 0)),
         "vat_fagni": float(pricing["vat_fagni"]),
         "total_ttc": float(pricing["total_client"]),
-        "amount_paid": float(paid_dec),
+        "amount_paid": float(paid_ui_dec),
+        "amount_paid_raw": float(paid_dec),
+        "overpaid": float(overpaid_dec),
         "amount_remaining": float(remaining_dec),
     }
 
@@ -325,7 +357,7 @@ def client_order_live_status(request, order_id: int):
             "id": o.id,
             "code": o.code,
             "status": o.status,
-            "payment_status": o.payment_status,
+            "payment_status": payment_status_ui,
             "amount_paid": float(paid_dec),
             "items": items,
             "pickup_time": o.pickup_time.isoformat() if o.pickup_time else None,
@@ -2621,6 +2653,8 @@ def _compute_order_pricing(order):
     if items_total <= 0:
         items_total = _dec_or_zero(getattr(order, "prestation_total", 0))
 
+    base_items_total = items_total  # vérité comptable prestations
+
     service_fee = _dec_or_zero(getattr(order, "service_fee", 0))
     delivery_fee = _dec_or_zero(getattr(order, "delivery_fee", 0))
     vat_fagni = _dec_or_zero(getattr(order, "vat_fagni", 0))
@@ -2632,6 +2666,57 @@ def _compute_order_pricing(order):
     # total stocké DB (peut être faux)
     stored_total = _dec_or_zero(getattr(order, "total_client_ttc", 0))
 
+    # ✅ Réconciliation breakdown (legacy) :
+    # Si la DB a un total TTC > computed_total et que service_fee est à 0,
+    # on tente d’expliquer l’écart comme "service FAGNI manquant".
+    # Cas typique: vat_fagni=90 => service≈500 (TVA 18%).
+    if stored_total > 0 and computed_total > 0:
+        delta = stored_total - computed_total  # ce qui manque dans le breakdown
+        if delta > Decimal("1") and service_fee <= 0:
+            # 1) Essai: déduire service_fee depuis la TVA (18%)
+            try:
+                VAT_RATE = Decimal("0.18")
+                inferred = (vat_fagni / VAT_RATE) if vat_fagni > 0 else Decimal("0")
+                # Arrondi FCFA (entier)
+                inferred = inferred.quantize(Decimal("1"))
+            except Exception:
+                inferred = Decimal("0")
+
+            # si inferred colle au delta (±1), on prend inferred
+            if inferred > 0 and abs(inferred - delta) <= Decimal("1"):
+                service_fee = inferred
+            else:
+                # 2) Sinon: si delta reste "raisonnable", on l’affecte au service_fee
+                cap = max(Decimal("5000"), (items_total + delivery_fee) * Decimal("0.5"))
+                if delta <= cap:
+                    service_fee = delta
+
+            # Recalcule le total canonique avec service_fee réconcilié
+            computed_total = items_total + service_fee + delivery_fee + vat_fagni + express_extra_fee
+
+
+    # ✅ Réconciliation LEGACY (service caché) :
+    # Cas: service_fee=0 mais vat_fagni>0, ET stored_total ≈ computed_total.
+    # => On reconstruit un service_fee (depuis TVA 18%) en le "splitant"
+    #    depuis delivery_fee (priorité), sinon depuis items_total (UI),
+    #    sans changer le total TTC.
+    if stored_total > 0 and vat_fagni > 0 and service_fee <= 0 and abs(stored_total - computed_total) <= Decimal("1"):
+        try:
+            VAT_RATE = Decimal("0.18")
+            inferred_service = (vat_fagni / VAT_RATE).quantize(Decimal("1"))  # FCFA entier
+        except Exception:
+            inferred_service = Decimal("0")
+    
+        if inferred_service > 0:
+            if delivery_fee >= inferred_service:
+                service_fee = inferred_service
+                delivery_fee = delivery_fee - inferred_service
+            elif items_total >= inferred_service:
+                service_fee = inferred_service
+                items_total = items_total - inferred_service
+    
+            computed_total = items_total + service_fee + delivery_fee + vat_fagni + express_extra_fee
+    
     # ✅ Fallback legacy:
     # - si computed_total est 0 mais que la DB a un total > 0, on garde le total DB
     # - sinon, on garde la DB uniquement si cohérente (±1 FCFA)
@@ -2673,8 +2758,7 @@ def _compute_order_pricing(order):
     laundry_amount = _dec_or_zero(getattr(order, "amount_laundry_partner", None))
     if laundry_amount <= 0 and items_total > 0:
         # par défaut, on considère que la blanchisserie touche le montant prestations
-        laundry_amount = items_total
-
+        laundry_amount = base_items_total
     return {
         "items_total": items_total,
         "service_fee": service_fee,
@@ -4596,7 +4680,7 @@ def client_home(request):
     - KPI commandes conditionnel selon filtre sélectionné
     """
     from django.core.paginator import Paginator
-    from django.db.models import Sum, F, Value, DecimalField
+    from django.db.models import Sum, F, Value, DecimalField, Q
     from django.db.models.functions import Coalesce, Cast
 
     phone = _client_phone(request)
@@ -4634,12 +4718,24 @@ def client_home(request):
         )
 
         # KPI globaux (sans filtre)
-        orders_count_all = base_qs.count()
-        active_orders_count = base_qs.filter(status__in=["pending", "in_progress"]).count()
-        unpaid_orders_count = base_qs.filter(payment_status__in=["pending", "unpaid", "failed"]).count()
+        # ✅ Pilote: masquer les commandes "vides" (tous montants à 0 / pas d'items)
+        # On garde les vraies commandes (même si estimation en cours), et on cache les brouillons fantômes.
+        nonempty_qs = base_qs.filter(
+            Q(total_client_ttc__gt=0)
+            | Q(prestation_total__gt=0)
+            | Q(items_total__gt=0)
+            | Q(service_fee__gt=0)
+            | Q(delivery_fee__gt=0)
+            | Q(express_extra_fee__gt=0)
+            | Q(vat_fagni__gt=0)
+        )
 
-        orders_qs = base_qs
+        # KPI globaux (sans filtre) recalculés sur nonempty_qs
+        orders_count_all = nonempty_qs.count()
+        active_orders_count = nonempty_qs.filter(status__in=["pending", "in_progress"]).count()
+        unpaid_orders_count = nonempty_qs.filter(payment_status__in=["pending", "unpaid", "failed"]).count()
 
+        orders_qs = nonempty_qs
     # ---------------------------
     # Filtre statut
     # ---------------------------
@@ -4871,18 +4967,50 @@ def client_order_detail(request, order_id: int):
         .values("id", "leg_type", "status", "driver_amount", "driver_id")
     )
 
-    # montants + paiement
+    # montants (canon)
     amounts = _client_order_amounts(order)
-    payment_status = getattr(order, "payment_status", None)
+    total = amounts.get("total_ttc") or DECIMAL_ZERO
+    paid = getattr(order, "amount_paid", None) or DECIMAL_ZERO
+    try:
+        total = Decimal(str(total))
+    except Exception:
+        total = DECIMAL_ZERO
+    try:
+        paid = Decimal(str(paid))
+    except Exception:
+        paid = DECIMAL_ZERO
+
+    remain = total - paid
+    if remain < DECIMAL_ZERO:
+        remain = DECIMAL_ZERO
+
+    # statut paiement canonique basé sur amounts + amount_paid
+    # (on garde order.payment_status seulement pour compat/info)
+    payment_status_raw = getattr(order, "payment_status", None)
+
+    if total <= DECIMAL_ZERO:
+        payment_ui = "waiting_amount"   # pas de total => estimation / attente
+        pay_pill_class = "pay-wait"
+        payment_label = "En attente"
+    else:
+        if paid <= DECIMAL_ZERO:
+            payment_ui = "unpaid"
+            pay_pill_class = "pay-wait"
+            payment_label = "Paiement en attente"
+        elif paid >= total:
+            payment_ui = "paid"
+            pay_pill_class = "pay-ok"
+            payment_label = "Payé"
+        else:
+            payment_ui = "partial"
+            pay_pill_class = "pay-wait"
+            payment_label = "Paiement partiel"
 
     # timeline
     timeline = _client_order_timeline(order)
 
+    # items
     items = order.items.all().order_by("id")
-
-    items = order.items.all().order_by("id")
-
-
 
     return render(request, "orders/client_order_detail.html", {
         "phone": phone,
@@ -4892,10 +5020,215 @@ def client_order_detail(request, order_id: int):
         "items": items,
 
         "amounts": amounts,
-        "payment_status": payment_status,
+
+        # ✅ paiement canonique pour template (ne dépend plus du champ payment_status)
+        "payment_status": payment_status_raw,   # compat si tu l’utilises ailleurs
+        "payment_ui": payment_ui,
+        "payment_label": payment_label,
+        "pay_pill_class": pay_pill_class,
+
+        # ✅ chiffres canon (pour badge + détails)
+        "paid_amount": paid,
+        "total_amount": total,
+        "remain_amount": remain,
+
         "timeline": timeline,
     })
 
+
+
+# -------------------------------------------------------------------
+# ✅ Paiement client (V1) — simulate + cash
+# -------------------------------------------------------------------
+
+@require_POST
+@client_login_required
+def client_order_pay_simulate(request, order_id: int):
+    """
+    Paiement simulé (MVP) : marque la commande comme payée (amount_paid = total_ttc).
+    Sécurisé par phone cookie.
+    """
+    phone = _client_phone(request)
+    if not phone:
+        return JsonResponse({"ok": False, "error": "not_authenticated"}, status=401)
+
+    order = (
+        Order.objects
+        .select_related("customer")
+        .filter(pk=order_id, customer__phone=phone)
+        .first()
+    )
+    if not order:
+        return JsonResponse({"ok": False, "error": "order_not_found"}, status=404)
+
+    amounts = _client_order_amounts(order)
+    total = amounts.get("total_ttc") or DECIMAL_ZERO
+    try:
+        total = Decimal(str(total))
+    except Exception:
+        total = DECIMAL_ZERO
+
+    if total <= DECIMAL_ZERO:
+        return JsonResponse({"ok": False, "error": "no_total_amount"}, status=400)
+
+    with transaction.atomic():
+        # on met le payé à total
+        try:
+            order.amount_paid = total
+        except Exception:
+            # si champ absent => refuse (mais chez toi il existe déjà)
+            return JsonResponse({"ok": False, "error": "amount_paid_field_missing"}, status=500)
+
+        # champ compat (si existant)
+        if hasattr(order, "payment_status"):
+            order.payment_status = "paid"
+
+        try:
+            order.save(update_fields=["amount_paid", "payment_status"] if hasattr(order, "payment_status") else ["amount_paid"])
+        except Exception:
+            order.save()
+
+    remain = total - (getattr(order, "amount_paid", DECIMAL_ZERO) or DECIMAL_ZERO)
+    if remain < DECIMAL_ZERO:
+        remain = DECIMAL_ZERO
+
+    # réponse JSON (front va recharger / refresh)
+    return JsonResponse({
+        "ok": True,
+        "payment_ui": "paid",
+        "payment_status": "paid",
+        "amounts": {
+            "total_ttc": float(total),
+            "amount_paid": float(total),
+            "amount_remaining": float(remain),
+        },
+    })
+
+
+def _parse_money_amount(raw: str) -> Decimal:
+    raw = (raw or "").strip()
+    if not raw:
+        return DECIMAL_ZERO
+    raw = raw.replace(" ", "").replace("\u00A0", "")
+    raw = raw.replace(",", ".")
+    # garder uniquement chiffres + point
+    raw = re.sub(r"[^0-9\.]", "", raw)
+    if raw.count(".") > 1:
+        # si plusieurs points, garder le 1er
+        first = raw.find(".")
+        raw = raw[:first+1] + raw[first+1:].replace(".", "")
+    try:
+        return Decimal(raw)
+    except Exception:
+        return DECIMAL_ZERO
+
+
+@require_POST
+@client_login_required
+def client_order_pay_cash(request, order_id: int):
+    """
+    Déclaration CASH / acompte (V1) :
+    - POST form-data: amount, note (optionnel)
+    - met à jour amount_paid += amount
+    - calcule paid/partial/unpaid
+    """
+    phone = _client_phone(request)
+    if not phone:
+        return JsonResponse({"ok": False, "error": "not_authenticated"}, status=401)
+
+    order = (
+        Order.objects
+        .select_related("customer")
+        .filter(pk=order_id, customer__phone=phone)
+        .first()
+    )
+    if not order:
+        return JsonResponse({"ok": False, "error": "order_not_found"}, status=404)
+
+    amounts = _client_order_amounts(order)
+    total = amounts.get("total_ttc") or DECIMAL_ZERO
+    try:
+        total = Decimal(str(total))
+    except Exception:
+        total = DECIMAL_ZERO
+
+    if total <= DECIMAL_ZERO:
+        return JsonResponse({"ok": False, "error": "no_total_amount"}, status=400)
+
+    # read input (form ou json)
+    amount_raw = request.POST.get("amount", "")
+    note = (request.POST.get("note", "") or "").strip()
+
+    # si JSON
+    ct = (request.headers.get("content-type") or "").lower()
+    if "application/json" in ct:
+        try:
+            payload = json.loads((request.body or b"{}").decode("utf-8", errors="replace"))
+            amount_raw = payload.get("amount", amount_raw)
+            note = (payload.get("note", note) or "").strip()
+        except Exception:
+            pass
+
+    add_amount = _parse_money_amount(str(amount_raw))
+    if add_amount <= DECIMAL_ZERO:
+        return JsonResponse({"ok": False, "error": "invalid_amount"}, status=400)
+
+    with transaction.atomic():
+        paid = getattr(order, "amount_paid", None) or DECIMAL_ZERO
+        try:
+            paid = Decimal(str(paid))
+        except Exception:
+            paid = DECIMAL_ZERO
+
+        new_paid = paid + add_amount
+        # cap à total (pas besoin de dépasser)
+        if new_paid > total:
+            new_paid = total
+
+        order.amount_paid = new_paid
+
+        # statut canonique
+        if hasattr(order, "payment_status"):
+            if new_paid <= DECIMAL_ZERO:
+                order.payment_status = "unpaid"
+            elif new_paid >= total:
+                order.payment_status = "paid"
+            else:
+                order.payment_status = "partial"
+
+        # note (si tu as un champ dédié un jour ; ici on n’écrit rien si champ absent)
+        if note and hasattr(order, "payment_note"):
+            order.payment_note = note
+
+        try:
+            fields = ["amount_paid"]
+            if hasattr(order, "payment_status"): fields.append("payment_status")
+            if note and hasattr(order, "payment_note"): fields.append("payment_note")
+            order.save(update_fields=fields)
+        except Exception:
+            order.save()
+
+    remain = total - (getattr(order, "amount_paid", DECIMAL_ZERO) or DECIMAL_ZERO)
+    if remain < DECIMAL_ZERO:
+        remain = DECIMAL_ZERO
+
+    # ui
+    if order.amount_paid >= total:
+        payment_ui = "paid"
+    else:
+        payment_ui = "partial"
+
+    return JsonResponse({
+        "ok": True,
+        "payment_ui": payment_ui,
+        "payment_status": getattr(order, "payment_status", None),
+        "note": note,
+        "amounts": {
+            "total_ttc": float(total),
+            "amount_paid": float(order.amount_paid),
+            "amount_remaining": float(remain),
+        },
+    })
 
 # -------------------------------------------------------------------
 # Items client (CRUD minimal) ✅ sécurisés par phone session
@@ -4903,6 +5236,139 @@ def client_order_detail(request, order_id: int):
 
 @require_http_methods(["GET", "POST"])
 @client_required
+
+
+# -------------------------------------------------------------------
+# ✅ Paiement Wave (V1) — page QR (simple)
+# -------------------------------------------------------------------
+
+@require_http_methods(["GET"])
+@client_login_required
+def client_order_pay_wave_page(request, order_id: int):
+    """
+    Page HTML simple qui affiche un QR code basé sur le numéro Wave (téléphone),
+    + montant conseillé (reste à payer).
+    MVP: QR = données texte (tel) via Google Chart.
+    """
+    phone = _client_phone(request)
+    if not phone:
+        return redirect("orders:client_login")
+
+    order = (
+        Order.objects
+        .select_related("customer")
+        .filter(pk=order_id, customer__phone=phone)
+        .first()
+    )
+    if not order:
+        return redirect("orders:client_home")
+
+    amounts = _client_order_amounts(order)
+    total = amounts.get("total_ttc") or DECIMAL_ZERO
+    paid = getattr(order, "amount_paid", DECIMAL_ZERO) or DECIMAL_ZERO
+
+    try:
+        total = Decimal(str(total))
+    except Exception as e:
+        total = DECIMAL_ZERO
+    try:
+        paid = Decimal(str(paid))
+    except Exception:
+        paid = DECIMAL_ZERO
+
+    remain = total - paid
+    if remain < DECIMAL_ZERO:
+        remain = DECIMAL_ZERO
+
+    # Numéro Wave: priorise settings.WAVE_RECEIVER_PHONE, sinon fallback sur phone client
+    wave_phone = (getattr(settings, "WAVE_RECEIVER_PHONE", "") or "").strip() or phone
+
+    # ✅ V2: lien de paiement Wave (Checkout API) avec montant exact
+    pay_link = ""
+    checkout_id = ""
+    api_enabled = bool(getattr(settings, "WAVE_CHECKOUT_ENABLED", False))
+    api_key = (getattr(settings, "WAVE_CHECKOUT_API_KEY", "") or "").strip()
+
+    # Montant Wave en XOF (entier, pas de décimales)
+    try:
+        amount_xof = str(int(remain))
+    except Exception:
+        amount_xof = "0"
+
+    if api_enabled and api_key and amount_xof != "0":
+        try:
+            import json
+            import urllib.request
+            import urllib.error
+            from django.urls import reverse
+
+            # Base URL publique (pour success/error)
+            base = (getattr(settings, "SITE_BASE_URL", "") or "").rstrip("/")
+            if not base:
+                # fallback: construit depuis la requête
+                base = request.build_absolute_uri("/").rstrip("/")
+
+            success_url = base + reverse("orders:client_order_detail", args=[order.id]) + "?wave=success"
+            error_url = base + reverse("orders:client_order_detail", args=[order.id]) + "?wave=error"
+
+            payload = {
+                "amount": amount_xof,
+                "currency": "XOF",
+                "success_url": success_url,
+                "error_url": error_url,
+                "client_reference": f"order-{order.id}-{getattr(order,'code',order.id)}",
+            }
+
+            req = urllib.request.Request(
+                "https://api.wave.com/v1/checkout/sessions",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+
+            pay_link = (data.get("wave_launch_url") or "").strip()
+            checkout_id = (data.get("id") or "").strip()
+
+        except Exception:
+            # On ne casse pas la page: fallback ci-dessous
+            pay_link = ""
+            checkout_id = ""
+
+    # Fallback: lien marchand Wave (si pas de pay_link API)
+    base_link = (getattr(settings, "WAVE_MERCHANT_LINK_BASE", "") or "").strip()
+    if (not pay_link) and base_link and amount_xof != "0":
+        sep = "&" if "?" in base_link else "?"
+        pay_link = f"{base_link}{sep}amount={amount_xof}"
+
+    # QR local (SVG) via segno
+    # -> si pay_link OK : QR encode le lien (lisible par téléphone)
+    # -> sinon : fallback encode le numéro
+    import segno
+    from io import BytesIO
+    import base64
+    qr_data = (pay_link or "").strip() or wave_phone
+    buf = BytesIO()
+    segno.make(qr_data).save(buf, kind="svg", scale=6, border=2)
+    qr_svg_bytes = buf.getvalue()
+    qr_b64 = base64.b64encode(qr_svg_bytes).decode("ascii")
+    qr_data_uri = "data:image/svg+xml;base64," + qr_b64
+
+    return render(request, "orders/client_pay_wave.html", {
+        "order": order,
+        "amounts": amounts,
+        "total": total,
+        "paid": paid,
+        "remain": remain,
+        "wave_phone": wave_phone,
+        "qr_data_uri": qr_data_uri,
+              "pay_link": pay_link,
+          "checkout_id": checkout_id,
+})
 def client_order_item_new(request, order_id):
     phone = _client_phone(request)
 
@@ -9980,15 +10446,36 @@ def driver_map(request):
     return render(request, "orders/driver_map.html", context)
 
 
+@login_required
 @require_GET
 def driver_map_data(request):
     """
     Endpoint JSON pour rafraîchir la carte des livreurs (Leaflet).
     Utilisé par driver_map.html en auto-refresh.
+    Ajouts OPS :
+    - status : available | busy | stale
+    - age_seconds / age_label
     """
     from decimal import Decimal
     from django.db.models import Sum
 
+    def _age_label(seconds: int) -> str:
+        try:
+            s = int(seconds)
+        except Exception:
+            return "—"
+        if s < 60:
+            return f"{s}s"
+        m = s // 60
+        if m < 60:
+            return f"{m} min"
+        h = m // 60
+        if h < 24:
+            return f"{h} h"
+        d = h // 24
+        return f"{d} j"
+
+    now = timezone.now()
     today = timezone.localdate()
     start_week = today - timezone.timedelta(days=today.weekday())
 
@@ -10023,6 +10510,22 @@ def driver_map_data(request):
         except (TypeError, ValueError):
             continue
 
+        updated_at = getattr(d, "updated_at", None)
+        age_seconds = None
+        if updated_at:
+            try:
+                age_seconds = int((now - updated_at).total_seconds())
+            except Exception:
+                age_seconds = None
+
+        # status
+        status = "available"
+        if active_order:
+            status = "busy"
+        # stale si pas d’update récente (15 min)
+        if (age_seconds is not None) and (age_seconds > 15 * 60) and (not active_order):
+            status = "stale"
+
         drivers.append({
             "id": d.id,
             "name": d.name,
@@ -10033,7 +10536,10 @@ def driver_map_data(request):
             "week_earnings": int(week_earnings),
             "active_order_id": active_order.id if active_order else None,
             "active_order_code": getattr(active_order, "code", None) if active_order else None,
-            "updated_at": getattr(d, "updated_at", None).isoformat() if getattr(d, "updated_at", None) else None,
+            "updated_at": updated_at.isoformat() if updated_at else None,
+            "age_seconds": age_seconds,
+            "age_label": _age_label(age_seconds) if age_seconds is not None else "—",
+            "status": status,
         })
 
     return JsonResponse({"drivers": drivers})
@@ -10763,6 +11269,26 @@ def client_new_order_step4(request, order_id: int):
         return redirect("orders:client_new_order_step3", order_id=order.id)
 
     if request.method == "POST":
+        # --- Garde-fou pilote: refuse confirmation si total prestations = 0 ---
+        from decimal import Decimal
+        try:
+            items_total = Decimal('0')
+            for it in items:
+                q = Decimal(str(getattr(it, 'quantity', 0) or 0))
+                u = Decimal(str(getattr(it, 'unit_price', 0) or 0))
+                if q < 0: q = Decimal('0')
+                if u < 0: u = Decimal('0')
+                items_total += (q * u)
+        except Exception:
+            items_total = Decimal('0')
+
+        if items_total <= Decimal('0'):
+            try:
+                from django.contrib import messages
+                messages.error(request, "Montant prestations = 0. Vérifie les quantités et prix de tes articles avant de confirmer.")
+            except Exception:
+                pass
+            return redirect('orders:client_new_order_step3', order_id=order.id)
         from orders.models import DeliveryLeg
 
         DeliveryLeg.objects.get_or_create(order=order, leg_type="pickup", defaults={"status":"pending"})

@@ -17,8 +17,6 @@ CLIENT_SESSION_KEY = "fagni_client_phone"
 
 ADMINS = [("Admin", "admin@example.com")]
 
-import os
-
 # --- Hosts autorisés (DEV) ---
 ALLOWED_HOSTS = [
     "127.0.0.1",
@@ -262,3 +260,17 @@ DEFAULT_FROM_EMAIL = "no-reply@fagni.local"
 # === GEO CODING (Lot 2.3) ===
 NOMINATIM_USER_AGENT = "FAGNI/1.0 (Côte d'Ivoire) contact: support@fagni.local"
 GEOCODING_COUNTRY_CODES = "ci"
+
+# -------------------------------------------------------------------
+# Wave (Checkout + lien marchand)
+# -------------------------------------------------------------------
+WAVE_CHECKOUT_ENABLED = (os.getenv("WAVE_CHECKOUT_ENABLED", "") or "").strip().lower() in ("1","true","yes","on")
+WAVE_CHECKOUT_API_KEY = (os.getenv("WAVE_CHECKOUT_API_KEY", "") or "").strip()
+WAVE_RECEIVER_PHONE   = (os.getenv("WAVE_RECEIVER_PHONE", "") or "").strip()
+
+# Lien marchand Wave (ex: https://pay.wave.com/m/.../c/ci/)
+WAVE_MERCHANT_LINK_BASE = (os.getenv("WAVE_MERCHANT_LINK_BASE", "") or "").strip()
+
+# URL publique (pour success/error)
+SITE_BASE_URL = (os.getenv("SITE_BASE_URL", "") or "").strip().rstrip("/")
+

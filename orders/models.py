@@ -2011,7 +2011,9 @@ class Order(models.Model):
         Garde-fous:
         - Exclut les legs canceled des calculs ET remet leurs montants à 0.
         - Répartit delivery_fee / driver_total / margin_total sur les legs actifs.
-        - Si une tx payout existe pour une jambe: driver_amount est VERROUILLÉ sur tx.amount.
+        - Si une tx payout existe pour une jambe:
+            - driver_amount est VERROUILLÉ sur tx.amount
+            - client_fee_share et fagni_margin sont FIGÉS (valeurs DB)
           (on répartit le reste sur les autres jambes non verrouillées)
         - Ne change pas les statuts et ne crée aucune transaction.
         """
@@ -2036,13 +2038,31 @@ class Order(models.Model):
             v = Decimal(str(v or 0))
             return v.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
+        def fix_rounding(shares, target_total: Decimal, allowed_idx=None):
+            """
+            Corrige le rounding pour que sum(shares)==target_total (en FCFA),
+            en ajustant uniquement les indices allowed_idx (si fournis).
+            """
+            target_total = _round_fcfa(target_total)
+            shares = [ _round_fcfa(s) for s in shares ]
+            idxs = list(allowed_idx) if allowed_idx else list(range(len(shares)))
+            if not idxs:
+                return shares
+            cur = sum([shares[i] for i in range(len(shares))], Decimal("0"))
+            diff = target_total - cur
+            if diff == 0:
+                return shares
+            # ajuster le dernier index autorisé
+            last = idxs[-1]
+            shares[last] = _round_fcfa(Decimal(str(shares[last])) + diff)
+            return shares
+
         # 1) Totaux de référence (commande)
         delivery_fee = Decimal(str(getattr(self, "delivery_fee", 0) or 0))
         driver_total = Decimal(str(getattr(self, "amount_driver_partner", 0) or 0))
         margin_total = Decimal(str(getattr(self, "logistic_margin", 0) or 0))
 
         # ✅ Pool cohérent = source de vérité (ne pas écraser ces montants)
-        # Si delivery_fee == amount_driver_partner + logistic_margin, on verrouille le pool.
         lock_pool = False
         try:
             _df = Decimal(str(delivery_fee or 0))
@@ -2107,16 +2127,20 @@ class Order(models.Model):
             n = len(legs)
             weights = [Decimal("1") / Decimal(str(n)) for _ in legs]
 
-        # ✅ Re-verrouillage du pool juste avant payouts (évite toute dérive de recalcul)
+        # ✅ Re-verrouillage du pool (évite dérives)
         if lock_pool:
             try:
                 driver_total = Decimal(str(self.amount_driver_partner or 0))
                 margin_total = Decimal(str(self.logistic_margin or 0))
+                delivery_fee = Decimal(str(self.delivery_fee or 0))
             except Exception:
                 pass
 
-        # 3) Verrouillage payout par jambe (si tx payout existe)
+        # 3) Verrouillage payout par jambe
         locked_driver_amount = {}
+        locked_client_share = {}
+        locked_margin = {}
+
         try:
             from wallets.models import WalletTransaction
             for leg in legs:
@@ -2132,135 +2156,99 @@ class Order(models.Model):
                 )
                 if tx:
                     locked_driver_amount[leg.id] = Decimal(str(tx.amount or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                    # FIGER client/marge = valeurs DB actuelles
+                    locked_client_share[leg.id] = Decimal(str(getattr(leg, "client_fee_share", 0) or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                    locked_margin[leg.id] = Decimal(str(getattr(leg, "fagni_margin", 0) or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         except Exception:
             locked_driver_amount = {}
+            locked_client_share = {}
+            locked_margin = {}
 
-        locked_sum = sum(locked_driver_amount.values()) if locked_driver_amount else Decimal("0")
+        def allocate_total(total: Decimal, locked: dict):
+            """
+            Alloue total sur legs avec:
+            - locked: dict leg_id -> montant figé
+            - reste distribué sur non-lock selon weights
+            Retourne (shares_list, adjusted_total)
+            """
+            total = Decimal(str(total or 0))
+            locked_sum = sum([Decimal(str(v or 0)) for v in locked.values()], Decimal("0")) if locked else Decimal("0")
+            if locked_sum > total:
+                total = locked_sum
+            remaining = total - locked_sum
+            n = len(legs)
+            shares = [Decimal("0") for _ in range(n)]
+            unlocked_idx = [i for i, lg in enumerate(legs) if lg.id not in locked]
+            if unlocked_idx:
+                if len(unlocked_idx) == 1:
+                    shares[unlocked_idx[0]] = _round_fcfa(remaining)
+                else:
+                    wsum = sum([weights[i] for i in unlocked_idx], Decimal("0"))
+                    for i in unlocked_idx:
+                        w = weights[i]
+                        if wsum > 0:
+                            w = w / wsum
+                        shares[i] = _round_fcfa(remaining * w)
+                shares = fix_rounding(shares, remaining, allowed_idx=unlocked_idx)
 
-        # 🔒 Réalité > théorie : si des payouts existent, on ne doit jamais "réduire" le total driver
-        if locked_sum > driver_total:
-            driver_total = locked_sum
+            # inject locked
+            for i, lg in enumerate(legs):
+                if lg.id in locked:
+                    shares[i] = _round_fcfa(locked[lg.id])
 
-        remaining_driver_total = driver_total - locked_sum
-        if remaining_driver_total < 0:
-            remaining_driver_total = Decimal("0")
+            # final correction to match total exactly (allow unlocked if possible else locked)
+            allowed = unlocked_idx if unlocked_idx else [i for i, lg in enumerate(legs) if lg.id in locked]
+            shares = fix_rounding(shares, total, allowed_idx=allowed)
+            return shares, total
 
-        unlocked_idx = [i for i, leg in enumerate(legs) if leg.id not in locked_driver_amount]
-        unlocked_wsum = sum([weights[i] for i in unlocked_idx]) if unlocked_idx else Decimal("0")
+        # 🔒 Réalité > théorie : si payouts existent, on ne doit jamais réduire les totaux sous le lock
+        # driver_total
+        driver_shares, driver_total_adj = allocate_total(driver_total, locked_driver_amount)
+        driver_total = driver_total_adj
 
+        # delivery_fee (client)
+        client_shares, delivery_fee_adj = allocate_total(delivery_fee, locked_client_share)
+        delivery_fee = delivery_fee_adj
 
-        # ✅ Cas simple (et le plus sûr): un seul leg non verrouillé => il prend 100% du reste
-        # évite des effets de bords de pondération/rounding
-        if len(unlocked_idx) == 1:
-            only_i = unlocked_idx[0]
-            # driver_shares sera créé plus bas, on stocke une intention dans remaining_driver_total
-            single_unlocked_idx = only_i
-        else:
-            single_unlocked_idx = None
+        # margin_total
+        margin_shares, margin_total_adj = allocate_total(margin_total, locked_margin)
+        margin_total = margin_total_adj
 
-        # 4) Shares client/marge
-        client_shares = [_round_fcfa(delivery_fee * w) for w in weights]
-        margin_shares = [_round_fcfa(margin_total * w) for w in weights]
-
-        # 5) Shares driver (verrouillés + restant)
-        driver_shares = [Decimal("0") for _ in legs]
-        for i, leg in enumerate(legs):
-            if leg.id in locked_driver_amount:
-                driver_shares[i] = _round_fcfa(locked_driver_amount[leg.id])
-
-        if unlocked_idx and remaining_driver_total > 0:
-            # ✅ Si un seul unlocked => 100% du remaining sur lui
-            if single_unlocked_idx is not None:
-                driver_shares[single_unlocked_idx] = _round_fcfa(remaining_driver_total)
-            else:
-                for i in unlocked_idx:
-                    w = weights[i]
-                    if unlocked_wsum > 0:
-                        w = w / unlocked_wsum
-                    driver_shares[i] = _round_fcfa(remaining_driver_total * w)
-
-        def fix_rounding(shares, target_total, allowed_idx=None):
-            allowed_idx = allowed_idx if allowed_idx is not None else list(range(len(shares)))
-            if not allowed_idx:
-                return shares
-            target_total = _round_fcfa(target_total)
-            current = sum([_round_fcfa(x) for x in shares])
-            diff = target_total - current
-            if diff != 0:
-                shares[allowed_idx[0]] = _round_fcfa(shares[allowed_idx[0]] + diff)
-            return shares
-
-        client_shares = fix_rounding(client_shares, delivery_fee)
-        margin_shares = fix_rounding(margin_shares, margin_total)
-        # ⚠️ Rounding driver uniquement sur les jambes non verrouillées
-        if unlocked_idx:
-            driver_shares = fix_rounding(driver_shares, driver_total, allowed_idx=unlocked_idx)
-        # sinon: tout est verrouillé -> on ne touche pas aux driver_shares (payout = vérité)
-
-        # ✅ Cas déterministe: s'il ne reste qu'UNE seule jambe non verrouillée,
-        # elle prend 100% du remaining du pool driver (après rounding), sans pondération.
-        try:
-            _unlocked_idx = [i for i, lg in enumerate(legs) if lg.id not in locked_driver_amount]
-            if len(_unlocked_idx) == 1:
-                _i = _unlocked_idx[0]
-                _locked_sum_fcfa = sum([_round_fcfa(v) for v in locked_driver_amount.values()]) if locked_driver_amount else Decimal("0")
-                _remaining_fcfa = _round_fcfa(driver_total) - _locked_sum_fcfa
-                if _remaining_fcfa < 0:
-                    _remaining_fcfa = Decimal("0")
-                driver_shares[_i] = _remaining_fcfa
-        except Exception:
-            pass
-
-        # 6) Écriture legs
+        # 4) Appliquer sur les legs
         for idx, leg in enumerate(legs):
-            leg.client_fee_share = client_shares[idx] if delivery_fee else Decimal("0")
-
-            # driver: payout lock > calcul
-            if leg.id in locked_driver_amount:
-                leg.driver_amount = locked_driver_amount[leg.id]
-            else:
-                # driver_shares est déjà en FCFA entier (round_fcfa) -> on garde .00
-                leg.driver_amount = Decimal(str(driver_shares[idx] or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-            leg.fagni_margin = margin_shares[idx] if margin_total else Decimal("0")
+            leg.client_fee_share = Decimal(str(client_shares[idx] or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            # driver: payout lock > calcul (déjà injecté)
+            leg.driver_amount = Decimal(str(driver_shares[idx] or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            leg.fagni_margin = Decimal(str(margin_shares[idx] or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
             if save_legs:
-                # ⚠️ bypass DeliveryLeg.save() (évite tout resync implicite)
-                type(leg).objects.filter(pk=leg.pk).update(
-                    client_fee_share=leg.client_fee_share,
-                    driver_amount=leg.driver_amount,
-                    fagni_margin=leg.fagni_margin,
-                )
+                leg.save(update_fields=["client_fee_share", "driver_amount", "fagni_margin"])
 
-
-        # 7) Agrégats commande (legs actifs)
+        # 5) Mettre à jour la commande (sans créer de tx)
         if save_order:
-            total_driver = sum([Decimal(str(l.driver_amount or 0)) for l in legs]).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-            total_margin = sum([Decimal(str(l.fagni_margin or 0)) for l in legs]).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-            total_dist2 = sum([l.distance_km or 0 for l in legs])
-
-            self.amount_driver_partner = total_driver
-            self.logistic_margin = total_margin
-            self.distance_km = total_dist2 or None
-            self.driver_logistic_cost = total_driver
-
-            # ⚠️ IMPORTANT: ne PAS appeler Order.save() ici (risque de recalcul/écrasement)
-            update_kwargs = {
-                'amount_driver_partner': total_driver,
-                'logistic_margin': total_margin,
-                'distance_km': total_dist2 or None,
-                'driver_logistic_cost': total_driver,
-            }
-            # Si on a reconstruit delivery_fee (legacy), on l’enregistre aussi
             try:
-                if 'delivery_fee_changed' in locals() and delivery_fee_changed:
-                    self.delivery_fee = delivery_fee
-                    update_kwargs['delivery_fee'] = delivery_fee
+                self.amount_driver_partner = Decimal(str(driver_total or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            except Exception:
+                self.amount_driver_partner = Decimal("0")
+
+            try:
+                self.logistic_margin = int(_round_fcfa(margin_total))
+            except Exception:
+                self.logistic_margin = 0
+
+            try:
+                self.delivery_fee = Decimal(str(delivery_fee or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             except Exception:
                 pass
-            type(self).objects.filter(pk=self.pk).update(**update_kwargs)
-    # ---------- Photos ----------
-    @property
+
+            # mirror legacy
+            try:
+                self.driver_logistic_cost = Decimal(str(self.amount_driver_partner or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            except Exception:
+                pass
+
+            self.distance_km = total_dist or None
+            self.save(update_fields=["amount_driver_partner", "logistic_margin", "delivery_fee", "driver_logistic_cost", "distance_km"])
     def total_photos(self):
         """
         Nombre total de photos sur toutes les lignes de la commande.
@@ -3077,111 +3065,113 @@ class DeliveryLeg(models.Model):
     def save(self, *args, **kwargs):
         """
         Auto-trigger payout driver quand une jambe passe à DONE.
-        - Idempotent: trigger_driver_payout_for_leg gère l'anti-doublon par leg.
-        - Sécurise les timestamps.
+
+        🔒 Verrouillage strict :
+        - Si un payout existe (WalletTransaction type='payout', direction='in' sur ce leg),
+          alors:
+            - status forcé à 'done'
+            - driver_amount forcé à tx.amount (source de vérité)
+            - client_fee_share + fagni_margin figés (repris depuis la DB)
+            - update_fields enrichi pour éviter qu’un save(update_fields=['status']) “drop” les champs verrouillés
+
+        Autres règles :
+        - Un leg ne peut pas passer assigned/in_progress/done sans driver (sauf si payout existe → historique)
+        - canceled ne peut pas être réouvert
+        - canceled => montants neutralisés (0)
+        - timestamps auto sur in_progress / done
         """
         from django.utils import timezone
 
-        # détecter l'ancien status AVANT guards
+        # snapshot DB (si exists)
+        old = None
         old_status = None
         if self.pk:
             try:
-                old_status = DeliveryLeg.objects.filter(pk=self.pk).values_list("status", flat=True).first()
+                old = DeliveryLeg.objects.filter(pk=self.pk).values(
+                    "status", "client_fee_share", "fagni_margin", "driver_amount"
+                ).first()
+                old_status = (old.get("status") if old else None)
             except Exception:
+                old = None
                 old_status = None
 
-        # 🔒 Guard: un leg ne peut pas passer "assigned/in_progress/done" sans driver
+        # Detect payout tx (lock)
+        tx = None
+        if self.pk:
+            try:
+                from wallets.models import WalletTransaction
+                tx = (
+                    WalletTransaction.objects.filter(
+                        order_id=self.order_id,
+                        leg_id=self.pk,
+                        type="payout",
+                        direction="in",
+                    )
+                    .order_by("-id")
+                    .first()
+                )
+            except Exception:
+                tx = None
+
+        has_payout = bool(tx)
+
+        # 🔒 LOCK payout : status + montants
+        if has_payout:
+            # status toujours DONE
+            if (self.status or "").lower() != "done":
+                self.status = "done"
+
+            # driver_amount = tx.amount (source-of-truth)
+            try:
+                self.driver_amount = tx.amount
+            except Exception:
+                pass
+
+            # figer les autres montants sur la DB (ne plus bouger après paiement)
+            if old:
+                try:
+                    self.client_fee_share = old.get("client_fee_share")
+                except Exception:
+                    pass
+                try:
+                    self.fagni_margin = old.get("fagni_margin")
+                except Exception:
+                    pass
+
+            # forcer update_fields à inclure les champs verrouillés
+            uf = kwargs.get("update_fields", None)
+            if uf is not None:
+                uf = set(list(uf))
+                uf.update({"status", "driver_amount", "client_fee_share", "fagni_margin"})
+                kwargs["update_fields"] = list(uf)
+
+        # 🔒 Guard: sans driver, pas de assigned/in_progress/done (sauf si payout lock)
         try:
-            if self.driver_id is None and (self.status or "").lower() in ("assigned", "in_progress", "done"):
+            if (not has_payout) and self.driver_id is None and (self.status or "").lower() in ("assigned", "in_progress", "done"):
                 self.status = "pending"
         except Exception:
             pass
 
-        # 🔒 Freeze: une jambe annulée ne peut pas être "réouverte"
-        # canceled -> pending/assigned/in_progress/done : interdit
+        # 🔒 Freeze: canceled ne peut pas être réouvert
         try:
             if old_status == "canceled" and self.status != "canceled":
                 self.status = "canceled"
         except Exception:
             pass
 
-        # 🔒 Guard anti-downgrade: si payout existe déjà, garder status='done'
-        # Empêche: leg payé -> save(update_fields=['status']) -> pending/assigned
-        try:
-            if self.pk:
-                from wallets.models import WalletTransaction
-                has_payout = WalletTransaction.objects.filter(
-                    order_id=self.order_id,
-                    leg_id=self.pk,
-                    wallet__owner_type="driver",
-                    type="payout",
-                    direction="in",
-                ).exists()
-                if has_payout and self.status != "done":
-                    self.status = "done"
-        except Exception:
-            pass
-
-        # 🔒 Si payout existe : geler aussi les montants (driver_amount / margin / client_share)
-        try:
-            if self.pk:
-                from wallets.models import WalletTransaction
-                tx = WalletTransaction.objects.filter(
-                    order_id=self.order_id,
-                    leg_id=self.pk,
-                    wallet__owner_type="driver",
-                    type="payout",
-                    direction="in",
-                ).order_by("-id").first()
-                if tx:
-                    # On recolle driver_amount sur le payout (source-of-truth)
-                    try:
-                        self.driver_amount = tx.amount
-                    except Exception:
-                        pass
-
-                    # Et on empêche update_fields de dropper driver_amount si quelqu’un ne voulait sauver que status
-                    uf = kwargs.get("update_fields", None)
-                    if uf is not None:
-                        uf = set(list(uf))
-                        uf.add("driver_amount")
-                        kwargs["update_fields"] = list(uf)
-        except Exception:
-            pass
-
-        # détecter transition vers done
-        old_status = None
-        if self.pk:
-            try:
-                old_status = DeliveryLeg.objects.filter(pk=self.pk).values_list("status", flat=True).first()
-            except Exception:
-                old_status = None
-
-        # ✅ Jambe annulée => neutraliser montants + garantir persistance même avec update_fields=["status"]
+        # ✅ canceled => neutraliser montants + garantir persistance même avec update_fields=["status"]
         try:
             if (getattr(self, "status", None) or "").lower() == "canceled":
                 from decimal import Decimal
-
-                if hasattr(self, "client_fee_share"):
-                    self.client_fee_share = Decimal("0")
-                if hasattr(self, "driver_amount"):
-                    self.driver_amount = Decimal("0")
-                if hasattr(self, "fagni_margin"):
-                    self.fagni_margin = Decimal("0")
+                self.client_fee_share = Decimal("0")
+                self.driver_amount = Decimal("0")
+                self.fagni_margin = Decimal("0")
 
                 uf = kwargs.get("update_fields", None)
                 if uf is not None:
                     uf = set(list(uf))
-                    uf.update({"client_fee_share", "driver_amount", "fagni_margin"})
+                    uf.update({"status", "client_fee_share", "driver_amount", "fagni_margin"})
                     kwargs["update_fields"] = list(uf)
-        except Exception:
-            pass
-
-        # 🔒 Guard: un return ne peut pas démarrer/finir sans driver
-        try:
-            if (self.leg_type == "return") and (self.driver_id is None) and (self.status in ("assigned", "in_progress", "done")):
-                # on ramène à pending (ou on laisse canceled si déjà canceled)
-                self.status = "pending"
         except Exception:
             pass
 
@@ -3193,13 +3183,12 @@ class DeliveryLeg(models.Model):
 
         super().save(*args, **kwargs)
 
-        # trigger payout uniquement si transition vers done
+        # trigger payout uniquement si transition vers done (idempotent côté service)
         if (old_status != "done") and (self.status == "done"):
             try:
                 from orders.service_layer.payouts import trigger_driver_payout_for_leg
                 trigger_driver_payout_for_leg(self)
             except Exception:
-                # on n'empêche pas la sauvegarde de la jambe
                 pass
 
 

@@ -379,3 +379,162 @@ class DeliveryLegPayoutTests(TestCase):
         # 7) agrégats cohérents
         self.assertEqual(o.amount_driver_partner, Decimal("2000.00"))
         self.assertEqual(o.logistic_margin, Decimal("500.00"))
+
+        # 8) somme legs = pool driver
+        total_driver_legs = (
+            pickup.driver_amount +
+            ret.driver_amount +
+            canceled.driver_amount
+        )
+        self.assertEqual(total_driver_legs, Decimal("2000.00"))
+
+        # 9) aucun montant négatif
+        self.assertGreaterEqual(pickup.driver_amount, Decimal("0"))
+        self.assertGreaterEqual(ret.driver_amount, Decimal("0"))
+        self.assertGreaterEqual(canceled.driver_amount, Decimal("0"))
+
+        # 10) aucune nouvelle tx payout créée par recompute
+        self.assertEqual(
+            WalletTransaction.objects.filter(
+                order=o,
+                type="payout",
+                direction="in"
+            ).count(),
+            1
+        )
+
+
+    def test_payout_lock_prevents_status_downgrade(self):
+        """
+        Si payout existe, toute tentative de repasser status à pending/assigned
+        doit être neutralisée (reste DONE).
+        """
+        from wallets.models import WalletTransaction
+
+        o, driver = self._mk_paid_order_and_driver()
+
+        leg = DeliveryLeg.objects.create(
+            order=o,
+            driver=driver,
+            leg_type="pickup",
+            status="assigned",
+            driver_amount=Decimal("300"),
+            client_fee_share=Decimal("1000"),
+            fagni_margin=Decimal("200"),
+        )
+
+        # done => payout créé
+        with self.captureOnCommitCallbacks(execute=True):
+            leg.status = "done"
+            leg.save(update_fields=["status"])
+
+        self.assertTrue(WalletTransaction.objects.filter(order=o, leg=leg, type="payout", direction="in").exists())
+
+        # tentative downgrade
+        DeliveryLeg.objects.filter(pk=leg.pk).update(status="pending")  # attaque SQL
+        leg.refresh_from_db()
+        self.assertEqual(leg.status, "pending")  # DB est pending, maintenant testons le save() lock
+
+        leg.status = "assigned"
+        leg.save(update_fields=["status"])  # doit revenir done via lock
+        leg.refresh_from_db()
+        self.assertEqual(leg.status, "done")
+
+
+    def test_payout_lock_freezes_fee_share_and_margin(self):
+        """
+        Si payout existe, driver_amount est tx.amount et les champs client_fee_share/fagni_margin
+        doivent rester figés (valeurs DB) même si on tente de les changer.
+        """
+        from wallets.models import WalletTransaction
+
+        o, driver = self._mk_paid_order_and_driver()
+
+        leg = DeliveryLeg.objects.create(
+            order=o,
+            driver=driver,
+            leg_type="pickup",
+            status="assigned",
+            driver_amount=Decimal("300"),
+            client_fee_share=Decimal("1000"),
+            fagni_margin=Decimal("200"),
+        )
+
+        # done => payout créé
+        with self.captureOnCommitCallbacks(execute=True):
+            leg.status = "done"
+            leg.save(update_fields=["status"])
+
+        tx = WalletTransaction.objects.filter(order=o, leg=leg, type="payout", direction="in").order_by("-id").first()
+        self.assertIsNotNone(tx)
+
+        # snapshot valeurs figées
+        leg.refresh_from_db()
+        frozen_client_share = leg.client_fee_share
+        frozen_margin = leg.fagni_margin
+        frozen_driver_amount = leg.driver_amount
+
+        # tentative de modification "après paiement"
+        leg.client_fee_share = Decimal("9999")
+        leg.fagni_margin = Decimal("8888")
+        leg.driver_amount = Decimal("7777")
+        leg.status = "pending"  # tentative downgrade aussi
+        leg.save(update_fields=["client_fee_share", "fagni_margin", "driver_amount", "status"])
+
+        leg.refresh_from_db()
+        self.assertEqual(leg.status, "done")
+        self.assertEqual(leg.driver_amount, tx.amount)          # source de vérité payout
+        self.assertEqual(leg.client_fee_share, frozen_client_share)
+        self.assertEqual(leg.fagni_margin, frozen_margin)
+        self.assertEqual(frozen_driver_amount, tx.amount)        # cohérence
+
+    def test_recompute_does_not_modify_locked_leg_finance(self):
+        """
+        Si payout existe pour une jambe, un appel à
+        order.recompute_logistics_from_legs()
+        ne doit pas modifier client_fee_share ni fagni_margin.
+        """
+        from wallets.models import WalletTransaction
+
+        o, driver = self._mk_paid_order_and_driver()
+
+        leg = DeliveryLeg.objects.create(
+            order=o,
+            driver=driver,
+            leg_type="pickup",
+            status="assigned",
+            driver_amount=Decimal("300"),
+            client_fee_share=Decimal("1000"),
+            fagni_margin=Decimal("200"),
+        )
+
+        # 1) Terminer jambe → payout créé
+        with self.captureOnCommitCallbacks(execute=True):
+            leg.status = "done"
+            leg.save(update_fields=["status"])
+
+        tx = WalletTransaction.objects.filter(order=o, leg=leg, type="payout", direction="in").first()
+        self.assertIsNotNone(tx)
+
+        leg.refresh_from_db()
+        frozen_client = leg.client_fee_share
+        frozen_margin = leg.fagni_margin
+        frozen_driver = leg.driver_amount
+
+        # 2) Modifier artificiellement le pool commande
+        Order.objects.filter(pk=o.pk).update(
+            delivery_fee=Decimal("9999"),
+            amount_driver_partner=Decimal("8888"),
+            logistic_margin=Decimal("1111"),
+        )
+        o.refresh_from_db()
+
+        # 3) Recompute
+        o.recompute_logistics_from_legs(save_legs=True, save_order=True)
+
+        leg.refresh_from_db()
+
+        # 4) Vérifications
+        self.assertEqual(leg.driver_amount, frozen_driver)
+        self.assertEqual(leg.client_fee_share, frozen_client)
+        self.assertEqual(leg.fagni_margin, frozen_margin)

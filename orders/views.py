@@ -9663,10 +9663,76 @@ def update_leg_status(leg, action, user=None):
         pass
 
     if action == "accept":
+
+        # ✅ Cas normal : pending → assigned
         if leg.status == "pending":
             leg.status = "assigned"
+
+            # 1) Fixer delivery_partner sur la commande si absent
+            try:
+                order = getattr(leg, "order", None)
+                driver = getattr(leg, "driver", None)
+                if order and driver and not getattr(order, "delivery_partner_id", None):
+                    order.delivery_partner = driver
+                    order.save(update_fields=["delivery_partner"])
+            except Exception:
+                pass
+
+            # 2) Aligner driver sur pickup+return
+            try:
+                from orders.models import DeliveryLeg
+                order = getattr(leg, "order", None)
+                driver_id = getattr(getattr(leg, "driver", None), "id", None)
+                if order and driver_id:
+                    DeliveryLeg.objects.filter(
+                        order=order,
+                        leg_type__in=["pickup", "return"],
+                    ).update(driver_id=driver_id)
+            except Exception:
+                pass
+
+            # 3) Réactiver return canceled non payé
+            try:
+                from orders.models import DeliveryLeg
+                from wallets.models import WalletTransaction
+
+                order = getattr(leg, "order", None)
+                driver_id = getattr(getattr(leg, "driver", None), "id", None)
+
+                if order and driver_id:
+                    r = DeliveryLeg.objects.filter(
+                        order=order,
+                        leg_type="return"
+                    ).order_by("-id").first()
+
+                    if r and (r.status or "").lower() == "canceled":
+                        has_payout = WalletTransaction.objects.filter(
+                            order_id=getattr(order, "id", None),
+                            leg_id=getattr(r, "id", None),
+                            wallet__owner_type="driver",
+                            type="payout",
+                            direction="in",
+                        ).exists()
+
+                        if not has_payout:
+                            DeliveryLeg.objects.filter(
+                                pk=r.pk,
+                                status="canceled"
+                            ).update(status="pending")
+            except Exception:
+                pass
+
+        # ✅ Déjà accepté
         elif leg.status == "assigned":
             return True, "Mission déjà acceptée."
+
+        # ✅ Déjà démarré
+        elif leg.status == "in_progress":
+            return True, "Mission déjà en cours."
+
+        # ✅ Déjà terminé
+        elif leg.status == "done":
+            return True, "Mission déjà terminée."
 
     elif action == "start":
         # 🔒 Le livreur doit d’abord ACCEPT (pending → assigned)

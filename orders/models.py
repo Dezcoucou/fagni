@@ -172,11 +172,12 @@ def sync_delivery_legs_for_order(order):
                         pass
                     leg.save(update_fields=["status", "client_fee_share", "driver_amount", "fagni_margin"])
 
-    # RÈGLE (STRICTE): le return reste PENDING tant que le livreur n'a pas "accept"
+    # RÈGLE (STRICTE) :
+    # - la jambe "return" reste PENDING tant que la collecte (pickup) n'est pas DONE
+    # - dès que pickup est DONE, "return" peut passer ASSIGNED si la commande est en cours (in_progress)
     pickup_leg = existing_by_type.get("pickup")
     pickup_done = bool(pickup_leg and (getattr(pickup_leg, "status", None) or "").lower() == "done")
-    # Important: on n'auto-upgrade JAMAIS le return (même si pickup_done / wash_ready).
-    base_status_return = "done" if st == "done" else "pending"
+    base_status_return = "done" if st == "done" else ("assigned" if pickup_done else "pending")
 
     for leg_type, client_part, driver_part, margin_part in legs_data:
         leg = existing_by_type.get(leg_type)
@@ -211,7 +212,17 @@ def sync_delivery_legs_for_order(order):
             elif cur in {"done", "in_progress"}:
                 pass
             elif cur in {"canceled"}:
-                pass
+                # ✅ Si leg annulé mais NON payé, on peut le réactiver via SQL (sinon freeze DeliveryLeg.save)
+                if not _has_payout_tx(leg):
+                    try:
+                        # On ne réactive que vers des statuts "soft"
+                        if desired_status in {"pending", "assigned"}:
+                            DeliveryLeg.objects.filter(pk=leg.pk, status="canceled").update(status=desired_status)
+                            leg.status = desired_status
+                            cur = desired_status
+                            status_changed = True
+                    except Exception:
+                        pass
 
             # 2) Sync métier autorisé : seulement pending/assigned (jamais done)
             else:

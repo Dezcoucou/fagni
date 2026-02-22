@@ -385,6 +385,28 @@
 
   // ----------------------------------------------------------------
   // LOT_2_17_WAVE_POLLING_OK
+  // LOT_2_21_WAVE_POLL_PAID_RELOAD_OK
+  // Quand le polling détecte "paid", on nettoie l'URL (Lot 2.20) + toast + reload 1 fois (anti-loop)
+  function __waveOnPaidOnce(orderId){
+    try{
+      var k = "wave_paid_reload_" + String(orderId || "");
+      if (window.sessionStorage && sessionStorage.getItem(k) === "1") return;
+      if (window.sessionStorage) sessionStorage.setItem(k, "1");
+    }catch(e){}
+
+    try{
+      if (typeof __waveCleanUrlParam === "function") __waveCleanUrlParam();
+    }catch(e){}
+
+    try{
+      if (typeof payShowMsg === "function") payShowMsg("✅ Paiement confirmé.", true);
+    }catch(e){}
+
+    setTimeout(function(){
+      try{ window.location.reload(); }catch(e){}
+    }, 650);
+  }
+
   // Polling léger après "Paiement déclaré"
   // ----------------------------------------------------------------
   try{
@@ -418,6 +440,12 @@
           });
           if (!res.ok) return;
           const data = await res.json();
+                try{
+                  if (data && (data.payment_ui === "paid" || data.payment_status === "paid")) {
+                    __waveOnPaidOnce(orderId);
+                  }
+                }catch(e){}
+          
           if (!data || !data.ok) return;
 
           if ((data.payment_ui || "").toLowerCase() === "paid") {

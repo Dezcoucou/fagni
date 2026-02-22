@@ -4910,6 +4910,77 @@ def _client_order_amounts(order: Order) -> dict:
     }
 
 
+# --- LOT_2_32_PAYMENT_UI_JSON_VIEW_OK ---
+@login_required
+def client_order_payment_ui_json(request, order_id):
+    """
+    Endpoint JSON (GET) pour polling UI paiement côté client.
+    - ne modifie PAS la commande
+    - renvoie un statut canonique basé sur total_ttc + amount_paid
+    """
+    from decimal import Decimal
+    from django.http import JsonResponse
+    from django.shortcuts import get_object_or_404
+
+    order = get_object_or_404(Order, id=order_id)
+
+    # Sécurité: si la commande a un user/owner, vérifie qu'on est bien le client
+    owner = getattr(order, "user", None) or getattr(order, "client", None) or getattr(order, "customer", None)
+    if owner is not None and owner != getattr(request, "user", None):
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+
+    amounts = _client_order_amounts(order)  # {'total_ttc': Decimal, ...}
+    total = amounts.get("total_ttc") or Decimal("0")
+    paid  = getattr(order, "amount_paid", None) or Decimal("0")
+
+    # normalise
+    try:
+        total = Decimal(str(total))
+    except Exception:
+        total = Decimal("0")
+    try:
+        paid = Decimal(str(paid))
+    except Exception:
+        paid = Decimal("0")
+
+    if paid < 0:
+        paid = Decimal("0")
+    if total < 0:
+        total = Decimal("0")
+
+    remain = total - paid
+    if remain < 0:
+        remain = Decimal("0")
+
+    if total <= 0:
+        payment_ui = "waiting_amount"
+        payment_status_ui = "unpaid"
+    elif paid <= 0:
+        payment_ui = "unpaid"
+        payment_status_ui = "unpaid"
+    elif paid >= total:
+        payment_ui = "paid"
+        payment_status_ui = "paid"
+    else:
+        payment_ui = "partial"
+        payment_status_ui = "partial"
+
+    wave_declared = bool(request.session.get(f"wave_declared_{order.id}"))
+
+    resp = JsonResponse({
+        "ok": True,
+        "order_id": order.id,
+        "payment_ui": payment_ui,
+        "payment_status_ui": payment_status_ui,
+        "total_ttc": float(total),
+        "amount_paid": float(paid),
+        "remain": float(remain),
+        "wave_declared": wave_declared,
+    })
+    resp["Cache-Control"] = "no-store"
+    return resp
+
+
 def _client_order_timeline(order: Order) -> list:
     """
     Timeline basée sur timestamps si présents, sinon fallback sur status.

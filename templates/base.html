@@ -111,8 +111,7 @@
 
     {% block extra_head %}{% endblock %}
 </head>
-<body>
-
+<body class="{% block body_class %}{% endblock %}">
 <header class="fagni-topbar">
 {% block topbar %}
     <div class="fagni-topbar-left">

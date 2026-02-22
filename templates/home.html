@@ -1,94 +1,479 @@
-<!doctype html>
-<html lang="fr">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>FAGNI – Accueil</title>
-  <style>
-    :root{
-      --orange:#ff7a00; --blue:#0056b3;
-      --bg:#0b1220; --card:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --line:rgba(148,163,184,.18);
-      --shadow: 0 18px 55px rgba(0,0,0,.45);
-    }
-    body{margin:0;background:radial-gradient(1200px 700px at 15% 10%, rgba(255,122,0,.22), transparent 45%),
-                     radial-gradient(1100px 650px at 85% 15%, rgba(0,86,179,.22), transparent 45%),
-                     var(--bg);
-         color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;}
-    .wrap{max-width:980px;margin:0 auto;padding:24px}
-    .hero{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:flex-end;margin-top:18px}
-    .brand{display:flex;gap:12px;align-items:center}
-    .logo{width:46px;height:46px;border-radius:16px;background:linear-gradient(135deg,var(--orange),#ffb100);
-          box-shadow:0 10px 30px rgba(255,122,0,.25)}
-    h1{margin:0;font-size:28px;letter-spacing:.2px}
-    .sub{margin-top:6px;color:var(--muted);font-weight:700}
-    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px;margin-top:18px}
-    .card{grid-column:span 12;background:rgba(15,23,42,.75);border:1px solid var(--line);
-          border-radius:20px;padding:16px;box-shadow:var(--shadow);backdrop-filter: blur(10px)}
-    @media(min-width:820px){ .card{grid-column:span 4} }
-    .title{font-weight:950;font-size:14px}
-    .desc{color:var(--muted);font-weight:750;margin-top:6px;font-size:13px;line-height:1.35}
-    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
-    a.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
-          padding:10px 12px;border-radius:999px;text-decoration:none;font-weight:900;font-size:13px}
-    .primary{background:linear-gradient(90deg,var(--orange),#ffb100);color:#111827}
-    .ghost{background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--text)}
-    .pillrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
-    .pill{padding:8px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid var(--line);
-          color:var(--muted);font-weight:850;font-size:12px}
-    .footer{margin-top:18px;color:var(--muted);font-weight:750;font-size:12px}
-    code{background:rgba(255,255,255,.06);padding:2px 6px;border-radius:8px;border:1px solid var(--line)}
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="hero">
-      <div class="brand">
-        <div class="logo"></div>
-        <div>
-          <h1>FAGNI</h1>
-          <div class="sub">Choisis ton espace</div>
-        </div>
-      </div>
+{% extends "base.html" %}
+{% load static %}
 
-      <div class="pillrow">
-        <span class="pill">MVP V1</span>
-        <span class="pill">Client • Blanchisseur • Livreur</span>
+{% block title %}FAGNI – Pressing & Logistique{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/fagni_premium_expressive.css' %}">
+<style>
+  :root{
+    --f-orange:#ff7a00;
+    --f-blue:#0056b3;
+
+    /* Option A — Clean & Luxury */
+    --bg:#f8fafc;            /* blanc cassé */
+    --surface:#ffffff;       /* cartes */
+    --text:#0b1220;          /* bleu nuit */
+    --muted:#64748b;         /* gris premium */
+    --line:rgba(15,23,42,.10);
+    --soft:rgba(2,6,23,.04);
+
+    --shadow: 0 18px 55px rgba(2,6,23,.10);
+    --shadow2: 0 10px 30px rgba(2,6,23,.08);
+  }
+
+  /* On neutralise le fond dark du base.html uniquement pour la home */
+  body{
+    background: radial-gradient(1200px 700px at 15% 10%, rgba(255,122,0,.14), transparent 55%),
+                radial-gradient(1100px 650px at 85% 15%, rgba(0,86,179,.10), transparent 55%),
+                var(--bg) !important;
+    color: var(--text) !important;
+  }
+
+  .landing{
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 16px 12px 28px;
+  }
+
+  /* Topbar local (menu) */
+  .homebar{
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: rgba(248,250,252,.82);
+    backdrop-filter: blur(10px);
+    border:1px solid var(--line);
+    border-radius: 18px;
+    padding: 10px 12px;
+    box-shadow: var(--shadow2);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .hb-left{ display:flex; align-items:center; gap:10px; min-width: 220px; }
+  .mark{
+    width:38px;height:38px;border-radius:14px;
+    background: linear-gradient(135deg, var(--f-orange), #ffb100);
+    display:flex; align-items:center; justify-content:center;
+    color:#111827; font-weight:1000;
+    box-shadow: 0 10px 22px rgba(255,122,0,.18);
+    flex: 0 0 auto;
+  }
+  .hb-title{ line-height:1.1; }
+  .hb-title .t{ font-weight:1000; letter-spacing:.06em; font-size:12px; text-transform:uppercase; }
+  .hb-title .s{ font-size:11px; color:var(--muted); font-weight:700; margin-top:2px; }
+
+  .hb-mid{
+    display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap;
+  }
+  .pill{
+    font-size:11px;
+    font-weight:850;
+    padding:6px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background: rgba(255,255,255,.70);
+    color: var(--muted);
+  }
+
+  .hb-right{ display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
+
+  a.btn, button.btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    padding:10px 12px;
+    border-radius:999px;
+    text-decoration:none;
+    font-weight:900;
+    font-size:13px;
+    border:1px solid transparent;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .primary{
+    background: linear-gradient(90deg, var(--f-orange), #ffb100);
+    color:#111827;
+  }
+  .ghost{
+    background: rgba(255,255,255,.82);
+    border:1px solid var(--line);
+    color: var(--text);
+  }
+  .link{
+    background: transparent;
+    border:1px solid transparent;
+    color: var(--text);
+    text-decoration:none;
+    font-weight:900;
+    font-size:13px;
+    padding:10px 10px;
+    border-radius:999px;
+  }
+  .link:hover{ background: rgba(2,6,23,.04); border-color: var(--line); }
+
+  /* Hero */
+  .hero{
+    margin-top: 14px;
+    border-radius: 22px;
+    border:1px solid var(--line);
+    background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.78));
+    box-shadow: var(--shadow);
+    overflow:hidden;
+    padding: 18px;
+  }
+  .hero-top{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:14px;
+    flex-wrap:wrap;
+  }
+  .hero h1{
+    margin:0;
+    font-size: 24px;
+    letter-spacing: .2px;
+  }
+  .hero p{
+    margin:8px 0 0;
+    color: var(--muted);
+    font-weight:750;
+    line-height:1.45;
+    max-width: 760px;
+  }
+  .badges{
+    display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:flex-end;
+  }
+  .badge{
+    font-size:12px;
+    font-weight:900;
+    padding:8px 10px;
+    border-radius: 999px;
+    border:1px solid var(--line);
+    background: rgba(2,6,23,.03);
+    color: var(--muted);
+  }
+
+  .hero-ctas{
+    margin-top: 14px;
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+
+  /* 3 étapes */
+  .steps{
+    margin-top: 14px;
+    display:grid;
+    grid-template-columns:repeat(12,1fr);
+    gap:12px;
+  }
+  .step{
+    grid-column: span 12;
+    border:1px solid var(--line);
+    background: rgba(255,255,255,.86);
+    border-radius: 18px;
+    padding: 12px;
+    box-shadow: var(--shadow2);
+  }
+  @media(min-width:900px){ .step{ grid-column: span 4; } }
+  .k{ font-weight: 1000; font-size: 12px; color: var(--text); }
+  .v{ margin-top:6px; font-weight:750; font-size:12px; color: var(--muted); line-height:1.4; }
+
+  /* Grid cartes espaces */
+  .grid{
+    margin-top: 14px;
+    display:grid;
+    grid-template-columns:repeat(12,1fr);
+    gap:14px;
+  }
+  .card{
+    grid-column: span 12;
+    border:1px solid var(--line);
+    background: rgba(255,255,255,.90);
+    border-radius: 20px;
+    padding: 16px;
+    box-shadow: var(--shadow2);
+  }
+  @media(min-width:900px){
+    .col4{ grid-column: span 4; }
+    .col6{ grid-column: span 6; }
+  }
+  .title{
+    font-weight: 1000;
+    font-size: 14px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    color: var(--text);
+  }
+  .desc{
+    margin-top: 6px;
+    color: var(--muted);
+    font-weight: 750;
+    font-size: 13px;
+    line-height:1.4;
+  }
+  .actions{
+    margin-top: 12px;
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  /* Bloc formules */
+  .plans{
+    margin-top: 12px;
+    display:grid;
+    grid-template-columns:repeat(12,1fr);
+    gap:12px;
+  }
+  .plan{
+    grid-column: span 12;
+    border:1px solid var(--line);
+    background: rgba(2,6,23,.02);
+    border-radius: 18px;
+    padding: 12px;
+  }
+  @media(min-width:900px){ .plan{ grid-column: span 4; } }
+  .plan h3{
+    margin:0;
+    font-size: 13px;
+    font-weight: 1000;
+    color: var(--text);
+  }
+  .plan p{
+    margin:6px 0 0;
+    font-size: 12px;
+    font-weight: 750;
+    color: var(--muted);
+    line-height:1.4;
+  }
+  .plan .mini{
+    margin-top:10px;
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .tag{
+    font-size:11px;
+    font-weight:850;
+    padding:6px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background: rgba(255,255,255,.72);
+    color: var(--muted);
+  }
+
+  /* Footer */
+  .foot{
+    margin-top: 14px;
+    color: var(--muted);
+    font-weight: 750;
+    font-size: 12px;
+  }
+  code{
+    background: rgba(2,6,23,.04);
+    border:1px solid var(--line);
+    padding:2px 6px;
+    border-radius: 10px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="landing">
+
+  <!-- Menu / Header -->
+  <div class="homebar">
+    <div class="hb-left">
+      <div class="mark">F</div>
+      <div class="hb-title">
+        <div class="t">FAGNI</div>
+        <div class="s">Pressing • Collecte • Livraison</div>
       </div>
     </div>
 
-    <div class="grid">
-      <div class="card">
-        <div class="title">👤 Espace Client</div>
-        <div class="desc">Créer une commande, suivre l’état, payer (Wave / cash / simulate), noter.</div>
-        <div class="actions">
-          <a class="btn primary" href="/orders/client/">Entrer</a>
-          <a class="btn ghost" href="/orders/client/new/">Nouvelle commande</a>
-          <a class="btn ghost" href="/orders/client/home/">Mes commandes</a>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="title">🧺 Espace Blanchisseur</div>
-        <div class="desc">Voir les commandes, peser, confirmer, contester, suivre le process.</div>
-        <div class="actions">
-          <a class="btn primary" href="/accounts/login/?next=/orders/laundry/app/">Se connecter</a>
-          <a class="btn ghost" href="/orders/laundry/app/">Ouvrir (si déjà connecté)</a>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="title">🛵 Espace Livreur</div>
-        <div class="desc">Mes courses, actions par étape, preuve, wallet, suivi.</div>
-        <div class="actions">
-          <a class="btn primary" href="/accounts/login/?next=/orders/driver-app/">Se connecter</a>
-          <a class="btn ghost" href="/orders/driver-app/">Ouvrir (si déjà connecté)</a>
-        </div>
-      </div>
+    <div class="hb-mid">
+      <span class="pill">MVP V1</span>
+      <span class="pill">Formules • Articles</span>
+      <span class="pill">Paiement Wave • Mode test</span>
+      {% if request.user.is_authenticated and request.user.is_staff %}
+        <span class="pill">Admin connecté</span>
+      {% endif %}
     </div>
 
-    <div class="footer">
-      Astuce : pour accéder au back-office, utilise <code>/admin/</code> ou <code>/dashboard/</code>.
+    <div class="hb-right">
+      <a class="btn primary" href="/orders/client/new/">Nouvelle commande</a>
+      <a class="link" href="/orders/client/">Espace client</a>
+      <a class="link" href="/accounts/login/?next=/orders/laundry/app/">Espace pro</a>
+      {% if request.user.is_authenticated and request.user.is_staff %}
+        <a class="link" href="/dashboard/">Dashboard</a>
+        <a class="link" href="/admin/">Admin</a>
+      {% endif %}
     </div>
   </div>
-</body>
-</html>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-top">
+      <div>
+        <h1>FAGNI — Pressing & Logistique</h1>
+        <p>
+          La super-app qui connecte <strong>clients</strong>, <strong>blanchisseries</strong> et <strong>livreurs</strong>.
+          Tu choisis une <strong>formule</strong> (ou des <strong>articles</strong>), on gère la collecte, le traitement et la livraison —
+          avec un suivi simple et traçable.
+        </p>
+
+        <div class="hero-ctas">
+          <a class="btn primary" href="/orders/client/new/">✅ Commander maintenant</a>
+          <a class="btn ghost" href="/orders/client/">📦 Suivre / mes commandes</a>
+        </div>
+      </div>
+
+      <div class="badges">
+        <span class="badge">⏱️ Standard</span>
+        <span class="badge">⚡ Express</span>
+        <span class="badge">📍 Suivi & preuves</span>
+        <span class="badge">💳 Wave</span>
+      </div>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="k">1) Commande</div>
+        <div class="v">Le client choisit une formule / des articles, puis valide la demande de collecte.</div>
+      </div>
+      <div class="step">
+        <div class="k">2) Traitement</div>
+        <div class="v">La blanchisserie traite selon la formule : lavage, repassage, packaging, statut en temps réel.</div>
+      </div>
+      <div class="step">
+        <div class="k">3) Livraison</div>
+        <div class="v">Le livreur livre. Le client suit, confirme la réception et peut noter l’expérience.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Choisir son espace -->
+  <section class="grid">
+    <div class="card col4">
+      <div class="title">👤 Espace Client</div>
+      <div class="desc">
+        Commander, suivre l’état, payer via <strong>Wave</strong> (ou <strong>mode test</strong> en pilote), noter.
+      </div>
+      <div class="actions">
+        <a class="btn primary" href="/orders/client/">Entrer</a>
+        <a class="btn ghost" href="/orders/client/new/">Nouvelle commande</a>
+        <a class="btn ghost" href="/orders/client/home/">Mes commandes</a>
+      </div>
+    </div>
+
+    <div class="card col4">
+      <div class="title">🧺 Espace Blanchisseur</div>
+      <div class="desc">
+        Recevoir des commandes, valider la formule, mettre à jour les étapes (reçu → en cours → prêt → remis).
+      </div>
+      <div class="actions">
+        <a class="btn primary" href="/accounts/login/?next=/orders/laundry/app/">Se connecter</a>
+        <a class="btn ghost" href="/orders/laundry/app/">Ouvrir</a>
+      </div>
+    </div>
+
+    <div class="card col4">
+      <div class="title">🛵 Espace Livreur</div>
+      <div class="desc">
+        Mes courses, actions par étape, preuves, wallet, suivi. Interface ultra simple sur mobile.
+      </div>
+      <div class="actions">
+        <a class="btn primary" href="/accounts/login/?next=/orders/driver-app/">Se connecter</a>
+        <a class="btn ghost" href="/orders/driver-app/">Ouvrir</a>
+      </div>
+    </div>
+
+    <!-- Formules -->
+    <div class="card col6">
+      <div class="title">🧾 Formules (modèle “articles”, sans pesée)</div>
+      <div class="desc">
+        On ne pèse plus : le client choisit une formule et/ou des articles. Le prix est clair, la qualité est standardisée.
+      </div>
+
+      <div class="plans">
+        <div class="plan">
+          <h3>Standard</h3>
+          <p>Lavage + repassage (selon articles). Idéal au quotidien.</p>
+          <div class="mini">
+            <span class="tag">🧼 Propre & net</span>
+            <span class="tag">📦 Packaging</span>
+            <span class="tag">📍 Suivi</span>
+          </div>
+        </div>
+
+        <div class="plan">
+          <h3>Express</h3>
+          <p>Priorité traitement + livraison rapide (pilote).</p>
+          <div class="mini">
+            <span class="tag">⚡ Prioritaire</span>
+            <span class="tag">⏱️ Rapide</span>
+            <span class="tag">📍 Suivi</span>
+          </div>
+        </div>
+
+        <div class="plan">
+          <h3>Premium</h3>
+          <p>Soins renforcés (délicats), contrôle qualité + finition.</p>
+          <div class="mini">
+            <span class="tag">✨ Finition</span>
+            <span class="tag">🧺 Délicats</span>
+            <span class="tag">✅ QC</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pilotage -->
+    <div class="card col6">
+      <div class="title">🚀 Pilote : simple, rapide, mesurable</div>
+      <div class="desc">
+        Démarre sur <strong>1 zone</strong>, <strong>1–2 blanchisseries</strong>, <strong>2–3 livreurs</strong> :
+        on mesure les délais, la qualité et la satisfaction, puis on élargit.
+      </div>
+
+      <div class="actions">
+        <a class="btn primary" href="/orders/client/new/">✅ Créer une commande test</a>
+        {% if request.user.is_authenticated and request.user.is_staff %}
+          <a class="btn ghost" href="/dashboard/">📊 Dashboard</a>
+          <a class="btn ghost" href="/admin/">⚙️ Admin</a>
+        {% else %}
+          <a class="btn ghost" href="/accounts/login/?next=/dashboard/">📊 Dashboard (staff)</a>
+        {% endif %}
+      </div>
+
+      <div class="steps" style="margin-top:12px;">
+        <div class="step">
+          <div class="k">Paiement</div>
+          <div class="v">Wave (QR) + mode test pour valider le parcours en conditions réelles.</div>
+        </div>
+        <div class="step">
+          <div class="k">Traçabilité</div>
+          <div class="v">Statuts + preuves : moins de WhatsApp, moins de litiges.</div>
+        </div>
+        <div class="step">
+          <div class="k">Qualité</div>
+          <div class="v">Notation client : amélioration continue des partenaires.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">
+    Accès rapide : <code>/orders/client/</code> • <code>/orders/laundry/app/</code> • <code>/orders/driver-app/</code>
+    {% if request.user.is_authenticated and request.user.is_staff %} • <code>/dashboard/</code> • <code>/admin/</code>{% endif %}
+  </div>
+
+</div>
+{% endblock %}

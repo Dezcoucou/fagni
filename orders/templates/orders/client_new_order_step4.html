@@ -176,4 +176,21 @@
   {% endwith %}
 
 </div>
+
+  <script>
+  document.addEventListener("DOMContentLoaded", function() {
+    const form = document.querySelector("form");
+    const btn = document.querySelector('button[type="submit"]');
+
+    if (form && btn) {
+      form.addEventListener("submit", function() {
+        btn.disabled = true;
+        btn.innerHTML = "Redirection vers paiement sécurisé...";
+        btn.style.opacity = "0.7";
+      });
+    }
+  });
+  </script>
+
+
 {% endblock %}

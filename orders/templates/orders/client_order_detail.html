@@ -1,11 +1,5 @@
-{% extends "base.html" %}
+{% extends "orders/client_base.html" %}
 {% load money_filters static %}
-
-{% block page_css %}
-<link rel="stylesheet" href="{% static 'css/client_app.css' %}">
-{% endblock %}
-
-
 {% block title %}Commande {{ order.code|default:order.id }} – Client FAGNI{% endblock %}
 {% block extra_head %}
 {{ block.super }}
@@ -474,7 +468,6 @@
         {% endif %}
         {% endwith %}{% endwith %}{% endwith %}{% endwith %}
 
-
         {% if order.status == "pending" or order.status == "in_progress" %}
           {% with prest=amounts.prestation_total|default:0 %}
             {% with prest0=prest|floatformat:0 %}
@@ -657,7 +650,6 @@
         </div>
       </div>
     </div>
-
 
   <!-- ✅ ÉVALUATION -->
   <div class="card panel" style="margin-top:12px;">
@@ -851,8 +843,6 @@
 
   if(btnPaySim) btnPaySim.addEventListener("click", doPaySimulate);
   if(btnPayCashSend) btnPayCashSend.addEventListener("click", doPayCash);
-
-
 
     const evidencePostUrl = `/orders/client/orders/${orderId}/evidence/upload/`;
 
@@ -1854,8 +1844,6 @@
 
     showRatingCreateForm();
   }
-
-
 
   async function tick(){
     if(busy) return;

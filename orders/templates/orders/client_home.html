@@ -1,12 +1,5 @@
-{% extends "base.html" %}
+{% extends "orders/client_base.html" %}
 {% load static humanize money_filters %}
-
-
-{% block page_css %}
-<link rel="stylesheet" href="{% static 'css/client_app.css' %}">
-{% endblock %}
-
-
 {# CSS spécifique à l'app Client #}
 {% block title %}Accueil – Client FAGNI{% endblock %}
 

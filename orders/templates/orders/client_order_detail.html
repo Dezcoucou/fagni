@@ -353,7 +353,15 @@
 
   {% elif request.GET.wave == "declared" %}
     <div class="co-notice co-notice--warn" id="waveNotice" data-wave="declared" data-order="{{ order.id }}">
-      <div class="co-notice__icon">✓</div>
+      <div class="co-notice__icon">✓
+      <!-- LOT_2_35_WAVE_MANUAL_REFRESH_OK -->
+      <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button type="button" id="waveRefreshBtn" class="btn btn-light" style="padding:8px 12px;border-radius:999px;">
+          🔄 Actualiser le paiement
+        </button>
+        <span id="waveRefreshHint" style="font-size:12px;color:var(--muted,#64748b)"></span>
+      </div>
+    </div>
       <div>
         <p class="co-notice__title">Paiement déclaré</p>
         <p class="co-notice__desc">Merci. Nous vérifions ton paiement Wave et on confirme dès que possible.</p>

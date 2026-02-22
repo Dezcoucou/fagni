@@ -1109,3 +1109,197 @@ summary:focus-visible{
     min-width: 100%;
   }
 }
+
+/* Client Topbar: micro ajustements */
+.client-topbar .fagni-logo-text-sub{ color: rgba(255,255,255,0.75); }
+.client-topbar .fagni-topbar-tag{
+  border-color: rgba(148,163,184,0.35);
+  background: rgba(15,23,42,0.55);
+}
+
+/* =========================================================
+   Client — New Order (Step 1) : styles propres (no inline)
+   ========================================================= */
+.page.client-new-order{ padding-bottom: 92px; max-width: 860px; margin: 0 auto; }
+
+.co-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+  margin: 8px 0 12px;
+}
+.co-title{
+  margin:0;
+  font-size:22px;
+  font-weight:950;
+  color: var(--ink);
+  letter-spacing:-0.2px;
+}
+.co-sub{
+  margin:6px 0 0;
+  font-size:13px;
+  color: var(--fagni-text-muted);
+  line-height:1.35;
+}
+.co-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+
+.co-steps{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin:10px 0 0;
+}
+.co-step{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 10px;
+  border:1px solid var(--hairline-2);
+  border-radius:999px;
+  background: var(--paper);
+  font-weight:900;
+  color: rgba(2,6,23,0.78);
+  font-size:12px;
+  box-shadow: 0 10px 22px rgba(2,6,23,0.04);
+}
+.co-step.active{
+  border-color: rgba(255,122,0,0.25);
+  box-shadow: 0 0 0 4px var(--ring-2), 0 12px 26px rgba(2,6,23,0.06);
+  color: var(--prem-blue);
+}
+
+.co-hero{ padding: 14px 16px; }
+.co-hero__row{
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+  justify-content:space-between;
+  flex-wrap:wrap;
+}
+.co-hero__copy{ min-width: 240px; }
+.co-hero__k{
+  font-weight:950;
+  color: var(--ink);
+  font-size:13px;
+}
+.co-hero__d{
+  margin-top:4px;
+  color: var(--fagni-text-muted);
+  font-size:12px;
+  line-height:1.35;
+}
+
+.co-badges{ display:flex; gap:8px; flex-wrap:wrap; }
+.co-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 10px;
+  border-radius:999px;
+  border:1px solid var(--hairline-2);
+  background: var(--paper);
+  font-size:12px;
+  font-weight:900;
+  color: rgba(2,6,23,0.78);
+  box-shadow: 0 10px 22px rgba(2,6,23,0.04);
+}
+.co-badge svg{ width:16px; height:16px; opacity:.9; }
+
+.co-mini{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap:10px;
+  margin-top:12px;
+}
+@media (max-width:820px){
+  .co-mini{ grid-template-columns: 1fr; }
+}
+.co-mini__card{
+  border:1px solid var(--hairline-2);
+  background: var(--paper);
+  border-radius:16px;
+  padding:12px;
+  box-shadow: 0 10px 22px rgba(2,6,23,0.04);
+}
+.co-mini__card .k{ font-size:12px; color: var(--fagni-text-muted); margin:0 0 6px 0; }
+.co-mini__card .v{ font-size:13px; font-weight:950; color: var(--ink); margin:0; }
+
+.co-panel{ padding: 14px 16px 16px; }
+.co-alert{
+  padding:10px 12px;
+  border-radius:14px;
+  border:1px solid rgba(239,68,68,0.35);
+  background: rgba(239,68,68,0.06);
+  color: rgba(2,6,23,0.88);
+  font-size:13px;
+  font-weight:800;
+  margin-bottom:10px;
+}
+
+.co-grid{ display:grid; grid-template-columns:1fr; gap:12px; }
+.co-field{ grid-column:1 / -1; }
+
+.co-label{
+  display:block;
+  font-weight:950;
+  margin: 4px 0 6px;
+  color: var(--ink);
+  font-size:13px;
+}
+
+.co-input, .co-textarea{
+  width:100%;
+  padding:12px;
+  border-radius:14px;
+  border:1px solid var(--hairline-2);
+  outline:none;
+  font-weight:800;
+  background: var(--paper);
+  color: var(--ink);
+}
+.co-textarea{ font-weight:700; resize:vertical; min-height:104px; }
+.co-input:focus, .co-textarea:focus{
+  border-color: rgba(255,122,0,0.35);
+  box-shadow: 0 0 0 4px var(--ring-2);
+}
+.co-input--disabled{
+  background: var(--paper-3);
+  color: rgba(2,6,23,0.55);
+}
+
+.co-help{
+  display:block;
+  margin-top:6px;
+  color: var(--fagni-text-muted);
+  font-size:12px;
+  line-height:1.35;
+}
+
+.co-cta{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+  margin-top:14px;
+}
+.co-cta__btn{ flex: 1 1 240px; }
+.co-cta__meta{
+  color: var(--fagni-text-muted);
+  font-size:12px;
+  line-height:1.35;
+}
+.co-cta__meta strong{ color: var(--ink); font-weight:950; }
+
+.co-note{
+  margin-top:12px;
+  padding:12px;
+  border-radius:14px;
+  border:1px solid var(--hairline-2);
+  background: var(--paper-3);
+  color: rgba(2,6,23,0.86);
+  font-size:12px;
+  line-height:1.45;
+}
+.co-note strong{ color: var(--ink); }

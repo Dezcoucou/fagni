@@ -406,26 +406,59 @@
   }
 
   // Quand le polling détecte "paid", on nettoie l'URL (Lot 2.20) + toast + reload 1 fois (anti-loop)
+  
+  // LOT_2_27_WAVE_NO_RELOAD_ON_PAID_OK
   function __waveOnPaidOnce(orderId){
-    try{
-      var k = "wave_paid_reload_" + String(orderId || "");
-      if (window.sessionStorage && sessionStorage.getItem(k) === "1") return;
-      if (window.sessionStorage) sessionStorage.setItem(k, "1");
-    }catch(e){}
+    try {
+      var k = "wave_paid_done_" + String(orderId || "");
+      // one-shot (évite répétition)
+      try {
+        if (sessionStorage.getItem(k) === "1") return;
+        sessionStorage.setItem(k, "1");
+      } catch(e) {}
 
-    try{
-      if (typeof __waveCleanUrlParam === "function") __waveCleanUrlParam();
-    }catch(e){}
+      // stop polling
+      try { window.__waveStopPolling = true; } catch(e) {}
 
-    try{
-      if (typeof payShowMsg === "function") payShowMsg("✅ Paiement confirmé.", true);
-    }catch(e){}
+      // clean URL (retire ?wave=declared / autres)
+      try {
+        var u = new URL(window.location.href);
+        if (u.searchParams.has("wave")) {
+          u.searchParams.delete("wave");
+          history.replaceState(null, "", u.toString());
+        }
+      } catch(e) {}
 
-    setTimeout(function(){
-      try{ window.location.reload(); }catch(e){}
-    }, 650);
+      // Update banner UI (si présent)
+      try {
+        var el = document.getElementById("waveNotice");
+        if (el) {
+          el.classList.remove("co-notice--warn","co-notice--err");
+          el.classList.add("co-notice--ok");
+          el.setAttribute("data-wave","success");
+          var titleEl = el.querySelector(".co-notice__title");
+          var descEl  = el.querySelector(".co-notice__desc");
+          if (titleEl) titleEl.textContent = "Paiement confirmé";
+          if (descEl)  descEl.textContent  = "Merci. Ton paiement Wave a été confirmé.";
+        }
+      } catch(e) {}
+
+      // Toast (si payShowMsg existe)
+      try {
+        if (typeof payShowMsg === "function") {
+          payShowMsg("✅ Paiement confirmé.", true);
+        }
+      } catch(e) {}
+
+      // Bonus UX: désactive boutons paiement (si zone identifiée)
+      try {
+        // cache toute zone d'actions Wave si elle existe
+        var actions = document.querySelectorAll("[data-wave-actions], #waveActions, .paywave-state__right");
+        actions.forEach(function(a){ a.style.opacity = "0.6"; });
+      } catch(e) {}
+
+    } catch(e) {}
   }
-
   // Polling léger après "Paiement déclaré"
   // ----------------------------------------------------------------
   try{
@@ -453,6 +486,9 @@
       if(typeof orderId === "undefined") return;
 
       // Fetch immédiat
+      
+          if (window.__waveStopPolling) { return; }
+
       fetch(endpoint, {
         method: "GET",
         credentials: "same-origin",

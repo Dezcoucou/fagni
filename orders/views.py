@@ -5244,7 +5244,7 @@ def client_order_pay_cash(request, order_id: int):
 # ✅ Paiement Wave (V1) — page QR (simple)
 # -------------------------------------------------------------------
 
-@require_http_methods(["GET"])
+@require_http_methods(["GET", "POST"])
 @client_login_required
 def client_order_pay_wave_page(request, order_id: int):
     """
@@ -5282,6 +5282,21 @@ def client_order_pay_wave_page(request, order_id: int):
     if remain < DECIMAL_ZERO:
         remain = DECIMAL_ZERO
 
+
+    # ---------------------------------------------------------
+    # ✅ Pilote: déclaration manuelle "J'ai payé" (Wave)
+    # - ne modifie pas amount_paid ni payment_status (évite faux positifs)
+    # - évite double POST via session
+    # - redirige vers détail commande avec flag
+    # ---------------------------------------------------------
+    if request.method == "POST":
+        key = f"wave_declared_{order.id}"
+        if not request.session.get(key):
+            request.session[key] = True
+            request.session.modified = True
+
+        from django.urls import reverse
+        return redirect(reverse("orders:client_order_detail", args=[order.id]) + "?wave=declared")
     # Numéro Wave: priorise settings.WAVE_RECEIVER_PHONE, sinon fallback sur phone client
     wave_phone = (getattr(settings, "WAVE_RECEIVER_PHONE", "") or "").strip() or phone
 

@@ -369,6 +369,20 @@
   (function(){
     const el = document.getElementById("waveNotice");
 
+    // LOT_2_20_WAVE_CLEAN_URL_OK
+    // Nettoie l’URL (retire ?wave=...) sans recharger, pour éviter que le statut reste "collé".
+    function __waveCleanUrlParam() {
+      try {
+        var u = new URL(window.location.href);
+        if (!u.searchParams || !u.searchParams.has("wave")) return;
+        u.searchParams.delete("wave");
+        var qs = u.searchParams.toString();
+        var newUrl = u.pathname + (qs ? ("?" + qs) : "") + (u.hash || "");
+        window.history.replaceState({}, "", newUrl);
+      } catch(e) {}
+    }
+
+
   // ----------------------------------------------------------------
   // LOT_2_17_WAVE_POLLING_OK
   // Polling léger après "Paiement déclaré"
@@ -376,6 +390,8 @@
   try{
     // On récupère l'élément (si le code existant n'a pas gardé la variable)
     var __waveEl = (typeof el !== "undefined" && el) ? el : document.getElementById("waveNotice");
+        __waveCleanUrlParam();
+
     if (__waveEl && __waveEl.dataset && __waveEl.dataset.wave === "declared") {
       const orderId = __waveEl.dataset.order;
       const endpoint = `/orders/client/orders/${orderId}/payment-ui/`;

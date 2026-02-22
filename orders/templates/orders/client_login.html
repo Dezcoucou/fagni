@@ -1,8 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Espace client – FAGNI{% endblock %}
+{% load static %}
 
+{% block page_css %}
+<link rel="stylesheet" href="{% static 'css/client_app.css' %}">
+{% endblock %}
+
+
+{% block title %}Espace client – FAGNI{% endblock %}
 {% block extra_head %}
+{{ block.super }}
 <style>
   :root{
     --fagni-orange:#ff7a00;
@@ -32,7 +39,6 @@
   .hint{ margin-top:10px;color:var(--muted);font-size:12px; }
 </style>
 {% endblock %}
-
 {% block content %}
 <div class="page">
   <div class="cardx">

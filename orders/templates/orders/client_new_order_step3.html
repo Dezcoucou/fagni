@@ -1,9 +1,14 @@
 {% extends "base.html" %}
-{% load money_filters %}
+{% load money_filters static %}
+
+{% block page_css %}
+<link rel="stylesheet" href="{% static 'css/client_app.css' %}">
+{% endblock %}
+
 
 {% block title %}Nouvelle commande – Étape 3{% endblock %}
-
 {% block extra_head %}
+{{ block.super }}
 <style>
   :root{
     --fagni-orange:#ff7a00;
@@ -332,9 +337,7 @@
   }
 })();
 </script>
-
 {% endblock %}
-
 {% block content %}
 <div class="page">
   <div class="header">

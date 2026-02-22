@@ -1,9 +1,14 @@
 {% extends "base.html" %}
-{% load money_filters %}
+{% load money_filters static %}
+
+{% block page_css %}
+<link rel="stylesheet" href="{% static 'css/client_app.css' %}">
+{% endblock %}
+
 
 {% block title %}Paiement Wave – Commande {{ order.code|default:order.id }}{% endblock %}
-
 {% block extra_head %}
+{{ block.super }}
 <style>
   .page{max-width:720px;margin:0 auto;padding:16px}
   .card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;box-shadow:0 1px 4px rgba(15,23,42,0.06)}
@@ -30,7 +35,6 @@
   code{font-weight:900}
 </style>
 {% endblock %}
-
 {% block content %}
 <div class="page">
 

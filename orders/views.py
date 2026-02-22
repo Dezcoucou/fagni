@@ -4911,7 +4911,7 @@ def _client_order_amounts(order: Order) -> dict:
 
 
 # --- LOT_2_32_PAYMENT_UI_JSON_VIEW_OK ---
-@login_required
+@client_login_required
 def client_order_payment_ui_json(request, order_id):
     """
     Endpoint JSON (GET) pour polling UI paiement côté client.
@@ -4924,10 +4924,21 @@ def client_order_payment_ui_json(request, order_id):
 
     order = get_object_or_404(Order, id=order_id)
 
-    # Sécurité: si la commande a un user/owner, vérifie qu'on est bien le client
-    owner = getattr(order, "user", None) or getattr(order, "client", None) or getattr(order, "customer", None)
-    if owner is not None and owner != getattr(request, "user", None):
+    
+    # Sécurité alignée sur client_order_detail (phone session)
+    phone = _client_phone(request)
+    if not phone:
+        return JsonResponse({"ok": False, "error": "not_authenticated"}, status=401)
+
+    order = (
+        Order.objects
+        .select_related("customer")
+        .filter(pk=order_id, customer__phone=phone)
+        .first()
+    )
+    if not order:
         return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+
 
     amounts = _client_order_amounts(order)  # {'total_ttc': Decimal, ...}
     total = amounts.get("total_ttc") or Decimal("0")

@@ -87,37 +87,37 @@
 }
 {% endblock %}
 
-/* Conteneur principal */
-.fagni-shell{
-            max-width:1200px;
-            margin:0 auto;
-            padding:10px 10px 24px;
-        }
+  /* Conteneur principal */
+  .fagni-shell{
+      max-width:1200px;
+      margin:0 auto;
+      padding:10px 10px 24px;
+  }
 
-        
-@media(min-width:1024px){
-  .fagni-shell{ padding:18px 18px 30px; }
-}
-/* Flash messages */
-        .flash-stack{
-            display:flex;
-            flex-direction:column;
-            gap:8px;
-            margin:12px 0 14px;
-        }
-        .flash{
-            padding:10px 12px;
-            border-radius:14px;
-            font-size:13px;
-            border:1px solid rgba(148,163,184,.35);
-            background: rgba(15,23,42,.55);
-            color:#f8fafc;
-            backdrop-filter: blur(6px);
-        }
-        .flash-success{ border-color: rgba(34,197,94,.45); }
-        .flash-error{ border-color: rgba(239,68,68,.45); }
-        .flash-warning{ border-color: rgba(245,158,11,.45); }
-        .flash-info{ border-color: rgba(59,130,246,.45); }
+  @media(min-width:1024px){
+      .fagni-shell{ padding:18px 18px 30px; }
+  }
+
+  /* Flash messages */
+  .flash-stack{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      margin:12px 0 14px;
+  }
+  .flash{
+      padding:10px 12px;
+      border-radius:14px;
+      font-size:13px;
+      border:1px solid rgba(148,163,184,.35);
+      background: rgba(15,23,42,.55);
+      color:#f8fafc;
+      backdrop-filter: blur(6px);
+  }
+  .flash-success{ border-color: rgba(34,197,94,.45); }
+  .flash-error{ border-color: rgba(239,68,68,.45); }
+  .flash-warning{ border-color: rgba(245,158,11,.45); }
+  .flash-info{ border-color: rgba(59,130,246,.45); }
     </style>
 
     {% block extra_head %}{% endblock %}

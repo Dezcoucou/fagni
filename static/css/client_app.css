@@ -1641,3 +1641,226 @@ summary:focus-visible{
   opacity: .55;
   pointer-events: none;
 }
+
+/* =========================================================
+   Lot 2.4 — Checkout Step4 (Recap)
+   Conventions: co-*
+   ========================================================= */
+
+.co-page{
+  max-width: 1000px;
+  margin: 0 auto 28px;
+  padding: 14px 10px 24px;
+}
+
+.co-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+.co-title{
+  margin:0;
+  font-size:22px;
+  font-weight:950;
+  letter-spacing:-.2px;
+  color: var(--ink, #0B121A);
+}
+
+.co-subtitle{
+  margin:6px 0 0;
+  font-size:13px;
+  color: var(--fagni-text-muted, #64748b);
+  line-height:1.35;
+}
+
+.co-head__actions{ display:flex; gap:10px; flex-wrap:wrap; }
+
+.co-card{ margin-top:14px; }
+
+.co-card__head{
+  padding:14px;
+  border-bottom:1px solid var(--hairline-2, rgba(2,6,23,0.08));
+  background: var(--paper-3, #F8FAFC);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.co-card__title{
+  font-weight:950;
+  color: var(--ink, #0B121A);
+}
+
+.co-card__sub{
+  margin-top:2px;
+  font-size:12px;
+  color: var(--fagni-text-muted, #64748b);
+  font-weight:900;
+}
+
+.co-section{
+  padding:14px;
+  border-top:1px solid var(--hairline-2, rgba(2,6,23,0.08));
+}
+
+.co-grid2{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+@media (max-width:820px){
+  .co-grid2{ grid-template-columns:1fr; }
+}
+
+.co-kv{
+  border:1px solid var(--hairline-2, rgba(2,6,23,0.08));
+  border-radius:16px;
+  padding:12px;
+  background:#fff;
+}
+
+.co-k{
+  font-size:12px;
+  font-weight:900;
+  color: var(--fagni-text-muted, #64748b);
+}
+
+.co-v{
+  margin-top:4px;
+  font-size:14px;
+  font-weight:950;
+  color: var(--ink, #0B121A);
+}
+
+.co-kv--strong .co-v{
+  font-size:15px;
+}
+
+.co-items{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.co-item{
+  border:1px solid var(--hairline-2, rgba(2,6,23,0.08));
+  border-radius:16px;
+  padding:12px;
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  background:#fff;
+}
+
+.co-item__name{
+  font-weight:950;
+  color: #111827;
+}
+
+.co-item__meta{
+  margin-top:6px;
+  color: var(--fagni-text-muted, #64748b);
+  font-weight:800;
+  font-size:12px;
+}
+
+.co-item__right{
+  text-align:right;
+  min-width:130px;
+}
+
+.co-item__k{
+  color: var(--fagni-text-muted, #64748b);
+  font-size:12px;
+  font-weight:900;
+}
+
+.co-item__total{
+  font-weight:950;
+  color:#0f172a;
+  margin-top:4px;
+}
+
+.co-pill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:4px 10px;
+  border-radius:999px;
+  border:1px solid var(--hairline-2, rgba(2,6,23,0.08));
+  background: var(--paper-3, #F8FAFC);
+  font-weight:950;
+  font-size:12px;
+  color:#334155;
+  margin-top:8px;
+}
+
+.co-warn{
+  border:1px solid rgba(245,158,11,.35);
+  background:rgba(245,158,11,.08);
+  color:#92400e;
+  border-radius:16px;
+  padding:12px;
+  font-weight:850;
+  font-size:13px;
+  margin-bottom:10px;
+}
+
+.co-actions{
+  padding:14px;
+  border-top:1px solid var(--hairline-2, rgba(2,6,23,0.08));
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+.co-actions__spacer{ flex:1; }
+
+.co-sticky{
+  position:sticky;
+  bottom:10px;
+  z-index:20;
+  margin-top:14px;
+  border:1px solid var(--hairline-2, rgba(2,6,23,0.08));
+  border-radius:18px;
+  background:#fff;
+  box-shadow: var(--shadow-soft, 0 10px 30px rgba(2,6,23,0.08));
+  padding:12px 14px;
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+.co-sticky__spacer{ flex:1; }
+
+.co-sticky__k{
+  color: var(--fagni-text-muted, #64748b);
+  font-size:12px;
+  font-weight:900;
+}
+.co-sticky__v{
+  font-size:16px;
+  font-weight:950;
+  color:#0f172a;
+  margin-top:2px;
+}
+.co-sticky__mini{
+  color: var(--fagni-text-muted, #64748b);
+  font-size:12px;
+  font-weight:800;
+  margin-top:2px;
+}
+
+/* Disabled premium button look */
+.btn[disabled],
+.btn[aria-disabled="true"]{
+  opacity:.55;
+  cursor:not-allowed;
+  pointer-events:none;
+}

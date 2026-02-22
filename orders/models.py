@@ -925,6 +925,14 @@ class Order(models.Model):
         verbose_name="Statut",
     )
 
+    # Brouillon (Wizard client) : n’apparaît pas dans OPS tant que non validé
+    is_draft = models.BooleanField(
+        "Brouillon",
+        default=False,
+        db_index=True,
+        help_text="Commande en cours de création côté client (wizard).",
+    )
+
     # ----- Modes de collecte & livraison -----
     pickup_mode = models.CharField(
         "Mode de collecte",

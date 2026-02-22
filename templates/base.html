@@ -12,13 +12,14 @@
     <link rel="manifest" href="{% static 'manifest.json' %}">
 
     <link rel="stylesheet" href="{% static 'css/fagni_theme.css' %}">
-    <link rel="stylesheet" href="{% static 'css/client_app.css' %}">
+    {% block page_css %}{% endblock %}
 
 
     <style>
         * { box-sizing: border-box; }
         img { max-width: 100%; display: block; }
 
+{% block topbar_css %}
         /* TOPBAR SUPER-APP FAGNI (ULTRA PREMIUM — SANS DÉGRADÉ) */
         .fagni-topbar{
             background:#020617; /* bleu nuit premium, sans dégradé */
@@ -73,9 +74,10 @@
             background:rgba(34,197,94,0.12); color:#bbf7d0;
             border:1px solid rgba(34,197,94,0.4);
         }
+{% endblock %}
 
-        /* Conteneur principal */
-        .fagni-shell{
+/* Conteneur principal */
+.fagni-shell{
             max-width:1200px;
             margin:0 auto;
             padding:10px 10px 24px;
@@ -112,6 +114,7 @@
 <body>
 
 <header class="fagni-topbar">
+{% block topbar %}
     <div class="fagni-topbar-left">
         <a href="{% url 'orders:driver_hub' %}" class="fagni-logo">
             <span class="fagni-logo-mark">
@@ -124,6 +127,8 @@
         </a>
         <span class="fagni-topbar-tag">🚀 Super-App</span>
     </div>
+{% endblock %}
+
 
     <div class="fagni-topbar-right">
         {% if request.user.is_authenticated %}

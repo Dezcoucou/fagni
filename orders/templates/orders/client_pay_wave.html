@@ -224,4 +224,50 @@
 
   </div>
 </div>
+
+<!-- WAVE_PAID_BTN_GUARD_OK -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  // On cible le form POST "J'ai payé" (celui qui a csrf_token)
+  const forms = Array.from(document.querySelectorAll("form"));
+  let paidForm = null;
+
+  for (const f of forms) {
+    // Heuristique: contient un input csrf + un bouton submit
+    const hasCsrf = !!f.querySelector('input[name="csrfmiddlewaretoken"]');
+    const hasSubmit = !!f.querySelector('button[type="submit"], input[type="submit"]');
+    if (hasCsrf && hasSubmit) { paidForm = f; break; }
+  }
+
+  if (!paidForm) return;
+
+  const btn = paidForm.querySelector('button[type="submit"], input[type="submit"]');
+  if (!btn) return;
+
+  let locked = false;
+
+  paidForm.addEventListener("submit", function() {
+    if (locked) {
+      // Empêche double submit même si navigateur insiste
+      event.preventDefault();
+      return false;
+    }
+    locked = true;
+
+    // UX: désactive + message
+    if (btn.tagName.toLowerCase() === "button") {
+      btn.disabled = true;
+      btn.innerHTML = "Vérification en cours…";
+      btn.style.opacity = "0.75";
+    } else {
+      btn.disabled = true;
+      btn.value = "Vérification en cours…";
+      btn.style.opacity = "0.75";
+    }
+  }, { passive: false });
+});
+</script>
+
+
+
 {% endblock %}

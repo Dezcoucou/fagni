@@ -325,15 +325,20 @@
       background:#ef4444; color:#fff;
     }
 
-  <!-- WAVE_BANNER_OK -->
-</style>
-{% endblock %}
-{% block content %}
-<div class="page">
+    <!-- WAVE_BANNER_OK -->
+  <!-- LOT_2_19_WAVE_AUTO_SUCCESS_OK -->
 
+  {# ✅ Priorité: si la commande est payée, afficher confirmé même sans ?wave=success #}
+  {% if order.payment_status == "paid" %}
+    <div class="co-notice co-notice--ok" id="waveNotice" data-wave="success" data-order="{{ order.id }}">
+      <div class="co-notice__icon">✓</div>
+      <div>
+        <p class="co-notice__title">Paiement confirmé</p>
+        <p class="co-notice__desc">Merci. Ton paiement Wave a été validé.</p>
+      </div>
+    </div>
 
-  {# --- Bandeau feedback paiement Wave (via querystring) --- #}
-  {% if request.GET.wave == "declared" %}
+  {% elif request.GET.wave == "declared" %}
     <div class="co-notice co-notice--warn" id="waveNotice" data-wave="declared" data-order="{{ order.id }}">
       <div class="co-notice__icon">✓</div>
       <div>
@@ -341,25 +346,26 @@
         <p class="co-notice__desc">Merci. Nous vérifions ton paiement Wave et on confirme dès que possible.</p>
       </div>
     </div>
+
   {% elif request.GET.wave == "success" %}
     <div class="co-notice co-notice--ok" id="waveNotice" data-wave="success" data-order="{{ order.id }}">
       <div class="co-notice__icon">✓</div>
       <div>
         <p class="co-notice__title">Paiement confirmé</p>
-        <p class="co-notice__desc">Ton paiement a été reçu. Merci 🙌</p>
+        <p class="co-notice__desc">Merci. Ton paiement Wave a été validé.</p>
       </div>
     </div>
+
   {% elif request.GET.wave == "error" %}
     <div class="co-notice co-notice--err" id="waveNotice" data-wave="error" data-order="{{ order.id }}">
       <div class="co-notice__icon">!</div>
       <div>
         <p class="co-notice__title">Paiement non confirmé</p>
-        <p class="co-notice__desc">Si tu as payé, clique “J’ai payé” sur la page Wave ou réessaie dans quelques minutes.</p>
+        <p class="co-notice__desc">Nous n’avons pas pu confirmer le paiement. Réessaie ou contacte le support.</p>
       </div>
     </div>
   {% endif %}
-
-  <script>
+<script>
   (function(){
     const el = document.getElementById("waveNotice");
 

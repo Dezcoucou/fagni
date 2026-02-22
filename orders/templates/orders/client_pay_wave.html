@@ -18,9 +18,21 @@
           {% csrf_token %}
           
 {% if remain > 0 and order.payment_status != "paid" %}
-<button id="btnWavePaid" class="co-btn" type="submit">
+
+  {% if request.session.wave_declared_{{ order.id }} %}
+    <div class="co-notice co-notice--warn" style="margin-top:12px;">
+      <div class="co-notice__icon">✓</div>
+      <div>
+        <p class="co-notice__title">Paiement déjà déclaré</p>
+        <p class="co-notice__desc">Merci. Nous vérifions ton paiement Wave. Tu seras notifié dès validation.</p>
+      </div>
+    </div>
+  {% else %}
+    <button id="btnWavePaid" class="co-btn" type="submit">
             J’ai payé
           </button>
+  {% endif %}
+
 {% else %}
 <div class="co-notice co-notice--ok" style="margin-top:12px;">
   <div class="co-notice__icon">✓</div>
@@ -267,5 +279,6 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
   <!-- WAVE_HIDE_BTN_IF_PAID_OK -->
   <!-- LOT_2_13_WAVE_FIX_OK -->
+  <!-- LOT_2_14_WAVE_HIDE_IF_DECLARED_OK -->
 
   {% endblock %}

@@ -1864,3 +1864,242 @@ summary:focus-visible{
   cursor:not-allowed;
   pointer-events:none;
 }
+
+/* =========================================================
+   PAY WAVE (Client) — cohérent avec client_app.css
+   ========================================================= */
+.co-page.paywave{ padding-bottom: 24px; }
+
+.paywave-card{ padding: 16px; }
+
+.co-head{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:flex-start;
+  flex-wrap:wrap;
+  margin-bottom: 12px;
+}
+.co-title{
+  margin:0;
+  font-size: 20px;
+  font-weight: 950;
+  letter-spacing:-0.2px;
+  color: var(--ink);
+}
+.co-sub{
+  margin:6px 0 0;
+  color: var(--fagni-text-muted);
+  font-size: 13px;
+}
+.co-chips{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.co-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline-2);
+  background: var(--paper);
+  text-decoration:none;
+  color: inherit;
+  font-weight: 900;
+  font-size: 12px;
+}
+
+.co-pill{
+  display:inline-flex;
+  align-items:center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline-2);
+  background: var(--paper);
+  font-weight: 950;
+  font-size: 12px;
+}
+
+.co-card{
+  background: var(--paper);
+  border: 1px solid var(--hairline-2);
+  border-radius: 18px;
+  box-shadow: var(--shadow-soft);
+}
+
+/* Buttons (client) */
+.co-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline-2);
+  background: var(--paper);
+  color: inherit;
+  text-decoration:none;
+  font-weight: 950;
+  font-size: 13px;
+  cursor:pointer;
+  transition: transform .12s var(--ease), box-shadow .12s var(--ease), opacity .12s var(--ease), background-color .12s var(--ease), border-color .12s var(--ease);
+  white-space: nowrap;
+}
+.co-btn:active{ transform: translateY(1px); }
+.co-btn--primary{
+  background: var(--prem-blue);
+  border-color: var(--prem-blue);
+  color:#fff;
+  box-shadow: 0 16px 36px rgba(2,6,23,0.22);
+}
+.co-btn--primary:hover{ background: var(--prem-blue-2); border-color: var(--prem-blue-2); }
+.co-btn--dark{
+  background: #0f172a;
+  border-color: #0f172a;
+  color:#fff;
+}
+.co-btn--ghost:hover{ background: rgba(2,6,23,0.03); }
+.co-btn--full{ width:100%; }
+.co-btn--sm{ padding: 7px 10px; font-size: 12px; border-radius: 14px; }
+
+/* Notes */
+.co-note{
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--hairline-2);
+  background: var(--paper-3);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fagni-text-muted);
+  font-weight: 750;
+}
+.co-note--warn{
+  border-color: rgba(255,122,0,0.28);
+  background: rgba(255,122,0,0.06);
+  color: #7c2d12;
+}
+.co-note--ok{
+  border-color: rgba(16,185,129,0.28);
+  background: rgba(16,185,129,0.07);
+  color: #065f46;
+}
+.co-note--soft{
+  background: var(--paper-2);
+}
+
+/* State row */
+.paywave-state{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--hairline-2);
+  margin-bottom: 12px;
+}
+.paywave-state__title{ font-weight: 950; color: var(--ink); }
+.paywave-state__sub{ margin-top:4px; color: var(--fagni-text-muted); font-size: 12px; }
+.paywave-amount{ color: var(--prem-blue); }
+.paywave-state--paid{ border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+/* Grid */
+.paywave-grid{
+  display:grid;
+  grid-template-columns: 1fr 320px;
+  gap: 14px;
+  align-items:start;
+}
+@media (max-width: 900px){
+  .paywave-grid{ grid-template-columns: 1fr; }
+}
+
+.paywave-qrbox{ min-width: 0; }
+.paywave-qr{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border: 1px solid var(--hairline-2);
+  border-radius: 18px;
+  background: var(--paper);
+  padding: 12px;
+}
+.paywave-qr img{
+  width: 260px;
+  height: 260px;
+  object-fit: contain;
+  border: 1px solid var(--hairline-2);
+  background: #fff;
+}
+
+.paywave-meta{
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--hairline-2);
+  border-radius: 18px;
+  background: var(--paper);
+}
+.paywave-meta__row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding: 8px 0;
+  border-bottom: 1px dashed rgba(2,6,23,0.10);
+}
+.paywave-meta__row:last-child{ border-bottom: none; }
+.paywave-meta .k{ color: var(--fagni-text-muted); font-size: 12px; font-weight: 900; }
+.paywave-meta code{
+  font-weight: 950;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--hairline-2);
+  background: var(--paper-3);
+}
+
+.paywave-linkbox{ margin-top: 10px; }
+.paywave-linkbox__inner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid var(--hairline-2);
+  background: var(--paper-3);
+}
+
+/* KPIs */
+.paywave-kpis{
+  display:grid;
+  gap:10px;
+}
+.paywave-kpi{
+  border: 1px solid var(--hairline-2);
+  background: var(--paper);
+  border-radius: 18px;
+  padding: 12px;
+}
+.paywave-kpi .k{
+  color: var(--fagni-text-muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+.paywave-kpi .v{
+  margin-top: 6px;
+  font-size: 16px;
+  font-weight: 950;
+  color: var(--ink);
+}
+.paywave-kpi--focus{
+  border-color: rgba(2,6,23,0.18);
+  box-shadow: 0 14px 30px rgba(2,6,23,0.08);
+}
+.paywave-kpi--ok{
+  border-color: rgba(16,185,129,0.25);
+}
+
+.paywave-actions{
+  margin-top: 12px;
+  display:grid;
+  gap:10px;
+}

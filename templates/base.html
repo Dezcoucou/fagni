@@ -20,6 +20,7 @@
         img { max-width: 100%; display: block; }
 
 {% block topbar_css %}
+
         /* TOPBAR SUPER-APP FAGNI (ULTRA PREMIUM — SANS DÉGRADÉ) */
 .fagni-topbar::after{
             content:"";
@@ -79,6 +80,10 @@
             background:rgba(34,197,94,0.12); color:#bbf7d0;
             border:1px solid rgba(34,197,94,0.4);
         }
+
+        @media(min-width:1024px){
+            .fagni-shell{ padding:18px 18px 30px; }
+
 {% endblock %}
 
 /* Conteneur principal */
@@ -87,9 +92,7 @@
             margin:0 auto;
             padding:10px 10px 24px;
         }
-        @media(min-width:1024px){
-            .fagni-shell{ padding:18px 18px 30px; }
-            .fagni-topbar{ padding:12px 32px; }
+.fagni-topbar{ padding:12px 32px; }
         }
         /* Flash messages */
         .flash-stack{

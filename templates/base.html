@@ -21,6 +21,7 @@
 
 {% block topbar_css %}
 
+
         /* TOPBAR SUPER-APP FAGNI (ULTRA PREMIUM — SANS DÉGRADÉ) */
 .fagni-topbar::after{
             content:"";
@@ -81,9 +82,10 @@
             border:1px solid rgba(34,197,94,0.4);
         }
 
-        @media(min-width:1024px){
-            .fagni-shell{ padding:18px 18px 30px; }
-
+@media(min-width:1024px){
+    .fagni-shell{ padding:18px 18px 30px; }
+    .fagni-topbar{ padding:12px 32px; }
+}
 {% endblock %}
 
 /* Conteneur principal */
@@ -92,8 +94,7 @@
             margin:0 auto;
             padding:10px 10px 24px;
         }
-.fagni-topbar{ padding:12px 32px; }
-        }
+
         /* Flash messages */
         .flash-stack{
             display:flex;

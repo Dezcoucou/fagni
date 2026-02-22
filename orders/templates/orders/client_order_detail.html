@@ -362,6 +362,60 @@
   <script>
   (function(){
     const el = document.getElementById("waveNotice");
+
+  // ----------------------------------------------------------------
+  // LOT_2_17_WAVE_POLLING_OK
+  // Polling léger après "Paiement déclaré"
+  // ----------------------------------------------------------------
+  try{
+    // On récupère l'élément (si le code existant n'a pas gardé la variable)
+    var __waveEl = (typeof el !== "undefined" && el) ? el : document.getElementById("waveNotice");
+    if (__waveEl && __waveEl.dataset && __waveEl.dataset.wave === "declared") {
+      const orderId = __waveEl.dataset.order;
+      const endpoint = `/orders/client/orders/${orderId}/payment-ui/`;
+
+      let tries = 0;
+      const maxTries = 30;      // ~4 minutes
+      const intervalMs = 8000;
+
+      const titleEl = __waveEl.querySelector(".co-notice__title");
+      const descEl  = __waveEl.querySelector(".co-notice__desc");
+
+      const tick = async () => {
+        tries += 1;
+        if (tries > maxTries) return;
+
+        try {
+          const res = await fetch(endpoint, {
+            method: "GET",
+            credentials: "same-origin",
+            headers: {
+              "Accept": "application/json",
+              "X-Requested-With": "XMLHttpRequest"
+            }
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (!data || !data.ok) return;
+
+          if ((data.payment_ui || "").toLowerCase() === "paid") {
+            __waveEl.classList.remove("co-notice--warn");
+            __waveEl.classList.add("co-notice--ok");
+
+            if (titleEl) titleEl.textContent = "Paiement confirmé";
+            if (descEl) descEl.textContent =
+              "Merci. Ton paiement Wave est confirmé. Tu peux suivre la progression de la commande.";
+
+            clearInterval(timer);
+          }
+        } catch (e) {}
+      };
+
+      tick();
+      const timer = setInterval(tick, intervalMs);
+    }
+  }catch(e){}
+
     if(!el) return;
 
     // Evite ré-affichage au refresh

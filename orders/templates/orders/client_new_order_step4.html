@@ -81,7 +81,6 @@
           </div>
         </div>
 
-        {# Si tu as des champs existants pour livraison, on les affiche sans casser si absent #}
         <div class="co-grid2" style="margin-top:10px;">
           <div class="co-kv">
             <div class="co-k">Mode de livraison</div>
@@ -143,28 +142,23 @@
         {% endif %}
       </div>
 
-      <!-- 4) Actions -->
+      <!-- 4) Actions (sans submit : single submit = sticky) -->
       <div class="co-actions">
         <a class="btn btn-light" href="{% url 'orders:client_new_order_step3' order.id %}">← Modifier les articles</a>
         <div class="co-actions__spacer"></div>
-
-        <button
-          class="btn btn-premium"
-          type="submit"
-          {% if not has_items %}disabled aria-disabled="true"{% endif %}
-        >
-          Confirmer la commande
-        </button>
+        <div class="hint">
+          Après confirmation : paiement <strong>Wave</strong> si nécessaire.
+        </div>
       </div>
 
     </div>
 
-    <!-- Sticky total -->
+    <!-- Sticky total : SEUL bouton submit -->
     <div class="co-sticky" role="region" aria-label="Total et confirmation">
       <div>
         <div class="co-sticky__k">Total TTC</div>
         <div class="co-sticky__v">{{ amounts.total_ttc|floatformat:0 }} FCFA</div>
-        <div class="co-sticky__mini">Vérifie tes articles et confirme</div>
+        <div class="co-sticky__mini">Confirme pour finaliser (paiement Wave si besoin)</div>
       </div>
 
       <div class="co-sticky__spacer"></div>

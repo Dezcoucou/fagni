@@ -2235,6 +2235,11 @@
     if(timer) return;
     tick();
     timer = setInterval(() => {
+      // LOT_2_25_WAVE_POLL_PAUSE_ON_MANUAL_OK
+      try{
+        if (window.__wavePollPausedUntil && Date.now() < window.__wavePollPausedUntil) { return; }
+      }catch(e){}
+
       if(document.hidden) return;
       tick();
     }, refreshMs);
@@ -2284,7 +2289,11 @@
 
     btn.addEventListener("click", async function(){
 
-      var original = btn.textContent;
+      
+      // LOT_2_25_WAVE_POLL_PAUSE_ON_MANUAL_OK
+      // Pause polling pendant 2.5s pour éviter double requête (polling + refresh manuel)
+      try{ window.__wavePollPausedUntil = Date.now() + 2500; }catch(e){}
+var original = btn.textContent;
       btn.disabled = true;
       btn.textContent = "Vérification…";
 

@@ -283,10 +283,111 @@
     35%{ transform: translateY(-1px); filter: brightness(1.05); }
     100%{ transform: translateY(0); filter: brightness(1); }
   }
+
+    /* --- WAVE BANNER (client_order_detail) --- */
+    .co-notice{
+      display:flex; align-items:flex-start; gap:10px;
+      padding:12px 12px; border-radius:16px;
+      border:1px solid var(--line); background:#fff;
+      box-shadow: var(--shadow);
+      margin: 12px 0 14px;
+    }
+    .co-notice__icon{
+      width:26px; height:26px; border-radius:999px;
+      display:flex; align-items:center; justify-content:center;
+      font-weight:950;
+      flex: 0 0 auto;
+    }
+    .co-notice__title{ font-weight:950; color:var(--text); margin:0; font-size:13px; }
+    .co-notice__desc{ color:var(--muted); margin:2px 0 0; font-size:12px; line-height:1.35; }
+
+    .co-notice--ok{
+      border-color:#bbf7d0;
+      background:#ecfdf3;
+    }
+    .co-notice--ok .co-notice__icon{
+      background:#16a34a; color:#fff;
+    }
+
+    .co-notice--warn{
+      border-color:#fde68a;
+      background:#fffbeb;
+    }
+    .co-notice--warn .co-notice__icon{
+      background:#f59e0b; color:#111827;
+    }
+
+    .co-notice--err{
+      border-color:#fecaca;
+      background:#fef2f2;
+    }
+    .co-notice--err .co-notice__icon{
+      background:#ef4444; color:#fff;
+    }
+
+  <!-- WAVE_BANNER_OK -->
 </style>
 {% endblock %}
 {% block content %}
 <div class="page">
+
+
+  {# --- Bandeau feedback paiement Wave (via querystring) --- #}
+  {% if request.GET.wave == "declared" %}
+    <div class="co-notice co-notice--warn" id="waveNotice" data-wave="declared" data-order="{{ order.id }}">
+      <div class="co-notice__icon">✓</div>
+      <div>
+        <p class="co-notice__title">Paiement déclaré</p>
+        <p class="co-notice__desc">Merci. Nous vérifions ton paiement Wave et on confirme dès que possible.</p>
+      </div>
+    </div>
+  {% elif request.GET.wave == "success" %}
+    <div class="co-notice co-notice--ok" id="waveNotice" data-wave="success" data-order="{{ order.id }}">
+      <div class="co-notice__icon">✓</div>
+      <div>
+        <p class="co-notice__title">Paiement confirmé</p>
+        <p class="co-notice__desc">Ton paiement a été reçu. Merci 🙌</p>
+      </div>
+    </div>
+  {% elif request.GET.wave == "error" %}
+    <div class="co-notice co-notice--err" id="waveNotice" data-wave="error" data-order="{{ order.id }}">
+      <div class="co-notice__icon">!</div>
+      <div>
+        <p class="co-notice__title">Paiement non confirmé</p>
+        <p class="co-notice__desc">Si tu as payé, clique “J’ai payé” sur la page Wave ou réessaie dans quelques minutes.</p>
+      </div>
+    </div>
+  {% endif %}
+
+  <script>
+  (function(){
+    const el = document.getElementById("waveNotice");
+    if(!el) return;
+
+    // Evite ré-affichage au refresh
+    const orderId = el.getAttribute("data-order") || "";
+    const flag = el.getAttribute("data-wave") || "";
+    const key = "wave_notice_seen_" + orderId + "_" + flag;
+
+    try{
+      if(sessionStorage.getItem(key) === "1"){
+        el.remove();
+        return;
+      }
+      sessionStorage.setItem(key, "1");
+    }catch(e){}
+
+    // Auto-hide
+    setTimeout(function(){
+      try{ el.style.transition = "opacity .25s ease, transform .25s ease"; }catch(e){}
+      el.style.opacity = "0";
+      el.style.transform = "translateY(-4px)";
+      setTimeout(function(){ try{ el.remove(); }catch(e){} }, 300);
+    }, 7000);
+  })();
+  </script>
+
+
 
   <div class="page-header">
     <div>

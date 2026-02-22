@@ -4978,6 +4978,16 @@ def client_order_payment_ui_json(request, order_id):
 
     wave_declared = bool(request.session.get(f"wave_declared_{order.id}"))
 
+    # LOT_2_34_WAVE_DECLARED_AUTOCLEAR_OK
+    # Si la commande est payée, on nettoie le flag "declared" pour éviter un état UI incohérent
+    if payment_ui == "paid" and wave_declared:
+        try:
+            del request.session[f"wave_declared_{order.id}"]
+        except KeyError:
+            pass
+        wave_declared = False
+
+
     resp = JsonResponse({
         "ok": True,
         "order_id": order.id,

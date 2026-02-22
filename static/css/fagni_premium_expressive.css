@@ -1,0 +1,130 @@
+:root{
+  --fagni-orange:#FF7A00;
+  --fagni-orange-light:#FF9F3F;
+  --fagni-blue-dark:#0B1B34;
+  --fagni-blue-soft:#132B4F;
+  --bg-main:#F5F7FB;
+  --text-main:#0F172A;
+  --text-muted:#64748B;
+  --white:#ffffff;
+
+  --radius-xl:28px;
+  --radius-lg:20px;
+  --radius-md:14px;
+
+  --shadow-soft:0 12px 30px rgba(15,23,42,0.08);
+  --shadow-light:0 6px 16px rgba(15,23,42,0.05);
+
+  --transition:all .25s ease;
+}
+
+body{
+  background:var(--bg-main);
+  color:var(--text-main);
+}
+
+/* HEADER PREMIUM */
+.header-premium{
+  background:linear-gradient(135deg,var(--fagni-blue-dark),var(--fagni-blue-soft));
+  color:#fff;
+  padding:18px;
+  border-bottom-left-radius:28px;
+  border-bottom-right-radius:28px;
+}
+
+/* HERO CARD */
+.hero-card{
+  background:#fff;
+  border-radius:var(--radius-xl);
+  padding:24px;
+  box-shadow:var(--shadow-soft);
+  position:relative;
+  overflow:hidden;
+}
+.hero-card::before{
+  content:"";
+  position:absolute;
+  width:180px;
+  height:180px;
+  background:linear-gradient(135deg,var(--fagni-orange),var(--fagni-orange-light));
+  opacity:0.08;
+  border-radius:50%;
+  top:-40px;
+  right:-40px;
+}
+
+/* BUTTONS */
+.btn-primary{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  background:linear-gradient(135deg,var(--fagni-orange),var(--fagni-orange-light));
+  color:#fff;
+  border:none;
+  padding:14px 20px;
+  border-radius:var(--radius-md);
+  font-weight:700;
+  text-decoration:none;
+  box-shadow:var(--shadow-light);
+  transition:var(--transition);
+}
+.btn-primary:hover{
+  transform:translateY(-2px);
+  box-shadow:0 16px 35px rgba(255,122,0,0.25);
+}
+
+.btn-outline{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  background:#fff;
+  border:1px solid #E2E8F0;
+  padding:12px 18px;
+  border-radius:var(--radius-md);
+  font-weight:600;
+  text-decoration:none;
+  color:var(--text-main);
+  transition:var(--transition);
+}
+.btn-outline:hover{
+  background:#F8FAFC;
+  transform:translateY(-1px);
+}
+
+/* CARDS */
+.finance-card{
+  background:#fff;
+  border-radius:var(--radius-lg);
+  padding:18px;
+  box-shadow:var(--shadow-light);
+  transition:var(--transition);
+}
+.finance-card:hover{ transform:translateY(-3px); }
+
+.service-card{
+  background:#fff;
+  border-radius:var(--radius-md);
+  padding:16px;
+  box-shadow:var(--shadow-light);
+  display:flex;
+  align-items:center;
+  gap:12px;
+  transition:var(--transition);
+}
+.service-card:hover{ transform:translateY(-2px); }
+
+/* BOTTOM NAV */
+.bottom-nav{
+  position:fixed;
+  bottom:0; left:0; right:0;
+  background:#fff;
+  box-shadow:0 -4px 20px rgba(0,0,0,0.05);
+  display:flex;
+  justify-content:space-around;
+  padding:12px 0;
+  z-index:50;
+}
+.bottom-nav a{ text-decoration:none; color:#475569; font-weight:700; }
+.bottom-nav a.active{ color:var(--fagni-orange); }

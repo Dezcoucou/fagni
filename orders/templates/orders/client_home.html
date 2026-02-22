@@ -1,18 +1,27 @@
 {% extends "base.html" %}
+{% load static %}
 {% load humanize %}
 {% load money_filters %}
-{% load static %}
+
+{# CSS spécifique à l'app Client #}
+{% block page_css %}
+<link rel="stylesheet" href="{% static 'css/client_app.css' %}">
+{% endblock %}
 
 {% block title %}Accueil – Client FAGNI{% endblock %}
 
 {% block content %}
+<!-- CLIENT_HOME_TEMPLATE_OK_20260222 -->
 <div class="page client-home">
 
   <!-- Header -->
   <div class="page-header">
     <div class="page-header__left">
       <h1 class="page-title">FAGNI</h1>
-      <div class="hero-mini hero-mini--header"><span class="hero-mini__tag">📞 <strong>{{ phone }}</strong></span><span class="hero-mini__tag">🧼 Pressing &amp; logistique</span></div>
+      <div class="hero-mini hero-mini--header">
+        <span class="hero-mini__tag">📞 <strong>{{ phone }}</strong></span>
+        <span class="hero-mini__tag">🧼 Pressing &amp; logistique</span>
+      </div>
     </div>
     <div class="page-header__right">
       <a class="btn btn-light" href="{% url 'orders:client_logout' %}">Déconnexion</a>
@@ -20,56 +29,55 @@
   </div>
 
   <!-- HERO (simple, rassurant, 1 action principale) -->
-    <div class="home-hero">
+  <div class="home-hero">
+    <div class="home-hero__top">
+      <div class="home-hero__copy">
+        <h2 class="home-hero__title">Bonjour 👋</h2>
+        <p class="home-hero__sub">
+          Crée une commande en quelques secondes. On s’occupe du reste : collecte → lavage → livraison.
+        </p>
 
-      <div class="home-hero__top">
-        <div class="home-hero__copy">
-          <h2 class="home-hero__title">Bonjour 👋</h2>
-          <p class="home-hero__sub">
-            Crée une commande en quelques secondes. On s’occupe du reste : collecte → lavage → livraison.
-          </p>
-
-          <div class="hero-mini hero-mini--hero">
-            <span class="hero-mini__tag">✅ Collecte</span>
-            <span class="hero-mini__tag">🧼 Lavage</span>
-            <span class="hero-mini__tag">🚚 Livraison</span>
-            <span class="hero-mini__tag">⏱️ 24h / 48h</span>
-          </div>
-
-          <div class="hint" style="margin-top:8px;">
-            Paiement sécurisé • Reçu dans la commande • Support en cas d’incident
-          </div>
+        <div class="hero-mini hero-mini--hero">
+          <span class="hero-mini__tag">✅ Collecte</span>
+          <span class="hero-mini__tag">🧼 Lavage</span>
+          <span class="hero-mini__tag">🚚 Livraison</span>
+          <span class="hero-mini__tag">⏱️ 24h / 48h</span>
         </div>
 
-        <div class="home-kpis">
-          <div class="home-kpi">
-            <div class="home-kpi__label">Commandes</div>
-            <div class="home-kpi__value">{{ kpi_orders_count|default:0 }}</div>
-            {% if customer and current_status != "all" %}
-              <div class="home-kpi__hint">Total : <strong>{{ orders_count_all }}</strong></div>
-            {% endif %}
-          </div>
+        <div class="hint" style="margin-top:8px;">
+          Paiement sécurisé • Reçu dans la commande • Support en cas d’incident
+        </div>
+      </div>
 
-          <div class="home-kpi home-kpi--soft">
-            <div class="home-kpi__label">Wallet</div>
-            <div class="home-kpi__value">—</div>
-            {% if customer %}
-              <div class="home-kpi__hint">Solde visible dans Wallet</div>
-            {% else %}
-              <div class="home-kpi__hint">Activé après 1ère commande</div>
-            {% endif %}
-          </div>
+      <div class="home-kpis">
+        <div class="home-kpi">
+          <div class="home-kpi__label">Commandes</div>
+          <div class="home-kpi__value">{{ kpi_orders_count|default:0 }}</div>
+          {% if customer and current_status != "all" %}
+            <div class="home-kpi__hint">Total : <strong>{{ orders_count_all }}</strong></div>
+          {% endif %}
+        </div>
+
+        <div class="home-kpi home-kpi--soft">
+          <div class="home-kpi__label">Wallet</div>
+          <div class="home-kpi__value">—</div>
+          {% if customer %}
+            <div class="home-kpi__hint">Solde visible dans Wallet</div>
+          {% else %}
+            <div class="home-kpi__hint">Activé après 1ère commande</div>
+          {% endif %}
         </div>
       </div>
     </div>
+  </div>
 
-    <div class="home-primary">
-      <a class="btn home-primary__btn" href="{% url 'orders:client_new_order' %}">
-        ➕ Créer une commande
-      </a>
-      <div class="home-primary__meta">
-        Paiement : <strong>Wave</strong> (Option A). Reçu disponible dans la commande.
-      </div>
+  <!-- CTA principal -->
+  <div class="home-primary">
+    <a class="btn home-primary__btn" href="{% url 'orders:client_new_order' %}">
+      ➕ Créer une commande
+    </a>
+    <div class="home-primary__meta">
+      Paiement : <strong>Wave</strong> (Option A). Reçu disponible dans la commande.
     </div>
 
     {% if not customer %}
@@ -79,7 +87,7 @@
     {% endif %}
   </div>
 
-  <!-- Commande rapide (mise en avant du statut / montant / action) -->
+  <!-- Commande récente (mise en avant) -->
   {% if orders %}
     {% with o=orders|first %}
       <div class="home-live card">
@@ -139,57 +147,57 @@
     {% endwith %}
   {% endif %}
 
-    <!-- Actions rapides (secondaires, ne volent pas le CTA) -->
-    <div class="card">
-      <div class="section-head">
-        <div class="section-title">Actions rapides</div>
-        <div class="section-sub">Le reste est dans “Mes commandes”</div>
-      </div>
-
-      <div class="home-shortcuts">
-        <a class="home-shortcut" href="#mes-commandes">
-          <div class="home-shortcut__ico">📦</div>
-          <div>
-            <div class="home-shortcut__t">Suivre mes commandes</div>
-            <div class="home-shortcut__d">Historique + statut en temps réel</div>
-          </div>
-        </a>
-
-        <a class="home-shortcut" href="{% url 'mlm:affiliate_dashboard' %}">
-          <div class="home-shortcut__ico">🎁</div>
-          <div>
-            <div class="home-shortcut__t">Parrainage</div>
-            <div class="home-shortcut__d">Inviter & gagner</div>
-          </div>
-        </a>
-
-        {% if customer %}
-          <a class="home-shortcut" href="{% url 'wallets:customer_wallet_detail' customer.id %}">
-            <div class="home-shortcut__ico">💼</div>
-            <div>
-              <div class="home-shortcut__t">Wallet</div>
-              <div class="home-shortcut__d">Solde & mouvements</div>
-            </div>
-          </a>
-        {% else %}
-          <div class="home-shortcut home-shortcut--disabled" aria-disabled="true">
-            <div class="home-shortcut__ico">💼</div>
-            <div>
-              <div class="home-shortcut__t">Wallet</div>
-              <div class="home-shortcut__d">Activé après 1ère commande</div>
-            </div>
-          </div>
-        {% endif %}
-      </div>
+  <!-- Actions rapides -->
+  <div class="card">
+    <div class="section-head">
+      <div class="section-title">Actions rapides</div>
+      <div class="section-sub">Le reste est dans “Mes commandes”</div>
     </div>
 
-    <!-- FAQ (court, utile) -->
+    <div class="home-shortcuts">
+      <a class="home-shortcut" href="#mes-commandes">
+        <div class="home-shortcut__ico">📦</div>
+        <div>
+          <div class="home-shortcut__t">Suivre mes commandes</div>
+          <div class="home-shortcut__d">Historique + statut en temps réel</div>
+        </div>
+      </a>
 
+      <a class="home-shortcut" href="{% url 'mlm:affiliate_dashboard' %}">
+        <div class="home-shortcut__ico">🎁</div>
+        <div>
+          <div class="home-shortcut__t">Parrainage</div>
+          <div class="home-shortcut__d">Inviter & gagner</div>
+        </div>
+      </a>
+
+      {% if customer %}
+        <a class="home-shortcut" href="{% url 'wallets:customer_wallet_detail' customer.id %}">
+          <div class="home-shortcut__ico">💼</div>
+          <div>
+            <div class="home-shortcut__t">Wallet</div>
+            <div class="home-shortcut__d">Solde & mouvements</div>
+          </div>
+        </a>
+      {% else %}
+        <div class="home-shortcut home-shortcut--disabled" aria-disabled="true">
+          <div class="home-shortcut__ico">💼</div>
+          <div>
+            <div class="home-shortcut__t">Wallet</div>
+            <div class="home-shortcut__d">Activé après 1ère commande</div>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- FAQ -->
   <div class="card" id="faq">
     <div class="section-head">
       <div class="section-title">Aide</div>
       <div class="section-sub">Réponses rapides</div>
     </div>
+
     <div class="faq">
       <details>
         <summary>Comment est calculé le prix ?</summary>
@@ -286,18 +294,18 @@
                     {% endif %}
 
                     {% with paid=o.amount_paid|default:0 %}
-                    {% with paid0=paid|floatformat:0 %}
-                    {% with tot0=tot|floatformat:0 %}
-                      {% if tot0 == "0" %}
-                        <span class="badge-status badge-status--pay-unknown">Non renseigné</span>
-                      {% elif paid0 == "0" %}
-                        <span class="badge-status badge-status--pay-pending">Paiement en attente</span>
-                      {% elif paid0 == tot0 %}
-                        <span class="badge-status badge-status--paid">Payé</span>
-                      {% else %}
-                        <span class="badge-status badge-status--pay-pending">Paiement partiel</span>
-                      {% endif %}
-                    {% endwith %}{% endwith %}{% endwith %}
+                      {% with paid0=paid|floatformat:0 %}
+                        {% if tot0 == "0" %}
+                          <span class="badge-status badge-status--pay-unknown">Non renseigné</span>
+                        {% elif paid0 == "0" %}
+                          <span class="badge-status badge-status--pay-pending">Paiement en attente</span>
+                        {% elif paid0 == tot0 %}
+                          <span class="badge-status badge-status--paid">Payé</span>
+                        {% else %}
+                          <span class="badge-status badge-status--pay-pending">Paiement partiel</span>
+                        {% endif %}
+                      {% endwith %}
+                    {% endwith %}
                   </div>
                 </div>
 

@@ -1,9 +1,14 @@
 {% extends "base.html" %}
+{% block body_class %}landing-page{% endblock %}
 {% load static %}
 
 {% block title %}FAGNI – Pressing & Logistique{% endblock %}
 
 {% block extra_head %}
+<style>
+  .landing-page .fagni-topbar{ display:none !important; }
+</style>
+
 {% block topbar_css %}{% endblock %}
 
 {% block topbar %}{% endblock %}

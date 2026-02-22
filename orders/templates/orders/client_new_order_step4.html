@@ -1,9 +1,14 @@
 {% extends "base.html" %}
-{% load money_filters %}
+{% load money_filters static %}
+
+{% block page_css %}
+<link rel="stylesheet" href="{% static 'css/client_app.css' %}">
+{% endblock %}
+
 
 {% block title %}Nouvelle commande – Étape 4{% endblock %}
-
 {% block extra_head %}
+{{ block.super }}
 <style>
   :root{
     --text:#0f172a;
@@ -90,7 +95,6 @@
   }
 </style>
 {% endblock %}
-
 {% block content %}
 <div class="page">
   <h1 class="title">Récapitulatif</h1>

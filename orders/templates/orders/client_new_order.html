@@ -1,8 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Nouvelle commande – Client FAGNI{% endblock %}
+{% load static %}
 
+{% block page_css %}
+<link rel="stylesheet" href="{% static 'css/client_app.css' %}">
+{% endblock %}
+
+
+{% block title %}Nouvelle commande – Client FAGNI{% endblock %}
 {% block extra_head %}
+{{ block.super }}
 <style>
   :root{
     --fagni-orange:#ff7a00;
@@ -153,7 +160,6 @@
   .mini-card .v{ font-size:13px;font-weight:950;color:#0f172a;margin:0; }
 </style>
 {% endblock %}
-
 {% block content %}
 <div class="page">
 

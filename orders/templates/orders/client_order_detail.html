@@ -5,6 +5,19 @@
 {% block extra_head %}
 {{ block.super }}
 <style>
+
+/* --- LOT 2.28: PAYMENT BADGE --- */
+.pay-pill{ margin-left:8px; }
+.pay-pill--due{ background:#f3f4f6;color:#374151;border-color:#e5e7eb; }
+.pay-pill--due .dot{ background:#6b7280; }
+.pay-pill--decl{ background:rgba(255,122,0,0.14);color:#9a3412;border-color:rgba(255,122,0,0.45); }
+.pay-pill--decl .dot{ background:#ff7a00; }
+.pay-pill--paid{ background:#ecfdf3;color:#166534;border-color:#bbf7d0; }
+.pay-pill--paid .dot{ background:#16a34a; }
+
+</style>
+
+<style>
   :root{
     --fagni-orange:#ff7a00;
     --fagni-blue:#0056b3;
@@ -626,6 +639,15 @@
   <div class="page-header">
     <div>
       <h1 class="page-title">Commande {{ order.code|default:order.id }}</h1>
+<!-- LOT_2_28_PAYMENT_BADGE_OK -->
+{% if order.payment_status == "paid" %}
+  <span class="pill pay-pill pay-pill--paid" title="Paiement confirmé"><span class="dot"></span>Payé</span>
+{% elif request.GET.wave == "declared" %}
+  <span class="pill pay-pill pay-pill--decl" title="Paiement en vérification"><span class="dot"></span>En vérification</span>
+{% else %}
+  <span class="pill pay-pill pay-pill--due" title="Paiement à effectuer"><span class="dot"></span>À payer</span>
+{% endif %}
+
       <p class="page-subtitle">Suivi en temps réel (refresh automatique).</p>
 
       <div class="liveHint">

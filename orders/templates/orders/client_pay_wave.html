@@ -17,7 +17,7 @@
         <form method="post" style="margin:0;">
           {% csrf_token %}
           
-{% if amount_remaining > 0 and order.payment_status != "paid" %}
+{% if remain > 0 and order.payment_status != "paid" %}
 <button id="btnWavePaid" class="co-btn" type="submit">
             J’ai payé
           </button>
@@ -33,20 +33,6 @@
 
         </form>
       </div>
-
-      <script>
-      document.addEventListener("DOMContentLoaded", function() {
-        const form = document.querySelector('form[method="post"]');
-        const btn = document.getElementById("btnWavePaid");
-        if(!form || !btn) return;
-        form.addEventListener("submit", function() {
-          btn.disabled = true;
-          btn.textContent = "Vérification en cours…";
-          btn.style.opacity = "0.7";
-        });
-      });
-      </script>
-
       <p class="co-sub">Commande <strong>{{ order.code|default:order.id }}</strong></p>
 
       <div class="co-chips" aria-label="Actions rapides">
@@ -258,10 +244,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
   let locked = false;
 
-  paidForm.addEventListener("submit", function() {
+  paidForm.addEventListener("submit", function(e) {
     if (locked) {
       // Empêche double submit même si navigateur insiste
-      event.preventDefault();
+      e.preventDefault();
       return false;
     }
     locked = true;
@@ -279,9 +265,7 @@ document.addEventListener("DOMContentLoaded", function() {
   }, { passive: false });
 });
 </script>
+  <!-- WAVE_HIDE_BTN_IF_PAID_OK -->
+  <!-- LOT_2_13_WAVE_FIX_OK -->
 
-
-
-{% endblock %}
-
-<!-- WAVE_HIDE_BTN_IF_PAID_OK -->
+  {% endblock %}

@@ -2,164 +2,201 @@
 {% load money_filters %}
 
 {% block title %}Paiement Wave – Commande {{ order.code|default:order.id }}{% endblock %}
-{% block extra_head %}
-{{ block.super }}
-<style>
-  .page{max-width:720px;margin:0 auto;padding:16px}
-  .card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;box-shadow:0 1px 4px rgba(15,23,42,0.06)}
-  .panel{padding:14px}
-  .row{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
-  .title{font-weight:950;font-size:18px;color:#0f172a;margin:0}
-  .meta{color:#64748b;font-size:12px}
-  .btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:999px;
-       font-size:13px;font-weight:950;border:1px solid #e5e7eb;background:#fff;color:#334155;text-decoration:none}
-  .btn:hover{background:#f9fafb}
-  .btn-primary{background:#0056b3;color:#fff;border-color:rgba(0,0,0,0.04)}
-  .btn-primary:hover{opacity:.92}
 
-  .qr{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:12px}
-.qr img{width:260px;height:260px;border-radius:0;border:1px solid #e5e7eb;background:#fff;image-rendering:pixelated;image-rendering:crisp-edges;object-fit:contain;}
-  .kpi{display:grid;gap:8px}
-  .kv{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px dashed #eef2f7}
-  .kv:last-child{border-bottom:none}
-  .k{color:#64748b;font-size:12px;font-weight:800}
-  .v{color:#0f172a;font-weight:950}
-
-  .hint{margin-top:10px;color:#7c2d12;background:rgba(255,122,0,0.08);border:1px dashed rgba(255,122,0,0.45);padding:10px 12px;border-radius:14px;font-size:12px;line-height:1.35}
-  .ok{margin-top:10px;color:#065f46;background:rgba(16,185,129,0.10);border:1px dashed rgba(16,185,129,0.40);padding:10px 12px;border-radius:14px;font-size:12px;line-height:1.35}
-  code{font-weight:900}
-</style>
-{% endblock %}
 {% block content %}
-<div class="page">
+<!-- CLIENT_PAY_WAVE_TEMPLATE_OK_20260222 -->
+<div class="co-page paywave">
 
-  <div class="row" style="margin-bottom:12px;">
+  <div class="co-head">
     <div>
-      <h1 class="title">Paiement Wave</h1>
-      <div class="meta">Commande {{ order.code|default:order.id }}</div>
+      <h1 class="co-title">Paiement Wave</h1>
+      <p class="co-sub">Commande <strong>{{ order.code|default:order.id }}</strong></p>
+
+      <div class="co-chips" aria-label="Actions rapides">
+        <a class="co-chip" href="{% url 'orders:client_order_detail' order.id %}">← Retour commande</a>
+        <a class="co-chip" href="{% url 'orders:client_home' %}">Mes commandes</a>
+      </div>
     </div>
-    <div class="row">
-      <a class="btn" href="{% url 'orders:client_order_detail' order.id %}">← Retour commande</a>
-      <a class="btn" href="{% url 'orders:client_home' %}">Mes commandes</a>
+
+    <div class="paywave-badge">
+      <span class="co-pill">💳 Wave</span>
     </div>
   </div>
 
-  <div class="card panel">
+  <div class="co-card paywave-card">
 
     {% if remain <= 0 %}
-      <div class="row">
-        <div>
-          <div style="font-weight:950;">✅ Commande déjà réglée</div>
-          <div class="meta">Aucun paiement à effectuer via Wave.</div>
+      <div class="paywave-state paywave-state--paid">
+        <div class="paywave-state__left">
+          <div class="paywave-state__title">✅ Commande déjà réglée</div>
+          <div class="paywave-state__sub">Aucun paiement à effectuer via Wave.</div>
         </div>
-        <div>
-          <a class="btn btn-primary" href="{% url 'orders:client_order_detail' order.id %}">Voir la commande</a>
+        <div class="paywave-state__right">
+          <a class="co-btn co-btn--primary" href="{% url 'orders:client_order_detail' order.id %}">Voir la commande</a>
         </div>
       </div>
 
-      <div class="kpi" style="margin-top:12px;">
-        <div class="kv"><div class="k">Total</div><div class="v">{{ total|fcfa }}</div></div>
-        <div class="kv"><div class="k">Déjà payé</div><div class="v">{{ paid|fcfa }}</div></div>
-        <div class="kv"><div class="k">Reste</div><div class="v">{{ remain|fcfa }}</div></div>
-
-        <div class="ok">
-          Si tu veux vérifier le détail du paiement, retourne sur la commande.
+      <div class="paywave-kpis">
+        <div class="paywave-kpi">
+          <div class="k">Total</div>
+          <div class="v">{{ total|fcfa }}</div>
         </div>
+        <div class="paywave-kpi">
+          <div class="k">Déjà payé</div>
+          <div class="v">{{ paid|fcfa }}</div>
+        </div>
+        <div class="paywave-kpi paywave-kpi--ok">
+          <div class="k">Reste</div>
+          <div class="v">{{ remain|fcfa }}</div>
+        </div>
+      </div>
+
+      <div class="co-note co-note--ok">
+        Si tu veux vérifier le détail, retourne sur la commande.
       </div>
 
     {% else %}
-      <div class="row">
-        <div>
-          <div style="font-weight:950;">À payer maintenant</div>
-          <div class="meta">Reste : <strong>{{ remain|fcfa }}</strong></div>
+
+      <div class="paywave-state">
+        <div class="paywave-state__left">
+          <div class="paywave-state__title">À payer maintenant</div>
+          <div class="paywave-state__sub">
+            Reste : <strong class="paywave-amount">{{ remain|fcfa }}</strong>
+          </div>
         </div>
-        <div>
+
+        <div class="paywave-state__right">
           {% if pay_link %}
-            <a class="btn btn-primary" href="{{ pay_link }}" target="_blank" rel="noopener">Payer via Wave</a>
-            <a class="btn" href="#" onclick="copyWaveLink();return false;">Copier lien</a>
+            <a class="co-btn co-btn--primary" href="{{ pay_link }}" target="_blank" rel="noopener">Payer via Wave</a>
+            <button class="co-btn co-btn--ghost" type="button" data-copy="#wavePayLink">Copier lien</button>
           {% else %}
-            <a class="btn" href="#" onclick="copyWave();return false;">Copier numéro Wave</a>
+            <button class="co-btn co-btn--ghost" type="button" data-copy="#wavePhone">Copier numéro</button>
           {% endif %}
         </div>
       </div>
-      <div class="qr">
-        <div>
-          <img src="{{ qr_data_uri }}" alt="QR Wave">
-          <div class="meta" style="margin-top:6px;">Numéro : <code id="wavePhone">{{ wave_phone }}</code></div>
+
+      <div class="paywave-grid">
+
+        <div class="paywave-qrbox">
+          <div class="paywave-qr">
+            <img src="{{ qr_data_uri }}" alt="QR Wave">
+          </div>
+
+          <div class="paywave-meta">
+            <div class="paywave-meta__row">
+              <span class="k">Numéro Wave</span>
+              <code id="wavePhone" class="v">{{ wave_phone }}</code>
+            </div>
+
             {% if pay_link %}
-            <div class="meta" style="margin-top:6px;">
-              <a class="btn" href="#" onclick="toggleWaveLink();return false;" id="waveLinkToggleBtn">Afficher le lien</a>
-            </div>
-            <div class="meta" style="margin-top:8px;display:none;" id="waveLinkBox">
-              Lien : <code id="wavePayLink">{{ pay_link }}</code>
-            </div>
+              <div class="paywave-meta__row">
+                <span class="k">Lien</span>
+                <button class="co-btn co-btn--sm co-btn--ghost" type="button" id="waveLinkToggleBtn">Afficher</button>
+              </div>
+
+              <div class="paywave-linkbox" id="waveLinkBox" hidden>
+                <div class="paywave-linkbox__inner">
+                  <code id="wavePayLink">{{ pay_link }}</code>
+                  <button class="co-btn co-btn--sm co-btn--ghost" type="button" data-copy="#wavePayLink">Copier</button>
+                </div>
+              </div>
             {% endif %}
-        </div>
+          </div>
 
-        <div class="kpi" style="min-width:280px;flex:1;">
-          <div class="kv"><div class="k">Total</div><div class="v">{{ total|fcfa }}</div></div>
-          <div class="kv"><div class="k">Déjà payé</div><div class="v">{{ paid|fcfa }}</div></div>
-          <div class="kv"><div class="k">Reste</div><div class="v">{{ remain|fcfa }}</div></div>
-
-          <div class="hint">
-            Ouvre l’app <strong>Wave</strong> → <strong>Scanner</strong> → scanne le QR → vérifie le numéro → saisis le montant <strong>{{ remain|fcfa }}</strong>.
-            <br><br>
-            Si le bouton **Payer via Wave** est disponible, utilise-le (plus simple). Sinon, scanne le QR puis confirme le **numéro** et le **montant** avant de valider.
+          <div class="co-note co-note--warn">
+            Ouvre <strong>Wave</strong> → <strong>Scanner</strong> → scanne le QR → vérifie le numéro → saisis
+            <strong>{{ remain|fcfa }}</strong>.
+            {% if pay_link %}
+              <br><br>Si le bouton <strong>Payer via Wave</strong> est dispo, utilise-le (plus simple).
+            {% endif %}
           </div>
         </div>
+
+        <div class="paywave-side">
+          <div class="paywave-kpis">
+            <div class="paywave-kpi">
+              <div class="k">Total</div>
+              <div class="v">{{ total|fcfa }}</div>
+            </div>
+            <div class="paywave-kpi">
+              <div class="k">Déjà payé</div>
+              <div class="v">{{ paid|fcfa }}</div>
+            </div>
+            <div class="paywave-kpi paywave-kpi--focus">
+              <div class="k">Reste</div>
+              <div class="v">{{ remain|fcfa }}</div>
+            </div>
+          </div>
+
+          <div class="co-note co-note--soft">
+            Après paiement, reviens sur la commande pour voir le statut “Payé”.
+          </div>
+
+          <div class="paywave-actions">
+            {% if pay_link %}
+              <a class="co-btn co-btn--primary co-btn--full" href="{{ pay_link }}" target="_blank" rel="noopener">
+                Ouvrir Wave & payer
+              </a>
+            {% endif %}
+            <a class="co-btn co-btn--dark co-btn--full" href="{% url 'orders:client_order_detail' order.id %}">
+              Revenir à la commande
+            </a>
+          </div>
+        </div>
+
       </div>
 
       <script>
-      function copyWaveLink(){
-        
-        // Auto-open the hidden link box (if any) before copying
-        try{
-          const box = document.getElementById("waveLinkBox");
-          const btn = document.getElementById("waveLinkToggleBtn");
-          if(box && btn && (box.style.display === "none" || box.style.display === "")){
-            box.style.display = "block";
-            btn.textContent = "Masquer le lien";
-            // Re-hide after a short delay (pure UX polish)
-            setTimeout(()=>{ 
-              box.style.display = "none"; 
-              btn.textContent = "Afficher le lien"; 
-            }, 1500);
+      (function(){
+        // Toggle link box
+        const toggleBtn = document.getElementById("waveLinkToggleBtn");
+        const linkBox = document.getElementById("waveLinkBox");
+        if(toggleBtn && linkBox){
+          toggleBtn.addEventListener("click", function(){
+            const isHidden = linkBox.hasAttribute("hidden");
+            if(isHidden){
+              linkBox.removeAttribute("hidden");
+              toggleBtn.textContent = "Masquer";
+            }else{
+              linkBox.setAttribute("hidden","hidden");
+              toggleBtn.textContent = "Afficher";
+            }
+          });
+        }
+
+        // Copy helper
+        async function copyText(txt){
+          if(!txt) return false;
+          try{
+            await navigator.clipboard.writeText(txt);
+            return true;
+          }catch(e){
+            return false;
           }
-        }catch(e){}
-const el = document.getElementById("wavePayLink");
-        const txt = el ? (el.textContent || "").trim() : "";
-        if(!txt){ alert("❌ Lien Wave introuvable."); return; }
-        navigator.clipboard.writeText(txt).then(()=>{
-          alert("✅ Lien Wave copié.");
-        }).catch(()=>{
-          prompt("Copie le lien :", txt);
-        });
-      }
+        }
 
-      function toggleWaveLink(){
-        const box = document.getElementById("waveLinkBox");
-        const btn = document.getElementById("waveLinkToggleBtn");
-        if(!box || !btn) return;
-        const open = (box.style.display !== "none");
-        box.style.display = open ? "none" : "block";
-        btn.textContent = open ? "Afficher le lien" : "Masquer le lien";
-      }
-
-function copyWave(){
-        const el = document.getElementById("wavePhone");
-        const txt = el ? (el.textContent || "").trim() : "";
-        if(!txt){ alert("❌ Numéro Wave introuvable."); return; }
-        navigator.clipboard.writeText(txt).then(()=>{
-          alert("✅ Numéro Wave copié : " + txt);
-        }).catch(()=>{
-          prompt("Copie le numéro :", txt);
+        document.addEventListener("click", async function(e){
+          const btn = e.target.closest("[data-copy]");
+          if(!btn) return;
+          const sel = btn.getAttribute("data-copy");
+          const el = sel ? document.querySelector(sel) : null;
+          const txt = el ? (el.textContent || "").trim() : "";
+          if(!txt){
+            alert("❌ Rien à copier.");
+            return;
+          }
+          const ok = await copyText(txt);
+          if(ok){
+            alert("✅ Copié.");
+          }else{
+            prompt("Copie :", txt);
+          }
         });
-      }
+      })();
       </script>
 
     {% endif %}
 
   </div>
-
 </div>
 {% endblock %}

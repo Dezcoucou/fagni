@@ -1,4 +1,8 @@
-{% extends "orders/client_base.html" %}
+{% extends "base.html" %}
 {% load static %}
 
-{# Base Client : charge client_app.css pour toutes les pages client #}
+{# Base Client : centralise le chargement du CSS Client #}
+{% block page_css %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'css/client_app.css' %}">
+{% endblock %}

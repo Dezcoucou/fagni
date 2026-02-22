@@ -5220,7 +5220,7 @@ def client_order_pay_cash(request, order_id: int):
     else:
         payment_ui = "partial"
 
-    return JsonResponse({
+    data = {
         "ok": True,
         "payment_ui": payment_ui,
         "payment_status": getattr(order, "payment_status", None),
@@ -5230,9 +5230,11 @@ def client_order_pay_cash(request, order_id: int):
             "amount_paid": float(order.amount_paid),
             "amount_remaining": float(remain),
         },
-    })
-
-# -------------------------------------------------------------------
+        # --- LOT_2_30_PAYMENT_UI_JSON_FIELDS_OK ---
+    }
+    resp = JsonResponse(data)
+    resp['Cache-Control'] = 'no-store'
+    return resp# -------------------------------------------------------------------
 # Items client (CRUD minimal) ✅ sécurisés par phone session
 # -------------------------------------------------------------------
 

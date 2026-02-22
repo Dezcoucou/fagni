@@ -429,6 +429,66 @@
       const orderId = __waveEl.dataset.order;
       const endpoint = `/orders/client/orders/${orderId}/payment-ui/`;
 
+
+  // LOT_2_23_WAVE_INSTANT_CHECK_OK
+  // Check immédiat si on arrive sur la page avec "Wave déclaré" (sans attendre le prochain tick)
+  (function(){
+    try{
+      // On ne fait le check immédiat que si on est dans un contexte "wave déclaré"
+      var w = (typeof __waveEl !== "undefined" && __waveEl) ? __waveEl : document.getElementById("waveNotice");
+      if(!w) return;
+
+      var waveState = (w.dataset && w.dataset.wave) ? String(w.dataset.wave) : "";
+      if(waveState !== "declared") return;
+
+      // orderId doit exister dans le scope du polling (Lot 2.17)
+      if(typeof orderId === "undefined") return;
+
+      // Fetch immédiat
+      fetch(endpoint, {
+        method: "GET",
+        credentials: "same-origin",
+        headers: { "X-Requested-With": "XMLHttpRequest" }
+      })
+      .then(function(r){ return r.json ? r.json() : {}; })
+      .then(function(data){
+        if(!data || data.ok !== true) return;
+
+        // Si déjà payé => bascule UI tout de suite + clean URL + reload one-shot (Lot 2.21)
+        if(data.payment_ui === "paid" || data.payment_status === "paid"){
+          // Bandeau OK (sans attendre)
+          try{
+            w.classList.remove("co-notice--warn","co-notice--err");
+            w.classList.add("co-notice--ok");
+            var t = w.querySelector(".co-notice__title");
+            var d = w.querySelector(".co-notice__desc");
+            if(t) t.textContent = "Paiement confirmé";
+            if(d) d.textContent = "Merci. Ton paiement Wave a été confirmé.";
+            // force dataset pour cohérence
+            if(w.dataset) w.dataset.wave = "success";
+          }catch(e){}
+
+          // Toast si helper existe
+          try{ if(typeof payShowMsg === "function") payShowMsg("✅ Paiement confirmé.", true); }catch(e){}
+
+          // Clean URL si helper Lot 2.20 existe, sinon fallback
+          try{
+            if(typeof __waveCleanUrl === "function") { __waveCleanUrl(); }
+            else if(window.history && history.replaceState){
+              var u = new URL(window.location.href);
+              u.searchParams.delete("wave");
+              history.replaceState({}, "", u.toString());
+            }
+          }catch(e){}
+
+          // Reload one-shot (Lot 2.21)
+          try{ if(typeof __waveOnPaidOnce === "function") __waveOnPaidOnce(orderId); }catch(e){}
+        }
+      })
+      .catch(function(){});
+    }catch(e){}
+  })();
+
       let tries = 0;
       const maxTries = 30;      // ~4 minutes
       const intervalMs = 8000;

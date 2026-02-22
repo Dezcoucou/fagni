@@ -11793,8 +11793,9 @@ def laundry_order_detail(request, order_id):
 # -------------------------------------------------------------------
 # LOT_2_18_WAVE_OPS_CONFIRM_OK
 @require_http_methods(["POST"])
-@login_required
-@user_passes_test(lambda u: getattr(u, "is_staff", False))
+
+@staff_member_required
+# LOT_2_18B_WAVE_OPS_STAFF_REQUIRED_OK
 def ops_order_confirm_wave_paid(request, order_id: int):
     """
     Confirme manuellement un paiement Wave côté Ops/Admin.

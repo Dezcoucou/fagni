@@ -1071,3 +1071,41 @@ summary:focus-visible{
   box-shadow: 0 12px 26px rgba(2,6,23,0.08);
 }
 
+
+/* =========================================================
+   LOT 1 — Home Conversion polish (CTA + Trust)
+   ========================================================= */
+.page.client-home .home-primary--inline{
+  margin-top: 12px;
+}
+
+.page.client-home .home-trust{
+  margin-top: 10px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+
+.page.client-home .trust-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:8px 10px;
+  border-radius:999px;
+  border:1px solid rgba(2,6,23,0.10);
+  background: rgba(2,6,23,0.03);
+  color: rgba(2,6,23,0.82);
+  font-size:12px;
+  font-weight:900;
+}
+
+.page.client-home .home-primary__hint{
+  margin-top: 8px;
+}
+
+@media (max-width:900px){
+  .page.client-home .home-kpis{
+    grid-template-columns: 1fr;
+    min-width: 100%;
+  }
+}

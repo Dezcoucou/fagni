@@ -1,7 +1,6 @@
 {% extends "orders/client_base.html" %}
 {% load humanize money_filters %}
 
-{# CSS spécifique à l'app Client #}
 {% block title %}Accueil – Client FAGNI{% endblock %}
 
 {% block content %}
@@ -22,9 +21,10 @@
     </div>
   </div>
 
-  <!-- HERO (simple, rassurant, 1 action principale) -->
+  <!-- HERO (1 CTA + confiance) -->
   <div class="home-hero">
     <div class="home-hero__top">
+
       <div class="home-hero__copy">
         <h2 class="home-hero__title">Bonjour 👋</h2>
         <p class="home-hero__sub">
@@ -38,11 +38,31 @@
           <span class="hero-mini__tag">⏱️ 24h / 48h</span>
         </div>
 
-        <div class="hint" style="margin-top:8px;">
-          Paiement sécurisé • Reçu dans la commande • Support en cas d’incident
+        <!-- CTA principal (dans la HERO pour conversion) -->
+        <div class="home-primary home-primary--inline">
+          <a class="btn home-primary__btn" href="{% url 'orders:client_new_order' %}">
+            ➕ Créer une commande
+          </a>
+          <div class="home-primary__meta">
+            Paiement : <strong>Wave</strong> • Reçu disponible dans la commande.
+          </div>
+
+          {% if not customer %}
+            <div class="hint home-primary__hint">
+              Ton profil se crée automatiquement à la première commande (V1).
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- Confiance (court, lisible) -->
+        <div class="home-trust" aria-label="Garanties">
+          <span class="trust-pill">🔒 Paiement sécurisé</span>
+          <span class="trust-pill">🧾 Reçu automatique</span>
+          <span class="trust-pill">🛟 Support en cas d’incident</span>
         </div>
       </div>
 
+      <!-- KPIs (secondaires) -->
       <div class="home-kpis">
         <div class="home-kpi">
           <div class="home-kpi__label">Commandes</div>
@@ -62,23 +82,8 @@
           {% endif %}
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- CTA principal -->
-  <div class="home-primary">
-    <a class="btn home-primary__btn" href="{% url 'orders:client_new_order' %}">
-      ➕ Créer une commande
-    </a>
-    <div class="home-primary__meta">
-      Paiement : <strong>Wave</strong> (Option A). Reçu disponible dans la commande.
     </div>
-
-    {% if not customer %}
-      <p class="hint" style="margin-top:10px;">
-        Ton profil se crée automatiquement à la première commande (V1).
-      </p>
-    {% endif %}
   </div>
 
   <!-- Commande récente (mise en avant) -->
@@ -139,21 +144,29 @@
         </div>
       </div>
     {% endwith %}
+  {% else %}
+    <div class="card" id="no-orders">
+      <div class="section-head">
+        <div class="section-title">Aucune commande pour le moment</div>
+        <div class="section-sub">Commence par créer ta première commande.</div>
+      </div>
+      <a class="btn btn-premium" href="{% url 'orders:client_new_order' %}">➕ Créer une commande</a>
+    </div>
   {% endif %}
 
-  <!-- Actions rapides -->
+  <!-- Actions rapides (secondaires) -->
   <div class="card">
     <div class="section-head">
-      <div class="section-title">Actions rapides</div>
-      <div class="section-sub">Le reste est dans “Mes commandes”</div>
+      <div class="section-title">Accès rapide</div>
+      <div class="section-sub">Les essentiels, sans chercher</div>
     </div>
 
     <div class="home-shortcuts">
       <a class="home-shortcut" href="#mes-commandes">
         <div class="home-shortcut__ico">📦</div>
         <div>
-          <div class="home-shortcut__t">Suivre mes commandes</div>
-          <div class="home-shortcut__d">Historique + statut en temps réel</div>
+          <div class="home-shortcut__t">Mes commandes</div>
+          <div class="home-shortcut__d">Historique + suivi</div>
         </div>
       </a>
 
@@ -182,52 +195,19 @@
           </div>
         </div>
       {% endif %}
-    </div>
-  </div>
 
-  <!-- FAQ -->
-  <div class="card" id="faq">
-    <div class="section-head">
-      <div class="section-title">Aide</div>
-      <div class="section-sub">Réponses rapides</div>
-    </div>
-
-    <div class="faq">
-      <details>
-        <summary>Comment est calculé le prix ?</summary>
-        <div class="ans">
-          Le prix dépend de la <strong>formule</strong> choisie et des <strong>articles</strong>.
-          Le total est confirmé après collecte et validation dans l’app.
+      <a class="home-shortcut" href="#faq">
+        <div class="home-shortcut__ico">❓</div>
+        <div>
+          <div class="home-shortcut__t">Aide</div>
+          <div class="home-shortcut__d">FAQ + support</div>
         </div>
-      </details>
-
-      <details>
-        <summary>Comment je paie ?</summary>
-        <div class="ans">
-          Paiement <strong>Wave</strong> (Option A). Le reçu est disponible dans la commande.
-        </div>
-      </details>
-
-      <details>
-        <summary>Comment fonctionne le parrainage ?</summary>
-        <div class="ans">
-          Tu peux inviter des proches. À chaque commande réalisée grâce à ton lien, tu gagnes un bonus.
-          Tes gains et invitations sont visibles dans <strong>Parrainage</strong>.
-        </div>
-      </details>
-
-      <details>
-        <summary>Incident (perte / tache / retard) ?</summary>
-        <div class="ans">
-          Contacte le support : on ouvre un ticket et on suit la résolution avec le partenaire.
-        </div>
-      </details>
+      </a>
     </div>
   </div>
 
   <!-- ORDERS -->
   <div class="card" id="mes-commandes">
-
     <div class="orders-head">
       <div>
         <h2 class="orders-title">Mes commandes</h2>
@@ -327,6 +307,46 @@
       <p class="empty">Aucune commande pour le moment.</p>
       <p class="hint">Commence par créer ta première commande.</p>
     {% endif %}
+  </div>
+
+  <!-- FAQ (tout en bas) -->
+  <div class="card" id="faq">
+    <div class="section-head">
+      <div class="section-title">Aide</div>
+      <div class="section-sub">Réponses rapides</div>
+    </div>
+
+    <div class="faq">
+      <details>
+        <summary>Comment est calculé le prix ?</summary>
+        <div class="ans">
+          Le prix dépend de la <strong>formule</strong> choisie et des <strong>articles</strong>.
+          Le total est confirmé après collecte et validation dans l’app.
+        </div>
+      </details>
+
+      <details>
+        <summary>Comment je paie ?</summary>
+        <div class="ans">
+          Paiement <strong>Wave</strong> (Option A). Le reçu est disponible dans la commande.
+        </div>
+      </details>
+
+      <details>
+        <summary>Comment fonctionne le parrainage ?</summary>
+        <div class="ans">
+          Tu peux inviter des proches. À chaque commande réalisée grâce à ton lien, tu gagnes un bonus.
+          Tes gains et invitations sont visibles dans <strong>Parrainage</strong>.
+        </div>
+      </details>
+
+      <details>
+        <summary>Incident (perte / tache / retard) ?</summary>
+        <div class="ans">
+          Contacte le support : on ouvre un ticket et on suit la résolution avec le partenaire.
+        </div>
+      </details>
+    </div>
   </div>
 
 </div>

@@ -436,7 +436,20 @@
       try {
         if (sessionStorage.getItem(k) === "1") return;
         sessionStorage.setItem(k, "1");
-      } catch(e) {}
+      }
+
+  // LOT_2_36_DEDUP_RELOAD_OK
+  // Évite les reload multiples (polling + instant check + clic utilisateur)
+  function __waveScheduleReload(ms){
+    try{
+      if(window.__waveReloadScheduled) return;
+      window.__waveReloadScheduled = true;
+      setTimeout(function(){
+        try{ window.location.reload(); }catch(e){}
+      }, (ms || 450));
+    }catch(e){}
+  }
+ catch(e) {}
 
       // stop polling
       try { window.__waveStopPolling = true; } catch(e) {}

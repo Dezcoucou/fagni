@@ -16,9 +16,21 @@
 
         <form method="post" style="margin:0;">
           {% csrf_token %}
-          <button id="btnWavePaid" class="co-btn" type="submit">
+          
+{% if amount_remaining > 0 and order.payment_status != "paid" %}
+<button id="btnWavePaid" class="co-btn" type="submit">
             J’ai payé
           </button>
+{% else %}
+<div class="co-notice co-notice--ok" style="margin-top:12px;">
+  <div class="co-notice__icon">✓</div>
+  <div>
+    <p class="co-notice__title">Paiement déjà confirmé</p>
+    <p class="co-notice__desc">Merci. Aucun paiement supplémentaire requis.</p>
+  </div>
+</div>
+{% endif %}
+
         </form>
       </div>
 
@@ -271,3 +283,5 @@ document.addEventListener("DOMContentLoaded", function() {
 
 
 {% endblock %}
+
+<!-- WAVE_HIDE_BTN_IF_PAID_OK -->

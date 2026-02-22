@@ -485,6 +485,54 @@
 
 
   // LOT_2_23_WAVE_INSTANT_CHECK_OK
+
+  // LOT_2_29_HIDE_PAY_CTA_IF_PAID_OK
+  (function(){
+    try{
+      var paid = ("{{ order.payment_status|default:'' }}" === "paid");
+      if(!paid) return;
+
+      // 1) Cache tous les liens de paiement (Wave & autres) détectés par URL
+      var payLinks = Array.from(document.querySelectorAll('a[href*="/pay/"], a[href*="/payment"], a[href*="pay/wave"]'));
+      payLinks.forEach(function(a){
+        a.setAttribute("aria-disabled","true");
+        a.style.pointerEvents = "none";
+        a.style.opacity = "0.55";
+        // si c’est un bouton principal, on le masque complètement
+        if((a.className||"").includes("co-btn--primary") || (a.textContent||"").toLowerCase().includes("payer")){
+          a.style.display = "none";
+        }
+      });
+
+      // 2) Désactive les boutons “Payer” (au cas où certains soient <button>)
+      var btns = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"]'));
+      btns.forEach(function(b){
+        var t = (b.textContent || b.value || "").trim().toLowerCase();
+        if(t.includes("payer") || t.includes("pay") || t.includes("wave")){
+          b.disabled = true;
+          b.style.opacity = "0.55";
+          // on masque ceux qui ressemblent à un CTA de paiement
+          if(t.includes("payer")){
+            b.style.display = "none";
+          }
+        }
+      });
+
+      // 3) Si un bloc “paiement” existe, on ajoute un petit label (non bloquant)
+      var payBox = document.querySelector('#paymentBox, .paymentBox, .payBox, .pay-card, .pay-card2');
+      if(payBox && !payBox.querySelector("[data-pay-locked='1']")){
+        var note = document.createElement("div");
+        note.setAttribute("data-pay-locked","1");
+        note.style.marginTop = "10px";
+        note.style.fontSize = "12px";
+        note.style.color = "#64748b";
+        note.textContent = "✅ Paiement déjà confirmé — actions de paiement désactivées.";
+        payBox.appendChild(note);
+      }
+    }catch(e){}
+  })();
+
+
   // Check immédiat si on arrive sur la page avec "Wave déclaré" (sans attendre le prochain tick)
   (function(){
     try{

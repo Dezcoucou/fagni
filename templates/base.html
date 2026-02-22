@@ -112,9 +112,9 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
-<header class="fagni-topbar">
 {% block topbar %}
-    <div class="fagni-topbar-left">
+<header class="fagni-topbar">
+<div class="fagni-topbar-left">
         <a href="{% url 'orders:driver_hub' %}" class="fagni-logo">
             <span class="fagni-logo-mark">
                 <img src="{% static 'img/fagni_logo_ok.png' %}" alt="FAGNI">
@@ -126,10 +126,7 @@
         </a>
         <span class="fagni-topbar-tag">🚀 Super-App</span>
     </div>
-{% endblock %}
-
-
-    <div class="fagni-topbar-right">
+<div class="fagni-topbar-right">
         {% if request.user.is_authenticated %}
             <div class="fagni-topbar-user">
                 <div class="fagni-topbar-avatar">
@@ -145,7 +142,7 @@
         {% endif %}
     </div>
 </header>
-
+{% endblock %}
 <div class="fagni-shell">
 
     {% if messages %}

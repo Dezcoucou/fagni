@@ -1,11 +1,5 @@
-{% extends "base.html" %}
+{% extends "orders/client_base.html" %}
 {% load money_filters static %}
-
-{% block page_css %}
-<link rel="stylesheet" href="{% static 'css/client_app.css' %}">
-{% endblock %}
-
-
 {% block title %}Paiement Wave – Commande {{ order.code|default:order.id }}{% endblock %}
 {% block extra_head %}
 {{ block.super }}
@@ -140,7 +134,6 @@ const el = document.getElementById("wavePayLink");
           prompt("Copie le lien :", txt);
         });
       }
-
 
       function toggleWaveLink(){
         const box = document.getElementById("waveLinkBox");

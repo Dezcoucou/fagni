@@ -1,12 +1,5 @@
-{% extends "base.html" %}
-
+{% extends "orders/client_base.html" %}
 {% load static %}
-
-{% block page_css %}
-<link rel="stylesheet" href="{% static 'css/client_app.css' %}">
-{% endblock %}
-
-
 {% block title %}Nouvelle commande – Client FAGNI{% endblock %}
 {% block extra_head %}
 {{ block.super }}

@@ -212,6 +212,23 @@ LOGGING = {
         },
     },
 }
+# --- LOT_2_16_SESSIONS_LOGGER_OK ---
+# Réduit le bruit "Session data corrupted" en DEV (warning émis par le backend sessions)
+if DEBUG:
+    LOGGING.setdefault("loggers", {})
+    LOGGING["loggers"].setdefault("django.contrib.sessions", {})
+    LOGGING["loggers"]["django.contrib.sessions"].update({
+        "handlers": ["console"],
+        "level": "ERROR",
+        "propagate": False,
+    })
+    # Certains messages viennent aussi de sous-loggers/backends
+    LOGGING["loggers"].setdefault("django.contrib.sessions.backends", {})
+    LOGGING["loggers"]["django.contrib.sessions.backends"].update({
+        "handlers": ["console"],
+        "level": "ERROR",
+        "propagate": False,
+    })
 
 # ========================
 #  SÉCURITÉ HTTPS

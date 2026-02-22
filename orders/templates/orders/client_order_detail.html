@@ -509,7 +509,9 @@
         if (tries > maxTries) return;
 
         try {
-          const res = await fetch(endpoint, {
+          const res = await fetch(endpoint,
+/* LOT_2_26_WAVE_REFRESH_DEBOUNCE_OK hook */
+ {
             method: "GET",
             credentials: "same-origin",
             headers: {
@@ -517,6 +519,19 @@
               "X-Requested-With": "XMLHttpRequest"
             }
           });
+
+      try { __setLastCheckNow(); } catch(e) {}
+
+      // feedback bouton
+      try {
+        if (btn) {
+          btn.textContent = "Actualisé ✓";
+          setTimeout(function(){
+            try { btn.textContent = __origLabel || "Actualiser le paiement"; } catch(e){}
+          }, 1400);
+        }
+      } catch(e) {}
+
           if (!res.ok) return;
           const data = await res.json();
                 try{
@@ -2290,7 +2305,56 @@
     btn.addEventListener("click", async function(){
 
       
-      // LOT_2_25_WAVE_POLL_PAUSE_ON_MANUAL_OK
+      
+      // LOT_2_26_WAVE_REFRESH_DEBOUNCE_OK
+      // Anti-spam (lock 3s) + horodatage "Dernière vérif" + feedback bouton
+      try {
+        if (btn.dataset && btn.dataset.locked === "1") return;
+        if (btn.dataset) btn.dataset.locked = "1";
+      } catch(e) {}
+
+      var __origLabel = (btn && (btn.textContent || btn.innerText)) ? (btn.textContent || btn.innerText) : "Actualiser le paiement";
+      try {
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Vérification…";
+          btn.style.opacity = "0.85";
+        }
+      } catch(e) {}
+
+      // Auto-unlock au bout de 3s (même si erreur réseau)
+      setTimeout(function(){
+        try {
+          if (btn) {
+            btn.disabled = false;
+            btn.style.opacity = "";
+          }
+          if (btn && btn.dataset) btn.dataset.locked = "0";
+        } catch(e) {}
+      }, 3000);
+
+      function __fmtTime(d){
+        try {
+          var hh = String(d.getHours()).padStart(2,"0");
+          var mm = String(d.getMinutes()).padStart(2,"0");
+          var ss = String(d.getSeconds()).padStart(2,"0");
+          return hh+":"+mm+":"+ss;
+        } catch(e) { return ""; }
+      }
+
+      function __setLastCheckNow(){
+        try {
+          var orderId = (btn && btn.getAttribute("data-order")) || (window.__waveOrderId) || "";
+          var now = new Date();
+          var t = __fmtTime(now);
+          var el = document.getElementById("waveLastCheck");
+          if (el) el.textContent = t ? ("Dernière vérif : " + t) : "";
+          if (orderId) {
+            try { sessionStorage.setItem("wave_last_check_"+String(orderId), String(now.getTime())); } catch(e) {}
+          }
+        } catch(e) {}
+      }
+// LOT_2_25_WAVE_POLL_PAUSE_ON_MANUAL_OK
       // Pause polling pendant 2.5s pour éviter double requête (polling + refresh manuel)
       try{ window.__wavePollPausedUntil = Date.now() + 2500; }catch(e){}
 var original = btn.textContent;

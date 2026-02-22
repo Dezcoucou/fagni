@@ -14,7 +14,7 @@ from django.http import HttpResponse, JsonResponse, HttpResponseBadRequest, Http
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import (
     Count,
     Q,
@@ -11786,3 +11786,81 @@ def laundry_order_detail(request, order_id):
         "is_ready_disabled": is_ready_disabled,
         "is_done_disabled": is_done_disabled,
     })
+
+
+# -------------------------------------------------------------------
+# ✅ Lot 2.18 — OPS: confirmer paiement Wave (déclaration client → validation ops)
+# -------------------------------------------------------------------
+# LOT_2_18_WAVE_OPS_CONFIRM_OK
+@require_http_methods(["POST"])
+@login_required
+@user_passes_test(lambda u: getattr(u, "is_staff", False))
+def ops_order_confirm_wave_paid(request, order_id: int):
+    """
+    Confirme manuellement un paiement Wave côté Ops/Admin.
+    - Set payment_status="paid"
+    - Set amount_paid = total TTC (calcul client)
+    - Clear session flag wave_declared_{order.id}
+    - Optionnel: crée un Payment si le modèle existe
+    """
+    order = Order.objects.filter(pk=order_id).first()
+    if not order:
+        return JsonResponse({"ok": False, "error": "order_not_found"}, status=404)
+
+    amounts = _client_order_amounts(order)
+    total = amounts.get("total_ttc") or DECIMAL_ZERO
+
+    try:
+        from decimal import Decimal
+        total = Decimal(str(total))
+    except Exception:
+        total = DECIMAL_ZERO
+
+    # Update order fields (si présents)
+    try:
+        if hasattr(order, "amount_paid"):
+            setattr(order, "amount_paid", total)
+        if hasattr(order, "payment_status"):
+            setattr(order, "payment_status", "paid")
+        order.save()
+    except Exception:
+        # On n'explose pas: on renvoie un KO explicite
+        return JsonResponse({"ok": False, "error": "order_update_failed"}, status=500)
+
+    # Clear declared flag (session ops actuelle)
+    try:
+        key = f"wave_declared_{order.id}"
+        if request.session.get(key):
+            del request.session[key]
+            request.session.modified = True
+    except Exception:
+        pass
+
+    # Optionnel: Payment record si existe
+    try:
+        from orders.models import Payment  # type: ignore
+        # On tente un create minimal (selon ton modèle réel)
+        kwargs = {}
+        if "order" in [f.name for f in Payment._meta.fields]:
+            kwargs["order"] = order
+        if "amount" in [f.name for f in Payment._meta.fields]:
+            kwargs["amount"] = total
+        if "method" in [f.name for f in Payment._meta.fields]:
+            kwargs["method"] = "wave"
+        if "status" in [f.name for f in Payment._meta.fields]:
+            kwargs["status"] = "paid"
+        if kwargs:
+            Payment.objects.create(**kwargs)
+    except Exception:
+        pass
+
+    # Réponse
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({"ok": True, "order_id": order.id, "total": float(total)})
+
+    # fallback redirect: renvoie vers detail ops si existe, sinon home
+    try:
+        from django.urls import reverse
+        return redirect(reverse("orders:ops_order_detail", args=[order.id]))
+    except Exception:
+        return redirect("orders:ops_dashboard")

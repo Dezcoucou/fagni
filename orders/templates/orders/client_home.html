@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load humanize %}
 {% load money_filters %}
+{% load static %}
 
 {% block title %}Accueil – Client FAGNI{% endblock %}
 
@@ -10,189 +11,214 @@
   <!-- Header -->
   <div class="page-header">
     <div class="page-header__left">
-      <h1 class="page-title">Accueil</h1>
-      <p class="page-subtitle">Téléphone : <strong>{{ phone }}</strong></p>
+      <h1 class="page-title">FAGNI</h1>
+      <div class="hero-mini hero-mini--header"><span class="hero-mini__tag">📞 <strong>{{ phone }}</strong></span><span class="hero-mini__tag">🧼 Pressing &amp; logistique</span></div>
     </div>
     <div class="page-header__right">
-      <a class="btn btn-premium" href="{% url 'orders:client_new_order' %}">➕ Nouvelle commande</a>
       <a class="btn btn-light" href="{% url 'orders:client_logout' %}">Déconnexion</a>
     </div>
   </div>
 
-  <!-- HERO -->
-  <div class="hero">
-    <div class="hero-grid">
-      <div>
-        <h2 class="hero-title">Bienvenue 👋</h2>
-        <p class="hero-meta">
-          Pressing : collecte → lavage → livraison.
-          <span class="hero-meta-soft">Super-app : parrainage, wallet, micro-crédit & support.</span>
-        </p>
+  <!-- HERO (simple, rassurant, 1 action principale) -->
+    <div class="home-hero">
 
-        <div class="hero-actions">
-          <a class="btn btn-premium" href="{% url 'orders:client_new_order' %}">🧺 Créer une commande</a>
-          <a class="btn btn-outline" href="#fagni-plus">🎁 Parrainage & Wallet</a>
-          <a class="btn btn-outline" href="#mes-commandes">📦 Historique</a>
-          <a class="btn btn-outline" href="#faq">❓ FAQ</a>
+      <div class="home-hero__top">
+        <div class="home-hero__copy">
+          <h2 class="home-hero__title">Bonjour 👋</h2>
+          <p class="home-hero__sub">
+            Crée une commande en quelques secondes. On s’occupe du reste : collecte → lavage → livraison.
+          </p>
+
+          <div class="hero-mini hero-mini--hero">
+            <span class="hero-mini__tag">✅ Collecte</span>
+            <span class="hero-mini__tag">🧼 Lavage</span>
+            <span class="hero-mini__tag">🚚 Livraison</span>
+            <span class="hero-mini__tag">⏱️ 24h / 48h</span>
+          </div>
+
+          <div class="hint" style="margin-top:8px;">
+            Paiement sécurisé • Reçu dans la commande • Support en cas d’incident
+          </div>
         </div>
 
-        {% if not customer %}
-          <p class="hint" style="margin-top:10px;">
-            Ton profil se crée automatiquement à la première commande (V1).
-          </p>
-        {% endif %}
+        <div class="home-kpis">
+          <div class="home-kpi">
+            <div class="home-kpi__label">Commandes</div>
+            <div class="home-kpi__value">{{ kpi_orders_count|default:0 }}</div>
+            {% if customer and current_status != "all" %}
+              <div class="home-kpi__hint">Total : <strong>{{ orders_count_all }}</strong></div>
+            {% endif %}
+          </div>
+
+          <div class="home-kpi home-kpi--soft">
+            <div class="home-kpi__label">Wallet</div>
+            <div class="home-kpi__value">—</div>
+            {% if customer %}
+              <div class="home-kpi__hint">Solde visible dans Wallet</div>
+            {% else %}
+              <div class="home-kpi__hint">Activé après 1ère commande</div>
+            {% endif %}
+          </div>
+        </div>
       </div>
+    </div>
 
-      <div class="hero-kpis">
-        <div class="kpi">
-          <p class="label">Commandes</p>
+    <div class="home-primary">
+      <a class="btn home-primary__btn" href="{% url 'orders:client_new_order' %}">
+        ➕ Créer une commande
+      </a>
+      <div class="home-primary__meta">
+        Paiement : <strong>Wave</strong> (Option A). Reçu disponible dans la commande.
+      </div>
+    </div>
 
-          {# ✅ KPI principal : dépend du filtre sélectionné #}
-          <p class="value">{{ kpi_orders_count|default:0 }}</p>
+    {% if not customer %}
+      <p class="hint" style="margin-top:10px;">
+        Ton profil se crée automatiquement à la première commande (V1).
+      </p>
+    {% endif %}
+  </div>
 
-          {# ℹ️ Info secondaire uniquement si on filtre #}
-          {% if customer and current_status != "all" %}
-            <p class="hero-meta" style="margin-top:6px;">
-              Total : <strong>{{ orders_count_all }}</strong>
-            </p>
+  <!-- Commande rapide (mise en avant du statut / montant / action) -->
+  {% if orders %}
+    {% with o=orders|first %}
+      <div class="home-live card">
+        <div class="home-live__head">
+          <div>
+            <div class="home-live__title">Commande récente</div>
+            <div class="home-live__sub">Statut • Montant • Action</div>
+          </div>
+
+          {% if o.status == "pending" %}
+            <span class="badge-status badge-status--pending">En attente</span>
+          {% elif o.status == "in_progress" %}
+            <span class="badge-status badge-status--in_progress">En cours</span>
+          {% elif o.status == "done" %}
+            <span class="badge-status badge-status--done">Terminée</span>
+          {% elif o.status == "canceled" %}
+            <span class="badge-status badge-status--canceled">Annulée</span>
+          {% else %}
+            <span class="badge-status">{{ o.status|default:"—" }}</span>
           {% endif %}
         </div>
 
+        <div class="home-live__grid">
+          <div class="home-live__box">
+            <div class="home-live__k">Référence</div>
+            <div class="home-live__v">#{{ o.code|default:o.id }}</div>
+          </div>
+
+          <div class="home-live__box">
+            <div class="home-live__k">Adresse</div>
+            <div class="home-live__v">📍 {{ o.pickup_address|default:o.customer.address|default:"—" }}</div>
+          </div>
+
+          <div class="home-live__box">
+            <div class="home-live__k">Montant</div>
+            {% with tot=o.total_client_display|default:0 %}
+              {% with tot0=tot|floatformat:0 %}
+                {% if tot0 == "0" %}
+                  <div class="home-live__v">
+                    <span class="est-pill"><span class="spark"></span>Estimation en cours</span>
+                    <div class="hint" style="margin-top:6px;">
+                      Le total est confirmé après collecte et validation de la formule (par article).
+                    </div>
+                  </div>
+                {% else %}
+                  <div class="home-live__v"><strong>{{ tot|fcfa }}</strong></div>
+                {% endif %}
+              {% endwith %}
+            {% endwith %}
+          </div>
+
+          <div class="home-live__box home-live__box--action">
+            <a class="btn btn-premium" href="{% url 'orders:client_order_detail' o.id %}">Suivre</a>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
+    {% endwith %}
+  {% endif %}
 
-  <!-- SERVICES -->
-  <div class="card">
-    <div class="section-head">
-      <div class="section-title">Services</div>
-      <div class="section-sub">Ce que tu peux utiliser maintenant</div>
-    </div>
+    <!-- Actions rapides (secondaires, ne volent pas le CTA) -->
+    <div class="card">
+      <div class="section-head">
+        <div class="section-title">Actions rapides</div>
+        <div class="section-sub">Le reste est dans “Mes commandes”</div>
+      </div>
 
-    <div class="modules-grid">
-      <a class="mod" href="{% url 'orders:client_new_order' %}">
-        <div class="mod-ico">🧺</div>
-        <div>
-          <p class="mod-title">Pressing & Blanchisserie</p>
-          <p class="mod-desc">Collecte • Lavage • Livraison</p>
-          <div class="mod-actions">
-            <span class="btn btn-premium btn-sm">Créer</span>
-          </div>
-        </div>
-        <span class="mod-badge on">Disponible</span>
-      </a>
-
-      <a class="mod" href="{% url 'mlm:affiliate_dashboard' %}">
-        <div class="mod-ico">🎁</div>
-        <div>
-          <p class="mod-title">Programme de parrainage</p>
-          <p class="mod-desc">Invite et gagne des bonus sur les commandes.</p>
-          <div class="mod-actions mod-actions-row">
-            <span class="btn btn-outline btn-sm">Inviter</span>
-            <span class="btn btn-outline btn-sm">Mes gains</span>
-          </div>
-        </div>
-        <span class="mod-badge on">Disponible</span>
-      </a>
-
-      {% if customer %}
-        <a class="mod" href="{% url 'wallets:customer_wallet_detail' customer.id %}">
-          <div class="mod-ico">💼</div>
+      <div class="home-shortcuts">
+        <a class="home-shortcut" href="#mes-commandes">
+          <div class="home-shortcut__ico">📦</div>
           <div>
-            <p class="mod-title">Wallet</p>
-            <p class="mod-desc">Solde, historique et retraits (selon règles).</p>
-            <div class="mod-actions">
-              <span class="btn btn-outline btn-sm">Ouvrir</span>
-            </div>
+            <div class="home-shortcut__t">Suivre mes commandes</div>
+            <div class="home-shortcut__d">Historique + statut en temps réel</div>
           </div>
-          <span class="mod-badge on">Disponible</span>
         </a>
-      {% else %}
-        <div class="mod disabled" aria-disabled="true">
-          <div class="mod-ico">💼</div>
+
+        <a class="home-shortcut" href="{% url 'mlm:affiliate_dashboard' %}">
+          <div class="home-shortcut__ico">🎁</div>
           <div>
-            <p class="mod-title">Wallet</p>
-            <p class="mod-desc">Ton wallet s’active après ta première commande.</p>
-            <div class="mod-actions">
-              <span class="btn btn-outline btn-sm">Bientôt</span>
+            <div class="home-shortcut__t">Parrainage</div>
+            <div class="home-shortcut__d">Inviter & gagner</div>
+          </div>
+        </a>
+
+        {% if customer %}
+          <a class="home-shortcut" href="{% url 'wallets:customer_wallet_detail' customer.id %}">
+            <div class="home-shortcut__ico">💼</div>
+            <div>
+              <div class="home-shortcut__t">Wallet</div>
+              <div class="home-shortcut__d">Solde & mouvements</div>
+            </div>
+          </a>
+        {% else %}
+          <div class="home-shortcut home-shortcut--disabled" aria-disabled="true">
+            <div class="home-shortcut__ico">💼</div>
+            <div>
+              <div class="home-shortcut__t">Wallet</div>
+              <div class="home-shortcut__d">Activé après 1ère commande</div>
             </div>
           </div>
-          <span class="mod-badge">Bientôt</span>
-        </div>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- FAGNI PLUS -->
-  <div class="card" id="fagni-plus">
-    <div class="section-head">
-      <div class="section-title">FAGNI Plus</div>
-      <div class="section-sub">Micro-crédit • Support • Sécurité</div>
-    </div>
-
-    <div class="modules-grid">
-      <div class="mod disabled" aria-disabled="true">
-        <div class="mod-ico">💳</div>
-        <div>
-          <p class="mod-title">Micro-crédit</p>
-          <p class="mod-desc">Avance de paiement (éligibilité + scoring).</p>
-          <div class="mod-actions">
-            <span class="btn btn-outline btn-sm">Bientôt</span>
-          </div>
-        </div>
-        <span class="mod-badge">Bientôt</span>
-      </div>
-
-      <div class="mod">
-        <div class="mod-ico">🛡️</div>
-        <div>
-          <p class="mod-title">Qualité & garantie</p>
-          <p class="mod-desc">Gestion des incidents, réclamations et suivi.</p>
-          <div class="mod-actions">
-            <a class="btn btn-outline btn-sm" href="#faq">Voir la FAQ</a>
-          </div>
-        </div>
-        <span class="mod-badge on">Disponible</span>
-      </div>
-
-      <div class="mod">
-        <div class="mod-ico">💬</div>
-        <div>
-          <p class="mod-title">Support</p>
-          <p class="mod-desc">Contact rapide : WhatsApp / Appel.</p>
-          <div class="mod-actions mod-actions-row">
-            <a class="btn btn-outline btn-sm" href="#" onclick="alert('Ajoute le lien WhatsApp support'); return false;">WhatsApp</a>
-            <a class="btn btn-outline btn-sm" href="#" onclick="alert('Ajoute le numéro support'); return false;">Appeler</a>
-          </div>
-        </div>
-        <span class="mod-badge on">Disponible</span>
+        {% endif %}
       </div>
     </div>
-  </div>
 
-  <!-- FAQ -->
+    <!-- FAQ (court, utile) -->
+
   <div class="card" id="faq">
     <div class="section-head">
-      <div class="section-title">FAQ</div>
+      <div class="section-title">Aide</div>
       <div class="section-sub">Réponses rapides</div>
     </div>
-
     <div class="faq">
       <details>
         <summary>Comment est calculé le prix ?</summary>
-        <div class="ans">Le total est confirmé après collecte/pesée. Avant ça, tu peux voir une estimation.</div>
+        <div class="ans">
+          Le prix dépend de la <strong>formule</strong> choisie et des <strong>articles</strong>.
+          Le total est confirmé après collecte et validation dans l’app.
+        </div>
       </details>
+
       <details>
-        <summary>Quand je paie ?</summary>
-        <div class="ans">Selon le mode : en ligne ou à la livraison. Le statut “paiement” apparaît dans la commande.</div>
+        <summary>Comment je paie ?</summary>
+        <div class="ans">
+          Paiement <strong>Wave</strong> (Option A). Le reçu est disponible dans la commande.
+        </div>
       </details>
-      <details>
-        <summary>Incident (perte / tache / retard) ?</summary>
-        <div class="ans">Contacte le support. Nous ouvrons un ticket et suivons la résolution avec le partenaire.</div>
-      </details>
+
       <details>
         <summary>Comment fonctionne le parrainage ?</summary>
-        <div class="ans">Va dans “Programme de parrainage”, partage ton code/lien, et suis tes gains sur ton dashboard affilié.</div>
+        <div class="ans">
+          Tu peux inviter des proches. À chaque commande réalisée grâce à ton lien, tu gagnes un bonus.
+          Tes gains et invitations sont visibles dans <strong>Parrainage</strong>.
+        </div>
+      </details>
+
+      <details>
+        <summary>Incident (perte / tache / retard) ?</summary>
+        <div class="ans">
+          Contacte le support : on ouvre un ticket et on suit la résolution avec le partenaire.
+        </div>
       </details>
     </div>
   </div>
@@ -234,19 +260,14 @@
                       {% if o.status == "pending" or o.status == "in_progress" %}
                         {% if tot0 == "0" %}
                           <span class="est-pill"><span class="spark"></span>Estimation en cours</span>
-                          <div class="hint" style="margin-top:6px;">Le total sera confirmé après collecte / pesée.</div>
+                          <div class="hint" style="margin-top:6px;">
+                            Total confirmé après collecte et validation de la formule (par article).
+                          </div>
                         {% else %}
                           <div class="order-amount"><small>Total</small> {{ tot|fcfa }}</div>
                         {% endif %}
                       {% else %}
                         <div class="order-amount"><small>Total</small> {{ tot|fcfa }}</div>
-                      {% endif %}
-                      {% if o.express_extra_fee and o.express_extra_fee|floatformat:0 != "0" %}
-                        <div class="order-meta" style="margin-top:4px;">
-                          <span class="badge-status" style="display:inline-flex; gap:6px; align-items:center;">
-                            ⚡ Express <strong>{{ o.express_extra_fee|fcfa }}</strong>
-                          </span>
-                        </div>
                       {% endif %}
                     </div>
                   </div>
@@ -267,7 +288,6 @@
                     {% with paid=o.amount_paid|default:0 %}
                     {% with paid0=paid|floatformat:0 %}
                     {% with tot0=tot|floatformat:0 %}
-                    {% with p=o.payment_status %}
                       {% if tot0 == "0" %}
                         <span class="badge-status badge-status--pay-unknown">Non renseigné</span>
                       {% elif paid0 == "0" %}
@@ -277,10 +297,7 @@
                       {% else %}
                         <span class="badge-status badge-status--pay-pending">Paiement partiel</span>
                       {% endif %}
-                    {% endwith %}{% endwith %}{% endwith %}{% endwith %}
-                    {% if o.express_extra_fee and o.express_extra_fee|floatformat:0 != "0" %}
-                      <span class="badge-status badge-status--express">⚡ Express</span>
-                    {% endif %}
+                    {% endwith %}{% endwith %}{% endwith %}
                   </div>
                 </div>
 
@@ -306,7 +323,7 @@
       {% endif %}
     {% else %}
       <p class="empty">Aucune commande pour le moment.</p>
-      <p class="hint">Commence par créer ta première commande de pressing.</p>
+      <p class="hint">Commence par créer ta première commande.</p>
     {% endif %}
   </div>
 
@@ -315,10 +332,18 @@
 <!-- Bottom nav -->
 <nav class="bottom-nav" aria-label="Navigation">
   <div class="wrap">
-    <a class="nav-item active" href="{% url 'orders:client_home' %}"><div class="ico">🏠</div><div>Accueil</div></a>
-    <a class="nav-item" href="{% url 'mlm:affiliate_dashboard' %}"><div class="ico">🎁</div><div>Parrainage</div></a>
-    <a class="nav-item" href="#mes-commandes"><div class="ico">📦</div><div>Commandes</div></a>
-    <a class="nav-item" href="#faq"><div class="ico">❓</div><div>FAQ</div></a>
+    <a class="nav-item active" href="{% url 'orders:client_home' %}">
+      <div class="ico">🏠</div><div>Accueil</div>
+    </a>
+    <a class="nav-item" href="{% url 'orders:client_new_order' %}">
+      <div class="ico">➕</div><div>Créer</div>
+    </a>
+    <a class="nav-item" href="#mes-commandes">
+      <div class="ico">📦</div><div>Commandes</div>
+    </a>
+    <a class="nav-item" href="#faq">
+      <div class="ico">❓</div><div>Aide</div>
+    </a>
   </div>
 </nav>
 {% endblock %}

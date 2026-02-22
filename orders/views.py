@@ -4846,6 +4846,8 @@ def client_new_order(request):
                 code = uuid.uuid4().hex[:8].upper()
 
             order = Order.objects.create(
+                is_draft=True,
+
                 customer=customer,
                 status="pending",
                 payment_status="unpaid",
@@ -11336,6 +11338,24 @@ def client_new_order_step4(request, order_id: int):
     )
     if not order:
         return redirect("orders:client_new_order")
+
+    from decimal import Decimal
+
+    # 🔒 Si la commande n'est plus draft, on ne repasse pas par confirmation
+    if not getattr(order, "is_draft", True):
+        amounts_locked = _client_order_amounts(order)
+
+        try:
+            total_ttc_locked = Decimal(str((amounts_locked or {}).get("total_ttc", 0) or 0))
+        except Exception:
+            total_ttc_locked = Decimal("0")
+
+        paid_locked = getattr(order, "amount_paid", Decimal("0")) or Decimal("0")
+        remain_locked = total_ttc_locked - paid_locked
+
+        if remain_locked > Decimal("0"):
+            return redirect("orders:client_order_pay_wave_page", order_id=order.id)
+        return redirect("orders:client_order_detail", order_id=order.id)
 
     amounts = _client_order_amounts(order)
     items = order.items.all().order_by("id")

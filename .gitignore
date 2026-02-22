@@ -167,3 +167,7 @@ data.json
 # backups
 *.bak.*
 *.broken_*
+
+# local debug
+cookies.txt
+csrf.txt

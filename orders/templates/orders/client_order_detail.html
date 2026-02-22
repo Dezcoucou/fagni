@@ -386,6 +386,17 @@
   // ----------------------------------------------------------------
   // LOT_2_17_WAVE_POLLING_OK
   // LOT_2_21_WAVE_POLL_PAID_RELOAD_OK
+  // LOT_2_22_WAVE_DEDUPE_RELOAD_OK
+  // Empêche les autres reloads de la page si le one-shot Wave est déjà programmé
+  function __waveReloadAllowed(orderId){
+    try{
+      var k = "wave_paid_reload_" + String(orderId || "");
+      return !(window.sessionStorage && sessionStorage.getItem(k) === "1");
+    }catch(e){
+      return true;
+    }
+  }
+
   // Quand le polling détecte "paid", on nettoie l'URL (Lot 2.20) + toast + reload 1 fois (anti-loop)
   function __waveOnPaidOnce(orderId){
     try{
@@ -967,7 +978,7 @@
 
       payShowMsg("✅ Paiement confirmé.", true);
       // le plus safe (vu que le live refresh existe déjà chez toi) : reload rapide
-      setTimeout(() => window.location.reload(), 450);
+      setTimeout(() => { if (__waveReloadAllowed(typeof orderId!=="undefined"?orderId:"")) window.location.reload(); }, 450);
 
     }catch(e){
       payShowMsg("Erreur réseau. Réessaie.", false);
@@ -1032,7 +1043,7 @@
         payCashOk.style.display = "";
       }
 
-      setTimeout(() => window.location.reload(), 500);
+      setTimeout(() => { if (__waveReloadAllowed(typeof orderId!=="undefined"?orderId:"")) window.location.reload(); }, 500);
 
     }catch(e){
       if(payCashErr){

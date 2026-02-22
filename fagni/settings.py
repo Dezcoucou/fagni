@@ -213,6 +213,23 @@ LOGGING = {
     },
 }
 # --- LOT_2_16_SESSIONS_LOGGER_OK ---
+
+# --- LOT_2_16B_SESSIONS_LOGGER_HARD_MUTE_OK ---
+# Coupe définitivement le warning "Session data corrupted" en DEV.
+if DEBUG:
+    for _lg in (
+        "django.contrib.sessions",
+        "django.contrib.sessions.backends",
+        "django.contrib.sessions.backends.base",
+        "django.contrib.sessions.backends.db",
+    ):
+        LOGGING["loggers"].setdefault(_lg, {})
+        LOGGING["loggers"][_lg].update({
+            "handlers": [],        # pas de handler => rien n'est émis
+            "level": "CRITICAL",   # au cas où un handler serait ajouté ailleurs
+            "propagate": False,    # n'envoie rien au root logger
+        })
+
 # Réduit le bruit "Session data corrupted" en DEV (warning émis par le backend sessions)
 if DEBUG:
     LOGGING.setdefault("loggers", {})

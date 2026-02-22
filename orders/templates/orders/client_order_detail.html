@@ -344,6 +344,14 @@
       <div>
         <p class="co-notice__title">Paiement déclaré</p>
         <p class="co-notice__desc">Merci. Nous vérifions ton paiement Wave et on confirme dès que possible.</p>
+
+      <!-- LOT_2_24_WAVE_MANUAL_REFRESH_OK -->
+      <div style="margin-top:10px;">
+        <button type="button" id="btnWaveRefresh" class="btn btn-light">
+          Actualiser le paiement
+        </button>
+      </div>
+
       </div>
     </div>
 
@@ -2259,3 +2267,57 @@
 })();
 </script>
 {% endblock %}
+
+
+
+// LOT_2_24_WAVE_MANUAL_REFRESH_OK
+(function(){
+  try{
+    var waveEl = document.getElementById("waveNotice");
+    if(!waveEl) return;
+
+    var mode = (waveEl.dataset && waveEl.dataset.wave) ? waveEl.dataset.wave : "";
+    if(mode !== "declared") return;
+
+    var btn = document.getElementById("btnWaveRefresh");
+    if(!btn) return;
+
+    btn.addEventListener("click", async function(){
+
+      var original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Vérification…";
+
+      try{
+        var orderId = waveEl.dataset.order || "";
+        if(!orderId) return;
+
+        var endpoint = "/orders/client/orders/" + orderId + "/payment-ui/";
+        const res = await fetch(endpoint, { credentials: "same-origin" });
+        const data = await res.json();
+
+        if(data && data.ok && (data.payment_status === "paid" || data.payment_ui === "paid")){
+          if(typeof __waveOnPaidOnce === "function"){
+            __waveOnPaidOnce(orderId);
+          }
+        }else{
+          if(typeof payShowMsg === "function"){
+            payShowMsg("⏳ Paiement toujours en attente.", false);
+          }
+        }
+
+      }catch(e){
+        if(typeof payShowMsg === "function"){
+          payShowMsg("⚠️ Erreur de vérification.", false);
+        }
+      }
+
+      setTimeout(function(){
+        btn.disabled = false;
+        btn.textContent = original;
+      }, 800);
+
+    }, { passive:true });
+
+  }catch(e){}
+})();

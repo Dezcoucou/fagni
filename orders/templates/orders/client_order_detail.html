@@ -440,13 +440,20 @@
 
   // LOT_2_36_DEDUP_RELOAD_OK
   // Évite les reload multiples (polling + instant check + clic utilisateur)
-  function __waveScheduleReload(ms){
+    function __waveScheduleReload(ms, orderId){
     try{
       if(window.__waveReloadScheduled) return;
       window.__waveReloadScheduled = true;
       setTimeout(function(){
-        try{ window.location.reload(); }catch(e){}
+        try{
+          if(typeof __waveReloadAllowed === "function"){
+            if(!__waveReloadAllowed(typeof orderId!=="undefined" ? orderId : "")) return;
+          }
+          window.location.reload();
+        }catch(e){}
       }, (ms || 450));
+    }catch(e){}
+  }, (ms || 450));
     }catch(e){}
   }
  catch(e) {}
@@ -1188,7 +1195,7 @@
 
       payShowMsg("✅ Paiement confirmé.", true);
       // le plus safe (vu que le live refresh existe déjà chez toi) : reload rapide
-      setTimeout(() => { if (__waveReloadAllowed(typeof orderId!=="undefined"?orderId:"")) window.location.reload(); }, 450);
+      __waveScheduleReload(450, (typeof orderId!=="undefined"?orderId:""));
 
     }catch(e){
       payShowMsg("Erreur réseau. Réessaie.", false);
@@ -1253,7 +1260,7 @@
         payCashOk.style.display = "";
       }
 
-      setTimeout(() => { if (__waveReloadAllowed(typeof orderId!=="undefined"?orderId:"")) window.location.reload(); }, 500);
+      __waveScheduleReload(500, (typeof orderId!=="undefined"?orderId:""));
 
     }catch(e){
       if(payCashErr){

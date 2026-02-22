@@ -7,6 +7,9 @@ from orders import views as views_ops
 app_name = "orders"
 
 urlpatterns = [
+    # --- LOT_2_31_PAYMENT_UI_ROUTE_OK ---
+    path("client/orders/<int:order_id>/payment-ui/", views.client_order_pay_cash, name="client_order_payment_ui"),
+
     # Liste & création (Back-office)
     path("", views.orders_list, name="list"),
     path("create/", views.create, name="create"),

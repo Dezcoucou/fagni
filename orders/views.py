@@ -5141,10 +5141,13 @@ def client_order_pay_simulate(request, order_id: int):
     """
     Paiement simulé (MVP) : marque la commande comme payée (amount_paid = total_ttc).
     Sécurisé par phone cookie.
+    + Guard serveur: refuse si déjà payé.
     """
     phone = _client_phone(request)
     if not phone:
-        return JsonResponse({"ok": False, "error": "not_authenticated"}, status=401)
+        resp = JsonResponse({"ok": False, "error": "not_authenticated"}, status=401)
+        resp["Cache-Control"] = "no-store"
+        return resp
 
     order = (
         Order.objects
@@ -5153,7 +5156,9 @@ def client_order_pay_simulate(request, order_id: int):
         .first()
     )
     if not order:
-        return JsonResponse({"ok": False, "error": "order_not_found"}, status=404)
+        resp = JsonResponse({"ok": False, "error": "order_not_found"}, status=404)
+        resp["Cache-Control"] = "no-store"
+        return resp
 
     amounts = _client_order_amounts(order)
     total = amounts.get("total_ttc") or DECIMAL_ZERO
@@ -5163,17 +5168,32 @@ def client_order_pay_simulate(request, order_id: int):
         total = DECIMAL_ZERO
 
     if total <= DECIMAL_ZERO:
-        return JsonResponse({"ok": False, "error": "no_total_amount"}, status=400)
+        resp = JsonResponse({"ok": False, "error": "no_total_amount"}, status=400)
+        resp["Cache-Control"] = "no-store"
+        return resp
+
+    # LOT_3_1_GUARD_DOUBLE_PAY_OK — already paid guard
+    try:
+        paid_now = getattr(order, "amount_paid", None) or DECIMAL_ZERO
+        paid_now = Decimal(str(paid_now))
+        if paid_now < DECIMAL_ZERO:
+            paid_now = DECIMAL_ZERO
+    except Exception:
+        paid_now = DECIMAL_ZERO
+
+    if paid_now >= total:
+        resp = JsonResponse({"ok": False, "error": "already_paid"}, status=409)
+        resp["Cache-Control"] = "no-store"
+        return resp
 
     with transaction.atomic():
-        # on met le payé à total
         try:
             order.amount_paid = total
         except Exception:
-            # si champ absent => refuse (mais chez toi il existe déjà)
-            return JsonResponse({"ok": False, "error": "amount_paid_field_missing"}, status=500)
+            resp = JsonResponse({"ok": False, "error": "amount_paid_field_missing"}, status=500)
+            resp["Cache-Control"] = "no-store"
+            return resp
 
-        # champ compat (si existant)
         if hasattr(order, "payment_status"):
             order.payment_status = "paid"
 
@@ -5186,8 +5206,7 @@ def client_order_pay_simulate(request, order_id: int):
     if remain < DECIMAL_ZERO:
         remain = DECIMAL_ZERO
 
-    # réponse JSON (front va recharger / refresh)
-    return JsonResponse({
+    resp = JsonResponse({
         "ok": True,
         "payment_ui": "paid",
         "payment_status": "paid",
@@ -5197,7 +5216,8 @@ def client_order_pay_simulate(request, order_id: int):
             "amount_remaining": float(remain),
         },
     })
-
+    resp["Cache-Control"] = "no-store"
+    return resp
 
 def _parse_money_amount(raw: str) -> Decimal:
     raw = (raw or "").strip()
@@ -5225,10 +5245,13 @@ def client_order_pay_cash(request, order_id: int):
     - POST form-data: amount, note (optionnel)
     - met à jour amount_paid += amount
     - calcule paid/partial/unpaid
+    + Guard serveur: refuse si déjà payé.
     """
     phone = _client_phone(request)
     if not phone:
-        return JsonResponse({"ok": False, "error": "not_authenticated"}, status=401)
+        resp = JsonResponse({"ok": False, "error": "not_authenticated"}, status=401)
+        resp["Cache-Control"] = "no-store"
+        return resp
 
     order = (
         Order.objects
@@ -5237,7 +5260,9 @@ def client_order_pay_cash(request, order_id: int):
         .first()
     )
     if not order:
-        return JsonResponse({"ok": False, "error": "order_not_found"}, status=404)
+        resp = JsonResponse({"ok": False, "error": "order_not_found"}, status=404)
+        resp["Cache-Control"] = "no-store"
+        return resp
 
     amounts = _client_order_amounts(order)
     total = amounts.get("total_ttc") or DECIMAL_ZERO
@@ -5247,13 +5272,28 @@ def client_order_pay_cash(request, order_id: int):
         total = DECIMAL_ZERO
 
     if total <= DECIMAL_ZERO:
-        return JsonResponse({"ok": False, "error": "no_total_amount"}, status=400)
+        resp = JsonResponse({"ok": False, "error": "no_total_amount"}, status=400)
+        resp["Cache-Control"] = "no-store"
+        return resp
+
+    # LOT_3_1_GUARD_DOUBLE_PAY_OK — already paid guard
+    try:
+        paid_now = getattr(order, "amount_paid", None) or DECIMAL_ZERO
+        paid_now = Decimal(str(paid_now))
+        if paid_now < DECIMAL_ZERO:
+            paid_now = DECIMAL_ZERO
+    except Exception:
+        paid_now = DECIMAL_ZERO
+
+    if paid_now >= total:
+        resp = JsonResponse({"ok": False, "error": "already_paid"}, status=409)
+        resp["Cache-Control"] = "no-store"
+        return resp
 
     # read input (form ou json)
     amount_raw = request.POST.get("amount", "")
     note = (request.POST.get("note", "") or "").strip()
 
-    # si JSON
     ct = (request.headers.get("content-type") or "").lower()
     if "application/json" in ct:
         try:
@@ -5265,7 +5305,9 @@ def client_order_pay_cash(request, order_id: int):
 
     add_amount = _parse_money_amount(str(amount_raw))
     if add_amount <= DECIMAL_ZERO:
-        return JsonResponse({"ok": False, "error": "invalid_amount"}, status=400)
+        resp = JsonResponse({"ok": False, "error": "invalid_amount"}, status=400)
+        resp["Cache-Control"] = "no-store"
+        return resp
 
     with transaction.atomic():
         paid = getattr(order, "amount_paid", None) or DECIMAL_ZERO
@@ -5275,13 +5317,11 @@ def client_order_pay_cash(request, order_id: int):
             paid = DECIMAL_ZERO
 
         new_paid = paid + add_amount
-        # cap à total (pas besoin de dépasser)
         if new_paid > total:
             new_paid = total
 
         order.amount_paid = new_paid
 
-        # statut canonique
         if hasattr(order, "payment_status"):
             if new_paid <= DECIMAL_ZERO:
                 order.payment_status = "unpaid"
@@ -5290,14 +5330,15 @@ def client_order_pay_cash(request, order_id: int):
             else:
                 order.payment_status = "partial"
 
-        # note (si tu as un champ dédié un jour ; ici on n’écrit rien si champ absent)
         if note and hasattr(order, "payment_note"):
             order.payment_note = note
 
         try:
             fields = ["amount_paid"]
-            if hasattr(order, "payment_status"): fields.append("payment_status")
-            if note and hasattr(order, "payment_note"): fields.append("payment_note")
+            if hasattr(order, "payment_status"):
+                fields.append("payment_status")
+            if note and hasattr(order, "payment_note"):
+                fields.append("payment_note")
             order.save(update_fields=fields)
         except Exception:
             order.save()
@@ -5306,40 +5347,22 @@ def client_order_pay_cash(request, order_id: int):
     if remain < DECIMAL_ZERO:
         remain = DECIMAL_ZERO
 
-    # ui
-    if order.amount_paid >= total:
-        payment_ui = "paid"
-    else:
-        payment_ui = "partial"
+    payment_ui = "paid" if (getattr(order, "amount_paid", DECIMAL_ZERO) or DECIMAL_ZERO) >= total else "partial"
 
-    data = {
+    resp = JsonResponse({
         "ok": True,
         "payment_ui": payment_ui,
         "payment_status": getattr(order, "payment_status", None),
         "note": note,
         "amounts": {
             "total_ttc": float(total),
-            "amount_paid": float(order.amount_paid),
+            "amount_paid": float(getattr(order, "amount_paid", DECIMAL_ZERO) or DECIMAL_ZERO),
             "amount_remaining": float(remain),
         },
-        # --- LOT_2_30_PAYMENT_UI_JSON_FIELDS_OK ---
-    }
-    resp = JsonResponse(data)
-    resp['Cache-Control'] = 'no-store'
-    return resp# -------------------------------------------------------------------
-# Items client (CRUD minimal) ✅ sécurisés par phone session
-# -------------------------------------------------------------------
+    })
+    resp["Cache-Control"] = "no-store"
+    return resp
 
-@require_http_methods(["GET", "POST"])
-@client_required
-
-
-# -------------------------------------------------------------------
-# ✅ Paiement Wave (V1) — page QR (simple)
-# -------------------------------------------------------------------
-
-@require_http_methods(["GET", "POST"])
-@client_login_required
 def client_order_pay_wave_page(request, order_id: int):
     """
     Page HTML simple qui affiche un QR code basé sur le numéro Wave (téléphone),
@@ -11959,3 +11982,6 @@ def ops_order_confirm_wave_paid(request, order_id: int):
         return redirect(reverse("orders:ops_order_detail", args=[order.id]))
     except Exception:
         return redirect("orders:ops_dashboard")
+
+
+# --- LOT_3_1_GUARD_DOUBLE_PAY_OK ---

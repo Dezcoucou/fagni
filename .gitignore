@@ -163,3 +163,7 @@ jar.txt
 # backups auto
 *.bak.*
 data.json
+
+# backups
+*.bak.*
+*.broken_*

@@ -5392,7 +5392,10 @@ def client_order_pay_wave_page(request, order_id: int):
     qr_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
     qr_data_uri = "data:image/png;base64," + qr_b64
     return render(request, "orders/client_pay_wave.html", {
-        "order": order,
+        
+          "wave_declared": bool(request.session.get(f"wave_declared_{order.id}")),
+          # LOT_2_15_WAVE_DECLARED_CTX_OK
+"order": order,
         "amounts": amounts,
         "total": total,
         "paid": paid,

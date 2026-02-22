@@ -19,7 +19,7 @@
           
 {% if remain > 0 and order.payment_status != "paid" %}
 
-  {% if request.session.wave_declared_{{ order.id }} %}
+  {% if wave_declared %}
     <div class="co-notice co-notice--warn" style="margin-top:12px;">
       <div class="co-notice__icon">✓</div>
       <div>
@@ -280,5 +280,6 @@ document.addEventListener("DOMContentLoaded", function() {
   <!-- WAVE_HIDE_BTN_IF_PAID_OK -->
   <!-- LOT_2_13_WAVE_FIX_OK -->
   <!-- LOT_2_14_WAVE_HIDE_IF_DECLARED_OK -->
+<!-- LOT_2_15_WAVE_DECLARED_TEMPLATE_OK -->
 
   {% endblock %}

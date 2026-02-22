@@ -1,0 +1,29 @@
+{% load static %}
+
+<header class="fagni-topbar client-topbar">
+  <div class="fagni-topbar-left">
+    <a href="{% url 'orders:client_home' %}" class="fagni-logo" aria-label="Accueil client">
+      <span class="fagni-logo-mark">
+        <img src="{% static 'img/fagni_logo_ok.png' %}" alt="FAGNI">
+      </span>
+      <span class="fagni-logo-text">
+        <span class="fagni-logo-text-main">FAGNI</span>
+        <span class="fagni-logo-text-sub">Client</span>
+      </span>
+    </a>
+    <span class="fagni-topbar-tag">👤 Client</span>
+  </div>
+
+  <div class="fagni-topbar-right">
+    <a class="fagni-topbar-tag" href="{% url 'orders:client_new_order' %}" style="text-decoration:none;">➕ Créer</a>
+
+    {% if phone %}
+      <span class="fagni-topbar-user">
+        <span class="fagni-topbar-tag">📞 {{ phone }}</span>
+      </span>
+      <a class="fagni-topbar-tag" href="{% url 'orders:client_logout' %}" style="text-decoration:none;">Déconnexion</a>
+    {% else %}
+      <a class="fagni-topbar-tag" href="{% url 'orders:client_login' %}" style="text-decoration:none;">Connexion</a>
+    {% endif %}
+  </div>
+</header>

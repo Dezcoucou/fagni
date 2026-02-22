@@ -169,4 +169,7 @@ urlpatterns = [
         path("laundry/weighing/<int:order_id>/", views.laundry_weighing, name="laundry_weighing"),
     path("laundry/weighing/<int:order_id>/confirm/", views.laundry_weighing_confirm, name="laundry_weighing_confirm"),
     path("laundry/weighing/<int:order_id>/dispute/", views.laundry_weighing_dispute, name="laundry_weighing_dispute"),
+    # LOT_2_18_WAVE_OPS_CONFIRM_OK
+    path("ops/orders/<int:order_id>/pay/wave/confirm/", views.ops_order_confirm_wave_paid, name="ops_order_confirm_wave_paid"),
+
 ]

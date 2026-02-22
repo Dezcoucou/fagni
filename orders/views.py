@@ -11390,8 +11390,42 @@ def client_new_order_step4(request, order_id: int):
         except Exception:
             pass
 
-        return redirect("orders:client_order_detail", order_id=order.id)
+        from decimal import Decimal
 
+
+        # Re-calcul après update_financials
+
+        amounts2 = _client_order_amounts(order)
+
+        try:
+
+            total_ttc = Decimal(str((amounts2 or {}).get('total_ttc', 0) or 0))
+
+        except Exception:
+
+            total_ttc = Decimal('0')
+
+
+        try:
+
+            paid = Decimal(str(getattr(order, 'amount_paid', 0) or 0))
+
+        except Exception:
+
+            paid = Decimal('0')
+
+
+        remain = total_ttc - paid
+
+
+        # Si reste à payer => Wave, sinon => détail commande
+
+        if remain > Decimal('0'):
+
+            return redirect('orders:client_order_pay_wave_page', order_id=order.id)
+
+
+        return redirect('orders:client_order_detail', order_id=order.id)
     return render(request, "orders/client_new_order_step4.html", {
         "order": order,
         "items": items,

@@ -324,6 +324,24 @@
   </div>
 </section>
 
+{% if laundry_offers %}
+  <h3>Blanchisserie — Formules</h3>
+  <ul>
+    {% for s in laundry_offers %}
+      <li><strong>{{ s.name }}</strong> — {{ s.default_price|floatformat:0 }} FCFA</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+{% if pressing_offers %}
+  <h3>Pressing — Par article</h3>
+  <ul>
+    {% for s in pressing_offers %}
+      <li><strong>{{ s.name }}</strong> — {{ s.default_price|floatformat:0 }} FCFA</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
 <section class="fagni-offers">
   <div class="grid-2">
     <div class="card">

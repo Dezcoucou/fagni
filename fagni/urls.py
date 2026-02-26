@@ -18,13 +18,43 @@ def home(request):
     """
     Page d'accueil FAGNI (MVP) :
     - Staff → dashboard
-    - Sinon → menu (Client / Blanchisseur / Livreur)
+    - Sinon → landing publique (Client / Blanchisseur / Livreur)
+    + Affiche les offres depuis l'admin (ServiceCategory/ServiceItem)
     """
     user = getattr(request, "user", None)
     if user and user.is_authenticated and user.is_staff:
         return redirect("dashboard:index")
 
-    return render(request, "home.html")
+    # ✅ Offres pilotables depuis l'admin
+    from orders.models import ServiceCategory, ServiceItem
+
+    # Slugs recommandés (tu les crées dans l’admin)
+    laundry_slug = "blanchisserie-formules"
+    pressing_slug = "pressing"
+
+    laundry_cat = ServiceCategory.objects.filter(slug=laundry_slug).first()
+    pressing_cat = ServiceCategory.objects.filter(slug=pressing_slug).first()
+
+    laundry_offers = []
+    pressing_offers = []
+
+    if laundry_cat:
+        laundry_offers = list(
+            ServiceItem.objects.filter(category=laundry_cat, is_active=True).order_by("default_price", "name")
+        )
+    if pressing_cat:
+        pressing_offers = list(
+            ServiceItem.objects.filter(category=pressing_cat, is_active=True).order_by("default_price", "name")
+        )
+
+    return render(
+        request,
+        "home.html",
+        {
+            "laundry_offers": laundry_offers,
+            "pressing_offers": pressing_offers,
+        },
+    )
 
 
 urlpatterns = [

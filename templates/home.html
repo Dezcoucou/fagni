@@ -347,7 +347,16 @@
         <p class="muted">Aucune formule active. (Admin → ServiceCategory “blanchisserie-formules” → ServiceItem)</p>
       {% endif %}
 
-      <p class="muted"><strong>Transport</strong> calculé selon votre zone (Riviera).</p>
+      <p class="muted">
+  <strong>Transport</strong> calculé automatiquement selon la distance (aller-retour).
+  <br><span style="font-size:12px">Montant exact confirmé après validation de l’adresse (distance réelle).</span>
+  <br>
+  Minimum : <strong>{{ pricing_cfg.delivery_min_fee }}</strong> FCFA •
+  Prix/km (AR) : <strong>{{ pricing_cfg.delivery_price_per_km }}</strong> FCFA
+  {% if pricing_cfg.delivery_fixed_fee and pricing_cfg.delivery_fixed_fee > 0 %}
+    • Frais fixes : <strong>{{ pricing_cfg.delivery_fixed_fee }}</strong> FCFA
+  {% endif %}
+</p>
       <a class="btn btn-primary w-100" href="/orders/client/new/">Commander</a>
     </div>
 

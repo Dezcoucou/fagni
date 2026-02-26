@@ -57,7 +57,7 @@ def home(request):
             "laundry_offers": laundry_offers,
             "pressing_offers": pressing_offers,
             "pricing_cfg": get_pricing_settings(),
-},
+        },
     )
 
 

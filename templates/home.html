@@ -324,51 +324,55 @@
   </div>
 </section>
 
-{% if laundry_offers %}
-  <h3>Blanchisserie — Formules</h3>
-  <ul>
-    {% for s in laundry_offers %}
-      <li><strong>{{ s.name }}</strong> — {{ s.default_price|floatformat:0 }} FCFA</li>
-    {% endfor %}
-  </ul>
-{% endif %}
 
-{% if pressing_offers %}
-  <h3>Pressing — Par article</h3>
-  <ul>
-    {% for s in pressing_offers %}
-      <li><strong>{{ s.name }}</strong> — {{ s.default_price|floatformat:0 }} FCFA</li>
-    {% endfor %}
-  </ul>
-{% endif %}
+
 
 <section class="fagni-offers">
   <div class="grid-2">
+
+    <!-- 🧺 Blanchisserie (Formules) -->
     <div class="card">
       <div class="card-head">
-        <h2>🧺 Formule 15 pièces</h2>
-        <div class="price">6 000 FCFA</div>
+        <h2>🧺 Blanchisserie — Formules</h2>
+        <div class="price">{% if laundry_offers %}Dès {{ laundry_offers.0.default_price|floatformat:0 }} FCFA{% else %}—{% endif %}</div>
       </div>
-      <p class="muted">Lavage • Séchage • Repassage • Pliage</p>
+
+      {% if laundry_offers %}
+        <ul class="list">
+          {% for s in laundry_offers %}
+            <li><strong>{{ s.name }}</strong> — {{ s.default_price|floatformat:0 }} FCFA</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">Aucune formule active. (Admin → ServiceCategory “blanchisserie-formules” → ServiceItem)</p>
+      {% endif %}
+
       <p class="muted"><strong>Transport</strong> calculé selon votre zone (Riviera).</p>
-      <a class="btn btn-primary w-100" href="/orders/client/">Commander</a>
+      <a class="btn btn-primary w-100" href="/orders/client/new/">Commander</a>
     </div>
 
+    <!-- 👔 Pressing (par article) -->
     <div class="card">
       <div class="card-head">
-        <h2>👔 Pressing premium</h2>
-        <div class="price">À la pièce</div>
+        <h2>👔 Pressing — Par article</h2>
+        <div class="price">{% if pressing_offers %}Dès {{ pressing_offers.0.default_price|floatformat:0 }} FCFA{% else %}—{% endif %}</div>
       </div>
-      <ul class="list">
-        <li>Chemise, pantalon, robe, costume</li>
-        <li>Délicats + contrôle qualité</li>
-        <li>Finition professionnelle</li>
-      </ul>
-      <a class="btn btn-light w-100" href="/orders/client/">Voir les tarifs</a>
+
+      {% if pressing_offers %}
+        <ul class="list">
+          {% for s in pressing_offers %}
+            <li><strong>{{ s.name }}</strong> — {{ s.default_price|floatformat:0 }} FCFA</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">Aucun article pressing actif. (Admin → ServiceCategory “pressing” → ServiceItem)</p>
+      {% endif %}
+
+      <a class="btn btn-light w-100" href="/orders/client/new/">Voir les tarifs</a>
     </div>
+
   </div>
 </section>
-
 <section class="fagni-how">
   <div class="card">
     <h2>🚀 Comment ça marche ?</h2>

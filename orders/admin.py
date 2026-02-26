@@ -61,6 +61,54 @@ class OrderItemInline(admin.TabularInline):
     readonly_fields = ("total",)
 
 
+
+class DeliveryLegInline(admin.TabularInline):
+    model = DeliveryLeg
+    extra = 0
+    can_delete = False
+    fields = (
+        "id",
+        "leg_type",
+        "status",
+        "driver",
+        "otp_bucket_inline",
+        "signature_bucket_inline",
+        "started_at",
+        "finished_at",
+        "created_at",
+    )
+    readonly_fields = (
+        "id",
+        "leg_type",
+        "status",
+        "otp_bucket_inline",
+        "signature_bucket_inline",
+        "started_at",
+        "finished_at",
+        "created_at",
+    )
+    raw_id_fields = ("driver",)
+
+    def otp_bucket_inline(self, obj):
+        lt = (getattr(obj, "leg_type", "") or "").lower()
+        if lt == "return":
+            return "OK" if getattr(obj, "delivery_otp_verified_at", None) else "KO"
+        if lt == "pickup":
+            return "OK" if getattr(obj, "pickup_otp_verified_at", None) else "KO"
+        return "-"
+
+    otp_bucket_inline.short_description = "OTP"
+
+    def signature_bucket_inline(self, obj):
+        lt = (getattr(obj, "leg_type", "") or "").lower()
+        if lt == "return":
+            return "OK" if getattr(obj, "client_signature", None) else "KO"
+        if lt == "pickup":
+            return "OK" if getattr(obj, "pickup_signature", None) else "KO"
+        return "-"
+
+    signature_bucket_inline.short_description = "Signature"
+
 # ============================================================
 #  CUSTOM FILTERS
 # ============================================================
@@ -394,6 +442,56 @@ class SubscriptionCycleAdmin(admin.ModelAdmin):
 # ============================================================
 
 
+
+# ============================================================
+#  DELIVERY LEGS (POD/POP / drivers)
+# ============================================================
+
+@admin.register(DeliveryLeg)
+class DeliveryLegAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "order_link",
+        "leg_type",
+        "status",
+        "driver",
+        "started_at",
+        "finished_at",
+        "otp_bucket",
+        "signature_bucket",
+        "created_at",
+    )
+    list_filter = ("leg_type", "status", "created_at")
+    search_fields = ("id", "order__id", "order__customer__name", "order__customer__phone", "driver__user__username")
+    autocomplete_fields = ("order", "driver")
+    ordering = ("-id",)
+    list_per_page = 50
+
+    def order_link(self, obj):
+        if not getattr(obj, "order_id", None):
+            return "-"
+        url = reverse("admin:orders_order_change", args=[obj.order_id])
+        return format_html('<a href="{}">Order #{}</a>', url, obj.order_id)
+    order_link.short_description = "Commande"
+
+    def otp_bucket(self, obj):
+        # POD OTP (return) ou POP OTP (pickup)
+        if (getattr(obj, "leg_type", "") or "").lower() == "return":
+            return "OK" if getattr(obj, "delivery_otp_verified_at", None) else "KO"
+        if (getattr(obj, "leg_type", "") or "").lower() == "pickup":
+            return "OK" if getattr(obj, "pickup_otp_verified_at", None) else "KO"
+        return "-"
+    otp_bucket.short_description = "OTP"
+
+    def signature_bucket(self, obj):
+        if (getattr(obj, "leg_type", "") or "").lower() == "return":
+            return "OK" if getattr(obj, "client_signature", None) else "KO"
+        if (getattr(obj, "leg_type", "") or "").lower() == "pickup":
+            return "OK" if getattr(obj, "pickup_signature", None) else "KO"
+        return "-"
+    signature_bucket.short_description = "Signature"
+
+
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
     list_display = (
@@ -443,9 +541,7 @@ class OrderAdmin(admin.ModelAdmin):
         "delivery_partner",
         "relay_partner",
     )
-
-    inlines = [OrderItemInline]
-
+    inlines = [DeliveryLegInline, OrderItemInline]
     actions = (
         "admin_validate_paid_psp",
         "admin_normalize_invoices_paid",

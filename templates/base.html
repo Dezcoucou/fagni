@@ -171,5 +171,10 @@
 </div>
 
 {% block extra_js %}{% endblock %}
+
+<div id="RENDER_COMMIT" style="position:fixed;left:10px;bottom:10px;z-index:2147483647;background:#111;color:#fff;padding:6px 10px;border-radius:10px;font:12px ui-monospace">
+  commit: {{ request.META.RENDER_GIT_COMMIT|default:"n/a" }}
+</div>
+
 </body>
 </html>

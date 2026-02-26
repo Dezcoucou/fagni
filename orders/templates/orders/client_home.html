@@ -1,6 +1,7 @@
 {% extends "orders/client_base.html" %}
 {% load humanize money_filters %}
 
+
 {% block title %}Accueil – Client FAGNI{% endblock %}
 
 {% block content %}
@@ -17,7 +18,10 @@
       </div>
     </div>
     <div class="page-header__right">
-      <a class="btn btn-light" href="{% url 'orders:client_logout' %}">Déconnexion</a>
+      <form method="post" action="{% url 'orders:client_logout' %}" style="display:inline;">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-light" style="background:transparent;border:0;cursor:pointer;text-decoration:none;">Déconnexion</button>
+</form>
     </div>
   </div>
 

@@ -53,6 +53,8 @@ urlpatterns = [
 
     path("wallets/", include("wallets.urls")),
 
+    path("api/", include("api.urls")),
+
     path(".well-known/appspecific/com.chrome.devtools.json", chrome_devtools_wellknown),
 
     path("favicon.ico", RedirectView.as_view(url=staticfiles_storage.url("favicon.ico"), permanent=False)),

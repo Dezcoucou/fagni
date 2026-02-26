@@ -4,7 +4,7 @@
 {% block title %}Paiement Wave – Commande {{ order.code|default:order.id }}{% endblock %}
 
 {% block content %}
-<!-- CLIENT_PAY_WAVE_TEMPLATE_OK_20260222 -->
+<!-- CLIENT_PAY_WAVE_TEMPLATE_CLEAN_REPLACE_20260226 -->
 <div class="co-page paywave">
 
   <div class="co-head">
@@ -16,35 +16,31 @@
 
         <form method="post" style="margin:0;">
           {% csrf_token %}
-          
-{% if remain > 0 and order.payment_status != "paid" %}
 
-  {% if wave_declared %}
-    <div class="co-notice co-notice--warn" style="margin-top:12px;">
-      <div class="co-notice__icon">✓</div>
-      <div>
-        <p class="co-notice__title">Paiement déjà déclaré</p>
-        <p class="co-notice__desc">Merci. Nous vérifions ton paiement Wave. Tu seras notifié dès validation.</p>
-      </div>
-    </div>
-  {% else %}
-    <button id="btnWavePaid" class="co-btn" type="submit">
-            J’ai payé
-          </button>
-  {% endif %}
-
-{% else %}
-<div class="co-notice co-notice--ok" style="margin-top:12px;">
-  <div class="co-notice__icon">✓</div>
-  <div>
-    <p class="co-notice__title">Paiement déjà confirmé</p>
-    <p class="co-notice__desc">Merci. Aucun paiement supplémentaire requis.</p>
-  </div>
-</div>
-{% endif %}
-
+          {% if remain > 0 and order.payment_status != "paid" %}
+            {% if wave_declared %}
+              <div class="co-notice co-notice--warn" style="margin-top:12px;">
+                <div class="co-notice__icon">✓</div>
+                <div>
+                  <p class="co-notice__title">Paiement déjà déclaré</p>
+                  <p class="co-notice__desc">Merci. Nous vérifions ton paiement Wave. Tu seras notifié dès validation.</p>
+                </div>
+              </div>
+            {% else %}
+              <button id="btnWavePaid" class="co-btn" type="submit">J’ai payé</button>
+            {% endif %}
+          {% else %}
+            <div class="co-notice co-notice--ok" style="margin-top:12px;">
+              <div class="co-notice__icon">✓</div>
+              <div>
+                <p class="co-notice__title">Paiement déjà confirmé</p>
+                <p class="co-notice__desc">Merci. Aucun paiement supplémentaire requis.</p>
+              </div>
+            </div>
+          {% endif %}
         </form>
       </div>
+
       <p class="co-sub">Commande <strong>{{ order.code|default:order.id }}</strong></p>
 
       <div class="co-chips" aria-label="Actions rapides">
@@ -72,23 +68,12 @@
       </div>
 
       <div class="paywave-kpis">
-        <div class="paywave-kpi">
-          <div class="k">Total</div>
-          <div class="v">{{ total|fcfa }}</div>
-        </div>
-        <div class="paywave-kpi">
-          <div class="k">Déjà payé</div>
-          <div class="v">{{ paid|fcfa }}</div>
-        </div>
-        <div class="paywave-kpi paywave-kpi--ok">
-          <div class="k">Reste</div>
-          <div class="v">{{ remain|fcfa }}</div>
-        </div>
+        <div class="paywave-kpi"><div class="k">Total</div><div class="v">{{ total|fcfa }}</div></div>
+        <div class="paywave-kpi"><div class="k">Déjà payé</div><div class="v">{{ paid|fcfa }}</div></div>
+        <div class="paywave-kpi paywave-kpi--ok"><div class="k">Reste</div><div class="v">{{ remain|fcfa }}</div></div>
       </div>
 
-      <div class="co-note co-note--ok">
-        Si tu veux vérifier le détail, retourne sur la commande.
-      </div>
+      <div class="co-note co-note--ok">Si tu veux vérifier le détail, retourne sur la commande.</div>
 
     {% else %}
 
@@ -103,7 +88,7 @@
         <div class="paywave-state__right">
           {% if pay_link %}
             <a class="co-btn co-btn--primary" href="{{ pay_link }}" target="_blank" rel="noopener">Payer via Wave</a>
-            <button class="co-btn co-btn--ghost" type="button" data-copy="#wavePayLink">Copier lien</button>
+            <button class="co-btn co-btn--ghost" type="button" data-copy="#wavePayLinkHidden">Copier lien</button>
           {% else %}
             <button class="co-btn co-btn--ghost" type="button" data-copy="#wavePhone">Copier numéro</button>
           {% endif %}
@@ -114,7 +99,20 @@
 
         <div class="paywave-qrbox">
           <div class="paywave-qr">
+            <!-- QR Wave: doit encoder pay_link (ou fallback URL Wave) -->
             <img src="{{ qr_data_uri }}" alt="QR Wave">
+
+            {% if pay_link %}
+              <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">
+                <a class="co-btn co-btn--primary" href="{{ pay_link }}" target="_blank" rel="noopener">Ouvrir dans Wave</a>
+                <button class="co-btn co-btn--ghost" type="button" data-copy="#wavePayLinkHidden">Copier le lien</button>
+              </div>
+              <code id="wavePayLinkHidden" style="display:none;">{{ pay_link }}</code>
+            {% else %}
+              <div class="co-note co-note--warn" style="margin-top:10px" data-flag="WAVE_NO_PAYLINK_WARN">
+                Lien Wave indisponible. Utilise le numéro ci-dessous et saisis le montant.
+              </div>
+            {% endif %}
           </div>
 
           <div class="paywave-meta">
@@ -131,8 +129,8 @@
 
               <div class="paywave-linkbox" id="waveLinkBox" hidden>
                 <div class="paywave-linkbox__inner">
-                  <code id="wavePayLink">{{ pay_link }}</code>
-                  <button class="co-btn co-btn--sm co-btn--ghost" type="button" data-copy="#wavePayLink">Copier</button>
+                  <code id="wavePayLinkVisible">{{ pay_link }}</code>
+                  <button class="co-btn co-btn--sm co-btn--ghost" type="button" data-copy="#wavePayLinkVisible">Copier</button>
                 </div>
               </div>
             {% endif %}
@@ -149,23 +147,12 @@
 
         <div class="paywave-side">
           <div class="paywave-kpis">
-            <div class="paywave-kpi">
-              <div class="k">Total</div>
-              <div class="v">{{ total|fcfa }}</div>
-            </div>
-            <div class="paywave-kpi">
-              <div class="k">Déjà payé</div>
-              <div class="v">{{ paid|fcfa }}</div>
-            </div>
-            <div class="paywave-kpi paywave-kpi--focus">
-              <div class="k">Reste</div>
-              <div class="v">{{ remain|fcfa }}</div>
-            </div>
+            <div class="paywave-kpi"><div class="k">Total</div><div class="v">{{ total|fcfa }}</div></div>
+            <div class="paywave-kpi"><div class="k">Déjà payé</div><div class="v">{{ paid|fcfa }}</div></div>
+            <div class="paywave-kpi paywave-kpi--focus"><div class="k">Reste</div><div class="v">{{ remain|fcfa }}</div></div>
           </div>
 
-          <div class="co-note co-note--soft">
-            Après paiement, reviens sur la commande pour voir le statut “Payé”.
-          </div>
+          <div class="co-note co-note--soft">Après paiement, reviens sur la commande pour voir le statut “Payé”.</div>
 
           <div class="paywave-actions">
             {% if pay_link %}
@@ -183,7 +170,6 @@
 
       <script>
       (function(){
-        // Toggle link box
         const toggleBtn = document.getElementById("waveLinkToggleBtn");
         const linkBox = document.getElementById("waveLinkBox");
         if(toggleBtn && linkBox){
@@ -199,15 +185,10 @@
           });
         }
 
-        // Copy helper
         async function copyText(txt){
           if(!txt) return false;
-          try{
-            await navigator.clipboard.writeText(txt);
-            return true;
-          }catch(e){
-            return false;
-          }
+          try{ await navigator.clipboard.writeText(txt); return true; }
+          catch(e){ return false; }
         }
 
         document.addEventListener("click", async function(e){
@@ -216,58 +197,42 @@
           const sel = btn.getAttribute("data-copy");
           const el = sel ? document.querySelector(sel) : null;
           const txt = el ? (el.textContent || "").trim() : "";
-          if(!txt){
-            alert("❌ Rien à copier.");
-            return;
-          }
+          if(!txt){ alert("❌ Rien à copier."); return; }
           const ok = await copyText(txt);
-          if(ok){
-            alert("✅ Copié.");
-          }else{
-            prompt("Copie :", txt);
-          }
+          if(ok) alert("✅ Copié.");
+          else prompt("Copie :", txt);
         });
       })();
       </script>
 
     {% endif %}
-
   </div>
 </div>
 
 <!-- WAVE_PAID_BTN_GUARD_OK -->
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-  // On cible le form POST "J'ai payé" (celui qui a csrf_token)
   const forms = Array.from(document.querySelectorAll("form"));
   let paidForm = null;
 
   for (const f of forms) {
-    // Heuristique: contient un input csrf + un bouton submit
     const hasCsrf = !!f.querySelector('input[name="csrfmiddlewaretoken"]');
     const hasSubmit = !!f.querySelector('button[type="submit"], input[type="submit"]');
     if (hasCsrf && hasSubmit) { paidForm = f; break; }
   }
-
   if (!paidForm) return;
 
   const btn = paidForm.querySelector('button[type="submit"], input[type="submit"]');
   if (!btn) return;
 
   let locked = false;
-
   paidForm.addEventListener("submit", function(e) {
-    if (locked) {
-      // Empêche double submit même si navigateur insiste
-      e.preventDefault();
-      return false;
-    }
+    if (locked) { e.preventDefault(); return false; }
     locked = true;
 
-    // UX: désactive + message
     if (btn.tagName.toLowerCase() === "button") {
       btn.disabled = true;
-      btn.innerHTML = "Vérification en cours…";
+      btn.textContent = "Vérification en cours…";
       btn.style.opacity = "0.75";
     } else {
       btn.disabled = true;
@@ -277,9 +242,4 @@ document.addEventListener("DOMContentLoaded", function() {
   }, { passive: false });
 });
 </script>
-  <!-- WAVE_HIDE_BTN_IF_PAID_OK -->
-  <!-- LOT_2_13_WAVE_FIX_OK -->
-  <!-- LOT_2_14_WAVE_HIDE_IF_DECLARED_OK -->
-<!-- LOT_2_15_WAVE_DECLARED_TEMPLATE_OK -->
-
-  {% endblock %}
+{% endblock %}

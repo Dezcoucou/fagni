@@ -429,7 +429,6 @@ class Subscription(models.Model):
 
     pack = models.CharField("Pack", max_length=20, choices=PACK_CHOICES, default="essential")
     bag_size = models.CharField("Taille sac", max_length=2, choices=BAG_SIZE_CHOICES, default="M")
-
     pickup_weekday = models.PositiveSmallIntegerField(
         "Jour collecte",
         choices=WEEKDAY_CHOICES,
@@ -454,10 +453,17 @@ class Subscription(models.Model):
         verbose_name = "Abonnement"
         verbose_name_plural = "Abonnements"
         ordering = ["-created_at"]
-
     def __str__(self):
-        return f"Abonnement {self.customer} ({self.get_pack_display()} / Sac {self.bag_size})"
+        code = None
+        try:
+            code = self.order.code if self.order_id else None
+        except Exception:
+            code = None
 
+        if not code:
+            code = f"Order#{self.order_id or 'N/A'}"
+
+        return f"{code} - {self.provider} - {self.event_type} - {self.provider_reference}"
     def _week_start(self, d):
         # Lundi comme début de semaine
         from datetime import timedelta
@@ -488,7 +494,6 @@ class Subscription(models.Model):
             ws = wk0 + timedelta(days=7*w)
             pickup_date = self._next_date_for_weekday(ws, self.pickup_weekday)
             delivery_date = self._next_date_for_weekday(ws, self.delivery_weekday)
-
             # garde-fou : livraison doit être >= collecte (sinon semaine suivante)
             if delivery_date < pickup_date:
                 delivery_date = delivery_date + timedelta(days=7)
@@ -3025,6 +3030,89 @@ class DeliveryLeg(models.Model):
         default="pending",
     )
 
+
+    # ======================
+    #  POD (Proof of Delivery) — Signature + OTP (MVP)
+    # ======================
+
+    delivery_otp = models.CharField(
+        "OTP livraison (6 chiffres)",
+        max_length=6,
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text="Code OTP à confirmer par le client pour valider la livraison (jambe return).",
+    )
+
+    delivery_otp_expires_at = models.DateTimeField(
+        "Expiration OTP livraison",
+        blank=True,
+        null=True,
+    )
+
+    delivery_otp_verified_at = models.DateTimeField(
+        "OTP vérifié le",
+        blank=True,
+        null=True,
+    )
+
+    client_signature = models.TextField(
+        "Signature client (base64 PNG)",
+        blank=True,
+        null=True,
+        help_text="Signature client encodée en base64 (data:image/png;base64,...) — MVP.",
+    )
+
+    client_signed_at = models.DateTimeField(
+        "Signature prise le",
+        blank=True,
+        null=True,
+    )
+
+    delivered_lat = models.FloatField("Lat livraison (POD)", blank=True, null=True)
+    delivered_lng = models.FloatField("Lng livraison (POD)", blank=True, null=True)
+
+    # ======================
+    #  POP (Proof of Pickup) — Signature + OTP (MVP)
+    # ======================
+
+    pickup_otp = models.CharField(
+        "OTP collecte (6 chiffres)",
+        max_length=6,
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text="Code OTP à confirmer par le client pour valider la collecte (jambe pickup).",
+    )
+
+    pickup_otp_expires_at = models.DateTimeField(
+        "Expiration OTP collecte",
+        blank=True,
+        null=True,
+    )
+
+    pickup_otp_verified_at = models.DateTimeField(
+        "OTP collecte vérifié le",
+        blank=True,
+        null=True,
+    )
+
+    pickup_signature = models.TextField(
+        "Signature collecte (base64 PNG)",
+        blank=True,
+        null=True,
+        help_text="Signature client à la collecte encodée en base64 (data:image/png;base64,...) — MVP.",
+    )
+
+    pickup_signed_at = models.DateTimeField(
+        "Signature collecte prise le",
+        blank=True,
+        null=True,
+    )
+
+    picked_up_lat = models.FloatField("Lat collecte (POP)", blank=True, null=True)
+    picked_up_lng = models.FloatField("Lng collecte (POP)", blank=True, null=True)
+
     distance_km = models.DecimalField(
         "Distance (km)",
         max_digits=6,
@@ -3565,3 +3653,72 @@ class Payment(models.Model):
         if becomes_paid:
             o2 = type(o).objects.get(pk=o.pk)
             o2.mark_as_paid_and_distribute()
+
+
+class PaymentEvent(models.Model):
+    """
+    Journal technique des événements PSP (Wave, MTN, Orange, etc.)
+
+    ⚠️ Ne modifie PAS directement Order.
+    Sert uniquement à tracer et sécuriser les callbacks PSP.
+    """
+
+    PROVIDER_CHOICES = [
+        ("wave", "Wave"),
+        ("orange", "Orange Money"),
+        ("mtn", "MTN Mobile Money"),
+    ]
+
+    EVENT_TYPE_CHOICES = [
+        ("checkout_created", "Checkout créé"),
+        ("payment_succeeded", "Paiement réussi"),
+        ("payment_failed", "Paiement échoué"),
+        ("refund", "Remboursement"),
+    ]
+
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("processed", "Processed"),
+        ("ignored", "Ignored"),
+        ("error", "Error"),
+    ]
+
+    order = models.ForeignKey("Order", on_delete=models.CASCADE, null=True, blank=True)
+    provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES)
+
+    event_type = models.CharField(max_length=40, choices=EVENT_TYPE_CHOICES)
+
+    provider_reference = models.CharField(
+        max_length=120,
+        help_text="ID unique côté PSP (checkout_id, transaction_id, event_id, etc.)"
+    )
+
+    payload = models.JSONField(
+        blank=True,
+        null=True,
+        help_text="Payload brut reçu du PSP (webhook)."
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["provider", "provider_reference"]),
+            models.Index(fields=["status"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["provider", "provider_reference"],
+                name="uniq_provider_reference_event"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.order.code} - {self.provider} - {self.event_type}"

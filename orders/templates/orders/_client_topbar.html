@@ -21,7 +21,10 @@
       <span class="fagni-topbar-user">
         <span class="fagni-topbar-tag">📞 {{ phone }}</span>
       </span>
-      <a class="fagni-topbar-tag" href="{% url 'orders:client_logout' %}" style="text-decoration:none;">Déconnexion</a>
+      <form method="post" action="{% url 'orders:client_logout' %}" style="display:inline;">
+  {% csrf_token %}
+  <button type="submit" class="fagni-topbar-tag" style="text-decoration:none;background:transparent;border:0;cursor:pointer;text-decoration:none;">Déconnexion</button>
+</form>
     {% else %}
       <a class="fagni-topbar-tag" href="{% url 'orders:client_login' %}" style="text-decoration:none;">Connexion</a>
     {% endif %}

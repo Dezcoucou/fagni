@@ -294,194 +294,108 @@
 {% endblock %}
 
 {% block content %}
-<div class="landing">
-
-  <!-- Menu / Header -->
-  <div class="homebar">
-    <div class="hb-left">
-      <div class="mark">F</div>
-      <div class="hb-title">
-        <div class="t">FAGNI</div>
-        <div class="s">Pressing • Collecte • Livraison</div>
-      </div>
-    </div>
-
-    <div class="hb-mid">
-      <span class="pill">MVP V1</span>
-      <span class="pill">Formules • Articles</span>
-      <span class="pill">Paiement Wave • Mode test</span>
-      {% if request.user.is_authenticated and request.user.is_staff %}
-        <span class="pill">Admin connecté</span>
-      {% endif %}
-    </div>
-
-    <div class="hb-right">
-      <a class="btn primary" href="/orders/client/new/">Nouvelle commande</a>
-      <a class="link" href="/orders/client/">Espace client</a>
-      <a class="link" href="/accounts/login/?next=/orders/laundry/app/">Espace pro</a>
-      {% if request.user.is_authenticated and request.user.is_staff %}
-        <a class="link" href="/dashboard/">Dashboard</a>
-        <a class="link" href="/admin/">Admin</a>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- Hero -->
-  <section class="hero">
+<section class="fagni-hero">
+  <div class="hero-card">
     <div class="hero-top">
-      <div>
-        <h1>FAGNI — Pressing & Logistique</h1>
-        <p>
-          La super-app qui connecte <strong>clients</strong>, <strong>blanchisseries</strong> et <strong>livreurs</strong>.
-          Tu choisis une <strong>formule</strong> (ou des <strong>articles</strong>), on gère la collecte, le traitement et la livraison —
-          avec un suivi simple et traçable.
-        </p>
-
-        <div class="hero-ctas">
-          <a class="btn primary" href="/orders/client/new/">✅ Commander maintenant</a>
-          <a class="btn ghost" href="/orders/client/">📦 Suivre / mes commandes</a>
-        </div>
+      <div class="logo-badge">F</div>
+      <div class="hero-txt">
+        <div class="hero-brand">FAGNI</div>
+        <div class="hero-sub">Pressing • Collecte • Livraison</div>
       </div>
-
-      <div class="badges">
-        <span class="badge">⏱️ Standard</span>
-        <span class="badge">⚡ Express</span>
-        <span class="badge">📍 Suivi & preuves</span>
-        <span class="badge">💳 Wave</span>
-      </div>
+      <div class="hero-pill">Riviera</div>
     </div>
 
-    <div class="steps">
-      <div class="step">
-        <div class="k">1) Commande</div>
-        <div class="v">Le client choisit une formule / des articles, puis valide la demande de collecte.</div>
-      </div>
-      <div class="step">
-        <div class="k">2) Traitement</div>
-        <div class="v">La blanchisserie traite selon la formule : lavage, repassage, packaging, statut en temps réel.</div>
-      </div>
-      <div class="step">
-        <div class="k">3) Livraison</div>
-        <div class="v">Le livreur livre. Le client suit, confirme la réception et peut noter l’expérience.</div>
-      </div>
-    </div>
-  </section>
+    <h1 class="hero-title">FAGNI — Pressing & Livraison à Riviera</h1>
+    <p class="hero-desc">
+      Blanchisserie & pressing digital. Collecte à domicile, livraison sous 48h.
+      Paiement sécurisé via Wave + suivi simple et traçable.
+    </p>
 
-  <!-- Choisir son espace -->
-  <section class="grid">
-    <div class="card col4">
-      <div class="title">👤 Espace Client</div>
-      <div class="desc">
-        Commander, suivre l’état, payer via <strong>Wave</strong> (ou <strong>mode test</strong> en pilote), noter.
-      </div>
-      <div class="actions">
-        <a class="btn primary" href="/orders/client/">Entrer</a>
-        <a class="btn ghost" href="/orders/client/new/">Nouvelle commande</a>
-        <a class="btn ghost" href="/orders/client/home/">Mes commandes</a>
-      </div>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="/orders/client/">✅ Commander maintenant</a>
+      <a class="btn btn-light" href="/orders/client/">📦 Suivre mes commandes</a>
     </div>
 
-    <div class="card col4">
-      <div class="title">🧺 Espace Blanchisseur</div>
-      <div class="desc">
-        Recevoir des commandes, valider la formule, mettre à jour les étapes (reçu → en cours → prêt → remis).
-      </div>
-      <div class="actions">
-        <a class="btn primary" href="/accounts/login/?next=/orders/laundry/app/">Se connecter</a>
-        <a class="btn ghost" href="/orders/laundry/app/">Ouvrir</a>
-      </div>
+    <div class="hero-badges">
+      <span class="chip">✔ Paiement Wave</span>
+      <span class="chip">✔ Suivi & preuves</span>
+      <span class="chip">✔ 48h (standard)</span>
     </div>
-
-    <div class="card col4">
-      <div class="title">🛵 Espace Livreur</div>
-      <div class="desc">
-        Mes courses, actions par étape, preuves, wallet, suivi. Interface ultra simple sur mobile.
-      </div>
-      <div class="actions">
-        <a class="btn primary" href="/accounts/login/?next=/orders/driver-app/">Se connecter</a>
-        <a class="btn ghost" href="/orders/driver-app/">Ouvrir</a>
-      </div>
-    </div>
-
-    <!-- Formules -->
-    <div class="card col6">
-      <div class="title">🧾 Formules (modèle “articles”, sans pesée)</div>
-      <div class="desc">
-        On ne pèse plus : le client choisit une formule et/ou des articles. Le prix est clair, la qualité est standardisée.
-      </div>
-
-      <div class="plans">
-        <div class="plan">
-          <h3>Standard</h3>
-          <p>Lavage + repassage (selon articles). Idéal au quotidien.</p>
-          <div class="mini">
-            <span class="tag">🧼 Propre & net</span>
-            <span class="tag">📦 Packaging</span>
-            <span class="tag">📍 Suivi</span>
-          </div>
-        </div>
-
-        <div class="plan">
-          <h3>Express</h3>
-          <p>Priorité traitement + livraison rapide (pilote).</p>
-          <div class="mini">
-            <span class="tag">⚡ Prioritaire</span>
-            <span class="tag">⏱️ Rapide</span>
-            <span class="tag">📍 Suivi</span>
-          </div>
-        </div>
-
-        <div class="plan">
-          <h3>Premium</h3>
-          <p>Soins renforcés (délicats), contrôle qualité + finition.</p>
-          <div class="mini">
-            <span class="tag">✨ Finition</span>
-            <span class="tag">🧺 Délicats</span>
-            <span class="tag">✅ QC</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Pilotage -->
-    <div class="card col6">
-      <div class="title">🚀 Pilote : simple, rapide, mesurable</div>
-      <div class="desc">
-        Démarre sur <strong>1 zone</strong>, <strong>1–2 blanchisseries</strong>, <strong>2–3 livreurs</strong> :
-        on mesure les délais, la qualité et la satisfaction, puis on élargit.
-      </div>
-
-      <div class="actions">
-        <a class="btn primary" href="/orders/client/new/">✅ Créer une commande test</a>
-        {% if request.user.is_authenticated and request.user.is_staff %}
-          <a class="btn ghost" href="/dashboard/">📊 Dashboard</a>
-          <a class="btn ghost" href="/admin/">⚙️ Admin</a>
-        {% else %}
-          <a class="btn ghost" href="/accounts/login/?next=/dashboard/">📊 Dashboard (staff)</a>
-        {% endif %}
-      </div>
-
-      <div class="steps" style="margin-top:12px;">
-        <div class="step">
-          <div class="k">Paiement</div>
-          <div class="v">Wave (QR) + mode test pour valider le parcours en conditions réelles.</div>
-        </div>
-        <div class="step">
-          <div class="k">Traçabilité</div>
-          <div class="v">Statuts + preuves : moins de WhatsApp, moins de litiges.</div>
-        </div>
-        <div class="step">
-          <div class="k">Qualité</div>
-          <div class="v">Notation client : amélioration continue des partenaires.</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <div class="foot">
-    Accès rapide : <code>/orders/client/</code> • <code>/orders/laundry/app/</code> • <code>/orders/driver-app/</code>
-    {% if request.user.is_authenticated and request.user.is_staff %} • <code>/dashboard/</code> • <code>/admin/</code>{% endif %}
   </div>
+</section>
 
-</div>
+<section class="fagni-offers">
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head">
+        <h2>🧺 Formule 15 pièces</h2>
+        <div class="price">6 000 FCFA</div>
+      </div>
+      <p class="muted">Lavage • Séchage • Repassage • Pliage</p>
+      <p class="muted"><strong>Transport</strong> calculé selon votre zone (Riviera).</p>
+      <a class="btn btn-primary w-100" href="/orders/client/">Commander</a>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>👔 Pressing premium</h2>
+        <div class="price">À la pièce</div>
+      </div>
+      <ul class="list">
+        <li>Chemise, pantalon, robe, costume</li>
+        <li>Délicats + contrôle qualité</li>
+        <li>Finition professionnelle</li>
+      </ul>
+      <a class="btn btn-light w-100" href="/orders/client/">Voir les tarifs</a>
+    </div>
+  </div>
+</section>
+
+<section class="fagni-how">
+  <div class="card">
+    <h2>🚀 Comment ça marche ?</h2>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><div><strong>Commandez en ligne</strong><div class="muted">Choisissez votre formule ou pressing.</div></div></div>
+      <div class="step"><div class="n">2</div><div><strong>Collecte à domicile</strong><div class="muted">Un livreur passe selon votre créneau.</div></div></div>
+      <div class="step"><div class="n">3</div><div><strong>Livraison sous 48h</strong><div class="muted">Suivi + preuve de remise.</div></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="fagni-zone">
+  <div class="card">
+    <h2>📍 Zone desservie (phase 1)</h2>
+    <p class="muted">Riviera 1 • Riviera 2 • Riviera 3 • Deux-Plateaux</p>
+  </div>
+</section>
+
+<style>
+  .fagni-hero,.fagni-offers,.fagni-how,.fagni-zone{max-width:980px;margin:0 auto;padding:12px 14px}
+  .hero-card{background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:22px;padding:18px;box-shadow:0 10px 40px rgba(15,23,42,.06)}
+  .hero-top{display:flex;align-items:center;gap:12px}
+  .logo-badge{width:44px;height:44px;border-radius:14px;background:linear-gradient(90deg,#ff7a00,#ff9a3d);display:flex;align-items:center;justify-content:center;font-weight:900;color:#111}
+  .hero-brand{font-weight:900}
+  .hero-sub{color:#64748b;font-size:13px}
+  .hero-pill{margin-left:auto;background:#f1f5f9;border:1px solid rgba(15,23,42,.08);padding:6px 10px;border-radius:999px;font-weight:800;font-size:12px;color:#0f172a}
+  .hero-title{margin:12px 0 6px;font-size:28px;line-height:1.15}
+  .hero-desc{margin:0;color:#475569}
+  .hero-cta{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;padding:11px 14px;border-radius:999px;font-weight:900;text-decoration:none;cursor:pointer}
+  .btn-primary{background:linear-gradient(90deg,#ff7a00,#ff9a3d);color:#111;border:1px solid rgba(0,0,0,.06)}
+  .btn-light{background:#fff;color:#0f172a;border:1px solid rgba(15,23,42,.12)}
+  .w-100{width:100%}
+  .hero-badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .chip{background:#fff;border:1px solid rgba(15,23,42,.10);border-radius:999px;padding:7px 10px;font-weight:800;font-size:12px;color:#0f172a}
+  .grid-2{display:grid;grid-template-columns:1fr;gap:12px}
+  @media(min-width:820px){.grid-2{grid-template-columns:1fr 1fr}}
+  .card{background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:20px;padding:16px;box-shadow:0 6px 20px rgba(15,23,42,.05)}
+  .card-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .price{font-weight:900}
+  .muted{color:#64748b}
+  .list{margin:10px 0 14px;padding-left:18px;color:#0f172a}
+  .steps{display:grid;gap:10px;margin-top:10px}
+  .step{display:flex;gap:12px;align-items:flex-start}
+  .n{width:28px;height:28px;border-radius:10px;background:#f1f5f9;border:1px solid rgba(15,23,42,.10);display:flex;align-items:center;justify-content:center;font-weight:900}
+</style>
 {% endblock %}
+

@@ -450,51 +450,47 @@ def client_order_rating(request, order_id: int):
 @client_login_required
 def client_order_evidence_upload(request, order_id: int):
     """
-    Upload preuve(s) photo côté client.
+    ✅ CLIENT — Evidence upload (preuves photos)
     - Auth: cookie client_phone
-    - Règle: client_phone doit matcher order.customer.phone
-    - Input: kind (pickup|laundry|dropoff) + files[] (ou photos)
-    - Output: {"ok": True, "created": n, "evidence_photos": [...], "evidence_counts": {...}, ...}
+    - Règle: phone doit matcher order.customer.phone
+    - Input:
+        kind (pickup|laundry|dropoff) + files[] (ou photos[])
+        step (collecte|lavage|livraison) accepté aussi (mapping vers kind)
+    - Output JSON:
+        {"ok": True, "created": n, "rejected": n, "rejected_reasons": {...},
+         "count_total": n, "evidence_photos": [...], "evidence_counts": {...}, "last_added_ids":[...]}
     """
     from collections import Counter
+    from datetime import timedelta
+    from django.http import JsonResponse
+    from django.utils import timezone
+    from django.conf import settings
+    from django.views.decorators.http import require_http_methods
     from orders.models import Order, OrderEvidencePhoto
 
-    phone = _normalize_phone(_client_phone(request) or "")
+    # ------- helpers -------
+    def _is_json(req):
+        try:
+            if req.headers.get("x-requested-with") == "XMLHttpRequest":
+                return True
+            acc = (req.headers.get("accept") or "").lower()
+            return "application/json" in acc
+        except Exception:
+            return True
 
-    from datetime import timedelta
-    from django.utils import timezone
+    def _norm_phone(x):
+        try:
+            x = (x or "").strip()
+            x = x.replace(" ", "").replace("-", "")
+            if x.startswith("+225"):
+                x = x[4:]
+            if x.startswith("00225"):
+                x = x[5:]
+            return x
+        except Exception:
+            return (x or "").strip()
 
-    # 🔒 RÈGLE MÉTIER: upload preuves client
-    # - interdit si annulée
-    # - interdit après livraison, sauf 24h et uniquement kind=dropoff
-    status_raw = (getattr(o, "status", "") or "").lower()
-
-    if status_raw == "canceled":
-        return JsonResponse({"ok": False, "error": "order_canceled"}, status=403)
-
-    # On essaie de détecter "livrée" de façon robuste
-    delivered_at = getattr(o, "delivered_at", None)
-    is_delivered = False
-
-    # 1) si champ delivered_at existe
-    if delivered_at:
-        is_delivered = True
-    else:
-        # 2) fallback : si status = done (ou assimilé)
-        if status_raw in {"done", "delivered"}:
-            is_delivered = True
-            # fallback timestamp (au pire)
-            delivered_at = getattr(o, "updated_at", None) or getattr(o, "created_at", None)
-
-    # Si livré => on limite
-    if is_delivered:
-        # sécurité timestamp
-        delivered_at = delivered_at or timezone.now()
-
-        # fenêtre 24h
-        if timezone.now() - delivered_at > timedelta(hours=24):
-            return JsonResponse({"ok": False, "error": "evidence_window_closed"}, status=403)
-
+    # ------- load order FIRST -------
     o = (
         Order.objects
         .select_related("customer")
@@ -504,18 +500,70 @@ def client_order_evidence_upload(request, order_id: int):
     if not o:
         return JsonResponse({"ok": False, "error": "not_found"}, status=404)
 
-    customer_phone = _normalize_phone(getattr(o.customer, "phone", "") or "")
+    # ------- auth check -------
+    # utilise ta fonction existante si elle existe, sinon fallback cookie direct
+    phone = ""
+    try:
+        phone = _normalize_phone(_client_phone(request) or "")
+    except Exception:
+        phone = _norm_phone(request.COOKIES.get("client_phone") or "")
+
+    customer_phone = ""
+    try:
+        customer_phone = _normalize_phone(getattr(o.customer, "phone", "") or "")
+    except Exception:
+        customer_phone = _norm_phone(getattr(o.customer, "phone", "") or "")
+
     if not customer_phone or not phone or customer_phone != phone:
         return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
 
+    # ------- business rules -------
+    status_raw = (getattr(o, "status", "") or "").lower()
+    if status_raw == "canceled":
+        return JsonResponse({"ok": False, "error": "order_canceled"}, status=403)
+
+    delivered_at = getattr(o, "delivered_at", None)
+    is_delivered = False
+
+    if delivered_at:
+        is_delivered = True
+    else:
+        if status_raw in {"done", "delivered"}:
+            is_delivered = True
+            delivered_at = getattr(o, "updated_at", None) or getattr(o, "created_at", None)
+
+    if is_delivered:
+        delivered_at = delivered_at or timezone.now()
+        if timezone.now() - delivered_at > timedelta(hours=24):
+            return JsonResponse({"ok": False, "error": "evidence_window_closed"}, status=403)
+
+    # ------- input (kind/step) -------
     kind_raw = (request.POST.get("kind") or "").strip().lower()
-    kind = kind_raw if kind_raw in {"pickup", "laundry", "dropoff"} else "pickup"
+    step_raw = (request.POST.get("step") or "").strip().lower()
+
+    step_map = {
+        "collecte": "pickup",
+        "pickup": "pickup",
+        "ramassage": "pickup",
+        "lavage": "laundry",
+        "laundry": "laundry",
+        "pressing": "laundry",
+        "livraison": "dropoff",
+        "dropoff": "dropoff",
+        "delivery": "dropoff",
+    }
+
+    kind = "pickup"
+    if kind_raw in {"pickup", "laundry", "dropoff"}:
+        kind = kind_raw
+    elif step_raw:
+        kind = step_map.get(step_raw, "pickup")
 
     # Si livré, seul dropoff autorisé
     if is_delivered and kind != "dropoff":
         return JsonResponse({"ok": False, "error": "only_dropoff_allowed_after_delivery"}, status=403)
 
-    # Support: input name "files" (multiple) ou "photos" (multiple)
+    # ------- files -------
     files = []
     files += list(request.FILES.getlist("files"))
     files += list(request.FILES.getlist("photos"))
@@ -527,90 +575,100 @@ def client_order_evidence_upload(request, order_id: int):
     if not files:
         return JsonResponse({"ok": False, "error": "no_files"}, status=400)
 
-    # ✅ Guards premium: type MIME + taille max
     allowed_mimes = {"image/jpeg", "image/png", "image/webp"}
     max_mb = int(getattr(settings, "FAGNI_EVIDENCE_MAX_MB", 5) or 5)
     max_bytes = max_mb * 1024 * 1024
 
+    # détecter le champ FileField du modèle
+    file_field = None
+    try:
+        for cand in ("file", "photo", "image", "img", "picture"):
+            if cand in [f.name for f in OrderEvidencePhoto._meta.fields]:
+                file_field = cand
+                break
+        if not file_field:
+            # fallback: premier FileField/ImageField
+            for f in OrderEvidencePhoto._meta.fields:
+                if f.get_internal_type() in ("FileField", "ImageField"):
+                    file_field = f.name
+                    break
+    except Exception:
+        file_field = "file"
+
     created = 0
     rejected = 0
-    rejected_reasons = {"too_large": 0, "bad_type": 0, "error": 0}
-    created_ids = []
+    reasons = Counter()
+    last_ids = []
 
     for f in files:
         try:
-            ct = (getattr(f, "content_type", "") or "").lower().strip()
-            size = int(getattr(f, "size", 0) or 0)
-
-            if size > max_bytes:
+            ctype = (getattr(f, "content_type", "") or "").lower()
+            if ctype and ctype not in allowed_mimes:
                 rejected += 1
-                rejected_reasons["too_large"] += 1
+                reasons["bad_type"] += 1
+                continue
+            if getattr(f, "size", 0) and f.size > max_bytes:
+                rejected += 1
+                reasons["too_large"] += 1
                 continue
 
-            # Si content_type absent, on laisse passer (certains clients/curl),
-            # mais si présent, on le valide.
-            if ct and ct not in allowed_mimes:
-                rejected += 1
-                rejected_reasons["bad_type"] += 1
-                continue
+            obj = OrderEvidencePhoto(order=o, kind=kind)
+            # set file field
+            try:
+                setattr(obj, file_field, f)
+            except Exception:
+                # si field différent, tente 'file'
+                try:
+                    setattr(obj, "file", f)
+                except Exception:
+                    pass
 
-            obj = OrderEvidencePhoto.objects.create(
-                order=o,
-                kind=kind,
-                image=f,
-                created_at=timezone.now(),
-            )
+            obj.save()
             created += 1
-            created_ids.append(obj.id)
-
+            last_ids.append(getattr(obj, "id", None))
         except Exception:
             rejected += 1
-            rejected_reasons["error"] += 1
-            continue
+            reasons["error"] += 1
 
-    # Renvoie la galerie à jour (derniers 50)
-    qs = OrderEvidencePhoto.objects.filter(order=o).order_by("-created_at")[:50]
+    # refresh list
+    qs = OrderEvidencePhoto.objects.filter(order=o).order_by("-created_at", "-id")
+    photos = []
+    counts = Counter()
 
-    # Labels (si ton modèle a KIND_CHOICES, on mappe)
-    kind_labels = {}
-    try:
-        kind_labels = {k: lbl for (k, lbl) in getattr(OrderEvidencePhoto, "KIND_CHOICES", [])}
-    except Exception:
-        kind_labels = {}
+    for ph in qs[:40]:
+        k = getattr(ph, "kind", "") or ""
+        counts[k] += 1
 
-    evidence_photos = []
-    kinds = []
-
-    for e in qs:
+        url = ""
         try:
-            url = e.image.url if getattr(e, "image", None) else ""
+            ff = getattr(ph, file_field, None)
+            url = getattr(ff, "url", "") or ""
         except Exception:
             url = ""
 
-        k = getattr(e, "kind", "") or ""
-        evidence_photos.append({
-            "id": e.id,
+        photos.append({
+            "id": getattr(ph, "id", None),
             "kind": k,
-            "kind_label": kind_labels.get(k, k),
+            "kind_label": k,
             "url": url,
-            "created_at": (getattr(e, "created_at", None).isoformat() if getattr(e, "created_at", None) else None),
+            "created_at": getattr(ph, "created_at", None).isoformat() if getattr(ph, "created_at", None) else None,
         })
-        kinds.append(k)
 
-    evidence_counts = dict(Counter(kinds))
-
-    return JsonResponse({
+    payload = {
         "ok": True,
         "created": created,
         "rejected": rejected,
-        "rejected_reasons": rejected_reasons,
-        "count_total": len(evidence_photos),
-        "evidence_photos": evidence_photos,
-        "evidence_counts": evidence_counts,
-        "last_added_ids": created_ids,
-    })
-
-
+        "rejected_reasons": {
+            "too_large": int(reasons.get("too_large", 0)),
+            "bad_type": int(reasons.get("bad_type", 0)),
+            "error": int(reasons.get("error", 0)),
+        },
+        "count_total": int(qs.count()),
+        "evidence_photos": photos,
+        "evidence_counts": dict(counts),
+        "last_added_ids": [x for x in last_ids if x is not None],
+    }
+    return JsonResponse(payload)
 def _wallet_net_expr():
     """
     Net = somme(direction=in) - somme(direction=out)
@@ -5042,8 +5100,9 @@ def client_order_detail(request, order_id: int):
 
     customer = Customer.objects.filter(phone=phone).order_by("-id").first()
     if not customer:
+        from django.contrib import messages
+        messages.error(request, 'Session client invalide. Reconnecte-toi.')
         return redirect("orders:client_home")
-
     order = (
         Order.objects
         .select_related("customer", "laundry_partner", "delivery_partner")
@@ -5051,7 +5110,34 @@ def client_order_detail(request, order_id: int):
         .first()
     )
     if not order:
+        from django.contrib import messages
+        messages.error(request, "Commande introuvable ou accès non autorisé.")
         return redirect("orders:client_home")
+
+    # ---- DEBUG: plain mode to detect blank-screen source ----
+    if request.GET.get("plain") == "1":
+        from django.http import HttpResponse
+        code = getattr(order, "code", None) or str(order.id)
+        html = f"""<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PLAIN {code}</title>
+</head>
+<body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#fff;color:#111;padding:16px">
+  <h1>PLAIN OK</h1>
+  <div>order_id: {order.id}</div>
+  <div>code: {code}</div>
+  <div>phone(session): {phone}</div>
+  <div>customer_phone: {getattr(order.customer,'phone',None)}</div>
+  <hr>
+  <div>Si tu vois ceci, Django rend OK → le “blanc” vient d’un CSS/JS/overlay.</div>
+</body>
+</html>"""
+        return HttpResponse(html)
+    # ---- END DEBUG ----
+
 
     # legs (simple)
     legs = list(
@@ -5106,7 +5192,7 @@ def client_order_detail(request, order_id: int):
     # items
     items = order.items.all().order_by("id")
 
-    return render(request, "orders/client_order_detail.html", {
+    resp = render(request, "orders/client_order_detail.html", {
         "phone": phone,
         "customer": customer,
         "order": order,
@@ -5131,7 +5217,17 @@ def client_order_detail(request, order_id: int):
 
 
 
-# -------------------------------------------------------------------
+
+
+    resp["Cache-Control"] = "no-store"
+
+
+
+
+
+
+    return resp
+    return resp# -------------------------------------------------------------------
 # ✅ Paiement client (V1) — simulate + cash
 # -------------------------------------------------------------------
 
@@ -5492,8 +5588,6 @@ def client_order_pay_wave_page(request, order_id: int):
     # QR: encode toujours un URL Wave scannable
     pl = (pay_link or "").strip()
     qr_data = pl if pl else "https://pay.wave.com/"
-
-
     qr = qrcode.QRCode(
         version=None,
         error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -11916,72 +12010,80 @@ def laundry_order_detail(request, order_id):
 def ops_order_confirm_wave_paid(request, order_id: int):
     """
     Confirme manuellement un paiement Wave côté Ops/Admin.
-    - Set payment_status="paid"
-    - Set amount_paid = total TTC (calcul client)
-    - Clear session flag wave_declared_{order.id}
-    - Optionnel: crée un Payment si le modèle existe
+
+    ✅ Règle FAGNI (source de vérité):
+    - On crée un Payment (channel="wave") pour le RESTE dû.
+    - Payment.save() applique les guards, sync Order.amount_paid/payment_status/payment_date,
+      et déclenche mark_as_paid_and_distribute() si la commande devient PAID (idempotent).
+
+    Notes:
+    - Idempotent: si déjà soldée => OK sans recréer.
+    - On n’essaie pas d’effacer la session "client" (wave_declared_*), car l’ops n’a pas cette session.
+      Côté UI, dès que paid, on n’affiche plus "declared".
     """
+    from decimal import Decimal
+    from django.db.models import Sum
+
     order = Order.objects.filter(pk=order_id).first()
     if not order:
         return JsonResponse({"ok": False, "error": "order_not_found"}, status=404)
 
-    amounts = _client_order_amounts(order)
-    total = amounts.get("total_ttc") or DECIMAL_ZERO
-
+    # Total TTC depuis DB (champ stable)
     try:
-        from decimal import Decimal
-        total = Decimal(str(total))
+        total = Decimal(str(getattr(order, "total_client_ttc", 0) or 0))
     except Exception:
-        total = DECIMAL_ZERO
+        total = Decimal("0")
 
-    # Update order fields (si présents)
+    if total <= 0:
+        return JsonResponse({"ok": False, "error": "total_is_zero"}, status=400)
+
+    # Source de vérité: somme des Payment
+    from orders.models import Payment
+    paid_sum = Payment.objects.filter(order=order).aggregate(s=Sum("amount")).get("s") or 0
     try:
-        if hasattr(order, "amount_paid"):
-            setattr(order, "amount_paid", total)
-        if hasattr(order, "payment_status"):
-            setattr(order, "payment_status", "paid")
-        order.save()
+        paid_sum = Decimal(str(paid_sum))
     except Exception:
-        # On n'explose pas: on renvoie un KO explicite
-        return JsonResponse({"ok": False, "error": "order_update_failed"}, status=500)
+        paid_sum = Decimal("0")
 
-    # Clear declared flag (session ops actuelle)
-    try:
-        key = f"wave_declared_{order.id}"
-        if request.session.get(key):
-            del request.session[key]
-            request.session.modified = True
-    except Exception:
-        pass
-
-    # Optionnel: Payment record si existe
-    try:
-        from orders.models import Payment  # type: ignore
-        # On tente un create minimal (selon ton modèle réel)
-        kwargs = {}
-        if "order" in [f.name for f in Payment._meta.fields]:
-            kwargs["order"] = order
-        if "amount" in [f.name for f in Payment._meta.fields]:
-            kwargs["amount"] = total
-        if "method" in [f.name for f in Payment._meta.fields]:
-            kwargs["method"] = "wave"
-        if "status" in [f.name for f in Payment._meta.fields]:
-            kwargs["status"] = "paid"
-        if kwargs:
-            Payment.objects.create(**kwargs)
-    except Exception:
-        pass
-
-    # Réponse
-    if request.headers.get("x-requested-with") == "XMLHttpRequest":
-        return JsonResponse({"ok": True, "order_id": order.id, "total": float(total)})
-
-    # fallback redirect: renvoie vers detail ops si existe, sinon home
-    try:
-        from django.urls import reverse
-        return redirect(reverse("orders:ops_order_detail", args=[order.id]))
-    except Exception:
+    remaining = total - paid_sum
+    if remaining <= 0:
+        # déjà soldée (idempotent)
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": True, "order_id": order.id, "total": float(total), "already_paid": True})
         return redirect("orders:ops_dashboard")
+
+    # Montant à enregistrer (entier FCFA)
+    amt = int(remaining)
+
+    # Reference idempotente (1 par "solde wave ops")
+    # Si tu as un checkout_id plus tard, tu pourras l’ajouter ici.
+    ref = f"WAVE-OPS-{order.id}-SOLDE"
+
+    # Idempotence DB applicative: order+reference
+    pmt, created = Payment.objects.get_or_create(
+        order=order,
+        reference=ref,
+        defaults={
+            "amount": amt,
+            "channel": "wave",
+            "source": "ops",
+            "confirmed_by": getattr(request, "user", None),
+        }
+    )
+
+    # Si déjà existant mais montant différent (cas rare: total_client_ttc a changé),
+    # on ne "modifie" pas un Payment existant (ça éviter des boucles / incohérences).
+    # On renvoie juste l’état actuel.
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({
+            "ok": True,
+            "order_id": order.id,
+            "total": float(total),
+            "created": bool(created),
+            "payment_id": pmt.id,
+        })
+
+    return redirect("orders:ops_dashboard")
 
 
 # --- LOT_3_1_GUARD_DOUBLE_PAY_OK ---

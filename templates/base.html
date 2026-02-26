@@ -26,7 +26,7 @@
 .fagni-topbar::after{
             content:"";
             position:absolute;
-            left:0; right:0; bottom:-1px;
+            left:0; right:0; bottom:0;
             height:2px;
             background:#FF7A00; /* orange marque */
             opacity:0.9;
@@ -62,7 +62,7 @@
             position: relative;
             overflow: hidden;
 
-            border-bottom: 1px solid rgba(255,122,0,0.22); /* orange subtil */
+            
             box-shadow: 0 10px 26px rgba(2,6,23,0.35);
         }
 
@@ -166,7 +166,8 @@
         </div>
     {% endif %}
 
-    {% block content %}{% endblock %}
+    <div id="SERVER_MARKER_FAGNI" style="position:fixed;right:10px;bottom:10px;z-index:2147483647;background:#111;color:#fff;padding:6px 10px;border-radius:10px;font:12px ui-monospace">SERVER_MARKER_FAGNI</div>
+{% block content %}{% endblock %}
 </div>
 
 {% block extra_js %}{% endblock %}

@@ -323,7 +323,7 @@ WAVE_CHECKOUT_API_KEY = (os.getenv("WAVE_CHECKOUT_API_KEY", "") or "").strip()
 WAVE_RECEIVER_PHONE   = (os.getenv("WAVE_RECEIVER_PHONE", "") or "").strip()
 
 # Lien marchand Wave (ex: https://pay.wave.com/m/.../c/ci/)
-WAVE_MERCHANT_LINK_BASE = (os.getenv("WAVE_MERCHANT_LINK_BASE", "") or "").strip()
+WAVE_MERCHANT_LINK_BASE = "https://pay.wave.com/m/M_ci_8SO-R9nJg71k/c/ci/"
 # ========================
 #  SECURITY (PROD)
 # ========================
@@ -337,3 +337,17 @@ if not DEBUG:
 
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+
+# --- DEV: disable template cached loader (avoid stale templates / blank pages) ---
+try:
+    if DEBUG:
+        opts = TEMPLATES[0].setdefault("OPTIONS", {})
+        loaders = opts.get("loaders")
+        # si loaders est défini et contient cached.Loader, on repasse en loaders standards
+        if loaders:
+            opts["loaders"] = [
+                "django.template.loaders.filesystem.Loader",
+                "django.template.loaders.app_directories.Loader",
+            ]
+except Exception:
+    pass

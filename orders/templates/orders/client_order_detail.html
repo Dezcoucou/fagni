@@ -338,7 +338,14 @@
       background:#ef4444; color:#fff;
     }
 
-    <!-- WAVE_BANNER_OK -->
+</style>
+
+    
+{% endblock %}
+
+{% block content %}
+
+<!-- WAVE_BANNER_OK -->
   <!-- LOT_2_19_WAVE_AUTO_SUCCESS_OK -->
 
   {# ✅ Priorité: si la commande est payée, afficher confirmé même sans ?wave=success #}
@@ -352,31 +359,24 @@
     </div>
 
   {% elif request.GET.wave == "declared" %}
-    <div class="co-notice co-notice--warn" id="waveNotice" data-wave="declared" data-order="{{ order.id }}">
-      <div class="co-notice__icon">✓
+  <div class="co-notice co-notice--warn" id="waveNotice" data-wave="declared" data-order="{{ order.id }}">
+    <div class="co-notice__icon">✓</div>
+
+    <div>
+      <p class="co-notice__title">Paiement déclaré</p>
+      <p class="co-notice__desc">Merci. Nous vérifions ton paiement Wave et on confirme dès que possible.</p>
+
       <!-- LOT_2_35_WAVE_MANUAL_REFRESH_OK -->
-      <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+      <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
         <button type="button" id="waveRefreshBtn" class="btn btn-light" style="padding:8px 12px;border-radius:999px;">
           🔄 Actualiser le paiement
         </button>
         <span id="waveRefreshHint" style="font-size:12px;color:var(--muted,#64748b)"></span>
       </div>
     </div>
-      <div>
-        <p class="co-notice__title">Paiement déclaré</p>
-        <p class="co-notice__desc">Merci. Nous vérifions ton paiement Wave et on confirme dès que possible.</p>
+  </div>
 
-      <!-- LOT_2_24_WAVE_MANUAL_REFRESH_OK -->
-      <div style="margin-top:10px;">
-        <button type="button" id="btnWaveRefresh" class="btn btn-light">
-          Actualiser le paiement
-        </button>
-      </div>
-
-      </div>
-    </div>
-
-  {% elif request.GET.wave == "success" %}
+{% elif request.GET.wave == "success" %}
     <div class="co-notice co-notice--ok" id="waveNotice" data-wave="success" data-order="{{ order.id }}">
       <div class="co-notice__icon">✓</div>
       <div>
@@ -395,322 +395,229 @@
     </div>
   {% endif %}
 <script>
-  (function(){
-    const el = document.getElementById("waveNotice");
+(function(){
+  // Banner Wave (optionnel)
+  var waveEl = document.getElementById("waveNotice");
+  if(!waveEl) return;
 
-    // LOT_2_20_WAVE_CLEAN_URL_OK
-    // Nettoie l’URL (retire ?wave=...) sans recharger, pour éviter que le statut reste "collé".
-    function __waveCleanUrlParam() {
-      try {
-        var u = new URL(window.location.href);
-        if (!u.searchParams || !u.searchParams.has("wave")) return;
-        u.searchParams.delete("wave");
-        var qs = u.searchParams.toString();
-        var newUrl = u.pathname + (qs ? ("?" + qs) : "") + (u.hash || "");
-        window.history.replaceState({}, "", newUrl);
-      } catch(e) {}
-    }
+  var orderId = waveEl.getAttribute("data-order") || "";
+  var state   = (waveEl.getAttribute("data-wave") || "").toLowerCase();
 
+  
+  
+  if(state !== "declared") return;
+// UX: bouton "Actualiser le paiement" (Wave déclaré)
+  var btn = document.getElementById("waveRefreshBtn");
+  var hint = document.getElementById("waveRefreshHint");
 
-  // ----------------------------------------------------------------
-  // LOT_2_17_WAVE_POLLING_OK
-  // LOT_2_21_WAVE_POLL_PAID_RELOAD_OK
-  // LOT_2_22_WAVE_DEDUPE_RELOAD_OK
-  // Empêche les autres reloads de la page si le one-shot Wave est déjà programmé
-  function __waveReloadAllowed(orderId){
+  function setHint(msg){
+    try{ if(hint) hint.textContent = msg || ""; }catch(e){}
+  }
+  function formatFCFA(n){
+  try{
+    if(n === null || n === undefined) return "";
+    var num = Number(n);
+    if(isNaN(num)) return "";
+    return Math.round(num).toLocaleString("fr-FR");
+  }catch(e){ return ""; }
+}
+
+function nowStr(){
     try{
-      var k = "wave_paid_reload_" + String(orderId || "");
-      return !(window.sessionStorage && sessionStorage.getItem(k) === "1");
-    }catch(e){
-      return true;
-    }
+      var d = new Date();
+      return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+    }catch(e){ return ""; }
   }
 
-  // Quand le polling détecte "paid", on nettoie l'URL (Lot 2.20) + toast + reload 1 fois (anti-loop)
-  
-  // LOT_2_27_WAVE_NO_RELOAD_ON_PAID_OK
-  function __waveOnPaidOnce(orderId){
-    try {
-      var k = "wave_paid_done_" + String(orderId || "");
-      // one-shot (évite répétition)
-      try {
-        if (sessionStorage.getItem(k) === "1") return;
-        sessionStorage.setItem(k, "1");
+  async function checkPaymentOnce(){
+    if(!orderId) return;
+    var endpoint = "/orders/client/orders/" + encodeURIComponent(orderId) + "/payment-ui/";
+    try{
+      var res = await fetch(endpoint, {
+        method: "GET",
+        credentials: "same-origin",
+        headers: { "Accept":"application/json", "X-Requested-With":"XMLHttpRequest" }
+      });
+      if(!res.ok) return;
+      var data = await res.json();
+
+      // payé → UI ok + reload one-shot
+      if(data && (data.payment_ui === "paid" || data.payment_status === "paid")){
+        try{
+          waveEl.classList.remove("co-notice--warn","co-notice--err");
+          waveEl.classList.add("co-notice--ok");
+          waveEl.setAttribute("data-wave","success");
+          var t = waveEl.querySelector(".co-notice__title");
+          var d = waveEl.querySelector(".co-notice__desc");
+          if(t) t.textContent = "Paiement confirmé";
+          if(d) d.textContent = "Merci. Ton paiement Wave a été confirmé.";
+        }catch(e){}
+        try{  }catch(e){}
+        try{ if(typeof __waveOnPaidOnce === "function") __waveOnPaidOnce(orderId); }catch(e){}
+        return;
       }
 
-  // LOT_2_36_DEDUP_RELOAD_OK
-  // Évite les reload multiples (polling + instant check + clic utilisateur)
-    function __waveScheduleReload(ms, orderId){
+      // sinon : feedback soft
+      
+    }catch(e){}
+  }
+
+  if(btn){
+    var lock = false;
+    var orig = (btn.textContent || "").trim() || "🔄 Actualiser le paiement";
+    btn.addEventListener("click", async function(){
+    try{ disableBtn(1500); }catch(e){}
+    try{ setHint("Vérification en cours… • " + nowStr()); }catch(e){}
+
+      if(lock) return;
+      lock = true;
+      try{
+        btn.disabled = true;
+        btn.textContent = "Vérification…";
+        setHint("On vérifie…");
+      }catch(e){}
+
+      await checkPaymentOnce();
+
+      setTimeout(function(){
+        lock = false;
+        try{
+          btn.disabled = false;
+          btn.textContent = orig;
+        }catch(e){}
+      }, 1800);
+    });
+  }
+function cleanWaveParam(){
+    try{
+      var u = new URL(window.location.href);
+      if(!u.searchParams || !u.searchParams.has("wave")) return;
+      u.searchParams.delete("wave");
+      var qs = u.searchParams.toString();
+      var newUrl = u.pathname + (qs ? ("?" + qs) : "") + (u.hash || "");
+      window.history.replaceState({}, "", newUrl);
+    }catch(e){}
+  }
+
+  function setBannerPaid(){
+    try{
+      waveEl.classList.remove("co-notice--warn","co-notice--err");
+      waveEl.classList.add("co-notice--ok");
+      waveEl.setAttribute("data-wave","success");
+      var t = waveEl.querySelector(".co-notice__title");
+      var d = waveEl.querySelector(".co-notice__desc");
+      if(t) t.textContent = "Paiement confirmé";
+      if(d) d.textContent = "Merci. Ton paiement Wave a été confirmé.";
+    }catch(e){}
+  }
+
+  function scheduleReloadOnce(ms){
     try{
       if(window.__waveReloadScheduled) return;
       window.__waveReloadScheduled = true;
-      setTimeout(function(){
-        try{
-          if(typeof __waveReloadAllowed === "function"){
-            if(!__waveReloadAllowed(typeof orderId!=="undefined" ? orderId : "")) return;
-          }
-          window.location.reload();
-        }catch(e){}
-      }, (ms || 450));
-    }catch(e){}
-  }, (ms || 450));
+      setTimeout(function(){ try{ window.location.reload(); }catch(e){} }, ms || 450);
     }catch(e){}
   }
- catch(e) {}
 
-      // stop polling
-      try { window.__waveStopPolling = true; } catch(e) {}
-
-      // clean URL (retire ?wave=declared / autres)
-      try {
-        var u = new URL(window.location.href);
-        if (u.searchParams.has("wave")) {
-          u.searchParams.delete("wave");
-          history.replaceState(null, "", u.toString());
-        }
-      } catch(e) {}
-
-      // Update banner UI (si présent)
-      try {
-        var el = document.getElementById("waveNotice");
-        if (el) {
-          el.classList.remove("co-notice--warn","co-notice--err");
-          el.classList.add("co-notice--ok");
-          el.setAttribute("data-wave","success");
-          var titleEl = el.querySelector(".co-notice__title");
-          var descEl  = el.querySelector(".co-notice__desc");
-          if (titleEl) titleEl.textContent = "Paiement confirmé";
-          if (descEl)  descEl.textContent  = "Merci. Ton paiement Wave a été confirmé.";
-        }
-      } catch(e) {}
-
-      // Toast (si payShowMsg existe)
-      try {
-        if (typeof payShowMsg === "function") {
-          payShowMsg("✅ Paiement confirmé.", true);
-        }
-      } catch(e) {}
-
-      // Bonus UX: désactive boutons paiement (si zone identifiée)
-      try {
-        // cache toute zone d'actions Wave si elle existe
-        var actions = document.querySelectorAll("[data-wave-actions], #waveActions, .paywave-state__right");
-        actions.forEach(function(a){ a.style.opacity = "0.6"; });
-      } catch(e) {}
-
-    } catch(e) {}
-  }
-  // Polling léger après "Paiement déclaré"
-  // ----------------------------------------------------------------
+  // Anti “bandeau collé”
   try{
-    // On récupère l'élément (si le code existant n'a pas gardé la variable)
-    var __waveEl = (typeof el !== "undefined" && el) ? el : document.getElementById("waveNotice");
-        __waveCleanUrlParam();
-
-    if (__waveEl && __waveEl.dataset && __waveEl.dataset.wave === "declared") {
-      const orderId = __waveEl.dataset.order;
-      const endpoint = `/orders/client/orders/${orderId}/payment-ui/`;
-
-
-  // LOT_2_23_WAVE_INSTANT_CHECK_OK
-
-  // LOT_2_29_HIDE_PAY_CTA_IF_PAID_OK
-  (function(){
-    try{
-      var paid = ("{{ order.payment_status|default:'' }}" === "paid");
-      if(!paid) return;
-
-      // 1) Cache tous les liens de paiement (Wave & autres) détectés par URL
-      var payLinks = Array.from(document.querySelectorAll('a[href*="/pay/"], a[href*="/payment"], a[href*="pay/wave"]'));
-      payLinks.forEach(function(a){
-        a.setAttribute("aria-disabled","true");
-        a.style.pointerEvents = "none";
-        a.style.opacity = "0.55";
-        // si c’est un bouton principal, on le masque complètement
-        if((a.className||"").includes("co-btn--primary") || (a.textContent||"").toLowerCase().includes("payer")){
-          a.style.display = "none";
-        }
-      });
-
-      // 2) Désactive les boutons “Payer” (au cas où certains soient <button>)
-      var btns = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"]'));
-      btns.forEach(function(b){
-        var t = (b.textContent || b.value || "").trim().toLowerCase();
-        if(t.includes("payer") || t.includes("pay") || t.includes("wave")){
-          b.disabled = true;
-          b.style.opacity = "0.55";
-          // on masque ceux qui ressemblent à un CTA de paiement
-          if(t.includes("payer")){
-            b.style.display = "none";
-          }
-        }
-      });
-
-      // 3) Si un bloc “paiement” existe, on ajoute un petit label (non bloquant)
-      var payBox = document.querySelector('#paymentBox, .paymentBox, .payBox, .pay-card, .pay-card2');
-      if(payBox && !payBox.querySelector("[data-pay-locked='1']")){
-        var note = document.createElement("div");
-        note.setAttribute("data-pay-locked","1");
-        note.style.marginTop = "10px";
-        note.style.fontSize = "12px";
-        note.style.color = "#64748b";
-        note.textContent = "✅ Paiement déjà confirmé — actions de paiement désactivées.";
-        payBox.appendChild(note);
-      }
-    }catch(e){}
-  })();
-
-
-  // Check immédiat si on arrive sur la page avec "Wave déclaré" (sans attendre le prochain tick)
-  (function(){
-    try{
-      // On ne fait le check immédiat que si on est dans un contexte "wave déclaré"
-      var w = (typeof __waveEl !== "undefined" && __waveEl) ? __waveEl : document.getElementById("waveNotice");
-      if(!w) return;
-
-      var waveState = (w.dataset && w.dataset.wave) ? String(w.dataset.wave) : "";
-      if(waveState !== "declared") return;
-
-      // orderId doit exister dans le scope du polling (Lot 2.17)
-      if(typeof orderId === "undefined") return;
-
-      // Fetch immédiat
-      
-          if (window.__waveStopPolling) { return; }
-
-      fetch(endpoint, {
-        method: "GET",
-        credentials: "same-origin",
-        headers: { "X-Requested-With": "XMLHttpRequest" }
-      })
-      .then(function(r){ return r.json ? r.json() : {}; })
-      .then(function(data){
-        if(!data || data.ok !== true) return;
-
-        // Si déjà payé => bascule UI tout de suite + clean URL + reload one-shot (Lot 2.21)
-        if(data.payment_ui === "paid" || data.payment_status === "paid"){
-          // Bandeau OK (sans attendre)
-          try{
-            w.classList.remove("co-notice--warn","co-notice--err");
-            w.classList.add("co-notice--ok");
-            var t = w.querySelector(".co-notice__title");
-            var d = w.querySelector(".co-notice__desc");
-            if(t) t.textContent = "Paiement confirmé";
-            if(d) d.textContent = "Merci. Ton paiement Wave a été confirmé.";
-            // force dataset pour cohérence
-            if(w.dataset) w.dataset.wave = "success";
-          }catch(e){}
-
-          // Toast si helper existe
-          try{ if(typeof payShowMsg === "function") payShowMsg("✅ Paiement confirmé.", true); }catch(e){}
-
-          // Clean URL si helper Lot 2.20 existe, sinon fallback
-          try{
-            if(typeof __waveCleanUrl === "function") { __waveCleanUrl(); }
-            else if(window.history && history.replaceState){
-              var u = new URL(window.location.href);
-              u.searchParams.delete("wave");
-              history.replaceState({}, "", u.toString());
-            }
-          }catch(e){}
-
-          // Reload one-shot (Lot 2.21)
-          try{ if(typeof __waveOnPaidOnce === "function") __waveOnPaidOnce(orderId); }catch(e){}
-        }
-      })
-      .catch(function(){});
-    }catch(e){}
-  })();
-
-      let tries = 0;
-      const maxTries = 30;      // ~4 minutes
-      const intervalMs = 8000;
-
-      const titleEl = __waveEl.querySelector(".co-notice__title");
-      const descEl  = __waveEl.querySelector(".co-notice__desc");
-
-      const tick = async () => {
-        tries += 1;
-        if (tries > maxTries) return;
-
-        try {
-          const res = await fetch(endpoint,
-/* LOT_2_26_WAVE_REFRESH_DEBOUNCE_OK hook */
- {
-            method: "GET",
-            credentials: "same-origin",
-            headers: {
-              "Accept": "application/json",
-              "X-Requested-With": "XMLHttpRequest"
-            }
-          });
-
-      try { __setLastCheckNow(); } catch(e) {}
-
-      // feedback bouton
-      try {
-        if (btn) {
-          btn.textContent = "Actualisé ✓";
-          setTimeout(function(){
-            try { btn.textContent = __origLabel || "Actualiser le paiement"; } catch(e){}
-          }, 1400);
-        }
-      } catch(e) {}
-
-          if (!res.ok) return;
-          const data = await res.json();
-                try{
-                  if (data && (data.payment_ui === "paid" || data.payment_status === "paid")) {
-                    __waveOnPaidOnce(orderId);
-                  }
-                }catch(e){}
-          
-          if (!data || !data.ok) return;
-
-          if ((data.payment_ui || "").toLowerCase() === "paid") {
-            __waveEl.classList.remove("co-notice--warn");
-            __waveEl.classList.add("co-notice--ok");
-
-            if (titleEl) titleEl.textContent = "Paiement confirmé";
-            if (descEl) descEl.textContent =
-              "Merci. Ton paiement Wave est confirmé. Tu peux suivre la progression de la commande.";
-
-            clearInterval(timer);
-          }
-        } catch (e) {}
-      };
-
-      tick();
-      const timer = setInterval(tick, intervalMs);
+    var key = "wave_notice_seen_" + orderId + "_" + state;
+    if(window.sessionStorage && sessionStorage.getItem(key) === "1"){
+      // si déjà vu, on ne le garde pas
+      waveEl.remove();
+      return;
     }
+    if(window.sessionStorage) sessionStorage.setItem(key, "1");
   }catch(e){}
 
-    if(!el) return;
+  // Si payé côté serveur, pas besoin de poll (robuste: payment_status OU amount_paid>=total)
+    var ps = ("{{ order.payment_status|default:'' }}").toLowerCase();
+    var total0 = Number(("{{ amounts.total_ttc|default:0|floatformat:0 }}").replace(",", ".") || 0);
+    var paid0  = Number(("{{ order.amount_paid|default:0|floatformat:0 }}").replace(",", ".") || 0);
+    var alreadyPaid = (ps === "paid") || (total0 > 0 && paid0 >= total0);
 
-    // Evite ré-affichage au refresh
-    const orderId = el.getAttribute("data-order") || "";
-    const flag = el.getAttribute("data-wave") || "";
-    const key = "wave_notice_seen_" + orderId + "_" + flag;
+    if(alreadyPaid){
+      setBannerPaid();
+      cleanWaveParam();
+      return;
+    }
+  // Poll uniquement si "declared"
+  if(state !== "declared") return;
+
+  var endpoint = "/orders/client/orders/" + orderId + "/payment-ui/";
+  var tries = 0;
+  var maxTries = 30;
+  var intervalMs = 8000;
+
+  // UX : on nettoie l’URL tout de suite (évite l’effet “collé”)
+  cleanWaveParam();
+
+  async function tick(){
+    tries += 1;
+    if(tries > maxTries) return;
 
     try{
-      if(sessionStorage.getItem(key) === "1"){
-        el.remove();
-        return;
+      var res = await fetch(endpoint, {
+        method: "GET",
+        credentials: "same-origin",
+        headers: {"Accept":"application/json","X-Requested-With":"XMLHttpRequest"}
+      });
+      if(!res.ok) return;
+      var data = await res.json();
+
+      if(!data || data.ok !== true) return;
+
+      // UX: affichage état clair
+      try{
+        var ui = String(data.payment_ui || data.payment_status_ui || "").toLowerCase();
+        var declared = !!data.wave_declared;
+          var remain = (data && data.amounts && typeof data.amounts.amount_remaining !== "undefined") ? data.amounts.amount_remaining : ((typeof data.amount_remaining !== "undefined") ? data.amount_remaining : ((typeof data.remain !== "undefined") ? data.remain : null));
+        if(ui === "paid"){
+          setHint("✅ Paiement confirmé • " + nowStr());
+          try{ if(typeof payShowMsg === "function") payShowMsg("✅ Paiement confirmé.", true); }catch(e){}
+          try{ if(typeof __waveOnPaidOnce === "function") __waveOnPaidOnce(orderId); }catch(e){}
+          try{ if(typeof __waveScheduleReload === "function") __waveScheduleReload(450, orderId); else window.location.reload(); }catch(e){}
+          return;
+        }
+
+        if(declared || ui === "declared" || ui === "pending"){
+          setHint("En vérification… • " + nowStr());
+          return;
+        }
+
+        // unpaid / unknown
+        if(remain !== null){
+          setHint("Pas de paiement détecté (reste " + formatFCFA(remain) + " FCFA) • " + nowStr());
+        }else{
+          setHint("Pas de paiement détecté • " + nowStr());
+        }
+      }catch(e){}
+
+      var paid = String(data.payment_ui || data.payment_status || "").toLowerCase() === "paid";
+      if(paid){
+        setBannerPaid();
+        // reload 1 fois pour rafraîchir les montants/état
+        scheduleReloadOnce(450);
+        clearInterval(timer);
       }
-      sessionStorage.setItem(key, "1");
     }catch(e){}
+  }
 
-    // Auto-hide
-    setTimeout(function(){
-      try{ el.style.transition = "opacity .25s ease, transform .25s ease"; }catch(e){}
-      el.style.opacity = "0";
-      el.style.transform = "translateY(-4px)";
-      setTimeout(function(){ try{ el.remove(); }catch(e){} }, 300);
-    }, 7000);
-  })();
-  </script>
+  tick();
+  var timer = setInterval(tick, intervalMs);
 
-
+  // Auto-hide doux après 7s (si pas paid)
+  setTimeout(function(){
+    try{
+      if(!waveEl || (waveEl.getAttribute("data-wave")||"").toLowerCase()==="success") return;
+      waveEl.style.transition = "opacity .25s ease, transform .25s ease";
+      waveEl.style.opacity = "0";
+      waveEl.style.transform = "translateY(-4px)";
+      setTimeout(function(){ try{ waveEl.remove(); }catch(e){} }, 300);
+    }catch(e){}
+  }, 7000);
+})();
+</script>
 
   <div class="page-header">
     <div>
@@ -1186,10 +1093,23 @@
       });
 
       const ct = (r.headers.get("content-type") || "").toLowerCase();
-      const data = ct.includes("application/json") ? await r.json() : null;
+        let data = null;
+        try{
+          data = ct.includes("application/json") ? await r.json() : null;
+        }catch(e){ data = null; }
+if(!data || !r.ok || data.ok !== true){
+                // ✅ cas particulier: déjà payé
+        if(data && (data.error === "already_paid")){
+          if(payCashOk){
+            payCashOk.textContent = "✅ Déjà payé.";
+            payCashOk.style.display = "";
+          }
+          closeCash();
+          __waveScheduleReload(450, (typeof orderId!=="undefined"?orderId:""));
+          return;
+        }
 
-      if(!data || !r.ok || data.ok !== true){
-        payShowMsg("Paiement impossible.", false);
+payShowMsg("Paiement impossible.", false);
         return;
       }
 
@@ -1198,8 +1118,8 @@
       __waveScheduleReload(450, (typeof orderId!=="undefined"?orderId:""));
 
     }catch(e){
-      payShowMsg("Erreur réseau. Réessaie.", false);
-    }finally{
+      payShowMsg("Connexion instable. Réessaie.", false);
+}finally{
       if(btnPaySim){
         btnPaySim.disabled = false;
         btnPaySim.style.opacity = "1";
@@ -1244,16 +1164,25 @@
       });
 
       const ct = (r.headers.get("content-type") || "").toLowerCase();
-      const data = ct.includes("application/json") ? await r.json() : null;
-
+        let data = null;
+        let textPreview = "";
+        try{
+          if(ct.includes("application/json")){
+            data = await r.json();
+          }else{
+            const t = await r.text();
+            textPreview = String(t || "").slice(0, 180);
+          }
+        }catch(e){ data = null; }
       if(!data || !r.ok || data.ok !== true){
-        const err = data?.error ? String(data.error) : ("HTTP " + r.status);
-        if(payCashErr){
-          payCashErr.textContent = "Paiement impossible : " + err;
-          payCashErr.style.display = "";
+          const err = data?.error ? String(data.error) : ("HTTP " + r.status);
+          const extra = (!data && textPreview) ? (" • " + textPreview) : "";
+          if(payCashErr){
+            payCashErr.textContent = "Paiement impossible : " + err + extra;
+            payCashErr.style.display = "";
+          }
+          return;
         }
-        return;
-      }
 
       if(payCashOk){
         payCashOk.textContent = "✅ Paiement enregistré.";
@@ -1384,12 +1313,18 @@
       const kind = (evKind && evKind.value) ? String(evKind.value) : "pickup";
 
       const fd = new FormData();
-      fd.append("kind", kind);
-      for(const f of evFiles.files){
-        fd.append("files", f);
-      }
 
-      // UI lock
+        // compat backend: kind + step
+        fd.append("kind", kind);
+        const stepMap = { pickup:"collecte", collecte:"collecte", delivery:"livraison", livraison:"livraison" };
+        fd.append("step", stepMap[kind] || kind);
+
+        // compat backend: files + photos (selon vue)
+        for(const f of evFiles.files){
+          fd.append("files", f);
+          fd.append("photos", f);
+        }
+// UI lock
       if(btnEvSend){
         btnEvSend.disabled = true;
         btnEvSend.style.opacity = "0.75";
@@ -1575,9 +1510,9 @@
 
   function pulse(el){
     if(!el) return;
-    el.classList.remove("pulse");
+    waveEl2.classList.remove("pulse");
     void el.offsetWidth;
-    el.classList.add("pulse");
+    waveEl2.classList.add("pulse");
   }
 
   function setExpress(amounts){
@@ -1861,7 +1796,7 @@
     if(newly.size){
       setTimeout(() => {
         try{
-          evidenceBox.querySelectorAll(".ph.phNew").forEach(el => el.classList.remove("phNew"));
+          evidenceBox.querySelectorAll(".ph.phNew").forEach(el => waveEl2.classList.remove("phNew"));
         }catch(e){}
       }, 1200);
     }
@@ -2420,9 +2355,8 @@
   start();
 })();
 </script>
+
 {% endblock %}
-
-
 
 // LOT_2_24_WAVE_MANUAL_REFRESH_OK
 (function(){

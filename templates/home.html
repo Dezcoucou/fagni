@@ -314,6 +314,9 @@
     <div class="hero-cta">
       <a class="btn btn-primary" href="/orders/client/">✅ Commander maintenant</a>
       <a class="btn btn-light" href="/orders/client/">📦 Suivre mes commandes</a>
+{% if request.user.is_authenticated and request.user.is_staff %}
+      <a class="btn btn-light" href="/?public=1">🌍 Voir version publique</a>
+{% endif %}
     </div>
 
     <div class="hero-badges">

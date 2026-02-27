@@ -6,12 +6,17 @@ from django.shortcuts import redirect, render
 from django.views.generic import RedirectView
 from django.http import HttpResponse
 from django.contrib.staticfiles.storage import staticfiles_storage
-
+from django.contrib.auth import logout
 from orders.utils.settings_loader import get_pricing_settings
 
 
 def chrome_devtools_wellknown(_request):
     return HttpResponse(status=204)
+
+
+def admin_logout_get(request):
+    logout(request)
+    return redirect("/")
 
 
 # ============================
@@ -25,9 +30,8 @@ def home(request):
     + Affiche les offres depuis l'admin (ServiceCategory/ServiceItem)
     """
     user = getattr(request, "user", None)
-    if user and user.is_authenticated and user.is_staff:
+    if user and user.is_authenticated and user.is_staff and request.GET.get("public") != "1":
         return redirect("dashboard:index")
-
     # ✅ Offres pilotables depuis l'admin
     from orders.models import ServiceCategory, ServiceItem
 
@@ -64,6 +68,7 @@ def home(request):
 urlpatterns = [
     # Admin Django
     path("admin/", admin.site.urls),
+    path("admin/logout/", admin_logout_get, name="admin_logout_get"),
 
     # 🏠 Accueil
     path("", home, name="home"),

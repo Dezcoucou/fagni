@@ -1,138 +1,210 @@
 {% extends "base.html" %}
-{% block body_class %}landing-page{% endblock %}
 {% load static %}
 
-{% block title %}FAGNI – Pressing & Logistique{% endblock %}
+{% block body_class %}fagni-home-premium{% endblock %}
+{% block title %}FAGNI – Pressing digital premium{% endblock %}
+{% block topbar %}{% endblock %}
 
 {% block extra_head %}
 <style>
-</style>
-
-{% block topbar_css %}{% endblock %}
-
-{% block topbar %}{% endblock %}
-
-<link rel="stylesheet" href="{% static 'css/fagni_premium_expressive.css' %}">
-<style>
   :root{
-    --f-orange:#ff7a00;
-    --f-blue:#0056b3;
-
-    /* Option A — Clean & Luxury */
-    --bg:#f8fafc;            /* blanc cassé */
-    --surface:#ffffff;       /* cartes */
-    --text:#0b1220;          /* bleu nuit */
-    --muted:#64748b;         /* gris premium */
-    --line:rgba(15,23,42,.10);
-    --soft:rgba(2,6,23,.04);
-
-    --shadow: 0 18px 55px rgba(2,6,23,.10);
-    --shadow2: 0 10px 30px rgba(2,6,23,.08);
+    --fagni-orange:#ff7a00;
+    --fagni-orange-2:#ffa247;
+    --fagni-blue:#0b1e3a;
+    --fagni-blue-2:#102746;
+    --fagni-ink:#0f172a;
+    --fagni-muted:#64748b;
+    --fagni-bg:#f5f7fb;
+    --fagni-card:#ffffff;
+    --fagni-line:rgba(15,23,42,.10);
+    --fagni-shadow:0 24px 60px rgba(11,30,58,.12);
+    --fagni-shadow-soft:0 12px 30px rgba(11,30,58,.08);
   }
 
-  /* On neutralise le fond dark du base.html uniquement pour la home */
-  body{
-    background: radial-gradient(1200px 700px at 15% 10%, rgba(255,122,0,.14), transparent 55%),
-                radial-gradient(1100px 650px at 85% 15%, rgba(0,86,179,.10), transparent 55%),
-                var(--bg) !important;
-    color: var(--text) !important;
+  body.fagni-home-premium{
+    background:
+      radial-gradient(1200px 520px at 0% 0%, rgba(255,122,0,.11), transparent 48%),
+      radial-gradient(1000px 500px at 100% 0%, rgba(11,30,58,.09), transparent 44%),
+      var(--fagni-bg) !important;
+    color:var(--fagni-ink) !important;
   }
 
-  .landing{
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 16px 12px 28px;
+  .fagni-shell{
+    max-width:1280px;
+    padding-top:14px;
   }
 
-  /* Topbar local (menu) */
-  .homebar{
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    background: rgba(248,250,252,.82);
-    backdrop-filter: blur(10px);
-    border:1px solid var(--line);
-    border-radius: 18px;
-    padding: 10px 12px;
-    box-shadow: var(--shadow2);
+  .home-wrap{
+    max-width:1160px;
+    margin:0 auto;
+    padding:0 0 34px;
+  }
+
+  .home-topbar{
+    position:sticky;
+    top:10px;
+    z-index:50;
     display:flex;
     align-items:center;
     justify-content:space-between;
-    gap:10px;
+    gap:12px;
+    flex-wrap:wrap;
+    padding:12px 14px;
+    border:1px solid var(--fagni-line);
+    border-radius:22px;
+    background:rgba(255,255,255,.88);
+    backdrop-filter:blur(14px);
+    box-shadow:var(--fagni-shadow-soft);
   }
-  .hb-left{ display:flex; align-items:center; gap:10px; min-width: 220px; }
-  .mark{
-    width:38px;height:38px;border-radius:14px;
-    background: linear-gradient(135deg, var(--f-orange), #ffb100);
-    display:flex; align-items:center; justify-content:center;
-    color:#111827; font-weight:1000;
-    box-shadow: 0 10px 22px rgba(255,122,0,.18);
-    flex: 0 0 auto;
-  }
-  .hb-title{ line-height:1.1; }
-  .hb-title .t{ font-weight:1000; letter-spacing:.06em; font-size:12px; text-transform:uppercase; }
-  .hb-title .s{ font-size:11px; color:var(--muted); font-weight:700; margin-top:2px; }
 
-  .hb-mid{
-    display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap;
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    min-width:0;
   }
-  .pill{
+
+  .brand-logo{
+    width:46px;
+    height:46px;
+    border-radius:14px;
+    background:linear-gradient(135deg,var(--fagni-orange),var(--fagni-orange-2));
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow:0 12px 24px rgba(255,122,0,.18);
+    overflow:hidden;
+    flex:0 0 auto;
+  }
+
+  .brand-logo img{
+    width:28px;
+    height:28px;
+    object-fit:contain;
+    display:block;
+  }
+
+  .brand-main{
+    font-size:12px;
+    font-weight:1000;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--fagni-blue);
+    line-height:1.05;
+  }
+
+  .brand-sub{
+    margin-top:4px;
     font-size:11px;
-    font-weight:850;
-    padding:6px 10px;
-    border-radius:999px;
-    border:1px solid var(--line);
-    background: rgba(255,255,255,.70);
-    color: var(--muted);
+    color:var(--fagni-muted);
+    font-weight:800;
+    line-height:1.1;
   }
 
-  .hb-right{ display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
+  .top-actions{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
 
-  a.btn, button.btn{
+  .btn{
     display:inline-flex;
     align-items:center;
     justify-content:center;
     gap:8px;
-    padding:10px 12px;
+    min-height:46px;
+    padding:0 16px;
     border-radius:999px;
     text-decoration:none;
-    font-weight:900;
     font-size:13px;
+    font-weight:900;
     border:1px solid transparent;
-    cursor:pointer;
     white-space:nowrap;
+    cursor:pointer;
+    transition:transform .12s ease, box-shadow .12s ease, background .12s ease, border-color .12s ease, opacity .12s ease;
   }
-  .primary{
-    background: linear-gradient(90deg, var(--f-orange), #ffb100);
-    color:#111827;
-  }
-  .ghost{
-    background: rgba(255,255,255,.82);
-    border:1px solid var(--line);
-    color: var(--text);
-  }
-  .link{
-    background: transparent;
-    border:1px solid transparent;
-    color: var(--text);
-    text-decoration:none;
-    font-weight:900;
-    font-size:13px;
-    padding:10px 10px;
-    border-radius:999px;
-  }
-  .link:hover{ background: rgba(2,6,23,.04); border-color: var(--line); }
 
-  /* Hero */
-  .hero{
-    margin-top: 14px;
-    border-radius: 22px;
-    border:1px solid var(--line);
-    background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.78));
-    box-shadow: var(--shadow);
-    overflow:hidden;
-    padding: 18px;
+  .btn:hover{ transform:translateY(-1px); }
+
+  .btn-primary{
+    background:linear-gradient(90deg,var(--fagni-orange),var(--fagni-orange-2));
+    color:#111827;
+    box-shadow:0 16px 34px rgba(255,122,0,.24);
   }
+
+  .btn-light{
+    background:#fff;
+    color:var(--fagni-blue);
+    border-color:var(--fagni-line);
+  }
+
+  .btn-dark{
+    background:var(--fagni-blue);
+    color:#fff;
+    border-color:var(--fagni-blue);
+    box-shadow:0 14px 30px rgba(11,30,58,.16);
+  }
+
+  .hero{
+    margin-top:16px;
+    position:relative;
+    overflow:hidden;
+    min-height:620px;
+    border-radius:32px;
+    box-shadow:var(--fagni-shadow);
+    border:1px solid rgba(255,255,255,.08);
+    background:
+      radial-gradient(700px 320px at 18% 18%, rgba(255,122,0,.22), rgba(255,122,0,0) 62%),
+      radial-gradient(620px 300px at 88% 18%, rgba(255,255,255,.10), rgba(255,255,255,0) 56%),
+      linear-gradient(135deg, #081428 0%, #0b1e3a 52%, #102746 100%);
+  }
+
+  .hero::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0)),
+      repeating-linear-gradient(
+        90deg,
+        rgba(255,255,255,.02) 0,
+        rgba(255,255,255,.02) 1px,
+        transparent 1px,
+        transparent 120px
+      );
+    pointer-events:none;
+  }
+
+  .hero::after{
+    content:"";
+    position:absolute;
+    right:-100px;
+    bottom:-120px;
+    width:420px;
+    height:420px;
+    background:radial-gradient(circle, rgba(255,122,0,.24), rgba(255,122,0,0));
+    pointer-events:none;
+    filter:blur(14px);
+  }
+
+  .hero-inner{
+    position:relative;
+    z-index:2;
+    display:grid;
+    grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);
+    gap:22px;
+    padding:30px;
+    color:#fff;
+    min-height:620px;
+  }
+
+  .hero-copy{
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+  }
+
   .hero-top{
     display:flex;
     align-items:flex-start;
@@ -140,296 +212,2505 @@
     gap:14px;
     flex-wrap:wrap;
   }
-  .hero h1{
+
+  .hero-brand-wrap{
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+  }
+
+  .hero-logo{
+    width:58px;
+    height:58px;
+    border-radius:18px;
+    background:linear-gradient(135deg,var(--fagni-orange),var(--fagni-orange-2));
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow:0 14px 28px rgba(255,122,0,.24);
+    overflow:hidden;
+    flex:0 0 auto;
+  }
+
+  .hero-logo img{
+    width:34px;
+    height:34px;
+    object-fit:contain;
+    display:block;
+  }
+
+  .hero-kicker{
+    font-size:12px;
+    font-weight:1000;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:#fff;
+    opacity:.96;
+  }
+
+  .hero-mini{
+    margin-top:5px;
+    color:rgba(255,255,255,.78);
+    font-size:13px;
+    font-weight:800;
+  }
+
+  .hero-chip-row{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .hero-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    min-height:34px;
+    padding:0 12px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.08);
+    backdrop-filter:blur(8px);
+    color:#fff;
+    font-size:12px;
+    font-weight:850;
+  }
+
+  .hero-title{
+    margin:22px 0 12px;
+    font-size:48px;
+    line-height:1.02;
+    letter-spacing:-.04em;
+    color:#fff;
+    max-width:680px;
+  }
+
+  .hero-desc{
     margin:0;
-    font-size: 24px;
-    letter-spacing: .2px;
-  }
-  .hero p{
-    margin:8px 0 0;
-    color: var(--muted);
+    max-width:620px;
+    color:rgba(255,255,255,.84);
+    font-size:15px;
+    line-height:1.6;
     font-weight:750;
-    line-height:1.45;
-    max-width: 760px;
   }
-  .badges{
-    display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:flex-end;
+
+  .hero-actions{
+    margin-top:20px;
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
   }
-  .badge{
+
+  .hero-actions .btn-light{
+    background:rgba(255,255,255,.10);
+    border-color:rgba(255,255,255,.18);
+    color:#fff;
+    backdrop-filter:blur(8px);
+  }
+
+  .hero-trust{
+    margin-top:18px;
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .trust-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    min-height:36px;
+    padding:0 12px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.08);
+    color:#fff;
     font-size:12px;
     font-weight:900;
-    padding:8px 10px;
-    border-radius: 999px;
-    border:1px solid var(--line);
-    background: rgba(2,6,23,.03);
-    color: var(--muted);
+    backdrop-filter:blur(8px);
   }
 
-  .hero-ctas{
-    margin-top: 14px;
+  .hero-side{
     display:flex;
-    gap:10px;
-    flex-wrap:wrap;
-    align-items:center;
+    align-items:flex-end;
+    justify-content:flex-end;
   }
 
-  /* 3 étapes */
-  .steps{
-    margin-top: 14px;
-    display:grid;
-    grid-template-columns:repeat(12,1fr);
-    gap:12px;
+  .hero-panel{
+    width:100%;
+    max-width:360px;
+    border:1px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.08);
+    backdrop-filter:blur(12px);
+    border-radius:24px;
+    padding:16px;
+    color:#fff;
+    box-shadow:0 20px 40px rgba(0,0,0,.18);
   }
-  .step{
-    grid-column: span 12;
-    border:1px solid var(--line);
-    background: rgba(255,255,255,.86);
-    border-radius: 18px;
-    padding: 12px;
-    box-shadow: var(--shadow2);
-  }
-  @media(min-width:900px){ .step{ grid-column: span 4; } }
-  .k{ font-weight: 1000; font-size: 12px; color: var(--text); }
-  .v{ margin-top:6px; font-weight:750; font-size:12px; color: var(--muted); line-height:1.4; }
 
-  /* Grid cartes espaces */
+  .hero-panel-k{
+    font-size:12px;
+    font-weight:900;
+    color:rgba(255,255,255,.70);
+    text-transform:uppercase;
+    letter-spacing:.06em;
+  }
+
+  .hero-panel-v{
+    margin-top:8px;
+    font-size:20px;
+    font-weight:1000;
+    line-height:1.2;
+  }
+
+  .hero-panel-sub{
+    margin-top:8px;
+    font-size:12px;
+    line-height:1.45;
+    color:rgba(255,255,255,.82);
+    font-weight:700;
+  }
+
+  .section{
+    margin-top:16px;
+  }
+
   .grid{
-    margin-top: 14px;
     display:grid;
-    grid-template-columns:repeat(12,1fr);
+    grid-template-columns:repeat(12,minmax(0,1fr));
     gap:14px;
   }
+
   .card{
-    grid-column: span 12;
-    border:1px solid var(--line);
-    background: rgba(255,255,255,.90);
-    border-radius: 20px;
-    padding: 16px;
-    box-shadow: var(--shadow2);
+    grid-column:span 12;
+    border:1px solid var(--fagni-line);
+    border-radius:24px;
+    background:rgba(255,255,255,.96);
+    box-shadow:var(--fagni-shadow-soft);
+    padding:18px;
   }
+
   @media(min-width:900px){
-    .col4{ grid-column: span 4; }
-    .col6{ grid-column: span 6; }
+    .col4{ grid-column:span 4; }
+    .col6{ grid-column:span 6; }
   }
-  .title{
-    font-weight: 1000;
-    font-size: 14px;
+
+  .card-title{
     display:flex;
     align-items:center;
-    gap:8px;
-    color: var(--text);
+    justify-content:space-between;
+    gap:12px;
+    margin:0;
+    font-size:16px;
+    font-weight:1000;
+    color:var(--fagni-ink);
   }
-  .desc{
-    margin-top: 6px;
-    color: var(--muted);
-    font-weight: 750;
-    font-size: 13px;
-    line-height:1.4;
+
+  .card-sub{
+    margin-top:8px;
+    color:var(--fagni-muted);
+    font-size:13px;
+    line-height:1.5;
+    font-weight:750;
   }
-  .actions{
-    margin-top: 12px;
+
+  .card-actions{
+    margin-top:14px;
     display:flex;
     gap:10px;
     flex-wrap:wrap;
   }
 
-  /* Bloc formules */
-  .plans{
-    margin-top: 12px;
-    display:grid;
-    grid-template-columns:repeat(12,1fr);
-    gap:12px;
+  .card-actions .btn{
+    width:100%;
   }
-  .plan{
-    grid-column: span 12;
-    border:1px solid var(--line);
-    background: rgba(2,6,23,.02);
-    border-radius: 18px;
-    padding: 12px;
+
+  .space-visual,
+  .offer-visual{
+    margin-top:14px;
+    position:relative;
+    overflow:hidden;
+    border-radius:22px;
+    border:1px solid var(--fagni-line);
+    background:
+      radial-gradient(280px 160px at 18% 18%, rgba(255,122,0,.16), rgba(255,122,0,0) 70%),
+      radial-gradient(240px 140px at 85% 22%, rgba(11,30,58,.13), rgba(11,30,58,0) 70%),
+      linear-gradient(135deg, #ffffff 0%, #f7f9fc 100%);
   }
-  @media(min-width:900px){ .plan{ grid-column: span 4; } }
-  .plan h3{
-    margin:0;
-    font-size: 13px;
-    font-weight: 1000;
-    color: var(--text);
+
+  .space-visual{
+    height:190px;
   }
-  .plan p{
-    margin:6px 0 0;
-    font-size: 12px;
-    font-weight: 750;
-    color: var(--muted);
-    line-height:1.4;
+
+  .offer-visual{
+    height:220px;
   }
-  .plan .mini{
-    margin-top:10px;
+
+  .space-visual--client{
+    background:url("{% static 'img/home/home_client.jpg' %}") center/cover no-repeat;
+  }
+
+  .space-visual--laundry{
+    background:url("{% static 'img/home/home_laundry.jpg' %}") center/cover no-repeat;
+  }
+
+  .space-visual--driver{
+    background:url("{% static 'img/home/home_driver.jpg' %}") center/cover no-repeat;
+  }
+
+  .offer-visual--laundry{
+    background:url("{% static 'img/home/home_offer_laundry.jpg' %}") center/cover no-repeat;
+  }
+
+  .offer-visual--pressing{
+    background:url("{% static 'img/home/home_offer_pressing.jpg' %}") center/cover no-repeat;
+  }
+
+  .space-visual::before,
+  .offer-visual::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    border-radius:22px;
+    background:linear-gradient(180deg, rgba(11,30,58,.06), rgba(11,30,58,.28));
+    pointer-events:none;
+  }
+
+  .visual-chip-row{
+    position:absolute;
+    left:18px;
+    top:18px;
+    z-index:2;
     display:flex;
     gap:8px;
     flex-wrap:wrap;
   }
-  .tag{
-    font-size:11px;
-    font-weight:850;
-    padding:6px 10px;
+
+  .visual-chip{
+    display:inline-flex;
+    align-items:center;
+    min-height:28px;
+    padding:0 10px;
     border-radius:999px;
-    border:1px solid var(--line);
-    background: rgba(255,255,255,.72);
-    color: var(--muted);
+    background:#fff;
+    border:1px solid var(--fagni-line);
+    color:var(--fagni-blue);
+    font-size:11px;
+    font-weight:900;
+    box-shadow:0 8px 20px rgba(11,30,58,.06);
   }
 
-  /* Footer */
-  .foot{
-    margin-top: 14px;
-    color: var(--muted);
-    font-weight: 750;
-    font-size: 12px;
+  .visual-lines{
+    position:absolute;
+    left:24px;
+    right:24px;
+    top:62px;
+    display:grid;
+    gap:10px;
+    z-index:1;
   }
-  code{
-    background: rgba(2,6,23,.04);
-    border:1px solid var(--line);
-    padding:2px 6px;
-    border-radius: 10px;
+
+  .visual-line{
+    height:12px;
+    border-radius:999px;
+    background:rgba(11,30,58,.08);
   }
+
+  .visual-line.short{ width:48%; }
+  .visual-line.mid{ width:72%; }
+  .visual-line.long{ width:88%; }
+
+  .visual-footer{
+    position:absolute;
+    left:20px;
+    right:20px;
+    bottom:18px;
+    z-index:2;
+  }
+
+  .visual-footer strong{
+    display:block;
+    font-size:15px;
+    font-weight:1000;
+    color:var(--fagni-blue);
+  }
+
+  .visual-footer span{
+    display:block;
+    margin-top:5px;
+    font-size:12px;
+    line-height:1.42;
+    color:var(--fagni-muted);
+    font-weight:800;
+  }
+
+  .price{
+    font-size:13px;
+    font-weight:1000;
+    color:var(--fagni-ink);
+    white-space:nowrap;
+  }
+
+  .list{
+    margin:12px 0 0;
+    padding-left:18px;
+  }
+
+  .list li{
+    margin:7px 0;
+    color:var(--fagni-ink);
+    font-size:13px;
+    line-height:1.42;
+  }
+
+  .steps{
+    margin-top:12px;
+    display:grid;
+    grid-template-columns:repeat(12,minmax(0,1fr));
+    gap:12px;
+  }
+
+  .step{
+    grid-column:span 12;
+    border:1px solid rgba(15,23,42,.08);
+    border-radius:20px;
+    background:rgba(11,30,58,.02);
+    padding:16px;
+  }
+
+  @media(min-width:900px){
+    .step{ grid-column:span 4; }
+  }
+
+  .step-n{
+    width:32px;
+    height:32px;
+    border-radius:11px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#fff;
+    border:1px solid var(--fagni-line);
+    color:var(--fagni-ink);
+    font-weight:1000;
+    font-size:13px;
+  }
+
+  .step-title{
+    margin-top:10px;
+    font-size:14px;
+    font-weight:1000;
+    color:var(--fagni-ink);
+  }
+
+  .step-desc{
+    margin-top:6px;
+    color:var(--fagni-muted);
+    font-size:13px;
+    line-height:1.5;
+    font-weight:750;
+  }
+
+  .mini-card{
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    min-height:168px;
+  }
+
+  .footer-note{
+    margin-top:16px;
+    padding:14px 16px;
+    border-radius:18px;
+    border:1px solid var(--fagni-line);
+    background:rgba(255,255,255,.88);
+    color:var(--fagni-muted);
+    font-size:12px;
+    font-weight:750;
+    text-align:center;
+  }
+
+  @media(max-width:1100px){
+    .hero{
+      min-height:unset;
+    }
+    .hero-inner{
+      grid-template-columns:1fr;
+      min-height:unset;
+    }
+    .hero-side{
+      justify-content:flex-start;
+    }
+  }
+
+  @media(max-width:720px){
+    .home-topbar{ padding:10px; }
+    .top-actions, .hero-actions{ width:100%; }
+    .top-actions .btn, .hero-actions .btn{ width:100%; }
+    .hero-inner{ padding:20px 18px 18px; }
+    .hero-title{ font-size:34px; }
+  }
+
+  /* ===== PATCH VISUELS PREMIUM FAGNI ===== */
+
+  .space-visual,
+  .offer-visual{
+    position:relative;
+    overflow:hidden;
+    transition:transform .25s ease, box-shadow .25s ease;
+  }
+
+  .space-visual:hover,
+  .offer-visual:hover{
+    transform:scale(1.03);
+    box-shadow:0 14px 34px rgba(0,0,0,.15);
+  }
+
+  .space-visual::after,
+  .offer-visual::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:linear-gradient(
+      to bottom,
+      rgba(0,0,0,0.05),
+      rgba(0,0,0,0.35)
+    );
+    pointer-events:none;
+  }
+
+
+  /* ===== FINAL HOME CLEANUP FAGNI ===== */
+
+  .space-visual,
+  .offer-visual{
+    position:relative;
+    overflow:hidden;
+    transition:transform .22s ease, box-shadow .22s ease;
+  }
+
+  .space-visual:hover,
+  .offer-visual:hover{
+    transform:translateY(-2px);
+    box-shadow:0 14px 28px rgba(11,30,58,.14);
+  }
+
+  /* On retire les surcouches textuelles dans les visuels */
+  .space-visual > *,
+  .offer-visual > *{
+    display:none !important;
+  }
+
+  /* Overlay plus léger et plus premium */
+  .space-visual::after,
+  .offer-visual::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:linear-gradient(
+      180deg,
+      rgba(11,30,58,.04) 0%,
+      rgba(11,30,58,.18) 100%
+    );
+    pointer-events:none;
+  }
+
+  /* Un peu plus de respiration visuelle */
+  .card-sub{
+    line-height:1.55;
+  }
+
+  .card-actions .btn{
+    min-height:44px;
+  }
+
+  /* Hero plus net sans casser la structure */
+  .hero{
+    box-shadow:0 26px 56px rgba(11,30,58,.18);
+  }
+
+  .hero-desc{
+    max-width:560px;
+  }
+
+
+  /* ===== HERO PREMIUM FINAL FAGNI ===== */
+
+  .hero{
+    position:relative;
+    overflow:hidden;
+    min-height:720px;
+    border-radius:34px;
+    background:
+      linear-gradient(90deg, rgba(8,18,38,.88) 0%, rgba(8,18,38,.74) 34%, rgba(8,18,38,.40) 62%, rgba(8,18,38,.18) 100%),
+      radial-gradient(circle at 18% 22%, rgba(255,122,0,.18), rgba(255,122,0,0) 34%),
+      url("{% static 'img/home/home_client.jpg' %}") center right / cover no-repeat !important;
+    box-shadow:0 26px 64px rgba(11,30,58,.20);
+    border:1px solid rgba(255,255,255,.08);
+  }
+
+  .hero::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0)),
+      linear-gradient(0deg, rgba(8,18,38,.10), rgba(8,18,38,.10));
+    pointer-events:none;
+  }
+
+  .hero-inner{
+    position:relative;
+    z-index:2;
+    width:min(700px, 100%);
+    padding:34px 30px 34px;
+  }
+
+  .hero-title{
+    max-width:620px;
+    font-size:56px;
+    line-height:1.02;
+    letter-spacing:-.045em;
+    text-shadow:0 8px 28px rgba(0,0,0,.18);
+  }
+
+  .hero-desc{
+    max-width:560px;
+    font-size:15px;
+    line-height:1.65;
+    color:rgba(255,255,255,.88);
+    text-shadow:0 4px 18px rgba(0,0,0,.14);
+  }
+
+  .hero-trust{
+    margin-top:18px;
+    gap:10px;
+  }
+
+  .trust-pill{
+    background:rgba(255,255,255,.10);
+    border:1px solid rgba(255,255,255,.16);
+    backdrop-filter:blur(10px);
+    color:#fff;
+  }
+
+  .hero-float{
+    right:26px;
+    bottom:26px;
+    width:min(360px, calc(100% - 52px));
+    background:rgba(255,255,255,.12);
+    border:1px solid rgba(255,255,255,.18);
+    backdrop-filter:blur(14px);
+    box-shadow:0 22px 44px rgba(0,0,0,.20);
+  }
+
+  .hero-float-v{
+    font-size:20px;
+    line-height:1.18;
+  }
+
+  .hero-float-sub{
+    font-size:12px;
+    line-height:1.55;
+  }
+
+  .hero-actions .btn-primary{
+    box-shadow:0 18px 34px rgba(255,122,0,.30);
+  }
+
+  .hero-actions .btn-light{
+    background:rgba(255,255,255,.12);
+    border-color:rgba(255,255,255,.18);
+    color:#fff;
+  }
+
+  @media(max-width:1100px){
+    .hero{
+      min-height:680px;
+      background:
+        linear-gradient(180deg, rgba(8,18,38,.84) 0%, rgba(8,18,38,.58) 48%, rgba(8,18,38,.42) 100%),
+        radial-gradient(circle at 18% 22%, rgba(255,122,0,.16), rgba(255,122,0,0) 36%),
+        url("{% static 'img/home/home_client.jpg' %}") center center / cover no-repeat !important;
+    }
+
+    .hero-float{
+      margin:18px 18px 18px auto;
+    }
+  }
+
+  @media(max-width:720px){
+    .hero{
+      min-height:unset;
+      border-radius:28px;
+    }
+
+    .hero-inner{
+      padding:22px 18px 20px;
+    }
+
+    .hero-title{
+      font-size:40px;
+      max-width:100%;
+    }
+
+    .hero-desc{
+      max-width:100%;
+      font-size:14px;
+    }
+
+    .hero-float{
+      position:relative;
+      right:auto;
+      bottom:auto;
+      width:calc(100% - 36px);
+      margin:14px 18px 18px;
+    }
+  }
+
+
+  /* ===== FAGNI FINAL POLISH ===== */
+
+  .home-wrap{
+    padding-top:0 !important;
+  }
+
+  .home-topbar{
+    margin-top:0 !important;
+  }
+
+  .hero{
+    min-height:620px !important;
+    border-radius:30px !important;
+    box-shadow:0 24px 54px rgba(11,30,58,.18) !important;
+  }
+
+  .hero-inner{
+    width:min(620px,100%) !important;
+    padding:28px 24px 28px !important;
+  }
+
+  .hero-title{
+    font-size:48px !important;
+    line-height:1.02 !important;
+    max-width:520px !important;
+  }
+
+  .hero-desc{
+    max-width:500px !important;
+    font-size:14px !important;
+    line-height:1.6 !important;
+  }
+
+  .hero-actions{
+    margin-top:16px !important;
+  }
+
+  .hero-trust{
+    margin-top:14px !important;
+    gap:8px !important;
+  }
+
+  .trust-pill,
+  .hero-chip{
+    font-size:11px !important;
+  }
+
+  .hero-float{
+    width:300px !important;
+    right:20px !important;
+    bottom:20px !important;
+    padding:14px !important;
+    border-radius:18px !important;
+    background:rgba(255,255,255,.10) !important;
+    border:1px solid rgba(255,255,255,.16) !important;
+    backdrop-filter:blur(12px) !important;
+  }
+
+  .hero-float-v{
+    font-size:18px !important;
+  }
+
+  .hero-float-sub{
+    font-size:11px !important;
+    line-height:1.5 !important;
+  }
+
+  .section{
+    margin-top:14px !important;
+  }
+
+  .grid{
+    gap:12px !important;
+  }
+
+  .card{
+    border-radius:22px !important;
+    padding:16px !important;
+    box-shadow:0 10px 24px rgba(11,30,58,.08) !important;
+  }
+
+  .card-title{
+    font-size:15px !important;
+  }
+
+  .card-sub{
+    font-size:12px !important;
+    line-height:1.5 !important;
+  }
+
+  .space-visual{
+    height:165px !important;
+    border-radius:18px !important;
+  }
+
+  .offer-visual{
+    height:175px !important;
+    border-radius:18px !important;
+  }
+
+  .steps{
+    gap:10px !important;
+  }
+
+  .step{
+    padding:14px !important;
+    border-radius:18px !important;
+  }
+
+  .step-title{
+    font-size:13px !important;
+  }
+
+  .step-desc{
+    font-size:12px !important;
+  }
+
+  .footer-note{
+    margin-top:14px !important;
+    padding:12px 14px !important;
+  }
+
+  @media (max-width: 900px){
+    .hero{
+      min-height:560px !important;
+    }
+
+    .hero-title{
+      font-size:40px !important;
+      max-width:100% !important;
+    }
+
+    .hero-desc{
+      max-width:100% !important;
+    }
+
+    .hero-float{
+      width:calc(100% - 32px) !important;
+      right:16px !important;
+      bottom:16px !important;
+    }
+  }
+
+  @media (max-width: 720px){
+    .hero{
+      min-height:auto !important;
+    }
+
+    .hero-inner{
+      padding:22px 18px 20px !important;
+    }
+
+    .hero-title{
+      font-size:34px !important;
+    }
+
+    .hero-float{
+      position:relative !important;
+      width:100% !important;
+      right:auto !important;
+      bottom:auto !important;
+      margin-top:14px !important;
+    }
+
+    .space-visual{
+      height:150px !important;
+    }
+
+    .offer-visual{
+      height:160px !important;
+    }
+  }
+
+
+  /* ===== FAGNI AUTO PATCH FINAL ===== */
+
+  .home-wrap{
+    padding-top:0 !important;
+  }
+
+  .home-topbar{
+    margin-top:0 !important;
+  }
+
+  .hero{
+    min-height:600px !important;
+    background-position:65% center !important;
+    box-shadow:0 24px 56px rgba(11,30,58,.18) !important;
+  }
+
+  .hero-inner{
+    width:min(600px,100%) !important;
+    padding:26px 22px 26px !important;
+  }
+
+  .hero-title{
+    font-size:46px !important;
+    line-height:1.03 !important;
+    max-width:500px !important;
+  }
+
+  .hero-desc{
+    max-width:480px !important;
+    font-size:14px !important;
+    line-height:1.58 !important;
+  }
+
+  .hero-actions{
+    margin-top:14px !important;
+  }
+
+  .hero-trust{
+    margin-top:12px !important;
+    gap:8px !important;
+  }
+
+  .hero-chip,
+  .trust-pill{
+    font-size:11px !important;
+  }
+
+  .hero-float{
+    width:280px !important;
+    padding:12px !important;
+    right:18px !important;
+    bottom:18px !important;
+    border-radius:18px !important;
+    background:rgba(255,255,255,.08) !important;
+    border:1px solid rgba(255,255,255,.14) !important;
+    box-shadow:0 18px 34px rgba(0,0,0,.18) !important;
+  }
+
+  .hero-float-v{
+    font-size:17px !important;
+    line-height:1.18 !important;
+  }
+
+  .hero-float-sub{
+    font-size:11px !important;
+    line-height:1.45 !important;
+  }
+
+  .card{
+    transition:transform .20s ease, box-shadow .20s ease !important;
+  }
+
+  .card:hover{
+    transform:translateY(-4px) !important;
+    box-shadow:0 18px 40px rgba(11,30,58,.12) !important;
+  }
+
+  .space-visual,
+  .offer-visual{
+    border-radius:18px !important;
+  }
+
+  .card-sub{
+    line-height:1.52 !important;
+  }
+
+  @media (max-width: 900px){
+    .hero{
+      min-height:540px !important;
+      background-position:60% center !important;
+    }
+
+    .hero-title{
+      font-size:40px !important;
+      max-width:100% !important;
+    }
+
+    .hero-desc{
+      max-width:100% !important;
+    }
+
+    .hero-float{
+      width:260px !important;
+      right:16px !important;
+      bottom:16px !important;
+    }
+  }
+
+  @media (max-width: 720px){
+    .hero{
+      min-height:auto !important;
+      background-position:center center !important;
+    }
+
+    .hero-inner{
+      padding:20px 16px 18px !important;
+    }
+
+    .hero-title{
+      font-size:34px !important;
+    }
+
+    .hero-float{
+      position:relative !important;
+      width:100% !important;
+      right:auto !important;
+      bottom:auto !important;
+      margin-top:14px !important;
+    }
+  }
+
+
+
+/* ===== FINAL FAGNI UI PATCH ===== */
+
+.hero{
+background-position:72% center !important;
+}
+
+.hero-float{
+width:260px !important;
+background:rgba(255,255,255,.06) !important;
+}
+
+.space-visual,
+.offer-visual{
+transition:transform .25s ease;
+}
+
+.space-visual:hover,
+.offer-visual:hover{
+transform:scale(1.04);
+}
+
+
+
+  /* ===== FAGNI HOMEPAGE UPGRADE ===== */
+
+  .hero{
+    min-height:560px !important;
+    background-position:72% center !important;
+    box-shadow:0 24px 56px rgba(11,30,58,.18) !important;
+  }
+
+  .hero::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:linear-gradient(
+      90deg,
+      rgba(10,20,40,.72) 0%,
+      rgba(10,20,40,.58) 34%,
+      rgba(10,20,40,.26) 58%,
+      rgba(10,20,40,.06) 100%
+    );
+    pointer-events:none;
+  }
+
+  .hero-inner{
+    position:relative;
+    z-index:2;
+    width:min(560px,100%) !important;
+    padding:24px 20px 24px !important;
+  }
+
+  .hero-title{
+    font-size:52px !important;
+    line-height:1.02 !important;
+    letter-spacing:-.04em !important;
+    max-width:500px !important;
+    margin:18px 0 12px !important;
+  }
+
+  .hero-desc{
+    max-width:470px !important;
+    font-size:15px !important;
+    line-height:1.6 !important;
+    color:rgba(255,255,255,.90) !important;
+  }
+
+  .hero-actions{
+    margin-top:18px !important;
+    gap:10px !important;
+  }
+
+  .hero-actions .btn{
+    min-height:48px !important;
+    padding:0 18px !important;
+    font-size:14px !important;
+  }
+
+  .hero-trust{
+    margin-top:14px !important;
+    gap:8px !important;
+  }
+
+  .trust-pill{
+    background:rgba(255,255,255,.10) !important;
+    border:1px solid rgba(255,255,255,.16) !important;
+    color:#fff !important;
+    font-size:12px !important;
+  }
+
+  .hero-chip{
+    font-size:11px !important;
+  }
+
+  .flow-strip{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    flex-wrap:wrap;
+    padding:14px 16px;
+    border:1px solid rgba(15,23,42,.08);
+    background:rgba(255,255,255,.92);
+    border-radius:20px;
+    box-shadow:0 10px 24px rgba(11,30,58,.06);
+  }
+
+  .flow-step{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 14px;
+    border-radius:999px;
+    background:#fff;
+    border:1px solid rgba(15,23,42,.08);
+    font-weight:900;
+    color:#0f172a;
+    font-size:13px;
+  }
+
+  .flow-n{
+    width:24px;
+    height:24px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:999px;
+    background:linear-gradient(90deg,#ff7a00,#ffab4d);
+    color:#111827;
+    font-size:12px;
+    font-weight:1000;
+  }
+
+  .flow-arrow{
+    color:#94a3b8;
+    font-weight:1000;
+    font-size:18px;
+  }
+
+  .grid{
+    gap:14px !important;
+  }
+
+  .card{
+    border-radius:22px !important;
+    padding:16px !important;
+    box-shadow:0 10px 24px rgba(11,30,58,.08) !important;
+    transition:transform .18s ease, box-shadow .18s ease !important;
+  }
+
+  .card:hover{
+    transform:translateY(-3px) !important;
+    box-shadow:0 18px 36px rgba(11,30,58,.12) !important;
+  }
+
+  .card-title{
+    font-size:16px !important;
+  }
+
+  .card-sub{
+    font-size:13px !important;
+    line-height:1.55 !important;
+  }
+
+  .space-visual{
+    height:170px !important;
+    border-radius:18px !important;
+  }
+
+  .offer-visual{
+    height:185px !important;
+    border-radius:18px !important;
+  }
+
+  .card-actions .btn{
+    min-height:44px !important;
+  }
+
+  .steps{
+    gap:12px !important;
+  }
+
+  .step{
+    border-radius:18px !important;
+    padding:16px !important;
+  }
+
+  .step-title{
+    font-size:14px !important;
+  }
+
+  .step-desc{
+    font-size:13px !important;
+    line-height:1.55 !important;
+  }
+
+  .footer-note{
+    font-size:12px !important;
+  }
+
+  @media(max-width:900px){
+    .hero{
+      min-height:520px !important;
+      background-position:70% center !important;
+    }
+
+    .hero-title{
+      font-size:42px !important;
+      max-width:100% !important;
+    }
+
+    .hero-desc{
+      max-width:100% !important;
+      font-size:14px !important;
+    }
+
+    .space-visual{
+      height:160px !important;
+    }
+
+    .offer-visual{
+      height:170px !important;
+    }
+  }
+
+  @media(max-width:720px){
+    .hero{
+      min-height:auto !important;
+      background-position:center center !important;
+    }
+
+    .hero-inner{
+      width:100% !important;
+      padding:20px 16px 20px !important;
+    }
+
+    .hero-title{
+      font-size:34px !important;
+      line-height:1.04 !important;
+    }
+
+    .hero-actions{
+      flex-direction:column;
+      align-items:stretch;
+    }
+
+    .hero-actions .btn{
+      width:100%;
+    }
+
+    .flow-strip{
+      justify-content:flex-start;
+    }
+
+    .flow-arrow{
+      display:none;
+    }
+  }
+
+
+  /* ===== FAGNI REAL HERO FINAL ===== */
+
+  .hero{
+    position:relative !important;
+    overflow:hidden !important;
+    min-height:580px !important;
+    border-radius:30px !important;
+    background:
+      linear-gradient(90deg,
+        rgba(10,20,40,.76) 0%,
+        rgba(10,20,40,.60) 34%,
+        rgba(10,20,40,.28) 60%,
+        rgba(10,20,40,.06) 100%
+      ),
+      url("{% static 'img/home/hero_fagni.jpg' %}") 70% center / cover no-repeat !important;
+    box-shadow:0 24px 56px rgba(11,30,58,.18) !important;
+    border:1px solid rgba(255,255,255,.08) !important;
+  }
+
+  .hero::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:
+      radial-gradient(circle at 18% 22%, rgba(255,122,0,.10), rgba(255,122,0,0) 28%),
+      linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
+    pointer-events:none;
+  }
+
+  .hero-inner{
+    position:relative !important;
+    z-index:2 !important;
+    width:min(560px,100%) !important;
+    padding:28px 22px 28px !important;
+  }
+
+  .hero-title{
+    font-size:54px !important;
+    line-height:1.02 !important;
+    letter-spacing:-.045em !important;
+    max-width:520px !important;
+    margin:18px 0 12px !important;
+    color:#fff !important;
+    text-shadow:0 8px 24px rgba(0,0,0,.16) !important;
+    white-space:pre-line !important;
+  }
+
+  .hero-desc{
+    max-width:500px !important;
+    font-size:15px !important;
+    line-height:1.62 !important;
+    color:rgba(255,255,255,.90) !important;
+    text-shadow:0 4px 16px rgba(0,0,0,.12) !important;
+  }
+
+  .hero-actions{
+    margin-top:18px !important;
+    gap:10px !important;
+  }
+
+  .hero-actions .btn{
+    min-height:48px !important;
+    padding:0 18px !important;
+    font-size:14px !important;
+  }
+
+  .hero-actions .btn-primary{
+    box-shadow:0 16px 34px rgba(255,122,0,.28) !important;
+  }
+
+  .hero-actions .btn-light{
+    background:rgba(255,255,255,.12) !important;
+    border-color:rgba(255,255,255,.18) !important;
+    color:#fff !important;
+    backdrop-filter:blur(8px) !important;
+  }
+
+  .hero-trust{
+    margin-top:14px !important;
+    gap:8px !important;
+  }
+
+  .trust-pill{
+    background:rgba(255,255,255,.10) !important;
+    border:1px solid rgba(255,255,255,.16) !important;
+    color:#fff !important;
+    font-size:12px !important;
+    backdrop-filter:blur(8px) !important;
+  }
+
+  .hero-chip{
+    font-size:11px !important;
+    background:rgba(255,255,255,.10) !important;
+    border-color:rgba(255,255,255,.14) !important;
+    color:#fff !important;
+  }
+
+  @media(max-width:900px){
+    .hero{
+      min-height:520px !important;
+      background:
+        linear-gradient(90deg,
+          rgba(10,20,40,.78) 0%,
+          rgba(10,20,40,.62) 38%,
+          rgba(10,20,40,.26) 62%,
+          rgba(10,20,40,.08) 100%
+        ),
+        url("{% static 'img/home/hero_fagni.jpg' %}") 74% center / cover no-repeat !important;
+    }
+
+    .hero-title{
+      font-size:42px !important;
+      max-width:100% !important;
+    }
+
+    .hero-desc{
+      max-width:100% !important;
+      font-size:14px !important;
+    }
+  }
+
+  @media(max-width:720px){
+    .hero{
+      min-height:500px !important;
+      background:
+        linear-gradient(180deg,
+          rgba(10,20,40,.72) 0%,
+          rgba(10,20,40,.52) 46%,
+          rgba(10,20,40,.24) 100%
+        ),
+        url("{% static 'img/home/hero_fagni.jpg' %}") 68% center / cover no-repeat !important;
+    }
+
+    .hero-inner{
+      width:100% !important;
+      padding:20px 16px 20px !important;
+    }
+
+    .hero-title{
+      font-size:36px !important;
+      line-height:1.04 !important;
+    }
+
+    .hero-desc{
+      font-size:14px !important;
+    }
+
+    .hero-actions{
+      flex-direction:column !important;
+      align-items:stretch !important;
+    }
+
+    .hero-actions .btn{
+      width:100% !important;
+    }
+  }
+
+
+  /* ===== FAGNI HERO VISIBILITY PATCH ===== */
+
+  .hero{
+    position:relative !important;
+    overflow:hidden !important;
+    min-height:580px !important;
+    border-radius:30px !important;
+    background:
+      linear-gradient(
+        90deg,
+        rgba(10,20,40,.55) 0%,
+        rgba(10,20,40,.35) 40%,
+        rgba(10,20,40,.12) 65%,
+        rgba(10,20,40,0) 100%
+      ),
+      url("{% static 'img/home/hero_fagni.jpg' %}") 70% center / cover no-repeat !important;
+    box-shadow:0 24px 56px rgba(11,30,58,.18) !important;
+    border:1px solid rgba(255,255,255,.08) !important;
+  }
+
+  .hero::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:
+      radial-gradient(circle at 18% 22%, rgba(255,122,0,.08), rgba(255,122,0,0) 30%),
+      linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
+    pointer-events:none;
+  }
+
+  .hero-inner{
+    position:relative !important;
+    z-index:2 !important;
+    width:min(560px,100%) !important;
+    padding:26px 22px 26px !important;
+  }
+
+  .hero-title{
+    font-size:52px !important;
+    line-height:1.02 !important;
+    letter-spacing:-.04em !important;
+    max-width:520px !important;
+    margin:18px 0 12px !important;
+    color:#fff !important;
+    text-shadow:0 8px 24px rgba(0,0,0,.14) !important;
+  }
+
+  .hero-desc{
+    max-width:500px !important;
+    font-size:15px !important;
+    line-height:1.6 !important;
+    color:rgba(255,255,255,.92) !important;
+    text-shadow:0 4px 16px rgba(0,0,0,.10) !important;
+  }
+
+  .hero-actions{
+    margin-top:18px !important;
+    gap:10px !important;
+  }
+
+  .hero-actions .btn{
+    min-height:48px !important;
+    padding:0 18px !important;
+    font-size:14px !important;
+  }
+
+  .hero-actions .btn-primary{
+    box-shadow:0 16px 34px rgba(255,122,0,.24) !important;
+  }
+
+  .hero-actions .btn-light{
+    background:rgba(255,255,255,.12) !important;
+    border-color:rgba(255,255,255,.18) !important;
+    color:#fff !important;
+    backdrop-filter:blur(8px) !important;
+  }
+
+  .hero-trust{
+    margin-top:14px !important;
+    gap:8px !important;
+  }
+
+  .trust-pill,
+  .hero-chip{
+    background:rgba(255,255,255,.10) !important;
+    border:1px solid rgba(255,255,255,.16) !important;
+    color:#fff !important;
+    backdrop-filter:blur(8px) !important;
+  }
+
+  .trust-pill{
+    font-size:12px !important;
+  }
+
+  .hero-chip{
+    font-size:11px !important;
+  }
+
+  .hero-float{
+    width:250px !important;
+    padding:12px !important;
+    right:18px !important;
+    bottom:18px !important;
+    border-radius:18px !important;
+    background:rgba(255,255,255,.06) !important;
+    border:1px solid rgba(255,255,255,.12) !important;
+    box-shadow:0 14px 28px rgba(0,0,0,.14) !important;
+    backdrop-filter:blur(10px) !important;
+  }
+
+  .hero-float-k{
+    font-size:11px !important;
+  }
+
+  .hero-float-v{
+    font-size:16px !important;
+    line-height:1.18 !important;
+  }
+
+  .hero-float-sub{
+    font-size:11px !important;
+    line-height:1.45 !important;
+  }
+
+  @media(max-width:900px){
+    .hero{
+      min-height:520px !important;
+      background:
+        linear-gradient(
+          90deg,
+          rgba(10,20,40,.58) 0%,
+          rgba(10,20,40,.38) 42%,
+          rgba(10,20,40,.14) 66%,
+          rgba(10,20,40,0) 100%
+        ),
+        url("{% static 'img/home/hero_fagni.jpg' %}") 72% center / cover no-repeat !important;
+    }
+
+    .hero-title{
+      font-size:42px !important;
+      max-width:100% !important;
+    }
+
+    .hero-desc{
+      max-width:100% !important;
+      font-size:14px !important;
+    }
+  }
+
+  @media(max-width:720px){
+    .hero{
+      min-height:500px !important;
+      background:
+        linear-gradient(
+          180deg,
+          rgba(10,20,40,.66) 0%,
+          rgba(10,20,40,.42) 48%,
+          rgba(10,20,40,.16) 100%
+        ),
+        url("{% static 'img/home/hero_fagni.jpg' %}") 68% center / cover no-repeat !important;
+    }
+
+    .hero-inner{
+      width:100% !important;
+      padding:20px 16px 20px !important;
+    }
+
+    .hero-title{
+      font-size:36px !important;
+      line-height:1.04 !important;
+    }
+
+    .hero-desc{
+      font-size:14px !important;
+    }
+
+    .hero-actions{
+      flex-direction:column !important;
+      align-items:stretch !important;
+    }
+
+    .hero-actions .btn{
+      width:100% !important;
+    }
+
+    .hero-float{
+      width:100% !important;
+      right:auto !important;
+      bottom:auto !important;
+      margin-top:14px !important;
+    }
+  }
+
+
+  /* ===== FAGNI FINAL POLISH V2 ===== */
+
+  .hero{
+    min-height:520px !important;
+    border-radius:28px !important;
+    background:
+      linear-gradient(
+        90deg,
+        rgba(10,20,40,.60) 0%,
+        rgba(10,20,40,.38) 36%,
+        rgba(10,20,40,.14) 60%,
+        rgba(10,20,40,.04) 100%
+      ),
+      url("{% static 'img/home/hero_fagni.jpg' %}") 72% center / cover no-repeat !important;
+  }
+
+  .hero-inner{
+    width:min(540px,100%) !important;
+    padding:24px 20px 22px !important;
+  }
+
+  .hero-top{
+    margin-bottom:10px !important;
+  }
+
+  .hero-title{
+    font-size:48px !important;
+    max-width:500px !important;
+    margin:16px 0 10px !important;
+  }
+
+  .hero-desc{
+    max-width:470px !important;
+    font-size:14px !important;
+    line-height:1.58 !important;
+  }
+
+  .hero-actions{
+    margin-top:16px !important;
+  }
+
+  .hero-trust{
+    margin-top:12px !important;
+  }
+
+  .trust-pill{
+    font-size:11px !important;
+    padding:0 10px !important;
+    min-height:34px !important;
+  }
+
+  .flow-strip{
+    margin-top:2px !important;
+  }
+
+  .card{
+    background:rgba(255,255,255,.96) !important;
+    border:1px solid rgba(15,23,42,.08) !important;
+    border-radius:20px !important;
+    box-shadow:0 10px 22px rgba(11,30,58,.07) !important;
+  }
+
+  .card-title{
+    font-size:15px !important;
+  }
+
+  .card-sub{
+    font-size:12px !important;
+    line-height:1.5 !important;
+  }
+
+  .space-visual{
+    height:150px !important;
+    border-radius:16px !important;
+  }
+
+  .offer-visual{
+    height:165px !important;
+    border-radius:16px !important;
+  }
+
+  .card-actions .btn{
+    min-height:42px !important;
+    font-size:13px !important;
+  }
+
+  .step{
+    background:#fff !important;
+    border:1px solid rgba(15,23,42,.08) !important;
+    border-radius:18px !important;
+  }
+
+  .step-title{
+    font-size:13px !important;
+  }
+
+  .step-desc{
+    font-size:12px !important;
+  }
+
+  .mini-card{
+    min-height:150px !important;
+  }
+
+  .footer-note{
+    border-radius:16px !important;
+    background:#fff !important;
+  }
+
+  @media(max-width:900px){
+    .hero{
+      min-height:500px !important;
+      background:
+        linear-gradient(
+          90deg,
+          rgba(10,20,40,.62) 0%,
+          rgba(10,20,40,.40) 40%,
+          rgba(10,20,40,.16) 64%,
+          rgba(10,20,40,.04) 100%
+        ),
+        url("{% static 'img/home/hero_fagni.jpg' %}") 74% center / cover no-repeat !important;
+    }
+
+    .hero-title{
+      font-size:42px !important;
+    }
+  }
+
+  @media(max-width:720px){
+    .hero{
+      min-height:460px !important;
+      border-radius:24px !important;
+      background:
+        linear-gradient(
+          180deg,
+          rgba(10,20,40,.66) 0%,
+          rgba(10,20,40,.44) 48%,
+          rgba(10,20,40,.16) 100%
+        ),
+        url("{% static 'img/home/hero_fagni.jpg' %}") 68% center / cover no-repeat !important;
+    }
+
+    .hero-inner{
+      padding:18px 16px 18px !important;
+    }
+
+    .hero-title{
+      font-size:34px !important;
+      line-height:1.04 !important;
+    }
+
+    .hero-desc{
+      font-size:13px !important;
+    }
+
+    .space-visual{
+      height:140px !important;
+    }
+
+    .offer-visual{
+      height:150px !important;
+    }
+  }
+
+
+  /* ===== FAGNI REMOVE HERO FLOAT FINAL ===== */
+
+  .hero{
+    min-height:470px !important;
+    border-radius:26px !important;
+    background:
+      linear-gradient(
+        90deg,
+        rgba(10,20,40,.60) 0%,
+        rgba(10,20,40,.38) 36%,
+        rgba(10,20,40,.14) 60%,
+        rgba(10,20,40,.04) 100%
+      ),
+      url("{% static 'img/home/hero_fagni.jpg' %}") 72% center / cover no-repeat !important;
+  }
+
+  .hero-inner{
+    width:min(520px,100%) !important;
+    padding:22px 18px 20px !important;
+  }
+
+  .hero-title{
+    font-size:44px !important;
+    line-height:1.03 !important;
+    margin:14px 0 10px !important;
+    max-width:480px !important;
+  }
+
+  .hero-desc{
+    max-width:460px !important;
+    font-size:14px !important;
+    line-height:1.55 !important;
+  }
+
+  .hero-actions{
+    margin-top:14px !important;
+  }
+
+  .hero-actions .btn{
+    min-height:44px !important;
+    font-size:13px !important;
+  }
+
+  .hero-trust{
+    margin-top:10px !important;
+    gap:8px !important;
+  }
+
+  .trust-pill{
+    min-height:32px !important;
+    font-size:11px !important;
+    padding:0 10px !important;
+  }
+
+  .hero-chip{
+    min-height:30px !important;
+    font-size:10px !important;
+    padding:0 10px !important;
+  }
+
+  @media(max-width:900px){
+    .hero{
+      min-height:440px !important;
+      background:
+        linear-gradient(
+          90deg,
+          rgba(10,20,40,.62) 0%,
+          rgba(10,20,40,.40) 40%,
+          rgba(10,20,40,.16) 64%,
+          rgba(10,20,40,.05) 100%
+        ),
+        url("{% static 'img/home/hero_fagni.jpg' %}") 74% center / cover no-repeat !important;
+    }
+
+    .hero-title{
+      font-size:38px !important;
+    }
+  }
+
+  @media(max-width:720px){
+    .hero{
+      min-height:420px !important;
+      border-radius:22px !important;
+      background:
+        linear-gradient(
+          180deg,
+          rgba(10,20,40,.66) 0%,
+          rgba(10,20,40,.44) 48%,
+          rgba(10,20,40,.16) 100%
+        ),
+        url("{% static 'img/home/hero_fagni.jpg' %}") 68% center / cover no-repeat !important;
+    }
+
+    .hero-inner{
+      padding:18px 14px 18px !important;
+    }
+
+    .hero-title{
+      font-size:32px !important;
+      line-height:1.05 !important;
+    }
+
+    .hero-desc{
+      font-size:13px !important;
+    }
+  }
+
+
+  /* ===== FAGNI HARD REMOVE EXPERIENCE FIX ===== */
+
+  .hero{
+    min-height:430px !important;
+    background:
+      linear-gradient(
+        90deg,
+        rgba(10,20,40,.58) 0%,
+        rgba(10,20,40,.34) 36%,
+        rgba(10,20,40,.12) 60%,
+        rgba(10,20,40,.04) 100%
+      ),
+      url("{% static 'img/home/hero_fagni.jpg' %}") 72% center / cover no-repeat !important;
+  }
+
+  .hero-inner{
+    width:min(500px,100%) !important;
+    padding:18px 18px 18px !important;
+  }
+
+  .hero-title{
+    font-size:40px !important;
+    margin:12px 0 8px !important;
+    max-width:440px !important;
+  }
+
+  .hero-desc{
+    font-size:13px !important;
+    line-height:1.5 !important;
+    max-width:430px !important;
+  }
+
+  .hero-actions .btn{
+    min-height:42px !important;
+    font-size:13px !important;
+  }
+
+  .hero-trust{
+    margin-top:10px !important;
+  }
+
+  @media(max-width:720px){
+    .hero{
+      min-height:390px !important;
+    }
+
+    .hero-title{
+      font-size:30px !important;
+    }
+
+    .hero-desc{
+      font-size:12px !important;
+    }
+  }
+
+
+  /* ===== FAGNI FORCE HIDE EXPERIENCE BLOCK ===== */
+
+  .hero .hero-trust + div{
+    display:none !important;
+  }
+
+  .hero-float{
+    display:none !important;
+    visibility:hidden !important;
+    opacity:0 !important;
+    pointer-events:none !important;
+  }
+
+  .hero{
+    min-height:420px !important;
+  }
+
+  .hero-inner{
+    padding-bottom:18px !important;
+  }
+
+
+  /* ===== FAGNI REMOVE HERO MOCK FINAL ===== */
+
+  .hero-mock,
+  .hero-mockup,
+  .hero-mock-card,
+  .hero-mock-panel{
+    display:none !important;
+    visibility:hidden !important;
+    opacity:0 !important;
+    pointer-events:none !important;
+  }
+
+  .hero{
+    min-height:410px !important;
+  }
+
+  .hero-inner{
+    width:min(500px,100%) !important;
+    padding:18px 18px 18px !important;
+  }
+
+  .hero-title{
+    font-size:40px !important;
+    margin:12px 0 8px !important;
+    max-width:440px !important;
+  }
+
+  .hero-desc{
+    font-size:13px !important;
+    line-height:1.5 !important;
+    max-width:430px !important;
+  }
+
+  .hero-actions .btn{
+    min-height:42px !important;
+    font-size:13px !important;
+  }
+
+  @media(max-width:720px){
+    .hero{
+      min-height:390px !important;
+    }
+
+    .hero-title{
+      font-size:30px !important;
+    }
+
+    .hero-desc{
+      font-size:12px !important;
+    }
+  }
+
+
+  /* ===== FAGNI DYNAMIC PRICES STRIP ===== */
+
+  .hero-price-strip{
+    margin-top:14px;
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  .hero-price-pill{
+    display:inline-flex;
+    align-items:center;
+    min-height:38px;
+    padding:0 12px;
+    border-radius:999px;
+    background:rgba(255,255,255,.10);
+    border:1px solid rgba(255,255,255,.18);
+    color:#fff;
+    font-size:12px;
+    font-weight:900;
+    backdrop-filter:blur(8px);
+  }
+
+  @media(max-width:720px){
+    .hero-price-strip{
+      flex-direction:column;
+      align-items:stretch;
+    }
+
+    .hero-price-pill{
+      width:100%;
+      justify-content:center;
+    }
+  }
+
+
+  /* ===== FAGNI HERO TEXT UPGRADE ===== */
+
+  .hero-inner{
+    width:min(620px,100%) !important;
+    padding:26px 24px 24px !important;
+  }
+
+  .hero-title{
+    font-size:52px !important;
+    line-height:1.15 !important;
+    font-weight:900 !important;
+    letter-spacing:-.03em !important;
+    max-width:520px !important;
+    margin:14px 0 10px !important;
+  }
+
+  .hero-desc{
+    font-size:16px !important;
+    line-height:1.6 !important;
+    max-width:520px !important;
+    opacity:.96 !important;
+    margin-top:14px !important;
+  }
+
+  .hero-actions{
+    margin-top:24px !important;
+    display:flex !important;
+    gap:12px !important;
+    flex-wrap:wrap !important;
+  }
+
+  .hero-actions .btn{
+    min-height:46px !important;
+    padding:0 18px !important;
+    font-size:14px !important;
+  }
+
+  .hero-benefits{
+    margin-top:18px !important;
+    display:flex !important;
+    gap:14px !important;
+    flex-wrap:wrap !important;
+    align-items:center !important;
+    font-size:13px !important;
+    font-weight:700 !important;
+    color:rgba(255,255,255,.88) !important;
+  }
+
+  .hero-benefits span{
+    display:inline-flex !important;
+    align-items:center !important;
+    gap:6px !important;
+  }
+
+  .hero{
+    background:
+      linear-gradient(
+        90deg,
+        rgba(15,23,42,.75) 0%,
+        rgba(15,23,42,.55) 40%,
+        rgba(15,23,42,.10) 70%,
+        rgba(15,23,42,0) 100%
+      ),
+      url("{% static 'img/home/hero_fagni.jpg' %}") 72% center / cover no-repeat !important;
+  }
+
+  @media(max-width:900px){
+    .hero-inner{
+      width:min(560px,100%) !important;
+      padding:22px 20px 22px !important;
+    }
+
+    .hero-title{
+      font-size:44px !important;
+      max-width:500px !important;
+    }
+
+    .hero-desc{
+      font-size:15px !important;
+      max-width:500px !important;
+    }
+  }
+
+  @media(max-width:720px){
+    .hero-inner{
+      width:100% !important;
+      padding:18px 16px 18px !important;
+    }
+
+    .hero-title{
+      font-size:34px !important;
+      line-height:1.1 !important;
+      max-width:100% !important;
+    }
+
+    .hero-desc{
+      font-size:14px !important;
+      max-width:100% !important;
+    }
+
+    .hero-actions{
+      gap:10px !important;
+    }
+
+    .hero-benefits{
+      gap:8px !important;
+      font-size:12px !important;
+      flex-direction:column !important;
+      align-items:flex-start !important;
+    }
+  }
+
+
+  /* ===== FAGNI TRANSPORT UNIFIED ===== */
+
+  .offers-transport-strip{
+    padding:14px 16px;
+    border-radius:18px;
+    border:1px solid rgba(15,23,42,.08);
+    background:rgba(255,255,255,.96);
+    box-shadow:0 10px 22px rgba(11,30,58,.06);
+    color:#0f172a;
+    font-size:13px;
+    line-height:1.6;
+    font-weight:700;
+  }
+
+  .offers-transport-strip strong{
+    font-weight:900;
+  }
+
+  .hero{
+    min-height:400px !important;
+  }
+
+  @media(max-width:720px){
+    .offers-transport-strip{
+      font-size:12px;
+      padding:12px 14px;
+    }
+
+    .hero{
+      min-height:380px !important;
+    }
+  }
+
 </style>
 {% endblock %}
 
 {% block content %}
-<section class="fagni-hero">
-  <div class="hero-card">
-    <div class="hero-top">
-      <div class="logo-badge">F</div>
-      <div class="hero-txt">
-        <div class="hero-brand">FAGNI</div>
-        <div class="hero-sub">Pressing • Collecte • Livraison</div>
+
+
+
+
+    <section class="hero">
+    <div class="hero-inner">
+      <div class="hero-copy">
+        <div class="hero-top">
+          <div class="hero-brand-wrap">
+            <div class="hero-logo">
+              <img src="{% static 'img/logo_fagni.png' %}" alt="FAGNI">
+            </div>
+            <div>
+              <div class="hero-kicker">FAGNI</div>
+              <div class="hero-mini">Laundry • Logistics • Pressing digital</div>
+            </div>
+          </div>
+
+          <div class="hero-chip-row">
+            <span class="hero-chip">Abidjan</span>
+            <span class="hero-chip">Collecte à domicile</span>
+            <span class="hero-chip">Paiement Wave</span>
+          </div>
+        </div>
+
+        <h1 class="hero-title">Le pressing digital simple,
+traçable et premium.</h1>
+        <p class="hero-desc">
+          FAGNI permet de commander une collecte, suivre le traitement du linge,
+          payer simplement et recevoir ses articles à domicile avec un parcours
+          plus clair, plus moderne et mieux organisé.
+        </p>
+
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="/orders/client/">✅ Commander maintenant</a>
+          <a class="btn btn-light" href="/orders/client/">📦 Suivre ma commande</a>
+          {% if request.user.is_authenticated and request.user.is_staff %}
+            <a class="btn btn-dark" href="/?public=1">🌍 Version publique</a>
+          {% endif %}
+        </div>
+
+        <div class="hero-trust">
+          <span class="trust-pill">✔ Collecte & livraison</span>
+          <span class="trust-pill">✔ Suivi des étapes</span>
+          <span class="trust-pill">✔ Preuves & traçabilité</span>
+          
+        </div>
       </div>
-      <div class="hero-pill">Riviera</div>
-    </div>
 
-    <h1 class="hero-title">FAGNI — Pressing & Livraison à Riviera</h1>
-    <p class="hero-desc">
-      Blanchisserie & pressing digital. Collecte à domicile, livraison sous 48h.
-      Paiement sécurisé via Wave + suivi simple et traçable.
-    </p>
-
-    <div class="hero-cta">
-      <a class="btn btn-primary" href="/orders/client/">✅ Commander maintenant</a>
-      <a class="btn btn-light" href="/orders/client/">📦 Suivre mes commandes</a>
-{% if request.user.is_authenticated and request.user.is_staff %}
-      <a class="btn btn-light" href="/?public=1">🌍 Voir version publique</a>
-{% endif %}
-    </div>
-
-    <div class="hero-badges">
-      <span class="chip">✔ Paiement Wave</span>
-      <span class="chip">✔ Suivi & preuves</span>
-      <span class="chip">✔ 48h (standard)</span>
-    </div>
-  </div>
-</section>
+      <div class="hero-side">
+        <div class="hero-panel">
+          <div class="hero-panel-k">Expérience FAGNI</div>
+          <div class="hero-panel-v"></div>
+          <div class="hero-panel-sub">
+            Une chaîne de service plus lisible, plus moderne et mieux organisée
+            pour le client, le blanchisseur et le livreur.
+          </div>
 
 
 
-
-<section class="fagni-offers">
-  <div class="grid-2">
-
-    <!-- 🧺 Blanchisserie (Formules) -->
-    <div class="card">
-      <div class="card-head">
-        <h2>🧺 Blanchisserie — Formules</h2>
-        <div class="price">{% if laundry_offers %}Dès {{ laundry_offers.0.default_price|floatformat:0 }} FCFA{% else %}—{% endif %}</div>
+</div>
+          </div>
+        </div>
       </div>
+    </div>
+  </section>
 
-      {% if laundry_offers %}
-        <ul class="list">
-          {% for s in laundry_offers %}
-            <li><strong>{{ s.name }}</strong> — {{ s.default_price|floatformat:0 }} FCFA</li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p class="muted">Aucune formule active. (Admin → ServiceCategory “blanchisserie-formules” → ServiceItem)</p>
+  <section class="section">
+    <div class="offers-transport-strip">
+      <strong>🚚 Transport :</strong>
+      calculé séparément selon la distance aller-retour —
+      Minimum : <strong>{{ pricing_cfg.delivery_min_fee }}</strong> FCFA •
+      Prix/km : <strong>{{ pricing_cfg.delivery_price_per_km }}</strong> FCFA
+      {% if pricing_cfg.delivery_fixed_fee and pricing_cfg.delivery_fixed_fee > 0 %}
+        • Frais fixes : <strong>{{ pricing_cfg.delivery_fixed_fee }}</strong> FCFA
       {% endif %}
-
-      <p class="muted">
-  <strong>Transport</strong> calculé automatiquement selon la distance (aller-retour).
-  <br><span style="font-size:12px">Montant exact confirmé après validation de l’adresse (distance réelle).</span>
-  <br>
-  Minimum : <strong>{{ pricing_cfg.delivery_min_fee }}</strong> FCFA •
-  Prix/km (AR) : <strong>{{ pricing_cfg.delivery_price_per_km }}</strong> FCFA
-  {% if pricing_cfg.delivery_fixed_fee and pricing_cfg.delivery_fixed_fee > 0 %}
-    • Frais fixes : <strong>{{ pricing_cfg.delivery_fixed_fee }}</strong> FCFA
-  {% endif %}
-</p>
-      <a class="btn btn-primary w-100" href="/orders/client/">Commander</a>
     </div>
+  </section>
 
-    <!-- 👔 Pressing (par article) -->
-    <div class="card">
-      <div class="card-head">
-        <h2>👔 Pressing — Par article</h2>
-        <div class="price">{% if pressing_offers %}Dès {{ pressing_offers.0.default_price|floatformat:0 }} FCFA{% else %}—{% endif %}</div>
+  <section class="section">
+    <div class="grid">
+      <div class="card col4">
+        <h2 class="card-title"><span>👤 Espace client</span></h2>
+        <div class="card-sub">
+          Crée ta commande, ajoute tes articles, confirme ton panier et suis ton parcours FAGNI.
+        </div>
+
+        <div class="space-visual space-visual--client">
+          <div class="visual-chip-row">
+            <span class="visual-chip">Commande</span>
+            <span class="visual-chip">Suivi</span>
+          </div>
+          <div class="visual-lines">
+            <div class="visual-line long"></div>
+            <div class="visual-line mid"></div>
+            <div class="visual-line short"></div>
+          </div>
+          <div class="visual-footer">
+            <strong>Parcours client simplifié</strong>
+            <span>Commande, validation, suivi et paiement dans une même logique produit.</span>
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <a class="btn btn-primary" href="/orders/client/">Accéder à l’espace client</a>
+        </div>
       </div>
 
-      {% if pressing_offers %}
-        <ul class="list">
-          {% for s in pressing_offers %}
-            <li><strong>{{ s.name }}</strong> — {{ s.default_price|floatformat:0 }} FCFA</li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p class="muted">Aucun article pressing actif. (Admin → ServiceCategory “pressing” → ServiceItem)</p>
-      {% endif %}
+      <div class="card col4">
+        <h2 class="card-title"><span>🧺 Espace blanchisseur</span></h2>
+        <div class="card-sub">
+          Consulte les commandes attribuées, traite le linge et fais avancer le flux atelier.
+        </div>
 
-      <a class="btn btn-light w-100" href="/orders/client/">Voir les tarifs</a>
+        <div class="space-visual space-visual--laundry">
+          <div class="visual-chip-row">
+            <span class="visual-chip">Atelier</span>
+            <span class="visual-chip">Statuts</span>
+          </div>
+          <div class="visual-lines">
+            <div class="visual-line mid"></div>
+            <div class="visual-line long"></div>
+            <div class="visual-line short"></div>
+          </div>
+          <div class="visual-footer">
+            <strong>Traitement atelier cadré</strong>
+            <span>Pesée, démarrage, prêt et visibilité métier dans une interface dédiée.</span>
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <a class="btn btn-light" href="/orders/laundry/app/">Ouvrir l’espace blanchisseur</a>
+        </div>
+      </div>
+
+      <div class="card col4">
+        <h2 class="card-title"><span>🚚 Espace livreur</span></h2>
+        <div class="card-sub">
+          Visualise les missions de collecte et de retour puis exécute les étapes terrain.
+        </div>
+
+        <div class="space-visual space-visual--driver">
+          <div class="visual-chip-row">
+            <span class="visual-chip">Pickup</span>
+            <span class="visual-chip">Return</span>
+          </div>
+          <div class="visual-lines">
+            <div class="visual-line short"></div>
+            <div class="visual-line long"></div>
+            <div class="visual-line mid"></div>
+          </div>
+          <div class="visual-footer">
+            <strong>Flux logistique maîtrisé</strong>
+            <span>Collecte, dépôt, retour et preuves dans un parcours livreur plus pro.</span>
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <a class="btn btn-light" href="/orders/driver/hub/">Ouvrir l’espace livreur</a>
+        </div>
+      </div>
     </div>
+  </section>
 
-  </div>
-</section>
-<section class="fagni-how">
-  <div class="card">
-    <h2>🚀 Comment ça marche ?</h2>
+  <section class="section">
+    <div class="grid">
+      <div class="card col6">
+        <h2 class="card-title">
+          <span>🧺 Blanchisserie — Formules</span>
+          <span class="price">
+            {% if laundry_offers %}
+              Dès {{ laundry_offers.0.default_price|floatformat:0 }} FCFA
+            {% else %}
+              —
+            {% endif %}
+          </span>
+        </h2>
+
+        {% if laundry_offers %}
+          <ul class="list">
+            {% for s in laundry_offers %}
+              <li><strong>{{ s.name }}</strong> — {{ s.default_price|floatformat:0 }} FCFA</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="card-sub">Aucune formule active pour le moment.</div>
+        {% endif %}
+
+        <div class="offer-visual offer-visual--laundry">
+          <div class="visual-chip-row">
+            <span class="visual-chip">Formules</span>
+            <span class="visual-chip">Standard</span>
+          </div>
+          <div class="visual-lines">
+            <div class="visual-line long"></div>
+            <div class="visual-line mid"></div>
+            <div class="visual-line short"></div>
+          </div>
+          <div class="visual-footer">
+            <strong>Linge courant & volumes simples</strong>
+            <span>Sacs, lots et formules de blanchisserie pour un parcours rapide et lisible.</span>
+          </div>
+        </div>
+
+        <div class="card-sub">
+          <strong>Transport</strong> calculé automatiquement selon la distance aller-retour.
+          <br>
+          Minimum : <strong>{{ pricing_cfg.delivery_min_fee }}</strong> FCFA •
+          Prix/km : <strong>{{ pricing_cfg.delivery_price_per_km }}</strong> FCFA
+          {% if pricing_cfg.delivery_fixed_fee and pricing_cfg.delivery_fixed_fee > 0 %}
+            • Frais fixes : <strong>{{ pricing_cfg.delivery_fixed_fee }}</strong> FCFA
+          {% endif %}
+        </div>
+
+        <div class="card-actions">
+          <a class="btn btn-primary" href="/orders/client/">Commander une formule</a>
+        </div>
+      </div>
+
+      <div class="card col6">
+        <h2 class="card-title">
+          <span>👔 Pressing — Par article</span>
+          <span class="price">
+            {% if pressing_offers %}
+              Dès {{ pressing_offers.0.default_price|floatformat:0 }} FCFA
+            {% else %}
+              —
+            {% endif %}
+          </span>
+        </h2>
+
+        {% if pressing_offers %}
+          <ul class="list">
+            {% for s in pressing_offers %}
+              <li><strong>{{ s.name }}</strong> — {{ s.default_price|floatformat:0 }} FCFA</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="card-sub">Aucun article pressing actif pour le moment.</div>
+        {% endif %}
+
+        <div class="offer-visual offer-visual--pressing">
+          <div class="visual-chip-row">
+            <span class="visual-chip">Article</span>
+            <span class="visual-chip">Premium</span>
+          </div>
+          <div class="visual-lines">
+            <div class="visual-line mid"></div>
+            <div class="visual-line long"></div>
+            <div class="visual-line short"></div>
+          </div>
+          <div class="visual-footer">
+            <strong>Pièces unitaires & traitement soigné</strong>
+            <span>Chemises, pantalons et articles à l’unité dans un cadre plus premium.</span>
+          </div>
+        </div>
+
+        <div class="card-actions">
+          
+<a class="btn btn-light" href="/orders/client/">Voir les tarifs</a>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  
+  <section class="section">
+    <div class="flow-strip">
+      <div class="flow-step"><span class="flow-n">1</span><span>Commande</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><span class="flow-n">2</span><span>Collecte</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><span class="flow-n">3</span><span>Atelier</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><span class="flow-n">4</span><span>Livraison</span></div>
+    </div>
+    <!-- FAGNI FLOW STRIP -->
+  </section>
+
+<section class="section card">
+    <h2 class="card-title"><span>🚀 Comment ça marche ?</span></h2>
+
     <div class="steps">
-      <div class="step"><div class="n">1</div><div><strong>Commandez en ligne</strong><div class="muted">Choisissez votre formule ou pressing.</div></div></div>
-      <div class="step"><div class="n">2</div><div><strong>Collecte à domicile</strong><div class="muted">Un livreur passe selon votre créneau.</div></div></div>
-      <div class="step"><div class="n">3</div><div><strong>Livraison sous 48h</strong><div class="muted">Suivi + preuve de remise.</div></div></div>
+      <div class="step">
+        <div class="step-n">1</div>
+        <div class="step-title">Commande en ligne</div>
+        <div class="step-desc">
+          Le client choisit ses articles ou sa formule puis valide sa demande depuis son espace.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">2</div>
+        <div class="step-title">Collecte & traitement</div>
+        <div class="step-desc">
+          Le livreur collecte, la blanchisserie traite la commande et le suivi évolue étape par étape.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-n">3</div>
+        <div class="step-title">Retour & livraison</div>
+        <div class="step-desc">
+          Le linge prêt repart en mission retour jusqu’à la livraison finale chez le client.
+        </div>
+      </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<section class="fagni-zone">
-  <div class="card">
-    <h2>📍 Zone desservie (phase 1)</h2>
-    <p class="muted">Riviera 1 • Riviera 2 • Riviera 3 • Deux-Plateaux</p>
-  </div>
-</section>
+  <section class="section">
+    <div class="grid">
+      <div class="card col6 mini-card">
+        <div>
+          <h2 class="card-title"><span>📍 Zone pilote</span></h2>
+          <div class="card-sub">
+            Riviera 1 • Riviera 2 • Riviera 3 • Deux-Plateaux • secteurs proches selon disponibilité logistique.
+          </div>
+        </div>
+      </div>
 
-<style>
-  .fagni-hero,.fagni-offers,.fagni-how,.fagni-zone{max-width:980px;margin:0 auto;padding:12px 14px}
-  .hero-card{background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:22px;padding:18px;box-shadow:0 10px 40px rgba(15,23,42,.06)}
-  .hero-top{display:flex;align-items:center;gap:12px}
-  .logo-badge{width:44px;height:44px;border-radius:14px;background:linear-gradient(90deg,#ff7a00,#ff9a3d);display:flex;align-items:center;justify-content:center;font-weight:900;color:#111}
-  .hero-brand{font-weight:900}
-  .hero-sub{color:#64748b;font-size:13px}
-  .hero-pill{margin-left:auto;background:#f1f5f9;border:1px solid rgba(15,23,42,.08);padding:6px 10px;border-radius:999px;font-weight:800;font-size:12px;color:#0f172a}
-  .hero-title{margin:12px 0 6px;font-size:28px;line-height:1.15}
-  .hero-desc{margin:0;color:#475569}
-  .hero-cta{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
-  .btn{display:inline-flex;align-items:center;justify-content:center;padding:11px 14px;border-radius:999px;font-weight:900;text-decoration:none;cursor:pointer}
-  .btn-primary{background:linear-gradient(90deg,#ff7a00,#ff9a3d);color:#111;border:1px solid rgba(0,0,0,.06)}
-  .btn-light{background:#fff;color:#0f172a;border:1px solid rgba(15,23,42,.12)}
-  .w-100{width:100%}
-  .hero-badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-  .chip{background:#fff;border:1px solid rgba(15,23,42,.10);border-radius:999px;padding:7px 10px;font-weight:800;font-size:12px;color:#0f172a}
-  .grid-2{display:grid;grid-template-columns:1fr;gap:12px}
-  @media(min-width:820px){.grid-2{grid-template-columns:1fr 1fr}}
-  .card{background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:20px;padding:16px;box-shadow:0 6px 20px rgba(15,23,42,.05)}
-  .card-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
-  .price{font-weight:900}
-  .muted{color:#64748b}
-  .list{margin:10px 0 14px;padding-left:18px;color:#0f172a}
-  .steps{display:grid;gap:10px;margin-top:10px}
-  .step{display:flex;gap:12px;align-items:flex-start}
-  .n{width:28px;height:28px;border-radius:10px;background:#f1f5f9;border:1px solid rgba(15,23,42,.10);display:flex;align-items:center;justify-content:center;font-weight:900}
-</style>
+      <div class="card col6 mini-card">
+        <div>
+          <h2 class="card-title"><span>💳 Paiement</span></h2>
+          <div class="card-sub">
+            Paiement Wave, suivi commande, transparence du parcours et expérience simplifiée pour le pilote FAGNI.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer-note">
+    FAGNI — pressing digital, collecte et livraison à domicile. Version pilote.
+  </div>
+</div>
 {% endblock %}
-

@@ -951,24 +951,6 @@
 {% block content %}
 <div class="detail-page">
 
-  <div class="topbar">
-    <div class="topbar-brand">
-      <div class="topbar-logo">
-        <img src="{% static 'img/logo_fagni.png' %}" alt="FAGNI">
-      </div>
-      <div class="topbar-copy">
-        <div class="topbar-title">FAGNI</div>
-        <div class="topbar-sub">Espace client</div>
-      </div>
-    </div>
-
-    <div class="topbar-actions">
-      <a class="btn btn-dark btn-xs" href="{% url 'orders:client_new_order' %}">➕ Nouvelle commande</a>
-      <a class="btn btn-light btn-xs" href="{% url 'orders:client_home' %}">← Mes commandes</a>
-      <a class="btn btn-light btn-xs" href="{% url 'orders:client_logout' %}">Déconnexion</a>
-    </div>
-  </div>
-
   {% if payment_ui == "paid" or remain_amount|default:0 <= 0 %}
     <div class="notice notice--ok" id="waveNotice" data-wave="success" data-order="{{ order.id }}">
       <div class="notice__icon">✓</div>

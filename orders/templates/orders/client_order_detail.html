@@ -1,1042 +1,1465 @@
 {% extends "orders/client_base.html" %}
-{% load money_filters %}
+{% load static money_filters %}
 
 {% block title %}Commande {{ order.code|default:order.id }} – Client FAGNI{% endblock %}
+
 {% block extra_head %}
 {{ block.super }}
 <style>
-
-/* --- LOT 2.28: PAYMENT BADGE --- */
-.pay-pill{ margin-left:8px; }
-.pay-pill--due{ background:#f3f4f6;color:#374151;border-color:#e5e7eb; }
-.pay-pill--due .dot{ background:#6b7280; }
-.pay-pill--decl{ background:rgba(255,122,0,0.14);color:#9a3412;border-color:rgba(255,122,0,0.45); }
-.pay-pill--decl .dot{ background:#ff7a00; }
-.pay-pill--paid{ background:#ecfdf3;color:#166534;border-color:#bbf7d0; }
-.pay-pill--paid .dot{ background:#16a34a; }
-
-</style>
-
-<style>
   :root{
-    --fagni-orange:#ff7a00;
-    --fagni-blue:#0056b3;
-
-    --bg:#ffffff;
+    --bg:#f4f7fb;
+    --card:#ffffff;
     --text:#0f172a;
     --muted:#64748b;
-
-    --line:#e5e7eb;
-    --shadow: 0 1px 4px rgba(15,23,42,0.06);
-    --shadow2: 0 12px 34px rgba(15,23,42,0.12);
+    --line:#e2e8f0;
+    --line-2:#cbd5e1;
+    --orange:#ff7a00;
+    --orange-dark:#dd6400;
+    --orange-soft:#fff7ed;
+    --green:#16a34a;
+    --green-soft:#ecfdf5;
+    --blue:#0f172a;
+    --blue-2:#1e293b;
+    --amber:#f59e0b;
+    --amber-soft:#fffbeb;
+    --red:#ef4444;
+    --red-soft:#fef2f2;
+    --shadow:0 10px 30px rgba(15,23,42,.08);
+    --shadow-soft:0 6px 18px rgba(15,23,42,.06);
+    --radius:24px;
+    --radius-sm:18px;
   }
 
-  .page{ max-width:980px;margin:0 auto 28px;padding:14px 10px 24px; }
+  *{ box-sizing:border-box; }
 
-  .page-header{ display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px; }
-  @media (max-width:860px){ .page-header{ flex-direction:column;align-items:stretch; } }
-
-  .page-title{ font-size:20px;font-weight:950;color:var(--text);margin:0;letter-spacing:-0.2px; }
-  .page-subtitle{ margin:4px 0 0;font-size:13px;color:var(--muted);line-height:1.35; }
-
-  .actions{ display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end; }
-  @media (max-width:860px){ .actions{ justify-content:flex-start; } }
-
-  .btn{
-    display:inline-flex;align-items:center;justify-content:center;padding:9px 14px;border-radius:999px;
-    font-size:13px;font-weight:950;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap;
-    transition: transform .12s ease, opacity .12s ease, background .12s ease, border-color .12s ease;
+  body{
+    background:var(--bg);
+    color:var(--text);
   }
-  .btn:active{ transform: translateY(1px); }
-  .btn-ghost{ background:#fff;color:#334155;border:1px solid var(--line); }
-  .btn-ghost:hover{ background:#f9fafb; }
 
-  .card{ background:var(--bg);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow); }
-  .panel{ padding:14px; }
-
-  .row{ display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap; }
-  .meta{ color:#6b7280;font-size:12px;margin-top:3px; }
-
-  .pill{
-    display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:950;
-    border:1px solid transparent;white-space:nowrap;
+  .detail-page{
+    max-width:1100px;
+    margin:0 auto;
+    padding:14px 10px 120px;
   }
-  .pill .dot{ width:7px;height:7px;border-radius:999px;display:inline-block; }
 
-  .st-pending{ background:#fffbeb;color:#92400e;border-color:#fde68a; }
-  .st-pending .dot{ background:#f59e0b; }
-
-  .st-in-progress{ background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe; }
-  .st-in-progress .dot{ background:#2563eb; }
-
-  .st-done{ background:#ecfdf3;color:#166534;border-color:#bbf7d0; }
-  .st-done .dot{ background:#16a34a; }
-
-  .st-canceled{ background:#fef2f2;color:#991b1b;border-color:#fecaca; }
-  .st-canceled .dot{ background:#ef4444; }
-
-  .st-other{ background:#f3f4f6;color:#374151;border-color:#e5e7eb; }
-  .st-other .dot{ background:#6b7280; }
-
-  .st-express{
-    background: rgba(255,122,0,0.14);
-    color: #9a3412;
-    border-color: rgba(255,122,0,0.45);
+  .topbar{
+    position:sticky;
+    top:10px;
+    z-index:40;
+    margin-bottom:14px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:12px 14px;
+    border-radius:999px;
+    background:rgba(255,255,255,.9);
+    backdrop-filter:blur(14px);
+    border:1px solid rgba(255,255,255,.75);
+    box-shadow:var(--shadow-soft);
   }
-  .st-express .dot{ background:#ff7a00; }
 
-  .addrBox{ min-width:260px;max-width:520px; }
-  .addrLabel{ color:#6b7280;font-size:12px; }
-  .addrValue{ font-weight:800;color:#111827;margin-top:2px; }
-
-  .notes{ margin-top:10px;color:#374151; }
-  .notesLabel{ color:#6b7280;font-size:12px; }
-  .notesValue{ margin-top:2px; }
-
-  .section-title{ margin:0 0 10px;font-size:14px;font-weight:950;color:#111827; }
-
-  .liveHint{
+  .topbar-brand{
     display:flex;
     align-items:center;
     gap:10px;
-    font-size:12px;
-    color:#64748b;
-    margin-top:6px;
-    flex-wrap:wrap;
-  }
-  .liveBadge{
-    display:inline-flex;align-items:center;gap:8px;
-    border:1px solid var(--line);
-    border-radius:999px;
-    padding:6px 10px;
-    background:#fff;
-  }
-  .liveDot{
-    width:8px;height:8px;border-radius:999px;background:#22c55e;
-    box-shadow:0 0 0 4px rgba(34,197,94,0.12);
-  }
-  .liveDot.off{
-    background:#94a3b8;
-    box-shadow:0 0 0 4px rgba(148,163,184,0.14);
+    min-width:0;
   }
 
-  .phasePill{
-    display:inline-flex;align-items:center;gap:8px;
-    padding:6px 10px;border-radius:999px;border:1px solid var(--line);
-    font-size:12px;font-weight:950;background:#fff;color:#0f172a;
-  }
-  .phaseDot{ width:7px;height:7px;border-radius:999px;background:#94a3b8; }
-  .phasePill.on .phaseDot{ background:var(--fagni-blue); }
-
-  .grid2{
-    display:grid;
-    grid-template-columns: 1fr 1fr;
-    gap:12px;
-  }
-  @media (max-width:860px){
-    .grid2{ grid-template-columns: 1fr; }
-  }
-
-  .kv{
-    display:flex;
-    justify-content:space-between;
-    gap:10px;
-    padding:9px 0;
-    border-bottom:1px dashed #eef2f7;
-  }
-  .kv:last-child{ border-bottom:none; }
-  .k{ color:#64748b; font-size:12px; font-weight:700; }
-  .v{ color:#0f172a; font-weight:950; }
-
-  .payPill{
-    display:inline-flex;align-items:center;gap:8px;
-    padding:6px 10px;border-radius:999px;border:1px solid var(--line);
-    font-size:12px;font-weight:950;
-    background:#fff;
-  }
-  .payDot{ width:7px;height:7px;border-radius:999px;background:#94a3b8; }
-  .pay-ok{ background:#ecfdf3;border-color:#bbf7d0;color:#166534; }
-  .pay-ok .payDot{ background:#22c55e; }
-  .pay-wait{ background:#fffbeb;border-color:#fde68a;color:#92400e; }
-  .pay-wait .payDot{ background:#f59e0b; }
-  .pay-bad{ background:#fef2f2;border-color:#fecaca;color:#991b1b; }
-  .pay-bad .payDot{ background:#ef4444; }
-
-  .estBox{
-    margin-top:10px;
-    padding:10px 12px;
+  .topbar-logo{
+    width:42px;
+    height:42px;
     border-radius:14px;
-    border:1px dashed rgba(255,122,0,0.45);
-    background:rgba(255,122,0,0.08);
-    color:#7c2d12;
-    font-size:12px;
-    line-height:1.35;
-  }
-  .estTitle{ font-weight:950; display:flex; align-items:center; gap:8px; }
-  .estDot{ width:8px;height:8px;border-radius:999px;background:#ff7a00; box-shadow:0 0 0 4px rgba(255,122,0,0.12); }
-
-  .timeline{ display:grid; gap:8px; }
-  .tstep{
-    display:flex;align-items:flex-start;gap:10px;
-    padding:10px;border-radius:14px;border:1px solid var(--line);background:#fff;
-    box-shadow:0 1px 3px rgba(15,23,42,0.05);
-  }
-  .ticon{
-    width:22px;height:22px;border-radius:999px;
-    display:flex;align-items:center;justify-content:center;
-    font-weight:950;font-size:12px;
-    background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;
+    background:#fff;
+    border:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
     flex:0 0 auto;
   }
-  .ticon.done{
-    background:#ecfdf3;color:#166534;border-color:#bbf7d0;
-  }
-  .tmain{ flex:1; }
-  .tlabel{ font-weight:950;color:#111827; }
-  .tts{ margin-top:2px;color:#64748b;font-size:12px; }
 
-  .legsGrid{ display:grid; gap:8px; }
-  .legCard{
-    padding:10px;border-radius:14px;border:1px solid var(--line);background:#fff;
-    box-shadow:0 1px 3px rgba(15,23,42,0.05);
+  .topbar-logo img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
   }
-  .legTop{ display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start; }
-  .legTitle{ font-weight:950;color:#111827; }
-  .legId{ color:#6b7280;font-size:12px; }
-  .muted{ color:#6b7280; }
 
-  /* ✅ preuves photos */
-  .gallery{
+  .topbar-copy{
+    min-width:0;
+    line-height:1.08;
+  }
+
+  .topbar-title{
+    font-size:14px;
+    font-weight:1000;
+    color:var(--text);
+  }
+
+  .topbar-sub{
+    margin-top:3px;
+    font-size:11px;
+    color:var(--muted);
+    font-weight:800;
+  }
+
+  .topbar-actions{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .btn{
+    appearance:none;
+    border:1px solid transparent;
+    border-radius:999px;
+    min-height:42px;
+    padding:0 16px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    text-decoration:none;
+    font-size:13px;
+    font-weight:950;
+    cursor:pointer;
+    transition:transform .14s ease, box-shadow .14s ease, opacity .14s ease, background .14s ease, border-color .14s ease;
+    white-space:nowrap;
+  }
+
+  .btn:hover{ transform:translateY(-1px); }
+  .btn:active{ transform:translateY(0); }
+
+  .btn-primary{
+    background:linear-gradient(135deg,var(--orange),var(--orange-dark));
+    color:#fff;
+    box-shadow:0 10px 22px rgba(255,122,0,.22);
+  }
+
+  .btn-dark{
+    background:var(--blue);
+    color:#fff;
+    box-shadow:0 10px 22px rgba(15,23,42,.18);
+  }
+
+  .btn-light{
+    background:#fff;
+    color:var(--text);
+    border-color:var(--line);
+  }
+
+  .btn-danger-light{
+    background:#fff;
+    color:#991b1b;
+    border-color:#fecaca;
+  }
+
+  .btn-xs{
+    min-height:36px;
+    padding:0 12px;
+    font-size:12px;
+  }
+
+  .notice{
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+    margin-bottom:14px;
+    padding:14px 16px;
+    border-radius:20px;
+    border:1px solid var(--line);
+    background:#fff;
+    box-shadow:var(--shadow-soft);
+  }
+
+  .notice__icon{
+    width:28px;
+    height:28px;
+    border-radius:999px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 auto;
+    font-weight:1000;
+  }
+
+  .notice__title{
+    margin:0;
+    font-size:14px;
+    font-weight:1000;
+  }
+
+  .notice__desc{
+    margin:4px 0 0;
+    font-size:12px;
+    line-height:1.45;
+    color:var(--muted);
+    font-weight:700;
+  }
+
+  .notice--ok{
+    background:var(--green-soft);
+    border-color:#bbf7d0;
+  }
+  .notice--ok .notice__icon{
+    background:var(--green);
+    color:#fff;
+  }
+
+  .notice--warn{
+    background:var(--amber-soft);
+    border-color:#fde68a;
+  }
+  .notice--warn .notice__icon{
+    background:var(--amber);
+    color:#111827;
+  }
+
+  .notice--err{
+    background:var(--red-soft);
+    border-color:#fecaca;
+  }
+  .notice--err .notice__icon{
+    background:var(--red);
+    color:#fff;
+  }
+
+  .hero{
     display:grid;
-    grid-template-columns: repeat(3, minmax(0,1fr));
+    grid-template-columns:1.45fr .95fr;
+    gap:14px;
+    margin-bottom:14px;
+  }
+
+  .hero-main,
+  .hero-side,
+  .section-card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+  }
+
+  .hero-main{
+    padding:20px;
+    background:
+      radial-gradient(circle at top right, rgba(255,122,0,.12), transparent 34%),
+      linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  }
+
+  .hero-side{
+    padding:18px;
+  }
+
+  .hero-pills{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:14px;
+  }
+
+  .pill{
+    min-height:30px;
+    padding:0 12px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:999px;
+    background:#fff;
+    border:1px solid var(--line);
+    color:#334155;
+    font-size:12px;
+    font-weight:900;
+  }
+
+  .hero-title{
+    margin:0;
+    max-width:760px;
+    font-size:28px;
+    line-height:1.1;
+    letter-spacing:-.03em;
+    font-weight:1000;
+    color:var(--text);
+  }
+
+  .hero-sub{
+    margin-top:10px;
+    max-width:760px;
+    color:var(--muted);
+    font-size:14px;
+    line-height:1.6;
+    font-weight:700;
+  }
+
+  .hero-kpis{
+    margin-top:18px;
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0,1fr));
     gap:10px;
   }
-  @media (max-width:860px){
-    .gallery{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+
+  .hero-kpi{
+    padding:14px;
+    border-radius:18px;
+    border:1px solid rgba(226,232,240,.95);
+    background:rgba(255,255,255,.9);
   }
-  .ph{
+
+  .hero-kpi__k{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--muted);
+    font-weight:900;
+  }
+
+  .hero-kpi__v{
+    margin-top:6px;
+    font-size:17px;
+    line-height:1.35;
+    color:var(--text);
+    font-weight:1000;
+    word-break:break-word;
+  }
+
+  .summary-head,
+  .section-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+
+  .summary-title,
+  .section-title{
+    margin:0;
+    font-size:19px;
+    line-height:1.1;
+    font-weight:1000;
+    color:var(--text);
+  }
+
+  .summary-sub,
+  .section-sub{
+    margin-top:4px;
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.45;
+    font-weight:700;
+  }
+
+  .state-chip{
+    min-height:32px;
+    padding:0 12px;
+    border-radius:999px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-size:12px;
+    font-weight:1000;
+    white-space:nowrap;
+  }
+
+  .state-chip--paid{
+    background:var(--green-soft);
+    color:#166534;
+    border:1px solid #bbf7d0;
+  }
+
+  .state-chip--warn{
+    background:var(--amber-soft);
+    color:#92400e;
+    border:1px solid #fde68a;
+  }
+
+  .summary-list{
+    margin-top:14px;
+    display:grid;
+    gap:10px;
+  }
+
+  .summary-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    padding:12px 0;
+    border-bottom:1px dashed #e5e7eb;
+  }
+
+  .summary-row:last-child{
+    border-bottom:none;
+    padding-bottom:0;
+  }
+
+  .summary-row__k{
+    color:var(--muted);
+    font-size:12px;
+    font-weight:800;
+  }
+
+  .summary-row__v{
+    color:var(--text);
+    font-size:14px;
+    font-weight:1000;
+    text-align:right;
+    white-space:nowrap;
+  }
+
+  .summary-actions{
+    margin-top:16px;
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns:minmax(0,1.35fr) minmax(320px,.95fr);
+    gap:14px;
+  }
+
+  .grid > div{
+    display:grid;
+    gap:14px;
+    align-content:start;
+  }
+
+  .section-card{
+    padding:18px;
+  }
+
+  .status-badge{
+    min-height:34px;
+    padding:0 12px;
+    border-radius:999px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    font-size:12px;
+    font-weight:1000;
+    white-space:nowrap;
+    border:1px solid transparent;
+  }
+
+  .status-dot{
+    width:8px;
+    height:8px;
+    border-radius:999px;
+    flex:0 0 auto;
+  }
+
+  .status-badge.pending{
+    background:#f8fafc;
+    color:#475569;
+    border-color:#e2e8f0;
+  }
+  .status-badge.pending .status-dot{ background:#94a3b8; }
+
+  .status-badge.progress{
+    background:var(--amber-soft);
+    color:#9a3412;
+    border-color:#fed7aa;
+  }
+  .status-badge.progress .status-dot{ background:var(--amber); }
+
+  .status-badge.done{
+    background:var(--green-soft);
+    color:#166534;
+    border-color:#bbf7d0;
+  }
+  .status-badge.done .status-dot{ background:var(--green); }
+
+  .status-badge.canceled{
+    background:var(--red-soft);
+    color:#991b1b;
+    border-color:#fecaca;
+  }
+  .status-badge.canceled .status-dot{ background:var(--red); }
+
+  .status-badge.express{
+    background:var(--orange-soft);
+    color:#9a3412;
+    border-color:#fdba74;
+  }
+  .status-badge.express .status-dot{ background:var(--orange); }
+
+  .timeline-list{
+    margin-top:14px;
+    display:grid;
+    gap:12px;
+  }
+
+  .timeline-step{
+    position:relative;
+    padding:14px 14px 14px 18px;
+    border-radius:18px;
     border:1px solid var(--line);
-    border-radius:14px;
-    overflow:hidden;
     background:#fff;
-    box-shadow:0 1px 3px rgba(15,23,42,0.05);
+    overflow:hidden;
   }
-  .ph img{
-    width:100%;
-    height:140px;
-    object-fit:cover;
-    display:block;
+
+  .timeline-step::before{
+    content:"";
+    position:absolute;
+    left:0;
+    top:0;
+    bottom:0;
+    width:4px;
+    background:#e2e8f0;
+  }
+
+  .timeline-step.done::before{ background:var(--green); }
+  .timeline-step.active::before{ background:var(--orange); }
+
+  .timeline-step__title{
+    font-size:14px;
+    font-weight:1000;
+    color:var(--text);
+  }
+
+  .timeline-step__desc{
+    margin-top:4px;
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.5;
+    font-weight:700;
+  }
+
+  .money-list{
+    margin-top:14px;
+    display:grid;
+    gap:10px;
+  }
+
+  .money-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    padding:12px 0;
+    border-bottom:1px dashed #e5e7eb;
+  }
+
+  .money-row:last-child{
+    border-bottom:none;
+    padding-bottom:0;
+  }
+
+  .money-row.total .money-k,
+  .money-row.total .money-v{
+    font-size:16px;
+    font-weight:1000;
+    color:var(--text);
+  }
+
+  .money-k{
+    color:var(--muted);
+    font-size:12px;
+    font-weight:800;
+  }
+
+  .money-v{
+    color:var(--text);
+    font-size:14px;
+    font-weight:1000;
+    text-align:right;
+    white-space:nowrap;
+  }
+
+  .money-note{
+    margin-top:14px;
+    padding:14px;
+    border-radius:18px;
+    background:#f8fafc;
+    border:1px solid var(--line);
+    color:#334155;
+    font-size:12px;
+    line-height:1.55;
+    font-weight:700;
+  }
+
+  .ok-strip{
+    margin-top:14px;
+    min-height:42px;
+    padding:0 14px;
+    border-radius:999px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--green-soft);
+    border:1px solid #bbf7d0;
+    color:#166534;
+    font-size:13px;
+    font-weight:1000;
+  }
+
+  .item-list,
+  .legs-list{
+    margin-top:14px;
+    display:grid;
+    gap:12px;
+  }
+
+  .item-card,
+  .leg-card{
+    padding:14px;
+    border-radius:18px;
+    border:1px solid var(--line);
+    background:#fff;
+  }
+
+  .item-head,
+  .leg-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+  }
+
+  .item-name,
+  .leg-title{
+    font-size:15px;
+    line-height:1.3;
+    font-weight:1000;
+    color:var(--text);
+  }
+
+  .item-meta,
+  .leg-meta{
+    margin-top:4px;
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.45;
+    font-weight:700;
+  }
+
+  .item-total{
+    font-size:20px;
+    line-height:1;
+    font-weight:1000;
+    color:var(--text);
+    white-space:nowrap;
+  }
+
+  .item-actions,
+  .evidence-actions,
+  .support-actions,
+  .modal-actions{
+    margin-top:12px;
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  .leg-mini{
+    min-height:30px;
+    padding:0 10px;
+    border-radius:999px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    background:#f8fafc;
+    border:1px solid var(--line);
+    color:#334155;
+    font-size:12px;
+    font-weight:900;
+  }
+
+  .proof-box,
+  .rating-placeholder,
+  .support-note,
+  .empty-box{
+    margin-top:14px;
+    padding:16px;
+    border-radius:18px;
+    border:1px dashed var(--line-2);
+    background:#fff;
+    color:var(--muted);
+    font-size:13px;
+    line-height:1.55;
+    font-weight:700;
+  }
+
+  .support-note{
+    border-style:solid;
     background:#f8fafc;
   }
 
-  .ph.phNew{
-    box-shadow: 0 0 0 3px rgba(255,122,0,0.22);
-    transform: translateY(-1px);
+  .modal{
+    display:none;
+    position:fixed;
+    inset:0;
+    padding:18px;
+    background:rgba(15,23,42,.56);
+    z-index:80;
   }
 
-  .phBtn{
+  .modal.is-open{
     display:block;
-    padding:0;
-    border:0;
-    background:transparent;
-    width:100%;
-    cursor: zoom-in;
   }
-  .phBtn:focus{ outline: 2px solid rgba(0,86,179,0.45); outline-offset: 2px; border-radius: 14px; }
 
-  .phMeta{
-    padding:8px 10px;
-    font-size:12px;
-    color:#334155;
-  }
-  .phTag{
-    display:inline-flex;align-items:center;gap:6px;
-    padding:4px 8px;border-radius:999px;
-    border:1px solid var(--line);
-    font-weight:950;
+  .modal-card{
+    max-width:540px;
+    margin:8vh auto 0;
     background:#fff;
+    border-radius:22px;
+    border:1px solid var(--line);
+    box-shadow:0 24px 60px rgba(15,23,42,.24);
+    padding:18px;
+  }
+
+  .modal-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    margin-bottom:12px;
+  }
+
+  .modal-title{
+    margin:0;
+    font-size:17px;
+    font-weight:1000;
+    color:var(--text);
+  }
+
+  .modal-sub{
+    margin:4px 0 0;
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.45;
+    font-weight:700;
+  }
+
+  .field{
+    margin-top:12px;
+  }
+
+  .field label{
+    display:block;
     margin-bottom:6px;
-  }
-  .phTag .dot{ width:7px;height:7px;border-radius:999px;background:#94a3b8; }
-  .phTag.pickup .dot{ background:#2563eb; }
-  .phTag.laundry .dot{ background:#a855f7; }
-  .phTag.dropoff .dot{ background:#16a34a; }
-
-  /* ✅ rating */
-  .ratingRow{ display:flex;align-items:center;gap:10px;flex-wrap:wrap; }
-  .stars{ display:inline-flex; gap:4px; }
-  .star{
-    width:18px;height:18px;
-    display:inline-flex;align-items:center;justify-content:center;
-    font-size:16px;line-height:1;
-  }
-  .star.on{ filter: brightness(1.05); }
-  .ratingNote{ font-size:12px;color:#64748b; }
-
-  .stars .star{ transition: transform .12s ease, filter .12s ease, opacity .12s ease; }
-  .stars .star:hover{ transform: translateY(-1px) scale(1.03); }
-  .ratingActions{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px; }
-  .btn-primary{
-    background: var(--fagni-blue);
-    color:#fff;
-    border-color: rgba(0,0,0,0.04);
-  }
-  .btn-primary:hover{ opacity:.92; }
-  .toastOk{
-    display:inline-flex;align-items:center;gap:8px;
-    padding:8px 10px;border-radius:999px;
-    background:#ecfdf3;border:1px solid #bbf7d0;color:#166534;
-    font-weight:900;font-size:12px;
+    color:#334155;
+    font-size:12px;
+    font-weight:900;
   }
 
-  /* micro-animations premium */
-  .pulse{ animation: pulse 520ms ease; }
-  @keyframes pulse{
-    0%{ transform: translateY(0); filter: brightness(1); }
-    35%{ transform: translateY(-1px); filter: brightness(1.05); }
-    100%{ transform: translateY(0); filter: brightness(1); }
+  .field input,
+  .field select{
+    width:100%;
+    min-height:46px;
+    border-radius:14px;
+    border:1px solid var(--line);
+    background:#fff;
+    padding:0 14px;
+    color:var(--text);
+    font-size:14px;
+    font-weight:800;
   }
 
-    /* --- WAVE BANNER (client_order_detail) --- */
-    .co-notice{
-      display:flex; align-items:flex-start; gap:10px;
-      padding:12px 12px; border-radius:16px;
-      border:1px solid var(--line); background:#fff;
-      box-shadow: var(--shadow);
-      margin: 12px 0 14px;
-    }
-    .co-notice__icon{
-      width:26px; height:26px; border-radius:999px;
-      display:flex; align-items:center; justify-content:center;
-      font-weight:950;
-      flex: 0 0 auto;
-    }
-    .co-notice__title{ font-weight:950; color:var(--text); margin:0; font-size:13px; }
-    .co-notice__desc{ color:var(--muted); margin:2px 0 0; font-size:12px; line-height:1.35; }
+  .field input[type="file"]{
+    min-height:auto;
+    padding:10px 12px;
+  }
 
-    .co-notice--ok{
-      border-color:#bbf7d0;
-      background:#ecfdf3;
-    }
-    .co-notice--ok .co-notice__icon{
-      background:#16a34a; color:#fff;
+  .feedback{
+    margin-top:10px;
+    font-size:12px;
+    font-weight:900;
+    display:none;
+  }
+
+  .feedback.ok{
+    display:block;
+    color:#166534;
+  }
+
+  .feedback.err{
+    display:block;
+    color:#991b1b;
+  }
+
+  .sticky-pay{
+    position:fixed;
+    left:0;
+    right:0;
+    bottom:0;
+    z-index:50;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg, rgba(244,247,251,0), rgba(244,247,251,.92) 22%, rgba(244,247,251,1) 100%);
+  }
+
+  .sticky-pay__inner{
+    max-width:1100px;
+    margin:0 auto;
+    background:rgba(255,255,255,.94);
+    backdrop-filter:blur(14px);
+    border:1px solid rgba(226,232,240,.95);
+    border-radius:999px;
+    box-shadow:0 16px 36px rgba(15,23,42,.14);
+    padding:10px 12px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
+
+  .sticky-pay__copy{
+    min-width:0;
+  }
+
+  .sticky-pay__k{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--muted);
+    font-weight:900;
+  }
+
+  .sticky-pay__v{
+    margin-top:2px;
+    font-size:20px;
+    line-height:1;
+    font-weight:1000;
+    color:var(--text);
+  }
+
+  .sticky-paid{
+    min-height:42px;
+    padding:0 16px;
+    border-radius:999px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--green-soft);
+    border:1px solid #bbf7d0;
+    color:#166534;
+    font-size:13px;
+    font-weight:1000;
+    white-space:nowrap;
+  }
+
+  @media (max-width:860px){
+    .hero,
+    .grid{
+      grid-template-columns:1fr;
     }
 
-    .co-notice--warn{
-      border-color:#fde68a;
-      background:#fffbeb;
-    }
-    .co-notice--warn .co-notice__icon{
-      background:#f59e0b; color:#111827;
+    .hero-kpis{
+      grid-template-columns:1fr;
     }
 
-    .co-notice--err{
-      border-color:#fecaca;
-      background:#fef2f2;
-    }
-    .co-notice--err .co-notice__icon{
-      background:#ef4444; color:#fff;
+    .topbar{
+      border-radius:24px;
+      align-items:flex-start;
+      flex-direction:column;
     }
 
+    .topbar-actions{
+      width:100%;
+      justify-content:flex-start;
+    }
+  }
+
+  @media (max-width:640px){
+    .detail-page{
+      padding:10px 8px 108px;
+    }
+
+    .hero-main,
+    .hero-side,
+    .section-card{
+      border-radius:20px;
+    }
+
+    .hero-main,
+    .hero-side,
+    .section-card{
+      padding:16px;
+    }
+
+    .hero-title{
+      font-size:22px;
+      line-height:1.08;
+    }
+
+    .summary-title,
+    .section-title{
+      font-size:18px;
+    }
+
+    .summary-row,
+    .money-row{
+      flex-direction:column;
+      align-items:flex-start;
+      gap:4px;
+    }
+
+    .summary-row__v,
+    .money-v{
+      text-align:left;
+      white-space:normal;
+    }
+
+    .item-head,
+    .leg-head,
+    .section-head,
+    .summary-head{
+      flex-direction:column;
+      align-items:flex-start;
+    }
+
+    .item-total{
+      font-size:18px;
+    }
+
+    .btn{
+      width:100%;
+    }
+
+    .topbar-actions .btn{
+      width:auto;
+    }
+
+    .summary-actions .btn,
+    .evidence-actions .btn,
+    .support-actions .btn,
+    .item-actions .btn,
+    .modal-actions .btn{
+      flex:1 1 100%;
+    }
+
+    .sticky-pay__inner{
+      border-radius:24px;
+      align-items:flex-start;
+      flex-direction:column;
+    }
+
+    .sticky-paid,
+    .sticky-pay__inner .btn{
+      width:100%;
+    }
+  }
 </style>
-
-    
 {% endblock %}
 
 {% block content %}
+<div class="detail-page">
 
-<!-- WAVE_BANNER_OK -->
-  <!-- LOT_2_19_WAVE_AUTO_SUCCESS_OK -->
-
-  {# ✅ Priorité: si la commande est payée, afficher confirmé même sans ?wave=success #}
-  {% if order.payment_status == "paid" %}
-    <div class="co-notice co-notice--ok" id="waveNotice" data-wave="success" data-order="{{ order.id }}">
-      <div class="co-notice__icon">✓</div>
-      <div>
-        <p class="co-notice__title">Paiement confirmé</p>
-        <p class="co-notice__desc">Merci. Ton paiement Wave a été validé.</p>
+  <div class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-logo">
+        <img src="{% static 'img/logo_fagni.png' %}" alt="FAGNI">
+      </div>
+      <div class="topbar-copy">
+        <div class="topbar-title">FAGNI</div>
+        <div class="topbar-sub">Espace client</div>
       </div>
     </div>
 
-  {% elif request.GET.wave == "declared" %}
-  <div class="co-notice co-notice--warn" id="waveNotice" data-wave="declared" data-order="{{ order.id }}">
-    <div class="co-notice__icon">✓</div>
-
-    <div>
-      <p class="co-notice__title">Paiement déclaré</p>
-      <p class="co-notice__desc">Merci. Nous vérifions ton paiement Wave et on confirme dès que possible.</p>
-
-      <!-- LOT_2_35_WAVE_MANUAL_REFRESH_OK -->
-      <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-        <button type="button" id="waveRefreshBtn" class="btn btn-light" style="padding:8px 12px;border-radius:999px;">
-          🔄 Actualiser le paiement
-        </button>
-        <span id="waveRefreshHint" style="font-size:12px;color:var(--muted,#64748b)"></span>
-      </div>
+    <div class="topbar-actions">
+      <a class="btn btn-dark btn-xs" href="{% url 'orders:client_new_order' %}">➕ Nouvelle commande</a>
+      <a class="btn btn-light btn-xs" href="{% url 'orders:client_home' %}">← Mes commandes</a>
+      <a class="btn btn-light btn-xs" href="{% url 'orders:client_logout' %}">Déconnexion</a>
     </div>
   </div>
 
-{% elif request.GET.wave == "success" %}
-    <div class="co-notice co-notice--ok" id="waveNotice" data-wave="success" data-order="{{ order.id }}">
-      <div class="co-notice__icon">✓</div>
+  {% if payment_ui == "paid" or remain_amount|default:0 <= 0 %}
+    <div class="notice notice--ok" id="waveNotice" data-wave="success" data-order="{{ order.id }}">
+      <div class="notice__icon">✓</div>
       <div>
-        <p class="co-notice__title">Paiement confirmé</p>
-        <p class="co-notice__desc">Merci. Ton paiement Wave a été validé.</p>
+        <p class="notice__title">Paiement confirmé</p>
+        <p class="notice__desc">Merci. Ton paiement a été validé pour cette commande.</p>
       </div>
     </div>
-
-  {% elif request.GET.wave == "error" %}
-    <div class="co-notice co-notice--err" id="waveNotice" data-wave="error" data-order="{{ order.id }}">
-      <div class="co-notice__icon">!</div>
+  {% elif request.GET.wave == "declared" %}
+    <div class="notice notice--warn" id="waveNotice" data-wave="declared" data-order="{{ order.id }}">
+      <div class="notice__icon">✓</div>
       <div>
-        <p class="co-notice__title">Paiement non confirmé</p>
-        <p class="co-notice__desc">Nous n’avons pas pu confirmer le paiement. Réessaie ou contacte le support.</p>
+        <p class="notice__title">Paiement déclaré</p>
+        <p class="notice__desc">Nous vérifions ton paiement Wave. La confirmation s’affichera automatiquement.</p>
+      </div>
+    </div>
+  {% elif request.GET.wave == "error" %}
+    <div class="notice notice--err" id="waveNotice" data-wave="error" data-order="{{ order.id }}">
+      <div class="notice__icon">!</div>
+      <div>
+        <p class="notice__title">Paiement non confirmé</p>
+        <p class="notice__desc">Nous n’avons pas pu confirmer le paiement. Réessaie ou contacte le support.</p>
       </div>
     </div>
   {% endif %}
-<script>
-(function(){
-  // Banner Wave (optionnel)
-  var waveEl = document.getElementById("waveNotice");
-  if(!waveEl) return;
 
-  var orderId = waveEl.getAttribute("data-order") || "";
-  var state   = (waveEl.getAttribute("data-wave") || "").toLowerCase();
+  <div class="hero">
+    <section class="hero-main">
+      <div class="hero-pills">
+        <span class="pill">Commande {{ order.code|default:order.id }}</span>
 
-  
-  
-  if(state !== "declared") return;
-// UX: bouton "Actualiser le paiement" (Wave déclaré)
-  var btn = document.getElementById("waveRefreshBtn");
-  var hint = document.getElementById("waveRefreshHint");
-
-  function setHint(msg){
-    try{ if(hint) hint.textContent = msg || ""; }catch(e){}
-  }
-  function formatFCFA(n){
-  try{
-    if(n === null || n === undefined) return "";
-    var num = Number(n);
-    if(isNaN(num)) return "";
-    return Math.round(num).toLocaleString("fr-FR");
-  }catch(e){ return ""; }
-}
-
-function nowStr(){
-    try{
-      var d = new Date();
-      return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
-    }catch(e){ return ""; }
-  }
-
-  async function checkPaymentOnce(){
-    if(!orderId) return;
-    var endpoint = "/orders/client/orders/" + encodeURIComponent(orderId) + "/payment-ui/";
-    try{
-      var res = await fetch(endpoint, {
-        method: "GET",
-        credentials: "same-origin",
-        headers: { "Accept":"application/json", "X-Requested-With":"XMLHttpRequest" }
-      });
-      if(!res.ok) return;
-      var data = await res.json();
-
-      // payé → UI ok + reload one-shot
-      if(data && (data.payment_ui === "paid" || data.payment_status === "paid")){
-        try{
-          waveEl.classList.remove("co-notice--warn","co-notice--err");
-          waveEl.classList.add("co-notice--ok");
-          waveEl.setAttribute("data-wave","success");
-          var t = waveEl.querySelector(".co-notice__title");
-          var d = waveEl.querySelector(".co-notice__desc");
-          if(t) t.textContent = "Paiement confirmé";
-          if(d) d.textContent = "Merci. Ton paiement Wave a été confirmé.";
-        }catch(e){}
-        try{  }catch(e){}
-        try{ if(typeof __waveOnPaidOnce === "function") __waveOnPaidOnce(orderId); }catch(e){}
-        return;
-      }
-
-      // sinon : feedback soft
-      
-    }catch(e){}
-  }
-
-  if(btn){
-    var lock = false;
-    var orig = (btn.textContent || "").trim() || "🔄 Actualiser le paiement";
-    btn.addEventListener("click", async function(){
-    try{ disableBtn(1500); }catch(e){}
-    try{ setHint("Vérification en cours… • " + nowStr()); }catch(e){}
-
-      if(lock) return;
-      lock = true;
-      try{
-        btn.disabled = true;
-        btn.textContent = "Vérification…";
-        setHint("On vérifie…");
-      }catch(e){}
-
-      await checkPaymentOnce();
-
-      setTimeout(function(){
-        lock = false;
-        try{
-          btn.disabled = false;
-          btn.textContent = orig;
-        }catch(e){}
-      }, 1800);
-    });
-  }
-function cleanWaveParam(){
-    try{
-      var u = new URL(window.location.href);
-      if(!u.searchParams || !u.searchParams.has("wave")) return;
-      u.searchParams.delete("wave");
-      var qs = u.searchParams.toString();
-      var newUrl = u.pathname + (qs ? ("?" + qs) : "") + (u.hash || "");
-      window.history.replaceState({}, "", newUrl);
-    }catch(e){}
-  }
-
-  function setBannerPaid(){
-    try{
-      waveEl.classList.remove("co-notice--warn","co-notice--err");
-      waveEl.classList.add("co-notice--ok");
-      waveEl.setAttribute("data-wave","success");
-      var t = waveEl.querySelector(".co-notice__title");
-      var d = waveEl.querySelector(".co-notice__desc");
-      if(t) t.textContent = "Paiement confirmé";
-      if(d) d.textContent = "Merci. Ton paiement Wave a été confirmé.";
-    }catch(e){}
-  }
-
-  function scheduleReloadOnce(ms){
-    try{
-      if(window.__waveReloadScheduled) return;
-      window.__waveReloadScheduled = true;
-      setTimeout(function(){ try{ window.location.reload(); }catch(e){} }, ms || 450);
-    }catch(e){}
-  }
-
-  // Anti “bandeau collé”
-  try{
-    var key = "wave_notice_seen_" + orderId + "_" + state;
-    if(window.sessionStorage && sessionStorage.getItem(key) === "1"){
-      // si déjà vu, on ne le garde pas
-      waveEl.remove();
-      return;
-    }
-    if(window.sessionStorage) sessionStorage.setItem(key, "1");
-  }catch(e){}
-
-  // Si payé côté serveur, pas besoin de poll (robuste: payment_status OU amount_paid>=total)
-    var ps = ("{{ order.payment_status|default:'' }}").toLowerCase();
-    var total0 = Number(("{{ amounts.total_ttc|default:0|floatformat:0 }}").replace(",", ".") || 0);
-    var paid0  = Number(("{{ order.amount_paid|default:0|floatformat:0 }}").replace(",", ".") || 0);
-    var alreadyPaid = (ps === "paid") || (total0 > 0 && paid0 >= total0);
-
-    if(alreadyPaid){
-      setBannerPaid();
-      cleanWaveParam();
-      return;
-    }
-  // Poll uniquement si "declared"
-  if(state !== "declared") return;
-
-  var endpoint = "/orders/client/orders/" + orderId + "/payment-ui/";
-  var tries = 0;
-  var maxTries = 30;
-  var intervalMs = 8000;
-
-  // UX : on nettoie l’URL tout de suite (évite l’effet “collé”)
-  cleanWaveParam();
-
-  async function tick(){
-    tries += 1;
-    if(tries > maxTries) return;
-
-    try{
-      var res = await fetch(endpoint, {
-        method: "GET",
-        credentials: "same-origin",
-        headers: {"Accept":"application/json","X-Requested-With":"XMLHttpRequest"}
-      });
-      if(!res.ok) return;
-      var data = await res.json();
-
-      if(!data || data.ok !== true) return;
-
-      // UX: affichage état clair
-      try{
-        var ui = String(data.payment_ui || data.payment_status_ui || "").toLowerCase();
-        var declared = !!data.wave_declared;
-          var remain = (data && data.amounts && typeof data.amounts.amount_remaining !== "undefined") ? data.amounts.amount_remaining : ((typeof data.amount_remaining !== "undefined") ? data.amount_remaining : ((typeof data.remain !== "undefined") ? data.remain : null));
-        if(ui === "paid"){
-          setHint("✅ Paiement confirmé • " + nowStr());
-          try{ if(typeof payShowMsg === "function") payShowMsg("✅ Paiement confirmé.", true); }catch(e){}
-          try{ if(typeof __waveOnPaidOnce === "function") __waveOnPaidOnce(orderId); }catch(e){}
-          try{ if(typeof __waveScheduleReload === "function") __waveScheduleReload(450, orderId); else window.location.reload(); }catch(e){}
-          return;
-        }
-
-        if(declared || ui === "declared" || ui === "pending"){
-          setHint("En vérification… • " + nowStr());
-          return;
-        }
-
-        // unpaid / unknown
-        if(remain !== null){
-          setHint("Pas de paiement détecté (reste " + formatFCFA(remain) + " FCFA) • " + nowStr());
-        }else{
-          setHint("Pas de paiement détecté • " + nowStr());
-        }
-      }catch(e){}
-
-      var paid = String(data.payment_ui || data.payment_status || "").toLowerCase() === "paid";
-      if(paid){
-        setBannerPaid();
-        // reload 1 fois pour rafraîchir les montants/état
-        scheduleReloadOnce(450);
-        clearInterval(timer);
-      }
-    }catch(e){}
-  }
-
-  tick();
-  var timer = setInterval(tick, intervalMs);
-
-  // Auto-hide doux après 7s (si pas paid)
-  setTimeout(function(){
-    try{
-      if(!waveEl || (waveEl.getAttribute("data-wave")||"").toLowerCase()==="success") return;
-      waveEl.style.transition = "opacity .25s ease, transform .25s ease";
-      waveEl.style.opacity = "0";
-      waveEl.style.transform = "translateY(-4px)";
-      setTimeout(function(){ try{ waveEl.remove(); }catch(e){} }, 300);
-    }catch(e){}
-  }, 7000);
-})();
-</script>
-
-  <div class="page-header">
-    <div>
-      <h1 class="page-title">Commande {{ order.code|default:order.id }}</h1>
-<!-- LOT_2_28_PAYMENT_BADGE_OK -->
-{% if order.payment_status == "paid" %}
-  <span class="pill pay-pill pay-pill--paid" title="Paiement confirmé"><span class="dot"></span>Payé</span>
-{% elif request.GET.wave == "declared" %}
-  <span class="pill pay-pill pay-pill--decl" title="Paiement en vérification"><span class="dot"></span>En vérification</span>
-{% else %}
-  <span class="pill pay-pill pay-pill--due" title="Paiement à effectuer"><span class="dot"></span>À payer</span>
-{% endif %}
-
-      <p class="page-subtitle">Suivi en temps réel (refresh automatique).</p>
-
-      <div class="liveHint">
-        <span class="liveBadge">
-          <span class="liveDot" id="liveDot"></span>
-          <span id="liveTxt">Synchronisation…</span>
-          <span class="muted">•</span>
-          <span class="muted">Dernière sync :</span>
-          <span id="lastSync">—</span>
-        </span>
-
-        <span id="phasePill" class="phasePill">
-          <span class="phaseDot"></span>
-          <span id="phaseTxt">Phase —</span>
-        </span>
-      </div>
-    </div>
-
-    <div class="actions">
-      <a class="btn btn-ghost" href="{% url 'orders:client_home' %}">← Mes commandes</a>
-      <a class="btn btn-ghost" href="{% url 'orders:client_logout' %}">Déconnexion</a>
-    </div>
-  </div>
-
-  <div class="grid2">
-    <!-- STATUT + ADRESSE -->
-    <div class="card panel">
-      <div class="row">
-        <div>
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <div style="font-weight:950;">Statut :</div>
-
-            <span id="orderStatusPill" class="pill st-other">
-              <span class="dot"></span>
-              <span id="orderStatus">{{ order.status }}</span>
-            </span>
-
-            {# Badge express (visible si >0) #}
-            <span id="expressPill"
-                  class="pill st-express"
-                  {% if not amounts.express_extra_fee or amounts.express_extra_fee|floatformat:0 == "0" %}style="display:none;"{% endif %}>
-              <span class="dot"></span>⚡ Express
-            </span>
-          </div>
-
-          <div class="meta">Créée le {{ order.created_at|date:"d/m/Y H:i" }}</div>
-        </div>
-
-        <div class="addrBox">
-          <div class="addrLabel">Adresse</div>
-          <div class="addrValue">📍 {{ order.pickup_address|default:order.customer.address|default:"—" }}</div>
-        </div>
-      </div>
-
-      {% if order.notes %}
-        <div class="notes">
-          <div class="notesLabel">Notes</div>
-          <div class="notesValue">{{ order.notes }}</div>
-        </div>
-      {% endif %}
-    </div>
-
-    <!-- PAIEMENT + MONTANTS -->
-    <div class="card panel">
-      <div class="row" style="align-items:center;">
-        <div>
-          <div class="section-title" style="margin:0;">Paiement</div>
-          <div class="meta">Montant estimé (V1) + statut de paiement.</div>
-        </div>
-
-        {% with total=amounts.total_ttc|default:0 %}
-        {% with total0=total|floatformat:0 %}
-        {% with paid=order.amount_paid|default:0 %}
-        {% with paid0=paid|floatformat:0 %}
-        <span id="payPill" class="payPill
-          {% if total0 == '0' or paid0 == '0' %}
-            pay-wait
-          {% elif paid0 == total0 %}
-            pay-ok
-          {% else %}
-            pay-wait
-          {% endif %}">
-        {% endwith %}{% endwith %}{% endwith %}{% endwith %}
-          <span class="payDot"></span>
-          {% with total=amounts.total_ttc|default:0 %}
-          {% with total0=total|floatformat:0 %}
-          {% with paid=order.amount_paid|default:0 %}
-          {% with paid0=paid|floatformat:0 %}
-          <span id="payTxt">
-            {% if total0 == "0" %}
-              En attente
-            {% elif paid0 == "0" %}
-              Paiement en attente
-            {% elif paid0 == total0 %}
-              Payé
-            {% else %}
-              Paiement partiel
-            {% endif %}
-          </span>
-          {% endwith %}{% endwith %}{% endwith %}{% endwith %}
-        </span>
-      </div>
-
-      <div style="margin-top:10px;">
-        <div class="kv"><div class="k">Prestations</div><div class="v" id="amtPrest">{{ amounts.prestation_total|fcfa }}</div></div>
-        <div class="kv"><div class="k">Frais de livraison</div><div class="v" id="amtDeliv">{{ amounts.delivery_fee|fcfa }}</div></div>
-        <div class="kv"><div class="k">Service FAGNI</div><div class="v" id="amtFee">{{ amounts.service_fee|fcfa }}</div></div>
-        <div class="kv"><div class="k">TVA (FAGNI)</div><div class="v" id="amtVat">{{ amounts.vat_fagni|default:0|fcfa }}</div></div>
-
-        {# Ligne express (visible si >0) #}
-        <div class="kv" id="rowExpress" {% if not amounts.express_extra_fee or amounts.express_extra_fee|floatformat:0 == "0" %}style="display:none;"{% endif %}>
-          <div class="k">⚡ Express</div>
-          <div class="v" id="amtExpress">{{ amounts.express_extra_fee|default:0|fcfa }}</div>
-        </div>
-
-        <div class="kv"><div class="k">Total client</div><div class="v" id="amtTotal">{{ amounts.total_ttc|fcfa }}</div></div>
-
-        <div class="meta" id="payDetails" style="margin-top:6px;font-weight:800;">
-          Payé : <span id="payPaid">{{ paid_amount|default:0|fcfa }}</span> / <span id="payTotal">{{ total_amount|default:0|fcfa }}</span> — Reste : <span id="payRemain">{{ remain_amount|default:0|fcfa }}</span>
-        </div>
-
-        <div class="meta" id="payOverRow" style="display:none; margin-top:6px; font-weight:900; color:#991b1b;">
-          Trop-perçu : <span id="payOver">0</span>
-        </div>
-        <div class="meta">NB : les montants peuvent évoluer si la livraison change (distance/express).</div>
-        <!-- ✅ ACTIONS PAIEMENT (V1) -->
-        {% with total=total_amount|default:0 %}
-        {% with total0=total|floatformat:0 %}
-        {% with remain=remain_amount|default:0 %}
-        {% with remain0=remain|floatformat:0 %}
-        {% if total0 != "0" and remain0 != "0" %}
-          <div class="ratingActions" style="margin-top:10px;">
-            <button class="btn btn-primary" id="btnPaySimulate" type="button">💳 Payer maintenant</button>
-              <a class="btn btn-ghost" href="{% url 'orders:client_order_pay_wave_page' order.id %}">🌊 Payer par Wave (QR)</a>
-            <button class="btn btn-ghost" id="btnPayCashOpen" type="button">💵 Déclarer cash</button>
-            <span class="ratingNote" id="payMsg" style="display:none;"></span>
-          </div>
-
-          <!-- ✅ MODAL CASH -->
-          <div id="payCashModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:9999; padding:18px;">
-            <div class="card panel" style="max-width:520px; margin:10vh auto 0; border-radius:18px; box-shadow: var(--shadow2);">
-              <div class="row" style="align-items:center;">
-                <div>
-                  <div style="font-weight:950; font-size:14px;">Déclarer un paiement cash</div>
-                  <div class="meta">Saisis le montant encaissé (acompte possible).</div>
-                </div>
-                <button class="btn btn-ghost" id="btnPayCashClose" type="button">✕</button>
-              </div>
-
-              <div style="margin-top:12px;">
-                <div class="kv">
-                  <div class="k">Montant</div>
-                  <div class="v">
-                    <input id="payCashAmount" type="number" min="0" step="1"
-                           style="width:180px; padding:8px 10px;border-radius:12px;border:1px solid var(--line);font-weight:900;">
-                    <span class="meta">FCFA</span>
-                  </div>
-                </div>
-
-                <div style="margin-top:10px;">
-                  <div class="k" style="margin-bottom:6px;">Note (optionnel)</div>
-                  <input id="payCashNote" type="text" placeholder="Ex: reçu par livreur / main à main"
-                         style="width:100%; padding:10px;border-radius:12px;border:1px solid var(--line);font-weight:800;">
-                </div>
-
-                <div class="ratingActions" style="margin-top:12px;">
-                  <button class="btn btn-primary" id="btnPayCashSend" type="button">Valider</button>
-                  <button class="btn btn-ghost" id="btnPayCashCancel" type="button">Annuler</button>
-                </div>
-
-                <div class="meta" id="payCashErr" style="display:none; color:#991b1b; font-weight:900;"></div>
-                <div class="meta" id="payCashOk" style="display:none; color:#166534; font-weight:900;"></div>
-              </div>
-            </div>
-          </div>
-        {% endif %}
-        {% endwith %}{% endwith %}{% endwith %}{% endwith %}
-
-        {% if order.status == "pending" or order.status == "in_progress" %}
-          {% with prest=amounts.prestation_total|default:0 %}
-            {% with prest0=prest|floatformat:0 %}
-              {% if prest0 == "0" %}
-                <div class="estBox" id="estBox">
-                  <div class="estTitle"><span class="estDot"></span>Estimation en cours</div>
-                  Le montant final sera confirmé après collecte / pesée, puis ajusté selon la distance (livraison).
-                </div>
-              {% endif %}
-            {% endwith %}
-          {% endwith %}
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  <!-- PRESTATIONS / ITEMS (UNIQUE) -->
-  <div class="card panel" style="margin-top:12px;">
-    <div class="row" style="align-items:center;">
-      <h3 class="section-title" style="margin:0;">Prestations</h3>
-      <div class="actions">
-        {% if not locked %}
-          <a class="btn btn-ghost" href="{% url 'orders:client_order_item_new' order.id %}">➕ Ajouter</a>
+        {% if order.status == "done" %}
+          <span class="pill">Terminée</span>
+        {% elif order.status == "in_progress" %}
+          <span class="pill">En cours</span>
+        {% elif order.status == "canceled" %}
+          <span class="pill">Annulée</span>
         {% else %}
-          <span class="meta" style="font-weight:800;">🔒 Prestations verrouillées (commande payée / mission créée)</span>
+          <span class="pill">En attente</span>
+        {% endif %}
+
+        {% if order.payment_status == "paid" %}
+          <span class="pill">Paiement confirmé</span>
         {% endif %}
       </div>
-    </div>
 
-    <!-- Zone affichée au chargement (Django) puis remplacée en LIVE par JS -->
-    <div id="itemsBox" style="margin-top:10px;">
-      {% if items %}
-        <div style="border:1px solid var(--line); border-radius:14px; overflow:hidden;">
-          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:0;background:#f8fafc;border-bottom:1px solid var(--line);padding:10px;font-weight:950;font-size:12px;color:#334155;">
-            <div>Désignation</div><div>Qté</div><div>PU</div><div>Total</div>
+      <h1 class="hero-title">Ta commande, ton paiement et ta logistique dans une seule page claire.</h1>
+      <div class="hero-sub">
+        Suis l’avancement de ton linge, visualise tes prestations, contrôle ton paiement et retrouve les missions de collecte et de retour sans friction.
+      </div>
+
+      <div class="hero-kpis">
+        <div class="hero-kpi">
+          <div class="hero-kpi__k">Total client</div>
+          <div class="hero-kpi__v" id="heroTotal">{{ amounts.total_ttc|fcfa }}</div>
+        </div>
+
+        <div class="hero-kpi">
+          <div class="hero-kpi__k">Créée le</div>
+          <div class="hero-kpi__v">{{ order.created_at|date:"d/m/Y H:i" }}</div>
+        </div>
+
+        <div class="hero-kpi">
+          <div class="hero-kpi__k">Adresse</div>
+          <div class="hero-kpi__v">{{ order.pickup_address|default:customer.address|default:"—" }}</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="hero-side">
+      <div class="summary-head">
+        <div>
+          <h2 class="summary-title">Résumé</h2>
+          <div class="summary-sub">Lecture rapide de l’état général de la commande.</div>
+        </div>
+
+        {% if order.payment_status == "paid" %}
+          <span class="state-chip state-chip--paid" id="payStateChip">Payé</span>
+        {% else %}
+          <span class="state-chip state-chip--warn" id="payStateChip">À suivre</span>
+        {% endif %}
+      </div>
+
+      <div class="summary-list">
+        <div class="summary-row">
+          <div class="summary-row__k">Statut</div>
+          <div class="summary-row__v" id="summaryStatus">
+            {% if order.status == "done" %}
+              Terminée
+            {% elif order.status == "in_progress" %}
+              En cours
+            {% elif order.status == "canceled" %}
+              Annulée
+            {% else %}
+              En attente
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="summary-row">
+          <div class="summary-row__k">Paiement</div>
+          <div class="summary-row__v" id="summaryPayment">
+            {% if order.payment_status == "paid" %}Confirmé{% else %}En attente{% endif %}
+          </div>
+        </div>
+
+        <div class="summary-row">
+          <div class="summary-row__k">Déjà payé</div>
+          <div class="summary-row__v" id="payPaid">{{ paid_amount|default:0|fcfa }}</div>
+        </div>
+
+        <div class="summary-row">
+          <div class="summary-row__k">Reste à payer</div>
+          <div class="summary-row__v" id="payRemain">{{ remain_amount|default:0|fcfa }}</div>
+        </div>
+      </div>
+
+      <div class="summary-actions">
+        <a class="btn btn-primary btn-xs" href="{% url 'orders:client_home' %}">← Mes commandes</a>
+        <a class="btn btn-light btn-xs" href="{% url 'orders:client_new_order' %}">➕ Nouvelle commande</a>
+      </div>
+    </section>
+  </div>
+
+  <div class="grid">
+    <div>
+      <section class="section-card">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Suivi</h2>
+            <div class="section-sub">Avancement global de la commande FAGNI.</div>
           </div>
 
-          {% for it in items %}
-            <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:0;padding:10px;border-bottom:1px solid #eef2f7;align-items:center;">
-              <div style="font-weight:900;color:#0f172a;">
-                {{ it.designation|default:"—" }}
-                <div class="meta" style="margin-top:3px;">
-                  {% if not locked %}
-                    <a class="btn btn-ghost" style="padding:6px 10px;font-size:12px;" href="{% url 'orders:client_order_item_edit' order.id it.id %}">Modifier</a>
-                    <a class="btn btn-ghost" style="padding:6px 10px;font-size:12px;border-color:#fecaca;color:#991b1b;" href="{% url 'orders:client_order_item_delete' order.id it.id %}">Supprimer</a>
+          <span id="orderStatusPill" class="status-badge {% if order.status == 'done' %}done{% elif order.status == 'in_progress' %}progress{% elif order.status == 'canceled' %}canceled{% else %}pending{% endif %}">
+            <span class="status-dot"></span>
+            <span id="orderStatus">
+              {% if order.status == "done" %}
+                Terminée
+              {% elif order.status == "in_progress" %}
+                En cours
+              {% elif order.status == "canceled" %}
+                Annulée
+              {% else %}
+                En attente
+              {% endif %}
+            </span>
+          </span>
+        </div>
+
+        <div class="timeline-list" id="timelineBox">
+          {% with order_status=order.status|default:"pending" %}
+            <div class="timeline-step done">
+              <div class="timeline-step__title">Commande reçue</div>
+              <div class="timeline-step__desc">Ta demande a bien été enregistrée dans FAGNI.</div>
+            </div>
+
+            <div class="timeline-step {% if order_status == 'in_progress' or order_status == 'done' %}done{% elif order_status == 'pending' %}active{% endif %}">
+              <div class="timeline-step__title">Collecte</div>
+              <div class="timeline-step__desc">Un livreur récupère ou va récupérer tes articles.</div>
+            </div>
+
+            <div class="timeline-step {% if order_status == 'done' %}done{% elif order_status == 'in_progress' %}active{% endif %}">
+              <div class="timeline-step__title">Pressing</div>
+              <div class="timeline-step__desc">Les articles sont en cours de traitement chez le partenaire.</div>
+            </div>
+
+            <div class="timeline-step {% if order_status == 'done' %}done{% endif %}">
+              <div class="timeline-step__title">Retour livraison</div>
+              <div class="timeline-step__desc">La commande repart vers toi dès qu’elle est prête.</div>
+            </div>
+
+            <div class="timeline-step {% if order_status == 'done' %}active{% endif %}">
+              <div class="timeline-step__title">Livrée</div>
+              <div class="timeline-step__desc">Commande terminée et remise au client.</div>
+            </div>
+          {% endwith %}
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Prestations</h2>
+            <div class="section-sub">Articles associés à cette commande.</div>
+          </div>
+
+          {% if not locked %}
+            <a class="btn btn-light btn-xs" href="{% url 'orders:client_order_item_new' order.id %}">➕ Ajouter</a>
+          {% endif %}
+        </div>
+
+        <div class="item-list" id="itemsBox">
+          {% if items %}
+            {% for it in items %}
+              <div class="item-card">
+                <div class="item-head">
+                  <div>
+                    <div class="item-name">{{ it.designation|default:"—" }}</div>
+                    <div class="item-meta">Qté : {{ it.quantity }} • PU : {{ it.unit_price|fcfa }}</div>
+                  </div>
+                  <div class="item-total">{{ it.total|fcfa }}</div>
+                </div>
+
+                {% if not locked %}
+                  <div class="item-actions">
+                    <a class="btn btn-light btn-xs" href="{% url 'orders:client_order_item_edit' order.id it.id %}">Modifier</a>
+                    <a class="btn btn-danger-light btn-xs" href="{% url 'orders:client_order_item_delete' order.id it.id %}">Supprimer</a>
+                  </div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty-box">Aucune prestation pour le moment.</div>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Livraison</h2>
+            <div class="section-sub">Missions logistiques liées à la commande.</div>
+          </div>
+        </div>
+
+        <div class="legs-list" id="legsBox">
+          {% if legs %}
+            {% for l in legs %}
+              <div class="leg-card">
+                <div class="leg-head">
+                  <div>
+                    <div class="leg-title">
+                      {% if l.leg_type == "pickup" %}
+                        Collecte
+                      {% elif l.leg_type == "return" %}
+                        Retour livraison
+                      {% else %}
+                        {{ l.leg_type }}
+                      {% endif %}
+                      —
+                      {% if l.status == "assigned" %}
+                        Affectée
+                      {% elif l.status == "pending" %}
+                        En attente
+                      {% elif l.status == "done" %}
+                        Terminée
+                      {% elif l.status == "in_progress" %}
+                        En cours
+                      {% else %}
+                        {{ l.status }}
+                      {% endif %}
+                    </div>
+                    <div class="leg-meta">Mission #{{ l.id }}</div>
+                  </div>
+
+                  <div class="leg-mini">#{{ l.id }}</div>
+                </div>
+
+                <div class="item-actions">
+                  {% if l.driver_id %}
+                    <span class="leg-mini">Livreur : #{{ l.driver_id }}</span>
+                  {% endif %}
+                  {% if l.driver_amount and l.driver_amount|floatformat:0 != "0" %}
+                    <span class="leg-mini">Mission : {{ l.driver_amount|fcfa }}</span>
                   {% endif %}
                 </div>
               </div>
-              <div style="font-weight:900;">{{ it.quantity }}</div>
-              <div style="font-weight:900;">{{ it.unit_price|fcfa }}</div>
-              <div style="font-weight:950;">{{ it.total|fcfa }}</div>
-            </div>
-          {% endfor %}
+            {% endfor %}
+          {% else %}
+            <div class="empty-box">Aucune mission affichée pour le moment.</div>
+          {% endif %}
         </div>
-      {% else %}
-        <div class="muted">Aucune ligne pour le moment.</div>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- TIMELINE -->
-  <div class="card panel" style="margin-top:12px;">
-    <h3 class="section-title">Avancement</h3>
-    <div id="timelineBox" class="timeline">
-      {% for s in timeline %}
-        <div class="tstep">
-          <div class="ticon {% if s.done %}done{% endif %}">{{ forloop.counter }}</div>
-          <div class="tmain">
-            <div class="tlabel">{{ s.label }}</div>
-            <div class="tts">
-              {% if s.ts %}{{ s.ts|date:"d/m/Y H:i" }}{% else %}{% if s.done %}Confirmé{% else %}—{% endif %}{% endif %}
-            </div>
-          </div>
-        </div>
-      {% endfor %}
-    </div>
-  </div>
-
-  <!-- LEGS -->
-  <div class="card panel" style="margin-top:12px;">
-    <h3 class="section-title">Livraison (legs)</h3>
-    <div id="legsBox" class="legsGrid">
-      {% if legs %}
-        {% for l in legs %}
-          <div class="legCard">
-            <div class="legTop">
-              <div class="legTitle">
-                {{ l.leg_type }} — <span class="muted leg-status">{{ l.status }}</span>
-              </div>
-              <div class="legId">#{{ l.id }}</div>
-            </div>
-
-            <div class="meta" style="margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;">
-              {% if l.driver_id %}
-                <span class="phasePill"><span class="phaseDot"></span> Livreur : #{{ l.driver_id }}</span>
-              {% endif %}
-              {% if l.driver_amount and l.driver_amount|floatformat:0 != "0" %}
-                <span class="phasePill"><span class="phaseDot"></span> Montant mission : {{ l.driver_amount|fcfa }}</span>
-              {% endif %}
-            </div>
-          </div>
-        {% endfor %}
-      {% else %}
-        <div class="muted">Pas encore de mission de livraison affichée.</div>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- ✅ PREUVES / PHOTOS -->
-  <div class="card panel" style="margin-top:12px;">
-    <div class="row" style="align-items:center;">
-      <h3 class="section-title" style="margin:0;">Preuves & photos</h3>
-      <div class="meta" id="evidenceHint" style="margin:0;">Sécurise la commande (collecte / laverie / livraison).</div>
+      </section>
     </div>
 
-    <div id="evidenceBox" style="margin-top:10px;">
-      <div class="muted">Aucune preuve photo pour le moment.</div>
-    </div>
-  </div>
-
-    <!-- ✅ PREUVES — actions -->
-    <div class="ratingActions" style="margin-top:10px;">
-      <button class="btn btn-primary" id="btnEvidenceOpen" type="button">📸 Ajouter une preuve</button>
-      <span class="ratingNote" id="evidenceMsg" style="display:none;"></span>
-    </div>
-
-    <!-- ✅ Modal Evidence -->
-    <div id="evidenceModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:9999; padding:18px;">
-      <div class="card panel" style="max-width:520px; margin:8vh auto 0; border-radius:18px; box-shadow: var(--shadow2);">
-        <div class="row" style="align-items:center;">
+    <div>
+      <section class="section-card">
+        <div class="section-head">
           <div>
-            <div style="font-weight:950; font-size:14px;">Ajouter une preuve photo</div>
-            <div class="meta">Choisis l’étape + ajoute une ou plusieurs photos.</div>
+            <h2 class="section-title">Paiement</h2>
+            <div class="section-sub">Prix client global, sans ligne TVA séparée.</div>
           </div>
-          <button class="btn btn-ghost" id="btnEvidenceClose" type="button">✕</button>
+
+          {% if order.payment_status == "paid" %}
+            <span class="state-chip state-chip--paid">Payé</span>
+          {% else %}
+            <span class="state-chip state-chip--warn">En attente</span>
+          {% endif %}
         </div>
 
-        <div style="margin-top:12px;">
-          <div class="kv">
-            <div class="k">Étape</div>
-            <div class="v">
-              <select id="evidenceKind" style="padding:8px 10px;border-radius:12px;border:1px solid var(--line);font-weight:800;">
-                <option value="pickup">Collecte</option>
-                <option value="laundry">Laverie</option>
-                <option value="dropoff">Livraison</option>
-              </select>
+        <div class="money-list">
+          <div class="money-row">
+            <div class="money-k">Prestations</div>
+            <div class="money-v" id="amtPrest">{{ amounts.prestation_total|fcfa }}</div>
+          </div>
+
+          <div class="money-row">
+            <div class="money-k">Livraison</div>
+            <div class="money-v" id="amtDeliv">{{ amounts.delivery_fee|fcfa }}</div>
+          </div>
+
+          <div class="money-row">
+            <div class="money-k">Service FAGNI</div>
+            <div class="money-v" id="amtFee">{{ amounts.service_fee|fcfa }}</div>
+          </div>
+
+          {% if amounts.express_extra_fee and amounts.express_extra_fee|floatformat:0 != "0" %}
+            <div class="money-row" id="rowExpress">
+              <div class="money-k">Express</div>
+              <div class="money-v" id="amtExpress">{{ amounts.express_extra_fee|fcfa }}</div>
             </div>
+          {% else %}
+            <div class="money-row" id="rowExpress" style="display:none;">
+              <div class="money-k">Express</div>
+              <div class="money-v" id="amtExpress">0 FCFA</div>
+            </div>
+          {% endif %}
+
+          <div class="money-row total">
+            <div class="money-k">Total client</div>
+            <div class="money-v" id="amtTotal">{{ amounts.total_ttc|fcfa }}</div>
           </div>
 
-          <div style="margin-top:10px;">
-            <input id="evidenceFiles" type="file" accept="image/*" multiple
-                   style="width:100%; padding:10px; border:1px dashed rgba(0,86,179,0.35); border-radius:14px; background:#f8fafc;">
-            <div class="meta" style="margin-top:6px;">Astuce: tu peux sélectionner plusieurs photos.</div>
+          <div class="money-row">
+            <div class="money-k">Déjà payé</div>
+            <div class="money-v">{{ paid_amount|default:0|fcfa }}</div>
           </div>
 
-          <div class="ratingActions">
-            <button class="btn btn-primary" id="btnEvidenceSend" type="button">Envoyer</button>
-            <button class="btn btn-ghost" id="btnEvidenceCancel" type="button">Annuler</button>
+          <div class="money-row">
+            <div class="money-k">Reste à payer</div>
+            <div class="money-v">{{ remain_amount|default:0|fcfa }}</div>
           </div>
-
-          <div class="meta" id="evidenceErr" style="display:none; color:#991b1b; font-weight:800;"></div>
-          <div class="meta" id="evidenceOk" style="display:none; color:#166534; font-weight:800;"></div>
         </div>
-      </div>
-    </div>
 
-          <div style="margin-top:10px;">
-            <input id="evidenceFiles" type="file" accept="image/*" multiple
-                   style="width:100%; padding:10px; border:1px dashed rgba(0,86,179,0.35); border-radius:14px; background:#f8fafc;">
-            <div class="meta" style="margin-top:6px;">Astuce: tu peux sélectionner plusieurs photos.</div>
-          </div>
-
-          <div class="ratingActions">
-            <button class="btn btn-primary" id="btnEvidenceSend" type="button">Envoyer</button>
-            <button class="btn btn-ghost" id="btnEvidenceCancel" type="button">Annuler</button>
-          </div>
-
-          <div class="meta" id="evidenceErr" style="display:none; color:#991b1b; font-weight:800;"></div>
-          <div class="meta" id="evidenceOk" style="display:none; color:#166534; font-weight:800;"></div>
+        <div class="money-note">
+          <strong>Information client :</strong> Ecolowash Africa, entreprise porteuse du projet FAGNI, est une SARL à la TEE. En conséquence, cette page n’affiche pas de ligne TVA séparée : le prix affiché au client est un prix global.
         </div>
-      </div>
-    </div>
 
-  <!-- ✅ ÉVALUATION -->
-  <div class="card panel" style="margin-top:12px;">
-    <div class="row" style="align-items:center;">
-      <h3 class="section-title" style="margin:0;">Évaluation</h3>
-      <div class="meta" style="margin:0;">Ton avis aide à améliorer le service (pilote Riviera).</div>
-    </div>
+        {% if order.payment_status == "paid" %}
+          <div class="ok-strip">● Paiement confirmé pour cette commande</div>
+        {% else %}
+          <div class="evidence-actions">
+            <button class="btn btn-primary btn-xs" id="btnPaySimulate" type="button">💳 Payer maintenant</button>
+            <a class="btn btn-light btn-xs" href="{% url 'orders:client_order_pay_wave_page' order.id %}">🌊 Payer par Wave</a>
+            <button class="btn btn-light btn-xs" id="btnPayCashOpen" type="button">💵 Déclarer cash</button>
+          </div>
+          <div class="feedback" id="payMsg"></div>
+        {% endif %}
+      </section>
 
-    <div id="ratingBox" style="margin-top:10px;">
-      <div class="muted">Évaluation non disponible pour le moment.</div>
+      <section class="section-card">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Preuves & photos</h2>
+            <div class="section-sub">Collecte, laverie, livraison.</div>
+          </div>
+        </div>
+
+        <div class="proof-box" id="evidenceBox">Aucune preuve photo pour le moment.</div>
+
+        <div class="evidence-actions">
+          <button class="btn btn-primary btn-xs" id="btnEvidenceOpen" type="button">📸 Ajouter une preuve</button>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Évaluation</h2>
+            <div class="section-sub">Ton avis aidera à améliorer l’expérience FAGNI.</div>
+          </div>
+        </div>
+
+        <div class="rating-placeholder" id="ratingBox">
+          L’évaluation sera disponible après la livraison.
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Besoin d’aide ?</h2>
+            <div class="section-sub">Support pilote FAGNI.</div>
+          </div>
+        </div>
+
+        <div class="support-actions">
+          <a class="btn btn-light btn-xs" href="#" onclick="return false;">💬 WhatsApp support</a>
+          <a class="btn btn-light btn-xs" href="#" onclick="return false;">📞 Appeler</a>
+        </div>
+
+        <div class="support-note">
+          En cas de besoin, contacte l’équipe FAGNI pour le suivi, le paiement ou la livraison.
+        </div>
+      </section>
     </div>
   </div>
 
-  <!-- ✅ SUPPORT PILOTE (optionnel) -->
-  <div class="card panel" style="margin-top:12px;">
-    <div class="row" style="align-items:center;">
-      <h3 class="section-title" style="margin:0;">Besoin d’aide ?</h3>
-      <div class="meta" style="margin:0;">Support pilote (Riviera) – réponse rapide.</div>
-    </div>
-    <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">
-      {# Remplace le lien WhatsApp si tu veux un vrai numéro #}
-      <a class="btn btn-ghost" href="#" onclick="return false;">💬 WhatsApp support</a>
-      <a class="btn btn-ghost" href="#" onclick="return false;">📞 Appeler</a>
+  <div class="modal" id="payCashModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h3 class="modal-title">Déclarer un paiement cash</h3>
+          <div class="modal-sub">Saisis le montant encaissé. Acompte possible.</div>
+        </div>
+        <button class="btn btn-light btn-xs" id="btnPayCashClose" type="button">✕</button>
+      </div>
+
+      <div class="field">
+        <label for="payCashAmount">Montant</label>
+        <input id="payCashAmount" type="number" min="0" step="1" placeholder="Montant en FCFA">
+      </div>
+
+      <div class="field">
+        <label for="payCashNote">Note</label>
+        <input id="payCashNote" type="text" placeholder="Ex : reçu par livreur">
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-xs" id="btnPayCashSend" type="button">Valider</button>
+        <button class="btn btn-light btn-xs" id="btnPayCashCancel" type="button">Annuler</button>
+      </div>
+
+      <div class="feedback" id="payCashErr"></div>
+      <div class="feedback" id="payCashOk"></div>
     </div>
   </div>
 
+  <div class="modal" id="evidenceModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h3 class="modal-title">Ajouter une preuve photo</h3>
+          <div class="modal-sub">Choisis l’étape et ajoute une ou plusieurs photos.</div>
+        </div>
+        <button class="btn btn-light btn-xs" id="btnEvidenceClose" type="button">✕</button>
+      </div>
+
+      <div class="field">
+        <label for="evidenceKind">Étape</label>
+        <select id="evidenceKind">
+          <option value="pickup">Collecte</option>
+          <option value="laundry">Laverie</option>
+          <option value="dropoff">Livraison</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="evidenceFiles">Photos</label>
+        <input id="evidenceFiles" type="file" accept="image/*" multiple>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-xs" id="btnEvidenceSend" type="button">Envoyer</button>
+        <button class="btn btn-light btn-xs" id="btnEvidenceCancel" type="button">Annuler</button>
+      </div>
+
+      <div class="feedback" id="evidenceErr"></div>
+      <div class="feedback" id="evidenceOk"></div>
+    </div>
+  </div>
+</div>
+
+<div class="sticky-pay">
+  <div class="sticky-pay__inner">
+    <div class="sticky-pay__copy">
+      <div class="sticky-pay__k">Total client</div>
+      <div class="sticky-pay__v">{{ amounts.total_ttc|fcfa }}</div>
+    </div>
+
+    {% if order.payment_status != "paid" %}
+      <button class="btn btn-primary" id="btnPaySimulateSticky" type="button">Payer maintenant</button>
+    {% else %}
+      <div class="sticky-paid">✓ Payé</div>
+    {% endif %}
+  </div>
 </div>
 
 <script>
 (function(){
   const liveUrl = "{% url 'orders:client_order_live' order.id %}";
-  const orderId = {{ order.id|default:0 }};
-
-  const ratingPostUrl = `/orders/client/orders/${orderId}/rating/`;
-
-  // =========================
-  // ✅ PAIEMENT CLIENT (V1) — simulate + cash
-  // =========================
-  const paySimUrl  = "{% url 'orders:client_order_pay_simulate' order.id %}";
+  const paySimUrl = "{% url 'orders:client_order_pay_simulate' order.id %}";
   const payCashUrl = "{% url 'orders:client_order_pay_cash' order.id %}";
+  const evidencePostUrl = "{% url 'orders:client_order_evidence_upload' order.id %}";
 
   const btnPaySim = document.getElementById("btnPaySimulate");
-  const btnPayCashOpen = document.getElementById("btnPayCashOpen");
+  const btnPaySimSticky = document.getElementById("btnPaySimulateSticky");
   const payMsg = document.getElementById("payMsg");
 
   const payCashModal = document.getElementById("payCashModal");
+  const btnPayCashOpen = document.getElementById("btnPayCashOpen");
   const btnPayCashClose = document.getElementById("btnPayCashClose");
   const btnPayCashCancel = document.getElementById("btnPayCashCancel");
   const btnPayCashSend = document.getElementById("btnPayCashSend");
@@ -1045,102 +1468,173 @@ function cleanWaveParam(){
   const payCashErr = document.getElementById("payCashErr");
   const payCashOk = document.getElementById("payCashOk");
 
-  function payShowMsg(msg, ok){
-    if(!payMsg) return;
-    payMsg.textContent = msg || "";
-    payMsg.style.display = msg ? "" : "none";
-    payMsg.style.color = ok ? "#166534" : "#991b1b";
-    payMsg.style.fontWeight = "900";
+  const evidenceModal = document.getElementById("evidenceModal");
+  const btnEvidenceOpen = document.getElementById("btnEvidenceOpen");
+  const btnEvidenceClose = document.getElementById("btnEvidenceClose");
+  const btnEvidenceCancel = document.getElementById("btnEvidenceCancel");
+  const btnEvidenceSend = document.getElementById("btnEvidenceSend");
+  const evidenceKind = document.getElementById("evidenceKind");
+  const evidenceFiles = document.getElementById("evidenceFiles");
+  const evidenceErr = document.getElementById("evidenceErr");
+  const evidenceOk = document.getElementById("evidenceOk");
+  const evidenceBox = document.getElementById("evidenceBox");
+
+  const orderStatus = document.getElementById("orderStatus");
+  const summaryStatus = document.getElementById("summaryStatus");
+  const summaryPayment = document.getElementById("summaryPayment");
+  const orderStatusPill = document.getElementById("orderStatusPill");
+  const heroTotal = document.getElementById("heroTotal");
+  const amtPrest = document.getElementById("amtPrest");
+  const amtDeliv = document.getElementById("amtDeliv");
+  const amtFee = document.getElementById("amtFee");
+  const amtExpress = document.getElementById("amtExpress");
+  const amtTotal = document.getElementById("amtTotal");
+  const rowExpress = document.getElementById("rowExpress");
+  const payPaid = document.getElementById("payPaid");
+  const payRemain = document.getElementById("payRemain");
+  const payStateChip = document.getElementById("payStateChip");
+
+  function getCookie(name){
+    const parts = (`; ${document.cookie}`).split(`; ${name}=`);
+    if(parts.length === 2) return parts.pop().split(";").shift();
+    return "";
   }
 
-  function openCash(){
-    if(payCashErr) payCashErr.style.display = "none";
-    if(payCashOk) payCashOk.style.display = "none";
-    if(payCashAmount) payCashAmount.value = "";
-    if(payCashNote) payCashNote.value = "";
-    if(payCashModal) payCashModal.style.display = "";
-  }
-  function closeCash(){
-    if(payCashModal) payCashModal.style.display = "none";
-  }
-
-  if(btnPayCashOpen) btnPayCashOpen.addEventListener("click", openCash);
-  if(btnPayCashClose) btnPayCashClose.addEventListener("click", closeCash);
-  if(btnPayCashCancel) btnPayCashCancel.addEventListener("click", closeCash);
-
-  payCashModal?.addEventListener("click", (e) => {
-    if(e.target === payCashModal) closeCash();
-  });
-
-  async function doPaySimulate(){
+  function fmtMoney(v){
     try{
-      if(btnPaySim){
-        btnPaySim.disabled = true;
-        btnPaySim.style.opacity = "0.7";
-      }
-      payShowMsg("Traitement du paiement…", true);
-
-      const csrf = getCookie("csrftoken");
-      const r = await fetch(paySimUrl, {
-        method: "POST",
-        headers: {
-          ...(csrf ? {"X-CSRFToken": csrf} : {}),
-          "X-Requested-With": "XMLHttpRequest",
-          "Accept": "application/json",
-        },
-        credentials: "same-origin",
-        cache: "no-store",
-      });
-
-      const ct = (r.headers.get("content-type") || "").toLowerCase();
-        let data = null;
-        try{
-          data = ct.includes("application/json") ? await r.json() : null;
-        }catch(e){ data = null; }
-if(!data || !r.ok || data.ok !== true){
-                // ✅ cas particulier: déjà payé
-        if(data && (data.error === "already_paid")){
-          if(payCashOk){
-            payCashOk.textContent = "✅ Déjà payé.";
-            payCashOk.style.display = "";
-          }
-          closeCash();
-          __waveScheduleReload(450, (typeof orderId!=="undefined"?orderId:""));
-          return;
-        }
-
-payShowMsg("Paiement impossible.", false);
-        return;
-      }
-
-      payShowMsg("✅ Paiement confirmé.", true);
-      // le plus safe (vu que le live refresh existe déjà chez toi) : reload rapide
-      __waveScheduleReload(450, (typeof orderId!=="undefined"?orderId:""));
-
+      const n = Number(v || 0);
+      return Math.round(n).toLocaleString("fr-FR") + " FCFA";
     }catch(e){
-      payShowMsg("Connexion instable. Réessaie.", false);
-}finally{
-      if(btnPaySim){
-        btnPaySim.disabled = false;
-        btnPaySim.style.opacity = "1";
+      return (v || 0) + " FCFA";
+    }
+  }
+
+  function showFeedback(el, msg, ok){
+    if(!el) return;
+    el.textContent = msg || "";
+    el.className = "feedback " + (ok ? "ok" : "err");
+  }
+
+  function hideFeedback(el){
+    if(!el) return;
+    el.textContent = "";
+    el.className = "feedback";
+  }
+
+  function openModal(el){
+    if(el) el.classList.add("is-open");
+  }
+
+  function closeModal(el){
+    if(el) el.classList.remove("is-open");
+  }
+
+  function statusLabel(raw){
+    const s = String(raw || "").toLowerCase();
+    if(s === "done") return ["Terminée", "done"];
+    if(s === "in_progress") return ["En cours", "progress"];
+    if(s === "canceled") return ["Annulée", "canceled"];
+    return ["En attente", "pending"];
+  }
+
+  function paymentLabel(raw){
+    const s = String(raw || "").toLowerCase();
+    if(s.includes("paid")) return "Confirmé";
+    if(s.includes("partial")) return "Partiel";
+    return "En attente";
+  }
+
+  function setStatusUI(raw){
+    const out = statusLabel(raw);
+    const label = out[0];
+    const cls = out[1];
+
+    if(orderStatus) orderStatus.textContent = label;
+    if(summaryStatus) summaryStatus.textContent = label;
+
+    if(orderStatusPill){
+      orderStatusPill.classList.remove("pending","progress","done","canceled");
+      orderStatusPill.classList.add(cls);
+    }
+  }
+
+  function setAmountsUI(amounts){
+    if(!amounts) return;
+
+    if(amtPrest) amtPrest.textContent = fmtMoney(amounts.prestation_total || 0);
+    if(amtDeliv) amtDeliv.textContent = fmtMoney(amounts.delivery_fee || 0);
+    if(amtFee) amtFee.textContent = fmtMoney(amounts.service_fee || 0);
+    if(amtTotal) amtTotal.textContent = fmtMoney(amounts.total_ttc || 0);
+    if(heroTotal) heroTotal.textContent = fmtMoney(amounts.total_ttc || 0);
+
+    const express = Number(amounts.express_extra_fee || 0);
+    if(rowExpress && amtExpress){
+      if(express > 0){
+        rowExpress.style.display = "";
+        amtExpress.textContent = fmtMoney(express);
+      }else{
+        rowExpress.style.display = "none";
       }
     }
   }
 
-  async function doPayCash(){
-    try{
-      if(payCashErr) payCashErr.style.display = "none";
-      if(payCashOk) payCashOk.style.display = "none";
+  async function doPaySimulate(){
+    const buttons = [btnPaySim, btnPaySimSticky].filter(Boolean);
 
-      const amt = Number(payCashAmount?.value || 0);
-      if(!amt || amt <= 0){
-        if(payCashErr){
-          payCashErr.textContent = "Montant invalide.";
-          payCashErr.style.display = "";
+    try{
+      buttons.forEach(function(b){
+        b.disabled = true;
+        b.style.opacity = "0.7";
+      });
+      showFeedback(payMsg, "Traitement du paiement…", true);
+
+      const csrf = getCookie("csrftoken");
+      const res = await fetch(paySimUrl, {
+        method:"POST",
+        headers:{
+          ...(csrf ? {"X-CSRFToken": csrf} : {}),
+          "X-Requested-With":"XMLHttpRequest",
+          "Accept":"application/json",
+        },
+        credentials:"same-origin",
+        cache:"no-store",
+      });
+
+      const data = await res.json().catch(function(){ return null; });
+
+      if(!res.ok || !data || data.ok !== true){
+        if(data && data.error === "already_paid"){
+          showFeedback(payMsg, "✅ Commande déjà payée.", true);
+          setTimeout(function(){ window.location.reload(); }, 450);
+          return;
         }
+        showFeedback(payMsg, "Paiement impossible.", false);
         return;
       }
 
+      showFeedback(payMsg, "✅ Paiement confirmé.", true);
+      setTimeout(function(){ window.location.reload(); }, 450);
+    }catch(e){
+      showFeedback(payMsg, "Connexion instable. Réessaie.", false);
+    }finally{
+      buttons.forEach(function(b){
+        b.disabled = false;
+        b.style.opacity = "1";
+      });
+    }
+  }
+
+  async function doPayCash(){
+    hideFeedback(payCashErr);
+    hideFeedback(payCashOk);
+
+    const amt = Number(payCashAmount && payCashAmount.value ? payCashAmount.value : 0);
+    if(!amt || amt <= 0){
+      showFeedback(payCashErr, "Montant invalide.", false);
+      return;
+    }
+
+    try{
       if(btnPayCashSend){
         btnPayCashSend.disabled = true;
         btnPayCashSend.style.opacity = "0.7";
@@ -1149,53 +1643,30 @@ payShowMsg("Paiement impossible.", false);
       const csrf = getCookie("csrftoken");
       const fd = new FormData();
       fd.append("amount", String(Math.round(amt)));
-      fd.append("note", String(payCashNote?.value || ""));
+      fd.append("note", String(payCashNote && payCashNote.value ? payCashNote.value : ""));
 
-      const r = await fetch(payCashUrl, {
-        method: "POST",
-        headers: {
+      const res = await fetch(payCashUrl, {
+        method:"POST",
+        headers:{
           ...(csrf ? {"X-CSRFToken": csrf} : {}),
-          "X-Requested-With": "XMLHttpRequest",
-          "Accept": "application/json",
+          "X-Requested-With":"XMLHttpRequest",
+          "Accept":"application/json",
         },
-        body: fd,
-        credentials: "same-origin",
-        cache: "no-store",
+        body:fd,
+        credentials:"same-origin",
+        cache:"no-store",
       });
 
-      const ct = (r.headers.get("content-type") || "").toLowerCase();
-        let data = null;
-        let textPreview = "";
-        try{
-          if(ct.includes("application/json")){
-            data = await r.json();
-          }else{
-            const t = await r.text();
-            textPreview = String(t || "").slice(0, 180);
-          }
-        }catch(e){ data = null; }
-      if(!data || !r.ok || data.ok !== true){
-          const err = data?.error ? String(data.error) : ("HTTP " + r.status);
-          const extra = (!data && textPreview) ? (" • " + textPreview) : "";
-          if(payCashErr){
-            payCashErr.textContent = "Paiement impossible : " + err + extra;
-            payCashErr.style.display = "";
-          }
-          return;
-        }
-
-      if(payCashOk){
-        payCashOk.textContent = "✅ Paiement enregistré.";
-        payCashOk.style.display = "";
+      const data = await res.json().catch(function(){ return null; });
+      if(!res.ok || !data || data.ok !== true){
+        showFeedback(payCashErr, "Paiement impossible.", false);
+        return;
       }
 
-      __waveScheduleReload(500, (typeof orderId!=="undefined"?orderId:""));
-
+      showFeedback(payCashOk, "✅ Paiement enregistré.", true);
+      setTimeout(function(){ window.location.reload(); }, 550);
     }catch(e){
-      if(payCashErr){
-        payCashErr.textContent = "Erreur réseau. Réessaie.";
-        payCashErr.style.display = "";
-      }
+      showFeedback(payCashErr, "Erreur réseau. Réessaie.", false);
     }finally{
       if(btnPayCashSend){
         btnPayCashSend.disabled = false;
@@ -1204,1261 +1675,139 @@ payShowMsg("Paiement impossible.", false);
     }
   }
 
+  async function sendEvidence(){
+    hideFeedback(evidenceErr);
+    hideFeedback(evidenceOk);
+
+    if(!evidenceFiles || !evidenceFiles.files || evidenceFiles.files.length === 0){
+      showFeedback(evidenceErr, "Sélectionne au moins une photo.", false);
+      return;
+    }
+
+    try{
+      if(btnEvidenceSend){
+        btnEvidenceSend.disabled = true;
+        btnEvidenceSend.style.opacity = "0.7";
+      }
+
+      const csrf = getCookie("csrftoken");
+      const fd = new FormData();
+      const kind = String(evidenceKind && evidenceKind.value ? evidenceKind.value : "pickup");
+
+      fd.append("kind", kind);
+      for(const f of evidenceFiles.files){
+        fd.append("files", f);
+        fd.append("photos", f);
+      }
+
+      const res = await fetch(evidencePostUrl, {
+        method:"POST",
+        headers:{
+          ...(csrf ? {"X-CSRFToken": csrf} : {}),
+          "X-Requested-With":"XMLHttpRequest",
+          "Accept":"application/json",
+        },
+        body:fd,
+        credentials:"same-origin",
+        cache:"no-store",
+      });
+
+      const data = await res.json().catch(function(){ return null; });
+      if(!res.ok || !data || data.ok !== true){
+        showFeedback(evidenceErr, "Upload impossible.", false);
+        return;
+      }
+
+      showFeedback(evidenceOk, "✅ Photo(s) ajoutée(s).", true);
+      if(evidenceBox){
+        evidenceBox.textContent = "Des preuves ont été ajoutées à cette commande.";
+      }
+      setTimeout(function(){ closeModal(evidenceModal); }, 500);
+    }catch(e){
+      showFeedback(evidenceErr, "Erreur réseau. Réessaie.", false);
+    }finally{
+      if(btnEvidenceSend){
+        btnEvidenceSend.disabled = false;
+        btnEvidenceSend.style.opacity = "1";
+      }
+    }
+  }
+
+  async function refreshLive(){
+    try{
+      const res = await fetch(liveUrl, {
+        method:"GET",
+        credentials:"same-origin",
+        headers:{
+          "Accept":"application/json",
+          "X-Requested-With":"XMLHttpRequest"
+        },
+        cache:"no-store",
+      });
+      if(!res.ok) return;
+
+      const data = await res.json().catch(function(){ return null; });
+      if(!data || data.ok !== true) return;
+
+      if(data.order_status){
+        setStatusUI(data.order_status);
+      }
+
+      if(data.payment_status){
+        const payLabel = paymentLabel(data.payment_status);
+        if(summaryPayment) summaryPayment.textContent = payLabel;
+
+        if(payStateChip){
+          if(String(data.payment_status).toLowerCase().includes("paid")){
+            payStateChip.textContent = "Payé";
+            payStateChip.classList.remove("state-chip--warn");
+            payStateChip.classList.add("state-chip--paid");
+          }else{
+            payStateChip.textContent = "En attente";
+            payStateChip.classList.remove("state-chip--paid");
+            payStateChip.classList.add("state-chip--warn");
+          }
+        }
+      }
+
+      if(data.amounts){
+        setAmountsUI(data.amounts);
+      }
+
+      if(typeof data.paid_amount !== "undefined" && payPaid){
+        payPaid.textContent = fmtMoney(data.paid_amount || 0);
+      }
+
+      if(typeof data.remain_amount !== "undefined" && payRemain){
+        payRemain.textContent = fmtMoney(data.remain_amount || 0);
+      }
+    }catch(e){}
+  }
+
   if(btnPaySim) btnPaySim.addEventListener("click", doPaySimulate);
+  if(btnPaySimSticky) btnPaySimSticky.addEventListener("click", doPaySimulate);
+
+  if(btnPayCashOpen) btnPayCashOpen.addEventListener("click", function(){ openModal(payCashModal); });
+  if(btnPayCashClose) btnPayCashClose.addEventListener("click", function(){ closeModal(payCashModal); });
+  if(btnPayCashCancel) btnPayCashCancel.addEventListener("click", function(){ closeModal(payCashModal); });
   if(btnPayCashSend) btnPayCashSend.addEventListener("click", doPayCash);
 
-    const evidencePostUrl = `/orders/client/orders/${orderId}/evidence/upload/`;
-
-  function getCookie(name){
-    const parts = (`; ${document.cookie}`).split(`; ${name}=`);
-    if(parts.length === 2) return parts.pop().split(";").shift();
-    return "";
-  }
-
-  function isPaidStatus(ps){
-    const s = String(ps || "").toLowerCase();
-    return (s === "paid" || s.includes("payé") || s.includes("paye") || s.includes("paid"));
-  }
-
-  function isDeliveredFromLive(data){
-    const tl = data?.timeline || [];
-    const delivered = tl.find(s => String(s.key||"") === "delivered");
-    return !!delivered?.done;
-  }
-
-  const statusTextEl = document.getElementById("orderStatus");
-  const statusPillEl = document.getElementById("orderStatusPill");
-
-  const legsBox = document.getElementById("legsBox");
-  const itemsBox = document.getElementById("itemsBox");
-
-  const liveDot = document.getElementById("liveDot");
-  const liveTxt = document.getElementById("liveTxt");
-  const lastSync = document.getElementById("lastSync");
-
-  const payTxt = document.getElementById("payTxt");
-  const payDetails = document.getElementById("payDetails");
-  const payPill = document.getElementById("payPill");
-
-  const phasePill = document.getElementById("phasePill");
-  const phaseTxt  = document.getElementById("phaseTxt");
-
-  const amtPrest = document.getElementById("amtPrest");
-  const amtDeliv = document.getElementById("amtDeliv");
-  const amtFee = document.getElementById("amtFee");
-  const amtVat = document.getElementById("amtVat");
-  const amtTotal = document.getElementById("amtTotal");
-
-  const rowExpress = document.getElementById("rowExpress");
-  const amtExpress = document.getElementById("amtExpress");
-  const expressPill = document.getElementById("expressPill");
-
-  const timelineBox = document.getElementById("timelineBox");
-  let estBox = document.getElementById("estBox");
-
-  const evidenceBox = document.getElementById("evidenceBox");
-  const ratingBox = document.getElementById("ratingBox");
-
-    // =========================
-    // ✅ CLIENT Evidence modal + upload
-    // =========================
-    const evModal = document.getElementById("evidenceModal");
-    const btnEvOpen = document.getElementById("btnEvidenceOpen");
-    const btnEvClose = document.getElementById("btnEvidenceClose");
-    const btnEvSend = document.getElementById("btnEvidenceSend");
-    const btnEvCancel = document.getElementById("btnEvidenceCancel");
-    const evKind = document.getElementById("evidenceKind");
-    const evFiles = document.getElementById("evidenceFiles");
-    const evErr = document.getElementById("evidenceErr");
-    const evOk = document.getElementById("evidenceOk");
-
-    function evShowErr(msg){
-      if(!evErr) return;
-      evErr.textContent = msg || "Erreur.";
-      evErr.style.display = "";
-      if(evOk) evOk.style.display = "none";
-    }
-    function evShowOk(msg){
-      if(!evOk) return;
-      evOk.textContent = msg || "OK.";
-      evOk.style.display = "";
-      if(evErr) evErr.style.display = "none";
-    }
-
-    function openEvidence(){
-      if(evErr) evErr.style.display = "none";
-      if(evOk) evOk.style.display = "none";
-      if(evFiles) evFiles.value = "";
-      if(evModal) evModal.style.display = "";
-    }
-    function closeEvidence(){
-      if(evModal) evModal.style.display = "none";
-    }
-
-    if(btnEvOpen) btnEvOpen.addEventListener("click", openEvidence);
-    if(btnEvClose) btnEvClose.addEventListener("click", closeEvidence);
-    if(btnEvCancel) btnEvCancel.addEventListener("click", closeEvidence);
-
-    // Fermer la modale si on clique sur le fond sombre
-    evModal?.addEventListener("click", (e) => {
-      if(e.target === evModal) closeEvidence();
-    });
-
-    async function sendEvidence(){
-      if(!evFiles || !evFiles.files || evFiles.files.length === 0){
-        evShowErr("Sélectionne au moins une photo.");
-        return;
-      }
-
-      const kind = (evKind && evKind.value) ? String(evKind.value) : "pickup";
-
-      const fd = new FormData();
-
-        // compat backend: kind + step
-        fd.append("kind", kind);
-        const stepMap = { pickup:"collecte", collecte:"collecte", delivery:"livraison", livraison:"livraison" };
-        fd.append("step", stepMap[kind] || kind);
-
-        // compat backend: files + photos (selon vue)
-        for(const f of evFiles.files){
-          fd.append("files", f);
-          fd.append("photos", f);
-        }
-// UI lock
-      if(btnEvSend){
-        btnEvSend.disabled = true;
-        btnEvSend.style.opacity = "0.75";
-      }
-      if(evErr) evErr.style.display = "none";
-      if(evOk) evOk.style.display = "none";
-
-      try{
-        const csrf = getCookie("csrftoken");
-
-        const r = await fetch(evidencePostUrl, {
-          method: "POST",
-          headers: {
-            ...(csrf ? {"X-CSRFToken": csrf} : {}),
-            "X-Requested-With": "XMLHttpRequest",
-            "Accept": "application/json",
-          },
-          body: fd,
-          credentials: "same-origin",
-          cache: "no-store",
-        });
-
-        const ct = (r.headers.get("content-type") || "").toLowerCase();
-        const data = ct.includes("application/json") ? await r.json() : null;
-
-        // Cas CSRF/403 HTML ou autre HTML
-        if(!data){
-          evShowErr(`Upload impossible : HTTP ${r.status}`);
-          return;
-        }
-
-        if(!r.ok || data.ok !== true){
-          const err = data.error ? String(data.error) : ("HTTP " + r.status);
-          evShowErr("Upload impossible : " + err);
-          return;
-        }
-
-        const created = Number(data.created || 0);
-        evShowOk(`✅ ${created} photo(s) ajoutée(s).`);
-
-        // refresh immédiat galerie + highlight les nouvelles
-        renderEvidence(data.evidence_photos || [], { new_ids: (data.last_added_ids || []) });
-
-        // 🔒 UX: si livré => on bloque l'ajout (sauf fenêtre serveur)
-        const delivered = isDeliveredFromLive(data);
-        if(btnEvOpen){
-          btnEvOpen.disabled = delivered;
-          btnEvOpen.style.opacity = delivered ? "0.55" : "1";
-        }
-        if(delivered){
-          // petit message (optionnel)
-          // evShowErr("Commande livrée : ajout de preuves bloqué (sauf litige livraison sous 24h).");
-        }
-
-        // reset input
-        if(evFiles) evFiles.value = "";
-
-        // ferme après mini délai (laisser l’œil voir le ✅)
-        setTimeout(() => closeEvidence(), 550);
-
-      }catch(e){
-        evShowErr("Erreur réseau. Réessaie.");
-      }finally{
-        if(btnEvSend){
-          btnEvSend.disabled = false;
-          btnEvSend.style.opacity = "1";
-        }
-      }
-    }
-
-    if(btnEvSend) btnEvSend.addEventListener("click", sendEvidence);
-
-  const refreshMs = 7000;
-  let busy = false;
-  let timer = null;
-
-  function escapeHtml(s){
-    return String(s ?? "").replace(/[&<>"'`=\/]/g, function (c) {
-      return ({
-        "&":"&amp;",
-        "<":"&lt;",
-        ">":"&gt;",
-        '"':"&quot;",
-        "'":"&#39;",
-        "`":"&#x60;",
-        "=":"&#x3D;",
-        "/":"&#x2F;"
-      })[c];
-    });
-  }
-
-  function nowLabel(){
-    const d = new Date();
-    return d.toLocaleString("fr-FR", {year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
-  }
-
-  function setLive(ok, msg){
-    if(liveDot) liveDot.classList.toggle("off", !ok);
-    if(liveTxt) liveTxt.textContent = msg || (ok ? "Connecté" : "Hors ligne");
-    if(lastSync && ok) lastSync.textContent = nowLabel();
-  }
-
-  function statusToPill(status){
-    const s = String(status || "").toLowerCase();
-    if(s === "pending") return {cls:"st-pending", label:"En attente"};
-    if(s === "in_progress") return {cls:"st-in-progress", label:"En cours"};
-    if(s === "done") return {cls:"st-done", label:"Terminée"};
-    if(s === "canceled") return {cls:"st-canceled", label:"Annulée"};
-    return {cls:"st-other", label: status || "—"};
-  }
-
-  function setStatus(statusRaw){
-    const s = statusToPill(statusRaw);
-    if(statusTextEl) statusTextEl.textContent = s.label;
-    if(statusPillEl){
-      statusPillEl.classList.remove("st-pending","st-in-progress","st-done","st-canceled","st-other");
-      statusPillEl.classList.add(s.cls);
-    }
-  }
-
-  function paymentLabel(ps){
-    const s = String(ps || "").toLowerCase();
-
-    if(s.includes("paid") || s.includes("paye") || s.includes("payé")) return {cls:"pay-ok", label:"Payé"};
-    if(s.includes("partial")) return {cls:"pay-wait", label:"Acompte"};
-    if(s.includes("pending") || s.includes("attente") || s.includes("unpaid")) return {cls:"pay-wait", label:"En attente"};
-    if(s.includes("failed") || s.includes("echec") || s.includes("échoué")) return {cls:"pay-bad", label:"Échec"};
-
-    return {cls:"", label: ps || "non renseigné"};
-  }
-
-  function setPayment(ps, amounts){
-    const p = paymentLabel(ps);
-    if(payTxt) payTxt.textContent = p.label;
-    if(payPill){
-      payPill.classList.remove("pay-ok","pay-wait","pay-bad");
-      if(p.cls) payPill.classList.add(p.cls);
-    }
-
-    // ✅ détails paiement (payPaid / payTotal / payRemain)
-    try{
-      const total = Number(String(amounts?.total_ttc ?? 0).replace(",", "."));
-      const paid  = Number(String(amounts?.amount_paid ?? 0).replace(",", "."));
-      const rest  = Number(String(amounts?.amount_remaining ?? Math.max(0, total - paid)).replace(",", "."));
-
-      // ✅ Trop-perçu (surpaiement) — info comptable, UI propre
-      const over = Number(String(amounts?.overpaid ?? 0).replace(",", "."));
-      const overRow = document.getElementById("payOverRow");
-      const overEl  = document.getElementById("payOver");
-      if(overRow && overEl){
-        if(isFinite(over) && over > 0){
-          overEl.textContent = formatMoney(over);
-          overRow.style.display = "";
-        }else{
-          overRow.style.display = "none";
-        }
-      }
-      const elPaid = document.getElementById("payPaid");
-      const elTotal = document.getElementById("payTotal");
-      const elRemain = document.getElementById("payRemain");
-
-      if(elPaid)  elPaid.textContent  = formatMoney(paid);
-      if(elTotal) elTotal.textContent = formatMoney(total);
-      if(elRemain)elRemain.textContent= formatMoney(rest);
-
-      if(payDetails){
-        payDetails.style.display = (total > 0) ? "" : "none";
-      }
-    }catch(e){
-      if(payDetails) payDetails.style.display = "none";
-    }
-  }
-
-  function formatMoney(n){
-    try{
-      const x = Number(String(n ?? "0").replace(",", "."));
-      if(!isFinite(x)) return "0 FCFA";
-      return x.toLocaleString("fr-FR", {maximumFractionDigits:0}) + " FCFA";
-    }catch(e){
-      return "0 FCFA";
-    }
-  }
-
-  function pulse(el){
-    if(!el) return;
-    waveEl2.classList.remove("pulse");
-    void el.offsetWidth;
-    waveEl2.classList.add("pulse");
-  }
-
-  function setExpress(amounts){
-    const ex = Number(amounts?.express_extra_fee || 0);
-
-    if(expressPill){
-      expressPill.style.display = (ex > 0) ? "inline-flex" : "none";
-    }
-
-    if(rowExpress){
-      rowExpress.style.display = (ex > 0) ? "" : "none";
-    }
-    if(amtExpress){
-      const v = formatMoney(ex);
-      if(amtExpress.textContent !== v){
-        amtExpress.textContent = v;
-        pulse(amtExpress);
-      }
-    }
-  }
-
-  function legTypeLabel(t){
-    const s = String(t || "").toLowerCase();
-    if(s.includes("pickup") || s.includes("collect")) return "Collecte";
-    if(s.includes("drop") || s.includes("deliver")) return "Livraison";
-    if(s.includes("return")) return "Retour";
-    if(s.includes("to_laundry") || s.includes("laundry")) return "Vers laverie";
-    return t || "Mission";
-  }
-
-  function legStatusLabel(st){
-    const s = String(st || "").toLowerCase();
-    if(s === "pending") return "En attente";
-    if(s === "assigned") return "Assignée";
-    if(s === "in_progress") return "En cours";
-    if(s === "done") return "Terminée";
-    if(s === "canceled") return "Annulée";
-    return st || "—";
-  }
-
-  function renderLegs(legs){
-    if(!legsBox) return;
-    if(!legs || !legs.length){
-      legsBox.innerHTML = '<div class="muted">Pas encore de mission de livraison affichée.</div>';
-      return;
-    }
-
-    legsBox.innerHTML = legs.map(l => {
-      const typ = escapeHtml(legTypeLabel(l.leg_type));
-      const st  = escapeHtml(legStatusLabel(l.status));
-      const id  = escapeHtml(l.id);
-
-      const driverId = (l.driver_id !== null && l.driver_id !== undefined && String(l.driver_id).trim() !== "")
-        ? escapeHtml(l.driver_id)
-        : "";
-
-      const amt = Number(String(l.driver_amount ?? "0").replace(",", "."));
-      const amtTxt = (isFinite(amt) && amt > 0) ? formatMoney(amt) : "";
-
-      const extraBits = [];
-      if(driverId) extraBits.push(`<span class="phasePill"><span class="phaseDot"></span> Livreur : #${driverId}</span>`);
-      if(amtTxt)   extraBits.push(`<span class="phasePill"><span class="phaseDot"></span> Montant mission : ${amtTxt}</span>`);
-
-      return `
-        <div class="legCard">
-          <div class="legTop">
-            <div class="legTitle">${typ} — <span class="muted leg-status">${st}</span></div>
-            <div class="legId">#${id}</div>
-          </div>
-          ${extraBits.length ? `<div class="meta" style="margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;">${extraBits.join("")}</div>` : ``}
-        </div>
-      `;
-    }).join("");
-  }
-
-  function renderItems(items){
-    if(!itemsBox) return;
-
-    if(!items || !items.length){
-      itemsBox.innerHTML = '<div class="muted">Aucune ligne pour le moment.</div>';
-      return;
-    }
-
-    itemsBox.innerHTML = `
-      <div style="border:1px solid var(--line); border-radius:14px; overflow:hidden;">
-        <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:0;background:#f8fafc;border-bottom:1px solid var(--line);padding:10px;font-weight:950;font-size:12px;color:#334155;">
-          <div>Désignation</div><div>Qté</div><div>PU</div><div>Total</div>
-        </div>
-
-        ${items.map(it => {
-          const id = escapeHtml(it.id);
-          const d  = escapeHtml(it.designation || "—");
-          const q  = escapeHtml(it.quantity ?? 0);
-          const up = formatMoney(it.unit_price ?? 0);
-          const tt = formatMoney(it.total ?? 0);
-
-          const editUrl = `/orders/client/orders/${orderId}/items/${id}/edit/`;
-          const delUrl  = `/orders/client/orders/${orderId}/items/${id}/delete/`;
-
-          return `
-            <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:0;padding:10px;border-bottom:1px solid #eef2f7;align-items:center;">
-              <div style="font-weight:900;color:#0f172a;">
-                ${d}
-                <div class="meta" style="margin-top:3px;">
-                  <a class="btn btn-ghost" style="padding:6px 10px;font-size:12px;" href="${editUrl}">Modifier</a>
-                  <a class="btn btn-ghost" style="padding:6px 10px;font-size:12px;border-color:#fecaca;color:#991b1b;" href="${delUrl}">Supprimer</a>
-                </div>
-              </div>
-              <div style="font-weight:900;">${q}</div>
-              <div style="font-weight:900;">${up}</div>
-              <div style="font-weight:950;">${tt}</div>
-            </div>
-          `;
-        }).join("")}
-      </div>
-    `;
-  }
-
-  function setAmounts(a){
-    if(!a) return;
-
-    const next = {
-      prest: formatMoney(a.prestation_total),
-      deliv: formatMoney(a.delivery_fee),
-      fee: formatMoney(a.service_fee),
-      vat: formatMoney(a.vat_fagni),
-      total: formatMoney(a.total_ttc),
-    };
-
-    if(amtPrest && amtPrest.textContent !== next.prest){ amtPrest.textContent = next.prest; pulse(amtPrest); }
-    if(amtDeliv && amtDeliv.textContent !== next.deliv){ amtDeliv.textContent = next.deliv; pulse(amtDeliv); }
-    if(amtFee && amtFee.textContent !== next.fee){ amtFee.textContent = next.fee; pulse(amtFee); }
-    if(amtVat && amtVat.textContent !== next.vat){ amtVat.textContent = next.vat; pulse(amtVat); }
-    if(amtTotal && amtTotal.textContent !== next.total){ amtTotal.textContent = next.total; pulse(amtTotal); }
-
-    setExpress(a);
-  }
-
-  function formatDate(iso){
-    try{
-      const d = new Date(iso);
-      if(isNaN(d.getTime())) return String(iso || "—");
-      return d.toLocaleString("fr-FR", {
-        year:"numeric", month:"2-digit", day:"2-digit",
-        hour:"2-digit", minute:"2-digit"
-      });
-    }catch(e){
-      return String(iso || "—");
-    }
-  }
-
-  function renderTimeline(tl){
-    if(!timelineBox) return;
-    if(!tl || !tl.length) return;
-
-    timelineBox.innerHTML = tl.map((s, idx) => {
-      const done = !!s.done;
-      const label = escapeHtml(s.label || "");
-      const ts = s.ts ? escapeHtml(formatDate(s.ts)) : (done ? "Confirmé" : "—");
-      return `
-        <div class="tstep">
-          <div class="ticon ${done ? "done" : ""}">${idx+1}</div>
-          <div class="tmain">
-            <div class="tlabel">${label}</div>
-            <div class="tts">${ts}</div>
-          </div>
-        </div>
-      `;
-    }).join("");
-  }
-
-  function isTerminalStatus(st){
-    const s = String(st || "").toLowerCase();
-    return (s === "done" || s === "canceled");
-  }
-
-  function isActiveStatus(st){
-    const s = String(st || "").toLowerCase();
-    return (s === "pending" || s === "in_progress");
-  }
-
-  function parseTotal(a){
-    try{
-      const v = a?.total_ttc ?? 0;
-      const n = Number(String(v).replace(",", "."));
-      return isFinite(n) ? n : 0;
-    }catch(e){
-      return 0;
-    }
-  }
-
-  function updateEstimationBox(active, totalIsZero){
-    const shouldShow = !!active && !!totalIsZero;
-    estBox = document.getElementById("estBox");
-    if(shouldShow){
-      if(estBox) estBox.style.display = "";
-    }else{
-      if(estBox) estBox.style.display = "none";
-    }
-  }
-
-  function computePhase(timeline){
-    const map = {};
-    (timeline || []).forEach(s => { map[String(s.key||"")] = !!s.done; });
-
-    if(map["delivered"]) return "Livraison terminée";
-    if(map["wash"]) return "Laverie (lavage terminé)";
-    if(map["pickup"]) return "Collecte effectuée";
-    return "Commande créée";
-  }
-
-  function setPhase(tl){
-    if(!phaseTxt || !phasePill) return;
-    const ph = computePhase(tl);
-    phaseTxt.textContent = ph;
-    phasePill.classList.add("on");
-  }
-
-  // ✅ preuves photos (safe si endpoint n’envoie rien)
-  function tagClass(t){
-    const s = String(t||"").toLowerCase();
-    if(s.includes("pickup")) return "pickup";
-    if(s.includes("laundry")) return "laundry";
-    if(s.includes("drop") || s.includes("deliver")) return "dropoff";
-    return "";
-  }
-
-  function tagLabel(t){
-    const s = String(t||"").toLowerCase();
-    if(s.includes("pickup")) return "Collecte";
-    if(s.includes("laundry")) return "Laverie";
-    if(s.includes("drop") || s.includes("deliver")) return "Livraison";
-    return t || "Photo";
-  }
-
-  function renderEvidence(photos, opts){
-    if(!evidenceBox) return;
-
-    const newly = new Set((opts && opts.new_ids) ? opts.new_ids.map(String) : []);
-
-    if(!photos || !photos.length){
-      evidenceBox.innerHTML = '<div class="muted">Aucune preuve photo pour le moment.</div>';
-      return;
-    }
-
-    evidenceBox.innerHTML = `
-      <div class="gallery">
-        ${photos.map((p) => {
-          const id  = (p.id != null) ? String(p.id) : "";
-          const url = escapeHtml(p.url || p.image_url || "");
-          const typ = escapeHtml(tagLabel(p.kind || p.type || p.stage || ""));
-          const cls = escapeHtml(tagClass(p.kind || p.type || p.stage || ""));
-          const ts  = p.created_at ? escapeHtml(formatDate(p.created_at)) : "";
-          const note = escapeHtml(p.note || p.comment || "");
-
-          const isNew = id && newly.has(id);
-
-          const tag = `<span class="phTag ${cls}"><span class="dot"></span>${typ}</span>`;
-          const meta = `
-            <div class="phMeta">
-              ${tag}
-              ${ts ? `<div class="ratingNote">📅 ${ts}</div>` : ``}
-              ${note ? `<div class="ratingNote">📝 ${note}</div>` : ``}
-            </div>
-          `;
-
-          return `
-            <div class="ph ${isNew ? "phNew" : ""}" data-evi-id="${escapeHtml(id)}">
-              ${url
-                ? `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="preuve photo"></a>`
-                : `<img src="" alt="preuve photo">`
-              }
-              ${meta}
-            </div>
-          `;
-        }).join("")}
-      </div>
-    `;
-
-    // Retire l’effet "new" après 1.2s (sans casser le layout)
-    if(newly.size){
-      setTimeout(() => {
-        try{
-          evidenceBox.querySelectorAll(".ph.phNew").forEach(el => waveEl2.classList.remove("phNew"));
-        }catch(e){}
-      }, 1200);
-    }
-  }
-
-  // ✅ Lightbox premium (plein écran)
-  function ensureEvidenceLightbox(){
-    if(document.getElementById("eviModal")) return;
-
-    const modal = document.createElement("div");
-    modal.id = "eviModal";
-    modal.style.cssText = [
-      "position:fixed",
-      "inset:0",
-      "z-index:9999",
-      "display:none",
-      "align-items:center",
-      "justify-content:center",
-      "background:rgba(15,23,42,0.72)",
-      "backdrop-filter: blur(3px)",
-      "padding:18px"
-    ].join(";");
-
-    modal.innerHTML = `
-      <div id="eviModalInner" style="
-        width:min(980px, 96vw);
-        max-height:92vh;
-        background:#0b1220;
-        border:1px solid rgba(255,255,255,0.12);
-        border-radius:18px;
-        box-shadow: 0 24px 64px rgba(0,0,0,0.35);
-        overflow:hidden;
-        position:relative;
-      ">
-        <button type="button" id="eviClose" aria-label="Fermer" style="
-          position:absolute; top:10px; right:10px;
-          width:40px; height:40px; border-radius:999px;
-          border:1px solid rgba(255,255,255,0.18);
-          background:rgba(255,255,255,0.08);
-          color:#fff; cursor:pointer; font-weight:950;
-        ">✕</button>
-
-        <div style="padding:10px 12px; color:#cbd5e1; font-size:12px; display:flex; gap:10px; align-items:center;">
-          <span style="font-weight:900;">Preuve photo</span>
-          <span style="opacity:.8">•</span>
-          <span style="opacity:.85">Clique dehors ou appuie sur ESC pour fermer</span>
-        </div>
-
-        <div style="background:#000; display:flex; align-items:center; justify-content:center;">
-          <img id="eviImg" alt="preuve photo" style="
-            max-width:100%;
-            max-height:calc(92vh - 58px);
-            display:block;
-            object-fit:contain;
-            background:#000;
-          ">
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(modal);
-
-    const close = () => closeEvidenceLightbox();
-    modal.addEventListener("click", (e) => {
-      // clic sur fond sombre => ferme
-      if(e.target && e.target.id === "eviModal") close();
-    });
-    modal.querySelector("#eviClose")?.addEventListener("click", close);
-
-    document.addEventListener("keydown", (e) => {
-      if(e.key === "Escape") closeEvidenceLightbox();
-    }, { passive: true });
-  }
-
-  function openEvidenceLightbox(url){
-    const modal = document.getElementById("eviModal");
-    const img = document.getElementById("eviImg");
-    if(!modal || !img) return;
-
-    img.setAttribute("src", url);
-    modal.style.display = "flex";
-    try{ document.body.style.overflow = "hidden"; }catch(e){}
-  }
-
-  function closeEvidenceLightbox(){
-    const modal = document.getElementById("eviModal");
-    const img = document.getElementById("eviImg");
+  if(btnEvidenceOpen) btnEvidenceOpen.addEventListener("click", function(){ openModal(evidenceModal); });
+  if(btnEvidenceClose) btnEvidenceClose.addEventListener("click", function(){ closeModal(evidenceModal); });
+  if(btnEvidenceCancel) btnEvidenceCancel.addEventListener("click", function(){ closeModal(evidenceModal); });
+  if(btnEvidenceSend) btnEvidenceSend.addEventListener("click", sendEvidence);
+
+  [payCashModal, evidenceModal].forEach(function(modal){
     if(!modal) return;
-
-    modal.style.display = "none";
-    if(img) img.setAttribute("src", "");
-    try{ document.body.style.overflow = ""; }catch(e){}
-  }
-
-  // ✅ rating (premium + safe)
-  function isPaidStatus(ps){
-    const s = String(ps || "").toLowerCase();
-    return (s === "paid" || s.includes("payé") || s.includes("paye") || s.includes("paid"));
-  }
-
-  function renderStars(n){
-    const v = Math.max(0, Math.min(5, Number(n || 0)));
-    let out = "";
-    for(let i=1;i<=5;i++){
-      out += `<span class="star ${i<=v ? "on" : ""}">${i<=v ? "★" : "☆"}</span>`;
-    }
-    return out;
-  }
-
-  function renderStarsInteractive(selected, hover){
-    const s = Math.max(0, Math.min(5, Number(selected || 0)));
-    const h = Math.max(0, Math.min(5, Number(hover || 0)));
-    const v = h || s;
-
-    let out = "";
-    for(let i=1;i<=5;i++){
-      const on = (i<=v);
-      out += `<span class="star ${on ? "on" : ""}" data-v="${i}" style="cursor:pointer;user-select:none;">${on ? "★" : "☆"}</span>`;
-    }
-    return out; 
-  }
-
-  function showRatingReadonly(r){
-    const score = Number(r?.score ?? r?.rating ?? 0);
-    const comment = escapeHtml(r?.comment || r?.note || "");
-    const ts = r?.created_at ? escapeHtml(formatDate(r.created_at)) : "";
-
-    ratingBox.innerHTML = `
-      <div class="ratingRow">
-        <div class="stars">${renderStars(score)}</div>
-        <div style="font-weight:950;">${escapeHtml(String(score))}/5</div>
-        ${ts ? `<div class="ratingNote">• ${ts}</div>` : ``}
-      </div>
-      ${comment ? `<div class="ratingNote" style="margin-top:8px;">📝 ${comment}</div>` : ``}
-
-      <div class="ratingActions" style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-        <button class="btn btn-ghost" id="rateEditBtn" type="button">✏️ Modifier mon avis</button>
-        <span class="meta" id="rateSaved" style="margin:0;"></span>
-      </div>
-
-      <div id="rateEditBox" style="display:none;margin-top:10px;"></div>
-    `;
-
-    ratingBox.dataset.hasRating = "1";
-    ratingBox.dataset.formOpen = "0";
-
-    const editBtn = document.getElementById("rateEditBtn");
-    const editBox = document.getElementById("rateEditBox");
-    const savedEl = document.getElementById("rateSaved");
-
-    editBtn?.addEventListener("click", () => {
-      if(!editBox) return;
-
-      const open = (editBox.style.display !== "none");
-      editBox.style.display = open ? "none" : "block";
-      ratingBox.dataset.formOpen = open ? "0" : "1";
-      if(open) return;
-
-      let selected = score;
-      let hover = 0;
-
-      editBox.innerHTML = `
-        <div style="display:grid;gap:10px;max-width:640px;">
-          <div class="ratingRow">
-            <div class="stars" id="rateStarsEdit"></div>
-            <div style="font-weight:950;" id="rateValueEdit">${selected}/5</div>
-            <div class="ratingNote" id="rateHintEdit">Survole puis clique</div>
-          </div>
-
-          <textarea id="rateCommentEdit"
-            rows="3"
-            style="width:100%;border:1px solid var(--line);border-radius:14px;padding:10px;font-size:13px;outline:none;"
-          >${escapeHtml(r?.comment || r?.note || "")}</textarea>
-
-          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-            <button class="btn btn-ghost" id="rateUpdate" type="button">Mettre à jour</button>
-            <button class="btn btn-ghost" id="rateCancel" type="button">Annuler</button>
-            <span class="meta" id="rateMsgEdit" style="margin:0;"></span>
-          </div>
-        </div>
-      `;
-
-      const starsEl = document.getElementById("rateStarsEdit");
-      const valEl = document.getElementById("rateValueEdit");
-      const msgEl = document.getElementById("rateMsgEdit");
-      const commentEl = document.getElementById("rateCommentEdit");
-      const btnUpdate = document.getElementById("rateUpdate");
-      const btnCancel = document.getElementById("rateCancel");
-
-      function draw(){
-        if(!starsEl) return;
-        starsEl.innerHTML = renderStarsInteractive(selected, hover);
-        if(valEl) valEl.textContent = `${(hover || selected)}/5`;
-      }
-      draw();
-
-      starsEl?.addEventListener("mousemove", (e) => {
-        const v = Number(e.target?.dataset?.v || 0);
-        if(v){ hover = v; draw(); }
-      });
-      starsEl?.addEventListener("mouseleave", () => {
-        hover = 0; draw();
-      });
-      starsEl?.addEventListener("click", (e) => {
-        const v = Number(e.target?.dataset?.v || 0);
-        if(v){ selected = v; hover = 0; draw(); }
-      });
-
-      btnCancel?.addEventListener("click", () => {
-        editBox.style.display = "none";
-        ratingBox.dataset.formOpen = "0";
-      });
-
-      btnUpdate?.addEventListener("click", async () => {
-        if(!msgEl) return;
-        msgEl.textContent = "Envoi…";
-        if(savedEl) savedEl.textContent = "";
-
-        try{
-          const csrftoken = getCookie("csrftoken");
-          const body = new URLSearchParams();
-          body.set("score", String(selected));
-          body.set("comment", String(commentEl?.value || "").trim());
-
-          const res = await fetch(ratingPostUrl, {
-            method: "POST",
-            credentials: "same-origin",
-            headers: {
-              "X-Requested-With": "XMLHttpRequest",
-              "Accept": "application/json",
-              "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-              "X-CSRFToken": csrftoken,
-            },
-            body: body.toString(),
-            cache: "no-store",
-          });
-
-          const ct = (res.headers.get("content-type") || "").toLowerCase();
-          const data = ct.includes("application/json") ? await res.json() : null;
-
-          if(!res.ok || !data || !data.ok){
-            const err = (data && data.error) ? data.error : `HTTP ${res.status}`;
-            msgEl.textContent = `Erreur: ${err}`;
-            return;
-          }
-
-          msgEl.textContent = "";
-          if(savedEl){
-            savedEl.innerHTML = '<span class="toastOk">✅ Avis mis à jour</span>';
-            setTimeout(() => { try{ savedEl.textContent = ""; }catch(e){} }, 2500);
-          }
-          ratingBox.classList.remove("pulse"); void ratingBox.offsetWidth; ratingBox.classList.add("pulse");
-          ratingBox.dataset.formOpen = "0";
-
-          // Re-affiche lecture seule avec la réponse serveur
-          showRatingReadonly(data.rating);
-
-        }catch(e){
-          msgEl.textContent = "Erreur réseau. Réessaie.";
-        }
-      });
-    });
-  }
-
-  function showRatingCreateForm(){
-    // évite d’écraser si l’utilisateur est en train d’écrire
-    if(ratingBox.dataset.formOpen === "1") return;
-
-    ratingBox.dataset.formOpen = "1";
-
-    ratingBox.innerHTML = `
-      <div style="display:grid;gap:10px;max-width:640px;">
-        <div class="meta" style="font-weight:900;">
-          Note le service (1 à 5) puis laisse un commentaire.
-        </div>
-
-        <div class="ratingRow">
-          <div class="stars" id="rateStars" aria-label="Choisir une note"></div>
-          <div style="font-weight:950;" id="rateValue">—/5</div>
-          <div class="ratingNote" id="rateHint">Clique sur les étoiles</div>
-        </div>
-
-        <textarea id="rateComment"
-          rows="3"
-          style="width:100%;border:1px solid var(--line);border-radius:14px;padding:10px;font-size:13px;outline:none;"
-          placeholder="Ex: Service nickel, livraison rapide."></textarea>
-
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-          <button class="btn btn-ghost" id="rateSend" type="button">Envoyer</button>
-          <span class="meta" id="rateMsg" style="margin:0;"></span>
-        </div>
-      </div>
-    `;
-
-    const starsEl = document.getElementById("rateStars");
-    const valEl   = document.getElementById("rateValue");
-    const msgEl   = document.getElementById("rateMsg");
-    const sendBtn = document.getElementById("rateSend");
-    const commentEl = document.getElementById("rateComment");
-
-    let selected = 0;
-    let hover = 0;
-
-    function draw(){
-      if(!starsEl) return;
-      starsEl.innerHTML = renderStarsInteractive(selected, hover);
-      if(valEl) valEl.textContent = (hover || selected) ? `${(hover || selected)}/5` : "—/5";
-      // ✅ premium: bouton inactif tant que note=0
-      if(sendBtn){
-        const ok = (selected > 0);
-        sendBtn.disabled = !ok;
-        sendBtn.style.opacity = ok ? "1" : "0.55";
-      }
-    }
-    draw();
-
-    starsEl?.addEventListener("mousemove", (e) => {
-      const v = Number(e.target?.dataset?.v || 0);
-      if(v){ hover = v; draw(); }
-    });
-    starsEl?.addEventListener("mouseleave", () => {
-      hover = 0; draw();
-    });
-    starsEl?.addEventListener("click", (e) => {
-      const v = Number(e.target?.dataset?.v || 0);
-      if(v){ selected = v; hover = 0; draw(); }
-    });
-
-    sendBtn?.addEventListener("click", async () => {
-      if(!msgEl) return;
-      if(selected <= 0){
-        msgEl.textContent = "Choisis une note (1 à 5).";
-        return;
-      }
-
-      sendBtn.disabled = true;
-      sendBtn.style.opacity = "0.7";
-      msgEl.textContent = "Envoi…";
-
-      try{
-        const csrftoken = getCookie("csrftoken");
-        const body = new URLSearchParams();
-        body.set("score", String(selected));
-        body.set("comment", String(commentEl?.value || "").trim());
-
-        const res = await fetch(ratingPostUrl, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            "X-Requested-With": "XMLHttpRequest",
-            "Accept": "application/json",
-            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-            "X-CSRFToken": csrftoken,
-          },
-          body: body.toString(),
-          cache: "no-store",
-        });
-
-        const ct = (res.headers.get("content-type") || "").toLowerCase();
-        const data = ct.includes("application/json") ? await res.json() : null;
-
-        if(!res.ok || !data || !data.ok){
-          const err = (data && data.error) ? data.error : `HTTP ${res.status}`;
-          msgEl.textContent = `Erreur: ${err}`;
-          sendBtn.disabled = false;
-          sendBtn.style.opacity = "1";
-          return;
-        }
-
-        ratingBox.classList.remove("pulse"); void ratingBox.offsetWidth; ratingBox.classList.add("pulse");
-        ratingBox.dataset.formOpen = "0";
-
-        // ✅ toast premium
-        if(msgEl){
-          msgEl.innerHTML = '<span class="toastOk">✅ Merci pour ton avis</span>';
-          setTimeout(() => { try{ msgEl.textContent = ""; }catch(e){} }, 2500);
-        }
-
-        // Re-affiche lecture seule
-        showRatingReadonly(data.rating);
-
-      }catch(e){
-        msgEl.textContent = "Erreur réseau. Réessaie.";
-        sendBtn.disabled = false;
-        sendBtn.style.opacity = "1";
+    modal.addEventListener("click", function(e){
+      if(e.target === modal){
+        closeModal(modal);
       }
     });
-  }
-
-  function renderRating(r, status, paymentStatus){
-    if(!ratingBox) return;
-
-    const st = String(status || "").toLowerCase();
-    const ps = String(paymentStatus || "").toLowerCase();
-
-    const terminal = isTerminalStatus(st);
-    const paid = isPaidStatus(ps);
-
-    const score = Number(r?.score ?? r?.rating ?? 0);
-    const hasRating = (score > 0);
-
-    // ✅ si note existe → lecture seule + édition possible
-    if(hasRating){
-      showRatingReadonly(r);
-      return;
-    }
-
-    // ✅ sinon : seulement après livraison + paiement
-    if(!(terminal && paid)){
-      ratingBox.dataset.formOpen = "0";
-      ratingBox.innerHTML = '<div class="muted">Tu pourras évaluer après la livraison et le paiement.</div>';
-      return;
-    }
-
-    showRatingCreateForm();
-  }
-
-  async function tick(){
-    if(busy) return;
-    busy = true;
-
-    try{
-      setLive(true, "Synchronisation…");
-
-      const res = await fetch(liveUrl, {
-        method: "GET",
-        credentials: "same-origin",
-        headers: {"X-Requested-With":"XMLHttpRequest","Accept":"application/json"},
-        cache: "no-store"
-      });
-
-      if(res.status === 401 || res.status === 403){
-        setLive(false, "Session expirée (reconnecte-toi)");
-        if(legsBox){
-          legsBox.innerHTML = `
-            <div class="muted">
-              🔒 Session expirée.
-              <a href="/orders/client/" style="text-decoration:underline;">Se reconnecter</a>
-            </div>
-          `;
-        }
-        if(itemsBox){
-          itemsBox.innerHTML = `<div class="muted">Connecte-toi pour afficher les lignes.</div>`;
-        }
-        stop();
-        return;
-      }
-
-      if(res.status === 404){
-        setLive(false, "Commande introuvable");
-        stop();
-        return;
-      }
-
-      const ct = (res.headers.get("content-type") || "").toLowerCase();
-      if(!ct.includes("application/json")){
-        setLive(false, "Erreur serveur (réponse non JSON)");
-        return;
-      }
-
-      const data = await res.json();
-      if(!data || !data.ok){
-        setLive(false, (data && data.error) ? ("Erreur: " + data.error) : "Synchronisation indisponible");
-        return;
-      }
-
-      const status = data.order?.status || "";
-      setStatus(status);
-
-      setPayment(data.order?.payment_status || "", data.amounts);
-      setAmounts(data.amounts);
-
-      renderLegs(data.legs || []);
-      renderItems(data.order?.items || []);
-      renderTimeline(data.timeline || []);
-      setPhase(data.timeline || []);
-
-      // ✅ preuves/évaluation (si le backend les envoie)
-      renderEvidence(data.evidence_photos || data.evidence || []);
-      const rb = document.getElementById("ratingBox");
-      const formOpen = (rb && rb.dataset && rb.dataset.formOpen === "1");
-
-      if(!formOpen){
-        const rb = document.getElementById("ratingBox");
-      const formOpen = (rb && rb.dataset && rb.dataset.formOpen === "1");
-
-      if(!formOpen){
-        renderRating(data.rating || data.review || null, status, data.order?.payment_status || "");
-      }
-      }     
-
-      const total = parseTotal(data.amounts);
-      const active = isActiveStatus(status);
-      const totalIsZero = (!total || total <= 0);
-      updateEstimationBox(active, totalIsZero);
-
-      if(active && totalIsZero){
-        setPayment("unpaid");
-      }
-
-      if(isTerminalStatus(status)){
-        const ps = String(data.order?.payment_status || "").toLowerCase();
-        const isPaid = (ps.includes("paid") || ps.includes("paye") || ps.includes("payé"));
-        if(isPaid){
-          setLive(true, "Terminé");
-          stop();
-          return;
-        }
-      }
-
-      setLive(true, "Connecté");
-    }catch(e){
-      setLive(false, "Hors ligne");
-    }finally{
-      busy = false;
-    }
-  }
-
-  function start(){
-    if(timer) return;
-    tick();
-    timer = setInterval(() => {
-      // LOT_2_25_WAVE_POLL_PAUSE_ON_MANUAL_OK
-      try{
-        if (window.__wavePollPausedUntil && Date.now() < window.__wavePollPausedUntil) { return; }
-      }catch(e){}
-
-      if(document.hidden) return;
-      tick();
-    }, refreshMs);
-  }
-
-  function stop(){
-    if(timer){
-      clearInterval(timer);
-      timer = null;
-    }
-  }
-
-  document.addEventListener("visibilitychange", () => {
-    if(!document.hidden){
-      if(!timer) start();
-      else tick();
-    }
   });
 
-  (function initPayPill(){
-    const txt = (payTxt?.textContent || "").toLowerCase();
-    if(!payPill) return;
-    payPill.classList.remove("pay-ok","pay-wait","pay-bad");
-    if(txt.includes("pay")) payPill.classList.add("pay-ok");
-    else if(txt.includes("attente")) payPill.classList.add("pay-wait");
-    else if(txt.includes("échec") || txt.includes("echec")) payPill.classList.add("pay-bad");
-  })();
-
-  start();
+  refreshLive();
+  setInterval(refreshLive, 7000);
 })();
 </script>
-
 {% endblock %}
-
-// LOT_2_24_WAVE_MANUAL_REFRESH_OK
-(function(){
-  try{
-    var waveEl = document.getElementById("waveNotice");
-    if(!waveEl) return;
-
-    var mode = (waveEl.dataset && waveEl.dataset.wave) ? waveEl.dataset.wave : "";
-    if(mode !== "declared") return;
-
-    var btn = document.getElementById("btnWaveRefresh");
-    if(!btn) return;
-
-    btn.addEventListener("click", async function(){
-
-      
-      
-      // LOT_2_26_WAVE_REFRESH_DEBOUNCE_OK
-      // Anti-spam (lock 3s) + horodatage "Dernière vérif" + feedback bouton
-      try {
-        if (btn.dataset && btn.dataset.locked === "1") return;
-        if (btn.dataset) btn.dataset.locked = "1";
-      } catch(e) {}
-
-      var __origLabel = (btn && (btn.textContent || btn.innerText)) ? (btn.textContent || btn.innerText) : "Actualiser le paiement";
-      try {
-        if (btn) {
-          btn.disabled = true;
-          btn.textContent = "Vérification…";
-          btn.style.opacity = "0.85";
-        }
-      } catch(e) {}
-
-      // Auto-unlock au bout de 3s (même si erreur réseau)
-      setTimeout(function(){
-        try {
-          if (btn) {
-            btn.disabled = false;
-            btn.style.opacity = "";
-          }
-          if (btn && btn.dataset) btn.dataset.locked = "0";
-        } catch(e) {}
-      }, 3000);
-
-      function __fmtTime(d){
-        try {
-          var hh = String(d.getHours()).padStart(2,"0");
-          var mm = String(d.getMinutes()).padStart(2,"0");
-          var ss = String(d.getSeconds()).padStart(2,"0");
-          return hh+":"+mm+":"+ss;
-        } catch(e) { return ""; }
-      }
-
-      function __setLastCheckNow(){
-        try {
-          var orderId = (btn && btn.getAttribute("data-order")) || (window.__waveOrderId) || "";
-          var now = new Date();
-          var t = __fmtTime(now);
-          var el = document.getElementById("waveLastCheck");
-          if (el) el.textContent = t ? ("Dernière vérif : " + t) : "";
-          if (orderId) {
-            try { sessionStorage.setItem("wave_last_check_"+String(orderId), String(now.getTime())); } catch(e) {}
-          }
-        } catch(e) {}
-      }
-// LOT_2_25_WAVE_POLL_PAUSE_ON_MANUAL_OK
-      // Pause polling pendant 2.5s pour éviter double requête (polling + refresh manuel)
-      try{ window.__wavePollPausedUntil = Date.now() + 2500; }catch(e){}
-var original = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = "Vérification…";
-
-      try{
-        var orderId = waveEl.dataset.order || "";
-        if(!orderId) return;
-
-        var endpoint = "/orders/client/orders/" + orderId + "/payment-ui/";
-        const res = await fetch(endpoint, { credentials: "same-origin" });
-        const data = await res.json();
-
-        if(data && data.ok && (data.payment_status === "paid" || data.payment_ui === "paid")){
-          if(typeof __waveOnPaidOnce === "function"){
-            __waveOnPaidOnce(orderId);
-          }
-        }else{
-          if(typeof payShowMsg === "function"){
-            payShowMsg("⏳ Paiement toujours en attente.", false);
-          }
-        }
-
-      }catch(e){
-        if(typeof payShowMsg === "function"){
-          payShowMsg("⚠️ Erreur de vérification.", false);
-        }
-      }
-
-      setTimeout(function(){
-        btn.disabled = false;
-        btn.textContent = original;
-      }, 800);
-
-    }, { passive:true });
-
-  }catch(e){}
-})();

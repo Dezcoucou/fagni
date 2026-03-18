@@ -4873,6 +4873,7 @@ def client_new_order(request):
     Création Client V1 (rapide) :
     - téléphone (session)
     - nom + adresse + notes
+    - optionnel : coordonnées GPS + place_id + source géoloc
     -> crée une commande "pending"
     """
     phone = _client_phone(request)
@@ -4882,44 +4883,119 @@ def client_new_order(request):
     name_init = customer.name if customer else ""
     address_init = getattr(customer, "address", "") if customer else ""
 
+    def _clean_str(v):
+        return (v or "").strip()
+
+    def _clean_float(v):
+        s = _clean_str(v)
+        if not s:
+            return None
+        try:
+            return float(s.replace(",", "."))
+        except Exception:
+            return None
+
+    customer_field_names = {
+        f.name for f in Customer._meta.get_fields()
+        if getattr(f, "concrete", False)
+    }
+    order_field_names = {
+        f.name for f in Order._meta.get_fields()
+        if getattr(f, "concrete", False)
+    }
+
     if request.method == "POST":
-        name = (request.POST.get("name") or "").strip()
-        address = (request.POST.get("address") or "").strip()
-        notes = (request.POST.get("notes") or "").strip()
+        name = _clean_str(request.POST.get("name"))
+        address = _clean_str(request.POST.get("address"))
+        notes = _clean_str(request.POST.get("notes"))
+
+        pickup_lat = _clean_float(request.POST.get("pickup_lat"))
+        pickup_lng = _clean_float(request.POST.get("pickup_lng"))
+        pickup_place_id = _clean_str(request.POST.get("pickup_place_id"))
+        pickup_geo_source = _clean_str(request.POST.get("pickup_geo_source"))
+        pickup_geo_label = _clean_str(request.POST.get("pickup_geo_label"))
 
         if not name:
             error = "Merci de renseigner ton nom."
         elif not address:
             error = "Merci de renseigner ton adresse."
         else:
-            # ✅ update_or_create évite de multiplier les Customer si tu recrées
+            customer_defaults = {
+                "name": name,
+                "address": address,
+            }
+
+            # Compat : on ne remplit que les champs qui existent réellement
+            if "lat" in customer_field_names and pickup_lat is not None:
+                customer_defaults["lat"] = pickup_lat
+            if "lng" in customer_field_names and pickup_lng is not None:
+                customer_defaults["lng"] = pickup_lng
+            if "latitude" in customer_field_names and pickup_lat is not None:
+                customer_defaults["latitude"] = pickup_lat
+            if "longitude" in customer_field_names and pickup_lng is not None:
+                customer_defaults["longitude"] = pickup_lng
+            if "place_id" in customer_field_names and pickup_place_id:
+                customer_defaults["place_id"] = pickup_place_id
+            if "geo_source" in customer_field_names and pickup_geo_source:
+                customer_defaults["geo_source"] = pickup_geo_source
+            if "geo_label" in customer_field_names and pickup_geo_label:
+                customer_defaults["geo_label"] = pickup_geo_label
+
             customer, _created = Customer.objects.update_or_create(
                 phone=phone,
-                defaults={"name": name, "address": address},
+                defaults=customer_defaults,
             )
 
-            # create order
             code = uuid.uuid4().hex[:8].upper()
             while Order.objects.filter(code=code).exists():
                 code = uuid.uuid4().hex[:8].upper()
 
-            order = Order.objects.create(
-                is_draft=True,
+            order_kwargs = {
+                "is_draft": True,
+                "customer": customer,
+                "status": "pending",
+                "payment_status": "unpaid",
+                "amount_paid": 0,
+                "code": code,
+                "notes": notes or None,
+                "pickup_address": address,
+                "delivery_address": address,
+            }
 
-                customer=customer,
-                status="pending",
-                payment_status="unpaid",
-                amount_paid=0,
-                code=code,
-                notes=notes or None,
-                pickup_address=address,
-                delivery_address=address,
-            )
+            # Compat champs coordonnées / géoloc côté Order
+            if "pickup_lat" in order_field_names and pickup_lat is not None:
+                order_kwargs["pickup_lat"] = pickup_lat
+            if "pickup_lng" in order_field_names and pickup_lng is not None:
+                order_kwargs["pickup_lng"] = pickup_lng
+            if "pickup_place_id" in order_field_names and pickup_place_id:
+                order_kwargs["pickup_place_id"] = pickup_place_id
+            if "pickup_geo_source" in order_field_names and pickup_geo_source:
+                order_kwargs["pickup_geo_source"] = pickup_geo_source
+            if "pickup_geo_label" in order_field_names and pickup_geo_label:
+                order_kwargs["pickup_geo_label"] = pickup_geo_label
+
+            if "delivery_lat" in order_field_names and pickup_lat is not None:
+                order_kwargs["delivery_lat"] = pickup_lat
+            if "delivery_lng" in order_field_names and pickup_lng is not None:
+                order_kwargs["delivery_lng"] = pickup_lng
+            if "delivery_place_id" in order_field_names and pickup_place_id:
+                order_kwargs["delivery_place_id"] = pickup_place_id
+
+            order = Order.objects.create(**order_kwargs)
 
             from orders.models import DeliveryLeg
 
-            DeliveryLeg.objects.get_or_create(order=order, leg_type="pickup", defaults={"status":"pending"})
-            DeliveryLeg.objects.get_or_create(order=order, leg_type="return", defaults={"status":"pending"})
+            DeliveryLeg.objects.get_or_create(
+                order=order,
+                leg_type="pickup",
+                defaults={"status": "pending"},
+            )
+            DeliveryLeg.objects.get_or_create(
+                order=order,
+                leg_type="return",
+                defaults={"status": "pending"},
+            )
+
             try:
                 order.update_financials(save=True)
             except Exception:

@@ -7641,7 +7641,7 @@ def driver_order_detail(request, order_id):
 
     }
 
-    return render(request, "orders/driver_order_detail.html", context)
+    return render(request, "orders/driver_order_detail_v2.html", context)
 
 
 # ===============================================

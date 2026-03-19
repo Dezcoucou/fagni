@@ -8611,43 +8611,35 @@ def compute_driver_week_stats(driver):
 @login_required
 def driver_me_app(request):
     """
-    Espace 'Moi' du livreur :
-    - stats globales (total courses, du mois, distance, revenus)
-    - stats d'activité du jour (en attente / en cours / terminées / annulées)
+    Profil livreur (app mobile) :
+    - identité du livreur connecté
+    - stats globales simples
+    - dernières courses
     """
-
-    user = request.user
-
-    # On matche le livreur par email (ajuste si tu utilises un autre lien)
-    try:
-        driver = DeliveryPartner.objects.get(email=user.email)
-    except DeliveryPartner.DoesNotExist:
-        # fallback : tu peux rediriger vers le hub ou afficher un message
+    connected_driver = _get_connected_driver(request)
+    if not connected_driver:
         return redirect("orders:driver_hub")
 
+    driver = connected_driver
     today = timezone.localdate()
 
-    # Toutes les courses du livreur
-    qs = Order.objects.filter(delivery_partner=driver)
+    qs = (
+        Order.objects
+        .filter(delivery_partner=driver)
+        .select_related("customer", "laundry_partner", "delivery_partner")
+        .order_by("-created_at")
+    )
 
-    # Période du mois en cours
     month_qs = qs.filter(
         created_at__year=today.year,
         created_at__month=today.month,
     )
 
-    # Activité du jour
-    # --- Agrégats simples (sans distance) ---
     raw_stats = qs.aggregate(
         total_orders=Count("id", distinct=True),
-        # adapte ce filtre si tu as déjà un start_month dans ta fonction
-        total_income=Coalesce(
-            Sum("driver_logistic_cost"),
-            Decimal("0.0"),
-        ),
+        total_driver_income=Coalesce(Sum("driver_logistic_cost"), Decimal("0.0")),
     )
 
-    # --- Distance totale en Python (on évite l'expression mixte ORM) ---
     legs_qs = DeliveryLeg.objects.filter(
         order__in=qs,
         distance_km__isnull=False,
@@ -8655,27 +8647,41 @@ def driver_me_app(request):
 
     total_distance_km = Decimal("0.0")
     for d in legs_qs:
-        # d est un float ou Decimal → on le convertit proprement en Decimal
         if d is not None:
             total_distance_km += Decimal(str(d))
-
-    # On peut arrondir à 1 décimale si tu veux un rendu propre
     total_distance_km = total_distance_km.quantize(Decimal("0.1"))
 
+    total_orders = raw_stats["total_orders"] or 0
+    pending_orders = qs.filter(status="pending").count()
+    in_progress_orders = qs.filter(status="in_progress").count()
+    done_orders = qs.filter(status="done").count()
+    canceled_orders = qs.filter(status="canceled").count()
+
+    avg_distance_km = Decimal("0.0")
+    if total_orders:
+        avg_distance_km = (total_distance_km / Decimal(str(total_orders))).quantize(Decimal("0.1"))
+
     stats = {
-        "total_orders": raw_stats["total_orders"] or 0,
+        "total_orders": total_orders,
         "month_orders": month_qs.count(),
+        "pending_orders": pending_orders,
+        "in_progress_orders": in_progress_orders,
+        "done_orders": done_orders,
+        "canceled_orders": canceled_orders,
         "total_distance_km": total_distance_km,
-        "total_income": raw_stats["total_income"] or Decimal("0.0"),
+        "avg_distance_km": avg_distance_km,
+        "total_driver_income": raw_stats["total_driver_income"] or Decimal("0.0"),
     }
 
     context = {
         "driver": driver,
+        "connected_driver": driver,
         "stats": stats,
         "today": today,
-        "orders": qs.order_by("-created_at")[:10],  # dernières courses, par ex
+        "orders": qs[:10],
     }
     return render(request, "orders/driver_me.html", context)
+
 
 
 # ===============================================
@@ -8684,129 +8690,86 @@ def driver_me_app(request):
 @login_required
 def driver_hub(request):
     """
-    Hub livreur :
-    - affiche KPIs + listes (pending / in_progress / done)
-    - alimente le template orders/driver_hub.html
+    Hub livreur mobile, strictement côté livreur :
+    - KPI simples
+    - actions utiles
+    - dernières courses
     """
     connected_driver = _get_connected_driver(request)
 
-    # Valeurs par défaut (hub vide si pas de driver)
     context = {
         "connected_driver": connected_driver,
-        "pending_orders": [],
-        "in_progress_orders": [],
-        "done_orders": [],
-        "kpi_today_count": 0,
-        "kpi_today_income": Decimal("0"),
-        "kpi_week_done_count": 0,
-        "kpi_week_income": Decimal("0"),
-        "kpi_month_done_count": 0,
-        "kpi_month_income": Decimal("0"),
+        "today": timezone.localdate(),
+        "period_display": "Aujourd'hui",
+        "stats": {
+            "total_orders": 0,
+            "pending_orders": 0,
+            "in_progress_orders": 0,
+            "done_orders": 0,
+            "canceled_orders": 0,
+            "total_distance_km": Decimal("0.0"),
+            "avg_distance_km": Decimal("0.0"),
+            "total_driver_income": Decimal("0.0"),
+        },
+        "last_orders": [],
     }
 
     if not connected_driver:
         return render(request, "orders/driver_hub.html", context)
 
-    # Base queryset
     qs = (
         Order.objects
         .filter(delivery_partner=connected_driver)
         .select_related("customer", "laundry_partner", "delivery_partner")
-        .prefetch_related("items__service")
+        .prefetch_related("items")
         .order_by("-created_at")
     )
 
-    # -----------------------------
-    # KPIs
-    # -----------------------------
-    today = timezone.localdate()
-    today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
-    today_end = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+    legs_qs = DeliveryLeg.objects.filter(
+        order__in=qs,
+        distance_km__isnull=False,
+    ).values_list("distance_km", flat=True)
 
-    today_qs = qs.filter(created_at__gte=today_start, created_at__lte=today_end)
+    total_distance_km = Decimal("0.0")
+    for d in legs_qs:
+        if d is not None:
+            total_distance_km += Decimal(str(d))
+    total_distance_km = total_distance_km.quantize(Decimal("0.1"))
 
-    kpi_today_count = today_qs.count()
-    kpi_today_income = (
-        today_qs.aggregate(s=Coalesce(Sum("driver_logistic_cost"), Decimal("0")))["s"]
-        or Decimal("0")
+    total_orders = qs.count()
+    pending_orders = qs.filter(status="pending").count()
+    in_progress_orders = qs.filter(status="in_progress").count()
+    done_orders = qs.filter(status="done").count()
+    canceled_orders = qs.filter(status="canceled").count()
+
+    total_driver_income = (
+        qs.aggregate(s=Coalesce(Sum("driver_logistic_cost"), Decimal("0.0"))).get("s")
+        or Decimal("0.0")
     )
 
-    week_start = timezone.now() - timedelta(days=7)
-    week_qs = qs.filter(created_at__gte=week_start)
+    avg_distance_km = Decimal("0.0")
+    if total_orders:
+        avg_distance_km = (total_distance_km / Decimal(str(total_orders))).quantize(Decimal("0.1"))
 
-    kpi_week_done_count = week_qs.filter(status="done").count()
-    kpi_week_income = (
-        week_qs.aggregate(s=Coalesce(Sum("driver_logistic_cost"), Decimal("0")))["s"]
-        or Decimal("0")
-    )
-
-    month_start = timezone.now() - timedelta(days=30)
-    month_qs = qs.filter(created_at__gte=month_start)
-
-    kpi_month_done_count = month_qs.filter(status="done").count()
-    kpi_month_income = (
-        month_qs.aggregate(s=Coalesce(Sum("driver_logistic_cost"), Decimal("0")))["s"]
-        or Decimal("0")
-    )
-
-    # -----------------------------
-    # Listes affichées dans le hub
-    # -----------------------------
-    pending_orders = list(qs.filter(status="pending")[:20])
-    in_progress_orders = list(qs.filter(status="in_progress")[:20])
-    done_orders = list(qs.filter(status="done")[:20])
-
-    # -----------------------------
-    # Enrichissement affichage montants (pour le template)
-    # total_client_display / driver_income_display
-    # -----------------------------
-    def enrich(order):
-        try:
-            amounts = compute_order_amounts(order) or {}
-        except Exception:
-            amounts = {}
-
-        # Montant client (fallback safe)
-        total_client = (
-            amounts.get("total_client_ttc")
-            or amounts.get("total_client")
-            or amounts.get("total_ttc_client")
-            or amounts.get("grand_total")
-            or order.total
-            or Decimal("0")
-        )
-
-        # Revenu livreur (fallback: driver_logistic_cost)
-        driver_income = (
-            amounts.get("driver_income")
-            or amounts.get("driver_cost")
-            or order.driver_logistic_cost
-            or Decimal("0")
-        )
-
-        # Injecte des "attributs" que le template utilise
-        order.total_client_display = total_client
-        order.driver_income_display = driver_income
-        return order
-
-    pending_orders = [enrich(o) for o in pending_orders]
-    in_progress_orders = [enrich(o) for o in in_progress_orders]
-    done_orders = [enrich(o) for o in done_orders]
-
-    context.update({
+    stats = {
+        "total_orders": total_orders,
         "pending_orders": pending_orders,
         "in_progress_orders": in_progress_orders,
         "done_orders": done_orders,
-        "kpi_today_count": kpi_today_count,
-        "kpi_today_income": kpi_today_income,
-        "kpi_week_done_count": kpi_week_done_count,
-        "kpi_week_income": kpi_week_income,
-        "kpi_month_done_count": kpi_month_done_count,
-        "kpi_month_income": kpi_month_income,
+        "canceled_orders": canceled_orders,
+        "total_distance_km": total_distance_km,
+        "avg_distance_km": avg_distance_km,
+        "total_driver_income": total_driver_income,
+    }
+
+    last_orders = list(qs[:10])
+
+    context.update({
+        "stats": stats,
+        "last_orders": last_orders,
     })
 
     return render(request, "orders/driver_hub.html", context)
-
 
 # ===============================================
 #  APP LIVREUR – DATA JSON pour refresh KPIs

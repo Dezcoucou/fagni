@@ -719,7 +719,13 @@
     return `${hh}:${mm}:${ss}`;
   }
 
-  function withQuery(url){
+  
+  function driverOrderDetailUrl(orderId){
+    if(!orderId) return "#";
+    return withQuery(`/orders/driver/orders/${orderId}/`);
+  }
+
+function withQuery(url){
     const currentQs = new URLSearchParams(window.location.search || "");
     const currentDriverId = currentQs.get("driver_id") || "";
 
@@ -1282,7 +1288,21 @@
 
   refreshAll();
   setInterval(refreshAll, refreshMs);
-})();
+
+  document.addEventListener("click", function(e){
+    const card = e.target.closest("[data-driver-order-id]");
+    if(!card) return;
+
+    const ignored = e.target.closest("a,button,input,select,textarea,label,summary");
+    if(ignored) return;
+
+    const orderId = card.getAttribute("data-driver-order-id");
+    if(orderId){
+      window.location.href = driverOrderDetailUrl(orderId);
+    }
+  });
+
+\n})();
 </script>
 
 <script>

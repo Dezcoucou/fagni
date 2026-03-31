@@ -174,32 +174,24 @@
       <tbody>
         <tr>
           <td class="muted">Prestations</td>
-          <td class="num">{{ prestations_amount|default:0|money }} FCFA</td>
-        </tr>
-        <tr>
-          <td class="muted">Frais de livraison</td>
-          <td class="num">{{ delivery_amount|default:0|money }} FCFA</td>
-        </tr>
-        <tr>
-          <td class="muted">Service FAGNI</td>
-          <td class="num">{{ service_amount|default:0|money }} FCFA</td>
+          <td class="num">{{ display_prestations_amount|default:0|money }} FCFA</td>
         </tr>
 
-        {% if express_amount and express_amount|floatformat:"0" != "0" %}
+        <tr>
+          <td class="muted">Frais de livraison</td>
+          <td class="num">{{ display_delivery_amount|default:0|money }} FCFA</td>
+        </tr>
+
+        {% if display_express_amount and display_express_amount|floatformat:"0" != "0" %}
         <tr class="highlight-express">
           <td class="muted">⚡ Express</td>
-          <td class="num">{{ express_amount|default:0|money }} FCFA</td>
+          <td class="num">{{ display_express_amount|default:0|money }} FCFA</td>
         </tr>
         {% endif %}
 
         <tr>
-          <td class="muted">TVA FAGNI ({{ vat_rate|default:"—" }}%)</td>
-          <td class="num">{{ vat_amount|default:0|money }} FCFA</td>
-        </tr>
-
-        <tr>
           <td style="font-weight:900;">Total TTC</td>
-          <td class="num" style="font-weight:900;">{{ total_ttc_client|default:0|money }} FCFA</td>
+          <td class="num" style="font-weight:900;">{{ display_total_ttc|default:0|money }} FCFA</td>
         </tr>
       </tbody>
     </table>

@@ -46,6 +46,7 @@
       .ticket { box-shadow:none; margin:0; border-radius:0; }
     }
   </style>
+    <link rel="stylesheet" href="/static/css/fagni_design_system.css">
 </head>
 <body>
   <div class="ticket">
@@ -108,23 +109,23 @@
 
       <div class="totals">
         <div class="row"><div class="label">Prestations</div><div class="value">{{ prestations_amount|default:0|money }} FCFA</div></div>
-        <div class="row"><div class="label">Livraison</div><div class="value">{{ delivery_amount|default:0|money }} FCFA</div></div>
-        <div class="row"><div class="label">Service FAGNI</div><div class="value">{{ service_amount|default:0|money }} FCFA</div></div>
 
-        {% if express_amount and express_amount|floatformat:"0" != "0" %}
+        <div class="row"><div class="label">Prestations</div><div class="value">{{ display_prestations_amount|default:0|money }} FCFA</div></div>
+
+        <div class="row"><div class="label">Livraison</div><div class="value">{{ display_delivery_amount|default:0|money }} FCFA</div></div>
+
+        {% if display_express_amount and display_express_amount|floatformat:"0" != "0" %}
           <div class="row">
             <div class="label">Express</div>
-            <div class="value"><span class="express">+ {{ express_amount|default:0|money }} FCFA</span></div>
+            <div class="value"><span class="express">+ {{ display_express_amount|default:0|money }} FCFA</span></div>
           </div>
         {% endif %}
-
-        <div class="row"><div class="label">TVA FAGNI ({{ vat_rate|default:"—" }}%)</div><div class="value">{{ vat_amount|default:0|money }} FCFA</div></div>
 
         <div class="line"></div>
 
         <div class="row">
           <div class="label grand">TOTAL TTC</div>
-          <div class="value grand">{{ total_ttc_client|default:0|money }} FCFA</div>
+          <div class="value grand">{{ display_total_ttc|default:0|money }} FCFA</div>
         </div>
 
         <div style="margin-top:10px;">

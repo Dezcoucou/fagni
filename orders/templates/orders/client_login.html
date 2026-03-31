@@ -42,8 +42,17 @@
       <div class="alert alert-danger" style="margin-top:12px;">{{ error }}</div>
     {% endif %}
 
+    {% if incoming_ref %}
+      <div style="margin-top:12px;padding:12px 14px;border-radius:14px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;font-size:13px;line-height:1.5;font-weight:800;">
+        🎁 Code de parrainage détecté : <strong>{{ incoming_ref }}</strong><br>
+        En te connectant, ce code sera pris en compte sur ton espace client.
+      </div>
+    {% endif %}
+
     <form method="post" style="margin-top:10px;">
       {% csrf_token %}
+      <input type="hidden" name="incoming_ref" value="{{ incoming_ref|default:'' }}">
+
       <label class="label">Téléphone</label>
       <input class="input" name="phone" value="{{ phone }}" placeholder="Ex : 0700000000" inputmode="tel" autocomplete="tel" />
 

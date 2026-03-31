@@ -1,0 +1,311 @@
+{% extends "orders/client_base.html" %}
+{% load humanize %}
+
+{% block title %}Wallet client – FAGNI{% endblock %}
+
+{% block content %}
+<style>
+  .cw-page{
+    max-width:1100px;
+    margin:0 auto;
+    padding:18px 12px 110px;
+  }
+  .cw-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-bottom:16px;
+  }
+  .cw-title{
+    margin:0;
+    font-size:28px;
+    line-height:1.05;
+    font-weight:1000;
+    color:#0f172a;
+  }
+  .cw-sub{
+    margin-top:6px;
+    color:#64748b;
+    font-size:14px;
+    line-height:1.5;
+    font-weight:700;
+  }
+  .cw-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .cw-grid{
+    display:grid;
+    grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);
+    gap:16px;
+  }
+  .cw-stack{
+    display:grid;
+    gap:16px;
+  }
+  .cw-card{
+    border:1px solid #e2e8f0;
+    border-radius:24px;
+    background:#fff;
+    padding:18px;
+    box-shadow:0 18px 40px rgba(15,23,42,.06);
+  }
+  .cw-hero{
+    background:linear-gradient(135deg,#0f172a,#1e293b);
+    color:#fff;
+    border:none;
+  }
+  .cw-eyebrow{
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    font-weight:1000;
+    opacity:.78;
+  }
+  .cw-balance{
+    margin-top:10px;
+    font-size:34px;
+    line-height:1;
+    font-weight:1000;
+  }
+  .cw-mini{
+    margin-top:10px;
+    font-size:13px;
+    line-height:1.6;
+    color:#cbd5e1;
+    font-weight:700;
+  }
+  .cw-section-title{
+    margin:0;
+    font-size:18px;
+    font-weight:1000;
+    color:#0f172a;
+  }
+  .cw-list{
+    margin-top:14px;
+    display:grid;
+    gap:12px;
+  }
+  .cw-row{
+    border:1px solid #e2e8f0;
+    border-radius:18px;
+    padding:14px;
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    align-items:flex-start;
+    background:#fff;
+  }
+  .cw-row-k{
+    font-size:14px;
+    font-weight:900;
+    color:#0f172a;
+  }
+  .cw-row-m{
+    margin-top:4px;
+    font-size:12px;
+    color:#64748b;
+    line-height:1.5;
+    font-weight:700;
+  }
+  .cw-row-v{
+    text-align:right;
+    font-size:14px;
+    font-weight:1000;
+    color:#0f172a;
+    white-space:nowrap;
+  }
+  .cw-empty{
+    margin-top:14px;
+    border:1px dashed #cbd5e1;
+    border-radius:18px;
+    padding:18px;
+    background:#f8fafc;
+    color:#475569;
+    font-size:14px;
+    line-height:1.6;
+    font-weight:700;
+  }
+  .cw-note{
+    margin-top:12px;
+    padding:12px 14px;
+    border-radius:16px;
+    background:#eff6ff;
+    border:1px solid #bfdbfe;
+    color:#1e3a8a;
+    font-size:13px;
+    line-height:1.6;
+    font-weight:700;
+  }
+  .cw-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    min-height:30px;
+    padding:0 12px;
+    border-radius:999px;
+    background:#eff6ff;
+    border:1px solid #bfdbfe;
+    color:#1d4ed8;
+    font-size:11px;
+    font-weight:1000;
+    white-space:nowrap;
+  }
+  @media (max-width: 860px){
+    .cw-grid{ grid-template-columns:1fr; }
+    .cw-actions{ width:100%; }
+    .cw-actions .fagni-btn{ width:100%; }
+  }
+</style>
+
+<div class="cw-page">
+  <div class="cw-head">
+    <div>
+      <h1 class="cw-title">Wallet</h1>
+      <div class="cw-sub">Consulte ton solde FAGNI et l’historique de tes mouvements.</div>
+    </div>
+    <div class="cw-actions">
+      <a class="fagni-btn fagni-btn--light" href="{% url 'orders:client_home' %}">← Retour</a>
+      <a class="fagni-btn fagni-btn--primary" href="{% url 'orders:client_new_order' %}">➕ Nouvelle commande</a>
+    </div>
+  </div>
+
+  <div class="cw-grid">
+    <div class="cw-stack">
+      <section class="cw-card cw-hero">
+        <div class="cw-eyebrow">Solde disponible</div>
+        <div class="cw-balance">{{ balance|floatformat:0|intcomma }} FCFA</div>
+        <div class="cw-mini">
+          {% if wallet %}
+            Gagne de l’argent avec FAGNI en suivant tes paiements, en recevant des avantages et en développant ton parrainage.
+          {% else %}
+            Ton wallet s’activera automatiquement dès ta première activité utile sur FAGNI : paiement, avantage ou commission de parrainage.
+          {% endif %}
+        </div>
+
+        <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
+          <a class="fagni-btn fagni-btn--primary" href="{% url 'orders:client_referrals' %}">
+            💰 Inviter et gagner
+          </a>
+        </div>
+
+        <div class="cw-note" style="margin-top:14px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#e2e8f0;">
+          💡 Chaque commande et chaque parrainage peut te faire gagner de l’argent avec FAGNI.
+        </div>
+      </section>
+
+      <section class="cw-card">
+        <h2 class="cw-section-title">Historique des mouvements</h2>
+
+        {% if transactions %}
+          <div class="cw-list">
+            {% for tx in transactions %}
+              <div class="cw-row">
+                <div>
+                  <div class="cw-row-k">
+                    {% if tx.type == "mlm_commission" %}
+                      Commission de parrainage
+                    {% elif tx.type == "topup" %}
+                      Recharge
+                    {% elif tx.type == "payout" %}
+                      Paiement sortant
+                    {% elif tx.type == "credit" %}
+                      Crédit
+                    {% elif tx.type == "debit" %}
+                      Débit
+                    {% elif tx.type == "adjustment" %}
+                      Ajustement
+                    {% else %}
+                      Mouvement wallet
+                    {% endif %}
+                  </div>
+                  <div class="cw-row-m">
+                    {{ tx.created_at|date:"d/m/Y H:i" }}
+                    {% if tx.description %}<br>{{ tx.description }}{% endif %}
+                    {% if tx.order %}<br>Commande {{ tx.order.code|default:tx.order.id }}{% endif %}
+                  </div>
+                </div>
+                <div class="cw-row-v">
+                  {% if tx.direction == "out" %}-{% else %}+{% endif %}
+                  {{ tx.amount|floatformat:0|intcomma }} FCFA
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="cw-empty">
+            Aucun mouvement disponible pour le moment.
+          </div>
+        {% endif %}
+      </section>
+    </div>
+
+    <div class="cw-stack">
+      <section class="cw-card">
+        <h2 class="cw-section-title">Mon compte</h2>
+        <div class="cw-list">
+          <div class="cw-row">
+            <div>
+              <div class="cw-row-k">Client</div>
+              <div class="cw-row-m">{{ customer.name|default:"—" }}</div>
+            </div>
+            <div class="cw-row-v">{{ customer.phone|default:"—" }}</div>
+          </div>
+
+          <div class="cw-row">
+            <div>
+              <div class="cw-row-k">Devise</div>
+              <div class="cw-row-m">Portefeuille client FAGNI</div>
+            </div>
+            <div class="cw-row-v">
+              {% if wallet %}{{ wallet.currency }}{% else %}XOF{% endif %}
+            </div>
+          </div>
+
+          <div class="cw-row">
+            <div>
+              <div class="cw-row-k">Activation</div>
+              <div class="cw-row-m">Activation progressive du wallet FAGNI</div>
+            </div>
+            <div class="cw-row-v">
+              {% if wallet %}
+                <span class="cw-pill">● Actif</span>
+              {% else %}
+                <span class="cw-pill">● En attente</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div class="cw-note">
+          Le wallet client FAGNI est un espace de suivi. Les fonctions avancées seront enrichies progressivement dans ton parcours client.
+        </div>
+      </section>
+
+      <section class="cw-card">
+        <h2 class="cw-section-title">Prochaines actions</h2>
+        <div class="cw-list">
+          <div class="cw-row">
+            <div>
+              <div class="cw-row-k">Utiliser mon wallet</div>
+              <div class="cw-row-m">Passe une commande et active ton activité FAGNI</div>
+            </div>
+            <a href="{% url 'orders:client_new_order' %}" class="fagni-btn fagni-btn--primary">Commander</a>
+          </div>
+
+          <div class="cw-row">
+            <div>
+              <div class="cw-row-k">Gagner de l’argent</div>
+              <div class="cw-row-m">Invite tes proches et développe ton parrainage FAGNI</div>
+            </div>
+            <a href="{% url 'orders:client_referrals' %}" class="fagni-btn fagni-btn--light">Parrainage</a>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -49,6 +49,16 @@ def _extract_point_from_args(*args: Any) -> Tuple[Optional[Any], Optional[Decima
     lat = getattr(obj, "latitude", None)
     lng = getattr(obj, "longitude", None)
 
+    # Order / objet logistique : priorité aux coords de collecte
+    if lat is None or lng is None:
+        lat = getattr(obj, "pickup_lat", lat)
+        lng = getattr(obj, "pickup_lng", lng)
+
+    # Fallback éventuel coords de livraison
+    if lat is None or lng is None:
+        lat = getattr(obj, "delivery_lat", lat)
+        lng = getattr(obj, "delivery_lng", lng)
+
     # order.customer fallback
     if (lat is None or lng is None) and hasattr(obj, "customer"):
         c = getattr(obj, "customer", None)

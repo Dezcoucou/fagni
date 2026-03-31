@@ -1,0 +1,534 @@
+{% extends "base.html" %}
+{% block title %}Mission terrain – FAGNI{% endblock %}
+
+{% block content %}
+<style>
+  :root{
+    --fagni-orange:#f97316;
+    --fagni-orange-dark:#ea580c;
+    --fagni-blue:#2563eb;
+    --fagni-navy:#0f172a;
+    --fagni-bg:#f6f8fc;
+    --fagni-card:#ffffff;
+    --fagni-text:#0f172a;
+    --fagni-muted:#64748b;
+    --fagni-line:#e5e7eb;
+    --fagni-green:#16a34a;
+    --shadow-soft:0 10px 28px rgba(15,23,42,.06);
+    --shadow-strong:0 18px 38px rgba(15,23,42,.14);
+  }
+
+  body{
+    background:
+      radial-gradient(circle at top right, rgba(37,99,235,.06), transparent 24%),
+      radial-gradient(circle at top left, rgba(249,115,22,.06), transparent 24%),
+      var(--fagni-bg);
+  }
+
+  .page{
+    max-width:540px;
+    margin:0 auto;
+    padding:12px 12px 28px;
+  }
+
+  .hero{
+    position:relative;
+    overflow:hidden;
+    border-radius:28px;
+    padding:18px 16px;
+    color:#fff;
+    background:
+      radial-gradient(circle at top right, rgba(255,255,255,.14), transparent 26%),
+      linear-gradient(135deg,#0f172a 0%, #1e3a8a 58%, #2563eb 100%);
+    box-shadow:var(--shadow-strong);
+    margin-bottom:14px;
+  }
+
+  .hero.green{
+    background:
+      radial-gradient(circle at top right, rgba(255,255,255,.14), transparent 26%),
+      linear-gradient(135deg,#0f172a 0%, #166534 58%, #22c55e 100%);
+  }
+
+  .hero.blue{
+    background:
+      radial-gradient(circle at top right, rgba(255,255,255,.14), transparent 26%),
+      linear-gradient(135deg,#0f172a 0%, #1d4ed8 58%, #38bdf8 100%);
+  }
+
+  .hero.gray{
+    background:
+      radial-gradient(circle at top right, rgba(255,255,255,.12), transparent 26%),
+      linear-gradient(135deg,#334155 0%, #475569 100%);
+  }
+
+  .hero-kicker{
+    font-size:11px;
+    font-weight:900;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:rgba(255,255,255,.76);
+  }
+
+  .hero-title{
+    margin:8px 0 0;
+    font-size:28px;
+    line-height:1.02;
+    font-weight:1000;
+    letter-spacing:-.02em;
+  }
+
+  .hero-sub{
+    margin-top:10px;
+    font-size:13px;
+    line-height:1.5;
+    color:rgba(255,255,255,.88);
+    font-weight:700;
+  }
+
+  .hero-pills{
+    margin-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+
+  .hero-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    min-height:32px;
+    padding:0 12px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.16);
+    background:rgba(255,255,255,.10);
+    font-size:11px;
+    font-weight:900;
+    color:#fff;
+  }
+
+  .card{
+    background:var(--fagni-card);
+    border-radius:22px;
+    padding:16px;
+    margin-bottom:14px;
+    border:1px solid var(--fagni-line);
+    box-shadow:var(--shadow-soft);
+  }
+
+  .section-title{
+    margin:0 0 10px;
+    font-size:15px;
+    line-height:1.2;
+    font-weight:1000;
+    color:var(--fagni-text);
+    letter-spacing:-.01em;
+  }
+
+  .section-sub{
+    margin:-2px 0 12px;
+    font-size:12px;
+    line-height:1.45;
+    color:var(--fagni-muted);
+  }
+
+  .client-name{
+    font-size:20px;
+    line-height:1.2;
+    font-weight:1000;
+    color:var(--fagni-text);
+    word-break:break-word;
+  }
+
+  .client-meta{
+    margin-top:10px;
+    display:grid;
+    gap:10px;
+  }
+
+  .meta-row{
+    display:grid;
+    gap:4px;
+  }
+
+  .meta-label{
+    font-size:10px;
+    font-weight:900;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:#94a3b8;
+  }
+
+  .meta-value{
+    font-size:14px;
+    line-height:1.5;
+    font-weight:800;
+    color:var(--fagni-text);
+    word-break:break-word;
+  }
+
+  .btn{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:100%;
+    min-height:54px;
+    padding:0 16px;
+    border-radius:18px;
+    font-weight:1000;
+    font-size:16px;
+    text-decoration:none;
+    border:none;
+    cursor:pointer;
+    transition:transform .12s ease, opacity .12s ease, box-shadow .12s ease;
+    box-shadow:0 8px 18px rgba(15,23,42,.08);
+  }
+
+  .btn:active{
+    transform:translateY(1px);
+  }
+
+  .btn-primary{
+    background:linear-gradient(90deg,var(--fagni-orange),var(--fagni-orange-dark));
+    color:#fff;
+  }
+
+  .btn-dark{
+    background:var(--fagni-navy);
+    color:#fff;
+  }
+
+  .btn-light{
+    background:#fff;
+    border:1px solid var(--fagni-line);
+    color:var(--fagni-text);
+    box-shadow:none;
+  }
+
+  .btn-stack{
+    display:grid;
+    gap:10px;
+  }
+
+  .quick-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+
+  .quick-btn{
+    min-height:48px;
+    border-radius:16px;
+    font-size:14px;
+    font-weight:900;
+  }
+
+  .info-chips{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+
+  .chip{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    min-height:30px;
+    padding:0 12px;
+    border-radius:999px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    color:#334155;
+    font-size:11px;
+    font-weight:900;
+  }
+
+  .chip.warn{
+    background:#fff7ed;
+    border-color:#fed7aa;
+    color:#9a3412;
+  }
+
+  .chip.ok{
+    background:#ecfdf5;
+    border-color:#bbf7d0;
+    color:#166534;
+  }
+
+  .proof-box{
+    border:1px dashed #cbd5e1;
+    border-radius:18px;
+    padding:14px;
+    background:#f8fafc;
+  }
+
+  .proof-grid{
+    display:grid;
+    gap:10px;
+  }
+
+  .proof-hint{
+    font-size:12px;
+    line-height:1.45;
+    color:var(--fagni-muted);
+  }
+
+  .summary-list{
+    display:grid;
+    gap:10px;
+  }
+
+  .summary-item{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    align-items:flex-start;
+    padding:10px 0;
+    border-bottom:1px solid #f1f5f9;
+  }
+
+  .summary-item:last-child{
+    border-bottom:none;
+    padding-bottom:0;
+  }
+
+  .summary-key{
+    font-size:12px;
+    color:#64748b;
+    font-weight:800;
+  }
+
+  .summary-value{
+    font-size:13px;
+    color:#0f172a;
+    font-weight:900;
+    text-align:right;
+    word-break:break-word;
+  }
+
+  .empty-state{
+    text-align:center;
+    padding:22px 18px;
+  }
+
+  .empty-title{
+    font-size:22px;
+    line-height:1.1;
+    font-weight:1000;
+    color:#0f172a;
+  }
+
+  .empty-sub{
+    margin-top:8px;
+    font-size:14px;
+    line-height:1.5;
+    color:#64748b;
+  }
+
+  .footer-link{
+    display:block;
+    margin-top:10px;
+    text-align:center;
+    font-size:13px;
+    font-weight:900;
+    color:#64748b;
+    text-decoration:none;
+  }
+
+  @media (max-width:420px){
+    .page{
+      padding:10px 10px 24px;
+    }
+
+    .hero-title{
+      font-size:24px;
+    }
+
+    .quick-grid{
+      grid-template-columns:1fr;
+    }
+  }
+</style>
+
+<div class="page">
+
+  {% if not leg %}
+    <div class="card empty-state">
+      <div class="empty-title">{{ mission_state_label|default:"✅ Aucune mission" }}</div>
+      <div class="empty-sub">{{ mission_hint|default:"Tu es libre pour le moment." }}</div>
+      <a href="{% url 'orders:driver_app' %}{% if driver %}?driver_id={{ driver.id }}{% endif %}" class="footer-link">
+        Retour au listing des courses
+      </a>
+    </div>
+  {% else %}
+
+    <section class="hero {{ mission_state_tone|default:'gray' }}">
+      <div class="hero-kicker">FAGNI • Mission terrain</div>
+      <h1 class="hero-title">{{ mission_state_label }}</h1>
+      <div class="hero-sub">{{ mission_hint }}</div>
+
+      <div class="hero-pills">
+        {% if mission_type_label %}
+          <span class="hero-pill">🚚 {{ mission_type_label }}</span>
+        {% endif %}
+        {% if order.code %}
+          <span class="hero-pill">📦 {{ order.code }}</span>
+        {% else %}
+          <span class="hero-pill">📦 #{{ order.id }}</span>
+        {% endif %}
+        {% if leg.status %}
+          <span class="hero-pill">📍 {{ leg.get_status_display|default:leg.status }}</span>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">👤 Client & destination</h2>
+
+      <div class="client-name">
+        {% if order.customer and order.customer.name %}
+          {{ order.customer.name }}
+        {% else %}
+          Client
+        {% endif %}
+      </div>
+
+      <div class="client-meta">
+        {% if order.customer and order.customer.phone %}
+          <div class="meta-row">
+            <div class="meta-label">Téléphone</div>
+            <div class="meta-value">{{ order.customer.phone }}</div>
+          </div>
+        {% endif %}
+
+        {% if address_display %}
+          <div class="meta-row">
+            <div class="meta-label">Adresse mission</div>
+            <div class="meta-value">📍 {{ address_display }}</div>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="quick-grid" style="margin-top:14px;">
+        {% if order.customer and order.customer.phone %}
+          <a href="tel:{{ order.customer.phone }}" class="btn btn-light quick-btn">📞 Appeler</a>
+        {% endif %}
+        {% if maps_url %}
+          <a href="{{ maps_url }}" target="_blank" class="btn btn-light quick-btn">🗺️ Ouvrir GPS</a>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">⚡ Action principale</h2>
+      <p class="section-sub">Un seul bouton principal pour éviter toute confusion sur le terrain.</p>
+
+      <div class="btn-stack">
+        {% if next_action %}
+          <form method="post" action="{% url 'orders:driver_leg_action' leg.id next_action %}{% if driver %}?driver_id={{ driver.id }}{% endif %}" style="margin:0;">
+            {% csrf_token %}
+            <input type="hidden" name="back" value="{% url 'orders:driver_mission_v3' order.id %}{% if driver %}?driver_id={{ driver.id }}{% endif %}">
+            <button type="submit" class="btn {% if next_action == 'finish' %}btn-dark{% else %}btn-primary{% endif %}">
+              {% if next_action == "accept" %}
+                ✅ Accepter mission
+              {% elif next_action == "start" %}
+                🚀 Démarrer mission
+              {% elif next_action == "finish" %}
+                {% if leg.leg_type == "pickup" %}
+                  ✅ Valider collecte
+                {% else %}
+                  ✅ Valider livraison
+                {% endif %}
+              {% else %}
+                {{ next_action_label|default:"Continuer" }}
+              {% endif %}
+            </button>
+          </form>
+        {% else %}
+          <div class="info-chips">
+            <span class="chip ok">✅ Mission terminée</span>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">📦 Collecte / exécution terrain</h2>
+      <p class="section-sub">
+        Ce bloc devient le point central terrain. La saisie détaillée pourra être enrichie ici progressivement.
+      </p>
+
+      <div class="info-chips">
+        {% if leg.leg_type == "pickup" %}
+          <span class="chip">🧺 Collecte client</span>
+          <span class="chip warn">À confirmer sur place</span>
+        {% else %}
+          <span class="chip">🚚 Livraison client</span>
+          <span class="chip ok">Linge prêt / mission en cours</span>
+        {% endif %}
+      </div>
+
+      {% if proof_url %}
+        <div style="margin-top:14px;">
+          <a href="{{ proof_url }}" class="btn btn-light">📝 Ouvrir saisie terrain / collecte</a>
+        </div>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">📸 Preuves photo</h2>
+      <div class="proof-box">
+        <div class="proof-grid">
+          <div class="proof-hint">
+            Ajoute ici les preuves utiles : articles remis, sac, balance, état du linge, preuve de livraison.
+          </div>
+
+          {% if proof_url %}
+            <a href="{{ proof_url }}" class="btn btn-light">📸 Ajouter ou consulter les preuves</a>
+          {% else %}
+            <div class="info-chips">
+              <span class="chip warn">Aucun accès preuve disponible</span>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">🧾 Résumé mission</h2>
+
+      <div class="summary-list">
+        <div class="summary-item">
+          <div class="summary-key">Type</div>
+          <div class="summary-value">{{ mission_type_label|default:"Mission" }}</div>
+        </div>
+
+        <div class="summary-item">
+          <div class="summary-key">Commande</div>
+          <div class="summary-value">
+            {% if order.code %}{{ order.code }}{% else %}#{{ order.id }}{% endif %}
+          </div>
+        </div>
+
+        <div class="summary-item">
+          <div class="summary-key">Statut mission</div>
+          <div class="summary-value">{{ mission_state_label }}</div>
+        </div>
+
+        {% if order.customer and order.customer.phone %}
+          <div class="summary-item">
+            <div class="summary-key">Téléphone client</div>
+            <div class="summary-value">{{ order.customer.phone }}</div>
+          </div>
+        {% endif %}
+      </div>
+
+      <a href="{% url 'orders:driver_order_detail' order.id %}{% if driver %}?driver_id={{ driver.id }}{% endif %}" class="footer-link">
+        Voir le détail complet de la course
+      </a>
+    </section>
+
+  {% endif %}
+
+</div>
+{% endblock %}

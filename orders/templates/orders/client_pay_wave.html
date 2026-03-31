@@ -45,7 +45,7 @@
 
       <div class="co-chips" aria-label="Actions rapides">
         <a class="co-chip" href="{% url 'orders:client_order_detail' order.id %}">← Retour commande</a>
-        <a class="co-chip" href="{% url 'orders:client_home' %}">Mes commandes</a>
+        <a class="wave-return-strong" href="{% url 'orders:client_home' %}#mes-commandes">← Mes commandes</a>
       </div>
     </div>
 
@@ -110,7 +110,7 @@
               <code id="wavePayLinkHidden" style="display:none;">{{ pay_link }}</code>
             {% else %}
               <div class="co-note co-note--warn" style="margin-top:10px" data-flag="WAVE_NO_PAYLINK_WARN">
-                Lien Wave indisponible. Utilise le numéro ci-dessous et saisis le montant.
+                Le lien de paiement automatique est momentanément indisponible. Utilise le numéro Wave affiché ci-dessous et saisis le montant indiqué.
               </div>
             {% endif %}
           </div>

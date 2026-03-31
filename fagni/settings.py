@@ -28,27 +28,32 @@ ALLOWED_HOSTS = [
     "fagni-t1s8.onrender.com",
 ]
 
-# Override via env (Render/Prod)
-_env_hosts = (os.getenv("ALLOWED_HOSTS", "") or "").strip()
-if _env_hosts:
-    ALLOWED_HOSTS = [h.strip() for h in _env_hosts.split(",") if h.strip()]
-
 # Ajoute automatiquement le host de SITE_BASE_URL (si défini)
+from urllib.parse import urlparse
+
+# Base URL dynamique (local vs production)
+SITE_BASE_URL = (os.getenv("SITE_BASE_URL", "http://127.0.0.1:8000") or "").strip().rstrip("/")
+
 try:
-    from urllib.parse import urlparse
     _u = urlparse((os.getenv("SITE_BASE_URL", "") or "").strip())
     _host = (_u.hostname or "").strip()
     if _host and _host not in ALLOWED_HOSTS and ALLOWED_HOSTS != ["*"]:
         ALLOWED_HOSTS.append(_host)
 except Exception:
     pass
+
+# Override via env (Render/Prod)
+_env_hosts = (os.getenv("ALLOWED_HOSTS", "") or "").strip()
+if _env_hosts:
+    ALLOWED_HOSTS = [h.strip() for h in _env_hosts.split(",") if h.strip()]
+
 # Optionnel: si tu as besoin de tester depuis d'autres IP du LAN/VPN
 # ALLOWED_HOSTS += ["192.168.0.0/16"]  # (Django ne supporte pas les CIDR ici)
 
 # Si tu veux une règle "dev only" (moins strict) :
 if os.environ.get("DJANGO_DEBUG_ALLOW_ALL_HOSTS") == "1":
     ALLOWED_HOSTS = ["*"]
-SITE_BASE_URL = (os.getenv("SITE_BASE_URL", "http://127.0.0.1:8000") or "").strip().rstrip("/")
+
 CSRF_TRUSTED_ORIGINS = [SITE_BASE_URL] if SITE_BASE_URL.startswith("https://") else []
 # Pour les QR codes FAGNI (tickets PDF)
 FAGNI_QR_BASE_URL = SITE_BASE_URL
@@ -65,8 +70,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize',
-
-    'orders.apps.OrdersConfig',  # ✅ IMPORTANT : PAS juste "orders"
     'partners',
     'django_extensions',
     'mlm',
@@ -74,6 +77,15 @@ INSTALLED_APPS = [
     'portal',
     'wallets.apps.WalletsConfig',
     'bonuses',
+    'core',
+    'accounts',
+    'services',
+    'orders',
+    'logistics',
+    'production',
+    'pricing',
+    'payments',
+    'tracking',
 ]
 
 # ========================
@@ -300,6 +312,19 @@ FAGNI_LOGISTICS = {
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 GOOGLE_DISTANCE_MATRIX_API_KEY = os.getenv("GOOGLE_DISTANCE_MATRIX_API_KEY", "")
 
+TWILIO_ACCOUNT_SID = (os.getenv("TWILIO_ACCOUNT_SID", "") or "").strip()
+TWILIO_AUTH_TOKEN = (os.getenv("TWILIO_AUTH_TOKEN", "") or "").strip()
+TWILIO_VERIFY_SERVICE_SID = (os.getenv("TWILIO_VERIFY_SERVICE_SID", "") or "").strip()
+TWILIO_VERIFY_ENABLED = (os.getenv("TWILIO_VERIFY_ENABLED", "false") or "").strip().lower() in ("1", "true", "yes", "on")
+TWILIO_WHATSAPP_FROM = (os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886") or "").strip()
+TWILIO_WHATSAPP_CONTENT_SID = (os.getenv("TWILIO_WHATSAPP_CONTENT_SID", "") or "").strip()
+TWILIO_WHATSAPP_ENABLED = (os.getenv("TWILIO_WHATSAPP_ENABLED", "false") or "").strip().lower() in ("1", "true", "yes", "on")
+
+TWILIO_ACCOUNT_SID = (os.getenv("TWILIO_ACCOUNT_SID", "") or "").strip()
+TWILIO_AUTH_TOKEN = (os.getenv("TWILIO_AUTH_TOKEN", "") or "").strip()
+TWILIO_VERIFY_SERVICE_SID = (os.getenv("TWILIO_VERIFY_SERVICE_SID", "") or "").strip()
+TWILIO_VERIFY_ENABLED = (os.getenv("TWILIO_VERIFY_ENABLED", "false") or "").strip().lower() in ("1", "true", "yes", "on")
+
 # ==========================
 # Auth / redirections FAGNI
 # ==========================
@@ -321,6 +346,9 @@ GEOCODING_COUNTRY_CODES = "ci"
 WAVE_CHECKOUT_ENABLED = (os.getenv("WAVE_CHECKOUT_ENABLED", "") or "").strip().lower() in ("1","true","yes","on")
 WAVE_CHECKOUT_API_KEY = (os.getenv("WAVE_CHECKOUT_API_KEY", "") or "").strip()
 WAVE_RECEIVER_PHONE   = (os.getenv("WAVE_RECEIVER_PHONE", "") or "").strip()
+
+WHATSAPP_PHONE_NUMBER_ID = (os.getenv("WHATSAPP_PHONE_NUMBER_ID", "") or "").strip()
+WHATSAPP_ACCESS_TOKEN = (os.getenv("WHATSAPP_ACCESS_TOKEN", "") or "").strip()
 
 # Lien marchand Wave (ex: https://pay.wave.com/m/.../c/ci/)
 WAVE_MERCHANT_LINK_BASE = "https://pay.wave.com/m/M_ci_8SO-R9nJg71k/c/ci/"
@@ -351,3 +379,4 @@ try:
             ]
 except Exception:
     pass
+

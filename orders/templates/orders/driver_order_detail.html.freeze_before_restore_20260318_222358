@@ -1,0 +1,686 @@
+{% extends "base.html" %}
+{% load static %}
+{% load l10n %}
+{% load money_filters %}
+
+{% block title %}Course {{ order.code|default:order.id }} – App livreur FAGNI{% endblock %}
+
+{% block extra_head %}
+<style>
+  .page { max-width: 980px; margin: 0 auto; padding: 16px; }
+  .topbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; }
+  .title { margin: 0; font-size: 22px; font-weight: 800; }
+  .subtle { opacity:.8; font-size: 13px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .chip { padding:6px 10px; border-radius: 999px; background: rgba(0,0,0,.05); font-size: 13px; }
+  .btn-soft { display:inline-flex; gap:6px; align-items:center; padding:8px 10px; border-radius: 10px; background: rgba(0,0,0,.06); text-decoration:none; }
+  .btn-soft:hover { background: rgba(0,0,0,.09); }
+  .grid { display:grid; gap:12px; grid-template-columns: 1fr; }
+  @media (min-width: 900px){ .grid-2 { grid-template-columns: 1.2fr .8fr; } }
+  .card { background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 14px; padding: 14px; }
+  .card h2 { margin:0 0 10px 0; font-size: 16px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; }
+  .kv { min-width: 180px; }
+  .kv .k { font-size: 12px; opacity:.7; }
+  .kv .v { font-size: 14px; font-weight: 650; }
+  .pricing-alert { border: 1px solid rgba(255,0,0,.18); background: rgba(255,0,0,.06); }
+  .pricing-alert strong { font-weight: 900; }
+  .legs { display:grid; gap:10px; }
+  .leg { border: 1px dashed rgba(0,0,0,.18); border-radius: 12px; padding: 12px; }
+  .leg-head { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; align-items:center; }
+  .leg-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .btn-xxs { padding:7px 10px; border-radius: 10px; border: 0; cursor:pointer; font-weight: 750; font-size: 12px; }
+  .btn-xxs-primary { background:#0d6efd; color:#fff; }
+  .btn-xxs-danger { background:#dc3545; color:#fff; }
+  .btn-xxs-soft { background: rgba(0,0,0,.08); }
+  .muted { opacity:.75; font-size: 13px; }
+  .table { width:100%; border-collapse: collapse; }
+  .table th, .table td { border-bottom: 1px solid rgba(0,0,0,.08); padding: 8px 6px; font-size: 13px; vertical-align: top; }
+  .badge { padding:4px 8px; border-radius: 999px; background: rgba(0,0,0,.06); font-size: 12px; }
+  .mapbox { border-radius: 14px; border: 1px solid rgba(0,0,0,.08); padding: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page"
+     data-order-id="{{ order.id }}"
+     data-live-url="{% url 'orders:driver_order_live' order.id %}"
+     data-leg-action-base="/orders/drivers/app/leg/"
+     data-pickup-lat="{{ order.pickup_lat|default_if_none:''|unlocalize }}"
+     data-pickup-lng="{{ order.pickup_lng|default_if_none:''|unlocalize }}"
+     data-delivery-lat="{{ order.delivery_lat|default_if_none:''|unlocalize }}"
+     data-delivery-lng="{{ order.delivery_lng|default_if_none:''|unlocalize }}"
+     data-laundry-lat="{% if order.laundry_partner %}{{ order.laundry_partner.latitude|default_if_none:''|unlocalize }}{% endif %}"
+     data-laundry-lng="{% if order.laundry_partner %}{{ order.laundry_partner.longitude|default_if_none:''|unlocalize }}{% endif %}"
+>
+
+  <div class="topbar">
+    <div>
+      <h1 class="title">Course {{ order.code|default:order.id }}</h1>
+      <div class="subtle">
+        Vue chauffeur – trajet, montant, étapes, actions.
+        • Créée le {{ order.created_at|date:"d/m/Y H:i" }}
+      </div>
+    </div>
+
+    <div class="chips">
+      <span class="chip">
+        {% with s=order.status %}
+          {% if s == "pending" %}⏳ En attente
+          {% elif s == "in_progress" %}🚦 En cours
+          {% elif s == "done" %}✅ Terminée
+          {% elif s == "canceled" %}❌ Annulée
+          {% else %}📦 {{ order.get_status_display }}
+          {% endif %}
+        {% endwith %}
+      </span>
+
+      {% if order.customer and order.customer.phone %}
+        <a class="btn-soft" href="tel:{{ order.customer.phone }}">📞 Appeler client</a>
+      {% endif %}
+
+      {% with pickup=order.pickup_address|default:order.customer.address %}
+        {% if pickup %}
+          <a class="btn-soft" target="_blank"
+             href="https://www.google.com/maps/search/?api=1&query={{ pickup|urlencode }}">🗺️ Maps collecte</a>
+        {% endif %}
+      {% endwith %}
+
+      {% if order.laundry_partner %}
+        {% with laund=order.laundry_partner %}
+          {% if laund.latitude and laund.longitude %}
+            <a class="btn-soft" target="_blank"
+               href="https://www.google.com/maps?q={{ laund.latitude }},{{ laund.longitude }}">🧺🗺️ Maps prestataire</a>
+          {% elif laund.address %}
+            <a class="btn-soft" target="_blank"
+               href="https://www.google.com/maps/search/?api=1&query={{ laund.address|urlencode }}">🧺🗺️ Maps prestataire</a>
+          {% else %}
+            <a class="btn-soft" target="_blank"
+               href="https://www.google.com/maps/search/?api=1&query={{ laund.name|urlencode }}">🧺🗺️ Maps prestataire</a>
+          {% endif %}
+        {% endwith %}
+      {% endif %}
+
+      {% if order.delivery_address %}
+        <a class="btn-soft" target="_blank"
+           href="https://www.google.com/maps/search/?api=1&query={{ order.delivery_address|urlencode }}">📦🗺️ Maps livraison</a>
+      {% endif %}
+
+      {% if driver_wallet_url %}
+        <a class="btn-soft" href="{{ driver_wallet_url }}">🚴💳 Mon wallet</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div style="margin-top:12px">
+    {% with back=request.GET.back %}
+      {% if back and back|slice:":1" == "/" and back != "/orders/driver/orders/" %}
+        <a class="btn-soft" href="{{ back }}">← Retour à mes courses</a>
+      {% else %}
+        <a class="btn-soft" href="{% url 'orders:driver_hub' %}">← Retour à mes courses</a>
+      {% endif %}
+    {% endwith %}
+  </div>
+
+  {# ✅ Bandeau UX : course non chiffrée #}
+  {% with tc=total_client_ttc|default:0 di=driver_leg_amount_all|default:driver_leg_amount|default:0 %}
+    {% if tc <= 0 or di <= 0 %}
+      <div class="card pricing-alert" style="margin-top:14px">
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+          <div>
+            <div><strong>⚠️ Course non chiffrée</strong></div>
+            <div class="muted">
+              Impossible d’accepter / démarrer / terminer tant que la commande n’est pas validée
+              (prestations + frais + montant livreur).
+            </div>
+          </div>
+          <div class="chip">
+            Ton gain : <strong><span id="alertDriverIncome">{{ driver_income|default:0|money }}</span></strong> FCFA
+          </div>
+        </div>
+
+        <div class="muted" style="margin-top:10px">
+          {% if order.items.count == 0 %}
+            • Aucune prestation n’est enregistrée sur cette commande.<br>
+          {% endif %}
+          • Total client : <strong>{{ total_client_ttc|default:0|money }}</strong> FCFA<br>
+          • Ton gain : <strong>{{ driver_income|default:0|money }}</strong> FCFA
+        </div>
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <div class="grid grid-2" style="margin-top:14px">
+    <div class="card">
+      <h2>👤 Client & adresses</h2>
+      <div class="row">
+        <div class="kv">
+          <div class="k">Nom</div>
+          <div class="v">{{ order.customer.name|default:"—" }}</div>
+        </div>
+        <div class="kv">
+          <div class="k">Téléphone</div>
+          <div class="v">{{ order.customer.phone|default:"—" }}</div>
+        </div>
+        <div class="kv" style="min-width:280px">
+          <div class="k">Adresse de collecte</div>
+          <div class="v">{{ order.pickup_address|default:order.customer.address|default:"—" }}</div>
+        </div>
+        <div class="kv" style="min-width:280px">
+          <div class="k">Adresse de livraison</div>
+          <div class="v">{{ order.delivery_address|default:order.pickup_address|default:order.customer.address|default:"—" }}</div>
+        </div>
+      </div>
+
+      {% if order.laundry_partner %}
+        <hr style="border:0;border-top:1px solid rgba(0,0,0,.08); margin:12px 0">
+        {% with laund=order.laundry_partner %}
+          <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+            <div>
+              <div class="k">Prestataire</div>
+              <div class="v">
+                {{ laund.name|default:"—" }}
+                {% if laund.city %}<span class="badge">📍 {{ laund.city }}</span>{% endif %}
+              </div>
+              <div class="muted">
+                {% if laund.address %}{{ laund.address }}{% endif %}
+                {% if laund.phone %} • ☎ {{ laund.phone }}{% endif %}
+                {% if laund.email %} • ✉ {{ laund.email }}{% endif %}
+                {% if laund.latitude and laund.longitude %} • GPS : {{ laund.latitude }}, {{ laund.longitude }}{% endif %}
+              </div>
+            </div>
+
+            <div class="chips">
+              {% if laund.phone %}
+                <a class="btn-soft" href="tel:{{ laund.phone }}">📞 Appeler</a>
+              {% endif %}
+              {% if laund.latitude and laund.longitude %}
+                <a class="btn-soft" target="_blank" href="https://www.google.com/maps?q={{ laund.latitude }},{{ laund.longitude }}">🗺️ Maps (GPS)</a>
+              {% elif laund.address %}
+                <a class="btn-soft" target="_blank" href="https://www.google.com/maps/search/?api=1&query={{ laund.address|urlencode }}">🗺️ Maps (adresse)</a>
+              {% else %}
+                <a class="btn-soft" target="_blank" href="https://www.google.com/maps/search/?api=1&query={{ laund.name|urlencode }}">🗺️ Maps</a>
+              {% endif %}
+            </div>
+          </div>
+        {% endwith %}
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2>💼 Résumé mission</h2>
+
+      <div class="row">
+        <div class="kv">
+          <div class="k">Mission</div>
+          <div class="v">{{ driver_mission_type_label }}</div>
+        </div>
+        <div class="kv">
+          <div class="k">Ton gain</div>
+          <div class="v" id="kpiDriverIncome">{{ driver_income|default:0|money }} FCFA</div>
+        </div>
+        <div class="kv">
+          <div class="k">Distance mission</div>
+          <div class="v">
+            {% if driver_leg_distance %}{{ driver_leg_distance|floatformat:2 }} km{% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <hr style="border:0;border-top:1px solid rgba(0,0,0,.08); margin:12px 0">
+
+      <div class="muted">
+        Payé par le client : <strong>{{ total_client_ttc|default:0|money }}</strong> FCFA —
+        {% if order.payment_status == "paid" %}Payé{% elif order.payment_status == "partial" %}Acompte{% else %}En attente{% endif %}
+        <br>
+        Payé : {{ order.amount_paid|default:0|money }} / {{ total_client_ttc|default:0|money }}
+        — Reste : {{ amount_remaining|default:0|money }}
+        <br>
+        Dont livraison : {{ delivery_fee_client|default:0|money }} FCFA
+      </div>
+
+      {% if order.distance_km_total or order.distance_km %}
+        <div class="muted" style="margin-top:10px">
+          • Distance totale théorique : <strong>
+            {% if order.distance_km_total %}{{ order.distance_km_total|floatformat:2 }}{% else %}{{ order.distance_km|floatformat:2 }}{% endif %}
+          </strong> km<br>
+          • Mode : <strong>
+            {% if order.delivery_mode == "express" %}Express{% elif order.delivery_mode == "scheduled" %}Programmée{% else %}Standard{% endif %}
+          </strong>
+        </div>
+      {% endif %}
+
+      {% if driver_wallet_url %}
+        <div style="margin-top:12px">
+          <a class="btn-soft" href="{{ driver_wallet_url }}">🚴💳 Ouvrir mon wallet</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>🧭 Tronçons de course (détail)</h2>
+
+    {% if driver_legs_qs %}
+      <div class="legs">
+        {% for leg in driver_legs_qs %}
+          <div class="leg">
+            <div class="leg-head">
+              <div>
+                <div style="font-weight:850">
+                  {% if leg.leg_type == "pickup" %}
+                    🟢 Client → Prestataire
+                  {% elif leg.leg_type == "delivery" or leg.leg_type == "return" %}
+                    🔵 Prestataire → Client
+                  {% elif leg.leg_type == "round_trip" %}
+                    🟣 A/R complet
+                  {% else %}
+                    ⚪ Tronçon {{ forloop.counter }}
+                  {% endif %}
+                </div>
+                <div class="muted">
+                  Distance : <strong>{{ leg.distance_km|default:0|floatformat:2 }}</strong> km —
+                  Part livreur : <strong>{{ leg.driver_amount|default:0|money }}</strong> FCFA
+                </div>
+              </div>
+
+              <div class="chip">
+                {% if leg.status == "pending" %}⏳ En attente
+                {% elif leg.status == "assigned" %}📌 Assignée
+                {% elif leg.status == "in_progress" %}🚴 En cours
+                {% elif leg.status == "done" %}✅ Terminée
+                {% elif leg.status == "canceled" %}❌ Annulée
+                {% else %}{{ leg.get_status_display }}
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="muted">
+        Cette course n'est pas encore découpée en tronçons individuels. Tu vois ton trajet global ci-dessus.
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="grid grid-2" style="margin-top:14px">
+    <div class="card mapbox">
+      <h2>🗺️ Carte (collecte → prestataire → livraison)</h2>
+      <div class="muted">⏳ Chargement de la carte…</div>
+      <div class="chips" style="margin-top:10px">
+        <button type="button" class="btn-xxs btn-xxs-soft">📍 Me localiser</button>
+        <button type="button" class="btn-xxs btn-xxs-primary">🎯 Suivi live</button>
+        <button type="button" class="btn-xxs btn-xxs-danger">⏹ Stop</button>
+        <span class="chip">GPS : —</span>
+      </div>
+      <div class="muted" style="margin-top:10px">
+        Pas de coordonnées GPS disponibles pour afficher la carte ?
+        Utilise “Maps collecte / Maps prestataire / Maps livraison”.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🕒 Timeline</h2>
+      <div class="muted">
+        • Course créée : <strong>{{ order.created_at|date:"d/m/Y H:i" }}</strong><br>
+        {% if order.pickup_time %}• Collecte démarrée : <strong>{{ order.pickup_time|date:"d/m/Y H:i" }}</strong><br>{% endif %}
+        {% if order.dropoff_time %}• Déposée au prestataire : <strong>{{ order.dropoff_time|date:"d/m/Y H:i" }}</strong><br>{% endif %}
+        {% if order.wash_complete_time %}• Prestataire validé (prêt) : <strong>{{ order.wash_complete_time|date:"d/m/Y H:i" }}</strong><br>{% endif %}
+        {% if order.return_time %}• Reprise pour livraison : <strong>{{ order.return_time|date:"d/m/Y H:i" }}</strong><br>{% endif %}
+        {% if order.delivered_time %}• Livrée au client : <strong>{{ order.delivered_time|date:"d/m/Y H:i" }}</strong><br>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>🚴 Actions chauffeur (par tronçon)</h2>
+
+    {% if driver_legs_qs %}
+      <div class="legs">
+        {% for leg in driver_legs_qs %}
+          {% with st=leg.status|default:''|lower|cut:" " %}
+            <div class="leg">
+              <div class="leg-head">
+                <div style="font-weight:850">
+                  {% if leg.leg_type == "pickup" %}
+                    🟢 Client → Prestataire
+                  {% elif leg.leg_type == "delivery" or leg.leg_type == "return" %}
+                    🔵 Prestataire → Client
+                  {% else %}
+                    ⚪ Tronçon {{ forloop.counter }}
+                  {% endif %}
+                </div>
+                <div class="chip">
+                  Statut :
+                  {% if st == "pending" %}⏳ En attente
+                  {% elif st == "assigned" %}📌 Assignée
+                  {% elif st == "in_progress" %}🚴 En cours
+                  {% elif st == "done" %}✅ Terminée
+                  {% elif st == "canceled" %}❌ Annulée
+                  {% else %}{{ leg.get_status_display }}
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="muted" style="margin-top:8px">
+                Distance : <strong>{{ leg.distance_km|default:0|floatformat:2 }}</strong> km —
+                Part livreur : <strong>{{ leg.driver_amount|default:0|money }}</strong> FCFA
+              </div>
+
+              {# blocages métier #}
+              {% if leg.leg_type != "pickup" and not order.dropoff_time and not order.pickup_time %}
+                <div class="muted" style="margin-top:10px">Termine d’abord la collecte (Client → Prestataire). La livraison sera disponible ensuite.</div>
+              {% elif leg.leg_type == "delivery" and not order.wash_complete_time %}
+                <div class="muted" style="margin-top:10px">En attente de validation prestataire. Livraison disponible uniquement après confirmation “prêt”.</div>
+              {% elif leg.leg_type == "return" and not order.wash_complete_time %}
+                <div class="muted" style="margin-top:10px">En attente de validation prestataire. Livraison disponible uniquement après confirmation “prêt”.</div>
+              {% else %}
+                <div class="leg-actions">
+                  <a class="btn-xxs btn-xxs-soft"
+                     href="{% url 'orders:driver_weighing' order.id %}?leg_id={{ leg.id }}&back={{ request.path|urlencode }}">
+                    📷 Ajouter preuve
+                  </a>
+
+                  {% if st == "pending" %}
+                    <form method="post" class="js-leg-form" data-leg="{{ leg.leg_type }}" data-action="accept" style="margin:0">
+                      {% csrf_token %}
+                        <input type="hidden" name="back" value="{{ request.path }}">
+                        <input type="hidden" name="leg" value="{{ leg.leg_type }}">
+                        <input type="hidden" name="action" value="accept">
+                      <button type="submit" class="btn-xxs btn-xxs-primary">✅ Accepter</button>
+                    </form>
+                  {% endif %}
+
+                  {% if st == "assigned" %}
+                    <form method="post" class="js-leg-form js-geo-action" data-leg="{{ leg.leg_type }}" data-action="start" style="margin:0">
+                      {% csrf_token %}
+                        <input type="hidden" name="back" value="{{ request.path }}">
+                        <input type="hidden" name="leg" value="{{ leg.leg_type }}">
+                        <input type="hidden" name="action" value="start">
+                      <button type="submit" class="btn-xxs btn-xxs-primary">🚴 Démarrer</button>
+                    </form>
+                  {% endif %}
+
+                  {% if st == "in_progress" %}
+                    <form method="post" class="js-leg-form js-geo-action" data-leg="{{ leg.leg_type }}" data-action="finish" style="margin:0">
+                      {% csrf_token %}
+                        <input type="hidden" name="back" value="{{ request.path }}">
+                        <input type="hidden" name="leg" value="{{ leg.leg_type }}">
+                        <input type="hidden" name="action" value="finish">
+                      <button type="submit" class="btn-xxs btn-xxs-primary">✅ Terminer</button>
+                    </form>
+                  {% endif %}
+
+                  {% if st != "done" and st != "canceled" %}
+                    <form method="post" class="js-leg-form" data-leg="{{ leg.leg_type }}" data-action="cancel" style="margin:0">
+                      {% csrf_token %}
+                        <input type="hidden" name="leg" value="{{ leg.leg_type }}">
+                        <input type="hidden" name="action" value="cancel">
+                      <button type="submit" class="btn-xxs btn-xxs-danger">❌ Annuler</button>
+                    </form>
+                  {% endif %}
+                </div>
+              {% endif %}
+            </div>
+          {% endwith %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="muted">Aucune jambe de course détaillée n'est encore définie pour cette course.</div>
+    {% endif %}
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>📦 Articles confiés</h2>
+    <div class="muted">Liste des pièces à collecter / livrer. Les prix détaillés ne sont pas affichés côté livreur.</div>
+
+    <table class="table" style="margin-top:10px">
+      <thead>
+        <tr>
+          <th>Prestation / Désignation</th>
+          <th>Qté</th>
+          <th>Photos</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in order.items.all %}
+          <tr>
+            <td>
+              <div style="font-weight:750">
+                {% if item.designation %}{{ item.designation }}
+                {% elif item.service %}{{ item.service.name }}
+                {% else %}—{% endif %}
+              </div>
+              <div class="muted">
+                {% if item.service and item.service.category %}{{ item.service.category.name }} • {% endif %}
+                ID #
+                {% if item.service %}{{ item.service.id }}{% else %}{{ item.id }}{% endif %}
+              </div>
+            </td>
+            <td>{{ item.quantity }}</td>
+            <td>
+              {% if item.photos.all %}
+                {% for p in item.photos.all %}
+                  <span class="badge">Photo article {{ item.id }}</span>
+                {% endfor %}
+              {% else %}
+                <span class="muted">Aucune photo</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="3" class="muted">Aucune ligne de prestation enregistrée pour cette commande.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h2 style="margin-top:16px">📝 Notes / instructions client</h2>
+    {% if order.notes %}
+      <div class="muted">{{ order.notes }}</div>
+    {% else %}
+      <div class="muted">Aucune note spécifique n'a été enregistrée pour cette commande.</div>
+    {% endif %}
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>📸 Photos liées</h2>
+    <div class="muted">Cette vue t’aide à vérifier que tu as bien tous les articles à la collecte et à la livraison.</div>
+
+    <div class="chips" style="margin-top:10px">
+      {% for item in order.items.all %}
+        {% for p in item.photos.all %}
+          <span class="badge">
+            Photo {{ order.code|default:order.id }} —
+            {% if item.designation %}{{ item.designation }}
+            {% elif item.service %}{{ item.service.name }}
+            {% else %}—{% endif %}
+          </span>
+        {% endfor %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div style="margin-top:14px">
+    {% with back=request.GET.back %}
+      {% if back and back|slice:":1" == "/" and back != "/orders/driver/orders/" %}
+        <a class="btn-soft" href="{{ back }}">← Retour à mes courses</a>
+      {% else %}
+        <a class="btn-soft" href="{% url 'orders:driver_hub' %}">← Retour à mes courses</a>
+      {% endif %}
+    {% endwith %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // IMPORTANT: ce template suppose que updatePayUI() existe déjà dans base.html ou un JS global.
+  // Si ce n'est pas le cas, dis-moi et je te fournis une version minimale.
+
+  function pollPayLive(){
+    var page = document.querySelector(".page");
+    if(!page || !page.dataset.liveUrl) return;
+
+    var url = page.dataset.liveUrl;
+    var did = null;
+    try{ did = new URLSearchParams(window.location.search).get("driver_id"); }catch(e){}
+    if(did && url.indexOf("driver_id=") < 0){
+      url += (url.indexOf("?") >= 0 ? "&" : "?") + "driver_id=" + encodeURIComponent(did);
+    }
+
+    fetch(url, {credentials:"same-origin"})
+      .then(function(r){
+        var ct = (r.headers.get("content-type") || "").toLowerCase();
+        if(ct.indexOf("application/json") < 0) throw new Error("non-json");
+        return r.json();
+      })
+      .then(function(d){
+        if(!d) return;
+
+        // 1) Paiement client (reste/paid/total)
+        if(d.order && typeof updatePayUI === "function") updatePayUI(d.order);
+
+        // 2) KPI driver : si wallet=0 => afficher potentiel legs
+        try {
+          var k = d.kpi || {};
+          var paid = Number(k.driver_income || 0);           // wallet payé
+          var pot  = Number(k.driver_leg_amount_all || 0);   // potentiel legs
+          var show = (paid > 0) ? paid : pot;
+
+          var elKpi = document.getElementById("kpiDriverIncome");
+          if (elKpi) elKpi.textContent = Math.round(show).toLocaleString() + " FCFA";
+
+          var elAlert = document.getElementById("alertDriverIncome");
+          if (elAlert) elAlert.textContent = Math.round(show).toLocaleString();
+
+          // Optionnel: cacher le bandeau si total OK et legs OK
+          var alertBox = document.querySelector(".pricing-alert");
+          var totalOk = Number((d.order && d.order.total_ttc) || 0) > 0;
+          var gainOk  = pot > 0;
+          if (alertBox && totalOk && gainOk) {
+            alertBox.style.display = "none";
+          } else if (alertBox) {
+            alertBox.style.display = "";
+          }
+        } catch (e) {}
+      })
+      .catch(function(){});
+  }
+
+  function __initPayLive(){
+    // init serveur (reste calculé sans attribut modèle)
+    if (typeof updatePayUI === "function") {
+      updatePayUI({
+        payment_status: "{{ order.payment_status|default:'' }}",
+        total_ttc: {{ total_client_ttc|default:0|unlocalize }},
+        amount_paid: {{ order.amount_paid|default:0|unlocalize }},
+        amount_remaining: ({{ total_client_ttc|default:0|unlocalize }} - {{ order.amount_paid|default:0|unlocalize }})
+      });
+    }
+
+    pollPayLive();
+    setTimeout(pollPayLive, 800);
+    setInterval(pollPayLive, 6000);
+  }
+
+  try{
+    if(document.readyState === "loading"){
+      document.addEventListener("DOMContentLoaded", __initPayLive);
+    }else{
+      __initPayLive();
+    }
+  }catch(e){}
+
+/* DRIVER_LEG_AJAX_HANDLER_V1 */
+    // Toast minimal (safe)
+    function toast(msg, kind){
+      try {
+        kind = kind || "error";
+        var t = document.createElement("div");
+        t.textContent = String(msg || "Erreur");
+        t.style.cssText =
+          "position:fixed;z-index:9999;left:50%;bottom:18px;transform:translateX(-50%);" +
+          "max-width:92vw;padding:10px 12px;border-radius:12px;font-weight:700;" +
+          "box-shadow:0 10px 30px rgba(15,23,42,.18);" +
+          "background:#fff;color:#0f172a;font-size:13px;";
+        if(kind==="ok") t.style.border="2px solid #22c55e";
+        if(kind==="warn") t.style.border="2px solid #f59e0b";
+        if(kind==="error") t.style.border="2px solid #ef4444";
+        document.body.appendChild(t);
+        setTimeout(function(){ t.style.opacity="0"; }, 2500);
+        setTimeout(function(){ try{t.remove();}catch(e){} }, 3000);
+      } catch(e){}
+    }
+
+    function safeJson(text){
+      try { return JSON.parse(text); } catch(e){ return null; }
+    }
+
+    // Interception AJAX des actions sur les jambes
+    document.querySelectorAll("form.js-leg-form").forEach(function(form){
+      form.addEventListener("submit", function(ev){
+        ev.preventDefault();
+
+        var btn = form.querySelector("button[type=submit]");
+        if(btn){
+          btn.disabled = true;
+          btn.dataset.old = btn.textContent;
+          btn.textContent = "⏳ ...";
+        }
+
+        var url = form.getAttribute("action") || window.location.href;
+        if(window.location.search && url.indexOf("?") < 0){
+          url += window.location.search;
+        }
+
+        fetch(url, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json"
+          },
+          body: new FormData(form)
+        })
+        .then(function(res){
+          return res.text().then(function(txt){
+            return {status:res.status, ok:res.ok, text:txt, ct:(res.headers.get("content-type")||"")};
+          });
+        })
+        .then(function(r){
+          if(r.status===401 || r.status===403){
+            toast("Session expirée / accès refusé","warn");
+            window.location.reload();
+            return;
+          }
+
+          var data = r.ct.indexOf("application/json")>=0 ? safeJson(r.text) : null;
+
+            // Si le backend renvoie une URL de redirection (ex: preuve requise), on navigue
+            if(data && data.redirect_url){
+              window.location.href = data.redirect_url;
+              return;
+            }
+
+          if(!r.ok || (data && data.ok===false)){
+            toast((data && (data.message||data.error)) || "Action impossible","error");
+            if(btn){ btn.disabled=false; btn.textContent=btn.dataset.old; }
+            return;
+          }
+
+          toast("Action effectuée","ok");
+          window.location.reload();
+        })
+        .catch(function(){
+          toast("Erreur réseau","error");
+          if(btn){ btn.disabled=false; btn.textContent=btn.dataset.old; }
+        });
+      });
+    });
+
+</script>
+{% endblock %}

@@ -32,11 +32,40 @@ def generate_mlm_commissions_for_order(order):
     # 5) Paramétrage actif
     settings_obj = MLMSettings.get_active()
 
-    # Pas de commissions si le service fee est trop faible
-    if order.service_fee < settings_obj.min_service_fee_for_commission:
+    # Base MLM = service FAGNI
+    fee_base_decimal = Decimal(str(getattr(order, "service_fee", 0) or 0)).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+
+    # Fallback métier si service_fee n'a pas encore été persisté
+    if fee_base_decimal <= Decimal("0.00"):
+        try:
+            computed_fee = order.compute_service_fee()
+            fee_base_decimal = Decimal(str(computed_fee or 0)).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+        except Exception:
+            fee_base_decimal = Decimal("0.00")
+
+        # si on a réussi à recalculer, on resynchronise la commande
+        if fee_base_decimal > Decimal("0.00") and hasattr(order, "service_fee"):
+            try:
+                order.service_fee = fee_base_decimal
+                order.save(update_fields=["service_fee"])
+            except Exception:
+                try:
+                    order.save()
+                except Exception:
+                    pass
+
+    # Pas de commissions si la base service FAGNI reste trop faible
+    min_fee = Decimal(str(getattr(settings_obj, "min_service_fee_for_commission", 0) or 0)).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    if fee_base_decimal < min_fee:
         return
 
-    fee_base = int(order.service_fee)
+    fee_base = int(fee_base_decimal)
 
     # 6) Pourcentages
     percent_levels = [

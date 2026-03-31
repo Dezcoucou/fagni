@@ -60,6 +60,8 @@ urlpatterns = [
     path("client/", views.client_login, name="client_login"),
     path("client/logout/", views.client_logout, name="client_logout"),
     path("client/home/", views.client_home, name="client_home"),
+    path("client/wallet/", views.client_wallet, name="client_wallet"),
+    path("client/referrals/", views.client_referrals, name="client_referrals"),
     path("client/new/", views.client_new_order, name="client_new_order"),
     path("client/new/step-2/<int:order_id>/", views.client_new_order_step2, name="client_new_order_step2"),
     path("client/new/step-3/<int:order_id>/", views.client_new_order_step3, name="client_new_order_step3"),
@@ -73,6 +75,11 @@ urlpatterns = [
     path("client/orders/<int:order_id>/pay/cash/", views.client_order_pay_cash, name="client_order_pay_cash"),
     path("client/orders/<int:order_id>/pay/wave/", views.client_order_pay_wave_page, name="client_order_pay_wave_page"),
 
+    path(
+        "client/orders/<int:order_id>/json/",
+        views.client_order_detail_json,
+        name="client_order_detail_json"
+    ),
 
     # --- Items (lignes de commande) côté client ---
     path("client/orders/<int:order_id>/items/new/", views.client_order_item_new, name="client_order_item_new"),
@@ -112,7 +119,7 @@ urlpatterns = [
 
     # Application mobile livreurs
     path("driver-app/", views.driver_app, name="driver_app"),
-    path("driver/app/", views.driver_app_alias, name="driver_app_legacy"),
+    path("driver/app/", views.driver_app, name="driver_app_legacy"),
     path("driver-app/data/", views.driver_app_data, name="driver_app_data"),
     path("driver/me/", views.driver_me_app, name="driver_me_app"),
     path("driver/me/data/", views.driver_me_data, name="driver_me_data"),
@@ -126,6 +133,7 @@ urlpatterns = [
     path("driver/map/", views.driver_map, name="driver_map"),
     path("driver/map/data/", views.driver_map_data, name="driver_map_data"),
 
+    path("driver/mission/<int:order_id>/", views.driver_mission_v3, name="driver_mission_v3"),
     path("driver/orders/<int:order_id>/", views.driver_order_detail, name="driver_order_detail"),
     path("driver/orders/<int:order_id>/live/", views.driver_order_live_status, name="driver_order_live"),
 
@@ -164,6 +172,12 @@ urlpatterns = [
 
     # App blanchisseur (liste)
     path("laundry/app/", views.laundry_app, name="laundry_app"),
+    path("laundry/supervisor/", views.laundry_supervisor_dashboard, name="laundry_supervisor_dashboard"),
+    path(
+        "laundry/update-status/<int:order_id>/",
+        views.laundry_update_status,
+        name="laundry_update_status"
+    ),
 
     # Détail commande blanchisseur (sans infos client)
     path("laundry/order/<int:order_id>/", views.laundry_order_detail, name="laundry_order_detail"),

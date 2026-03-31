@@ -141,18 +141,25 @@
       <div class="totals-card">
 
         <div class="tot">
-          <span>Total HT facturé au client</span>
-          <strong>{{ total_ht_client|money }} FCFA</strong>
+          <span>Prestations</span>
+          <strong>{{ display_prestations_amount|money }} FCFA</strong>
         </div>
 
         <div class="tot">
-          <span>TVA sur revenus FAGNI ({{ vat_rate }}%)</span>
-          <strong>{{ vat_amount|money }} FCFA</strong>
+          <span>Livraison</span>
+          <strong>{{ display_delivery_amount|money }} FCFA</strong>
         </div>
+
+        {% if display_express_amount and display_express_amount|floatformat:"0" != "0" %}
+        <div class="tot">
+          <span>Supplément express</span>
+          <strong>{{ display_express_amount|money }} FCFA</strong>
+        </div>
+        {% endif %}
 
         <div class="tot grand">
           <span>Total TTC client</span>
-          <strong>{{ total_ttc_client|money }} FCFA</strong>
+          <strong>{{ display_total_ttc|money }} FCFA</strong>
         </div>
 
       </div>

@@ -4,510 +4,508 @@
 
 {% block title %}Mon wallet chauffeur – FAGNI{% endblock %}
 
-{% block extra_head %}
+{% block page_css %}
 <style>
-    .page {
-        max-width: 900px;
-        margin: 0 auto 32px;
-        padding: 12px 10px 24px;
+  .wallet-page{
+    max-width:1180px;
+    margin:0 auto;
+    padding:10px 6px 24px;
+  }
+
+  .wallet-layout{
+    display:grid;
+    grid-template-columns:minmax(0, .95fr) minmax(0, 1.05fr);
+    gap:14px;
+    align-items:start;
+  }
+
+  .wallet-stack{
+    display:grid;
+    gap:14px;
+  }
+
+  .wallet-balance{
+    background:linear-gradient(135deg,#0f172a 0%, #172554 46%, #2563eb 100%);
+    color:#fff;
+    border:1px solid rgba(255,255,255,.08);
+  }
+
+  .wallet-balance .fagni-eyebrow{
+    color:rgba(255,255,255,.74);
+  }
+
+  .wallet-balance-value{
+    font-size:42px;
+    line-height:1;
+    font-weight:950;
+    letter-spacing:-.03em;
+    margin-top:10px;
+    color:#fff;
+  }
+
+  .wallet-balance-sub{
+    margin-top:10px;
+    font-size:13px;
+    line-height:1.5;
+    color:rgba(255,255,255,.84);
+  }
+
+  .wallet-mini-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-top:14px;
+  }
+
+  .wallet-mini-card{
+    background:rgba(255,255,255,.10);
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:16px;
+    padding:12px;
+  }
+
+  .wallet-mini-label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:rgba(255,255,255,.68);
+    font-weight:900;
+  }
+
+  .wallet-mini-value{
+    margin-top:6px;
+    font-size:18px;
+    font-weight:900;
+    color:#fff;
+  }
+
+  .wallet-note{
+    font-size:12px;
+    line-height:1.5;
+    color:#64748b;
+  }
+
+  .wallet-withdraw-box{
+    display:grid;
+    gap:12px;
+  }
+
+  .wallet-withdraw-form{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:10px;
+    align-items:end;
+  }
+
+  .wallet-history-table-wrap{
+    overflow:auto;
+    border-radius:18px;
+    border:1px solid #e5e7eb;
+    background:#fff;
+    box-shadow:0 6px 16px rgba(15,23,42,.05);
+  }
+
+  .wallet-history-table{
+    width:100%;
+    min-width:760px;
+    border-collapse:separate;
+    border-spacing:0;
+  }
+
+  .wallet-history-table thead th{
+    text-align:left;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:#64748b;
+    background:#f8fafc;
+    padding:12px 14px;
+    border-bottom:1px solid #e5e7eb;
+  }
+
+  .wallet-history-table tbody td{
+    padding:12px 14px;
+    border-bottom:1px solid #f1f5f9;
+    font-size:13px;
+    color:#0f172a;
+    vertical-align:top;
+  }
+
+  .wallet-history-table tbody tr:last-child td{
+    border-bottom:none;
+  }
+
+  .wallet-amount{
+    text-align:right;
+    white-space:nowrap;
+    font-weight:900;
+  }
+
+  .wallet-amount.in{
+    color:#166534;
+  }
+
+  .wallet-amount.out{
+    color:#b91c1c;
+  }
+
+  .wallet-date{
+    white-space:nowrap;
+    color:#64748b;
+    font-size:12px;
+  }
+
+  .wallet-order-link{
+    color:#2563eb;
+    text-decoration:none;
+    font-weight:800;
+  }
+
+  .wallet-order-link:hover{
+    text-decoration:underline;
+  }
+
+  .wallet-chip-group{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .wallet-filter-btn{
+    appearance:none;
+    border:1px solid #e5e7eb;
+    background:#fff;
+    color:#475569;
+    min-height:30px;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:11px;
+    font-weight:900;
+    cursor:pointer;
+  }
+
+  .wallet-filter-btn.is-active{
+    background:#eff6ff;
+    border-color:#bfdbfe;
+    color:#1d4ed8;
+  }
+
+  .wallet-summary-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+
+  .wallet-summary-item{
+    border:1px solid #eef2f7;
+    border-radius:16px;
+    padding:12px;
+    background:#fff;
+  }
+
+  .wallet-summary-label{
+    font-size:11px;
+    color:#64748b;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    font-weight:900;
+  }
+
+  .wallet-summary-value{
+    margin-top:6px;
+    font-size:18px;
+    font-weight:950;
+    color:#111827;
+  }
+
+  .wallet-summary-value.success{
+    color:#166534;
+  }
+
+  .wallet-summary-value.warning{
+    color:#9a3412;
+  }
+
+  .wallet-empty{
+    border:1px dashed #e5e7eb;
+    border-radius:16px;
+    padding:16px;
+    background:#fff;
+    color:#94a3b8;
+    font-size:13px;
+  }
+
+  @media (max-width:980px){
+    .wallet-layout{
+      grid-template-columns:1fr;
+    }
+  }
+
+  @media (max-width:760px){
+    .wallet-mini-grid,
+    .wallet-summary-grid{
+      grid-template-columns:1fr;
     }
 
-    .page-header {
-        display:flex;
-        justify-content:space-between;
-        align-items:flex-start;
-        gap:12px;
-        margin-bottom:18px;
+    .wallet-withdraw-form{
+      grid-template-columns:1fr;
     }
 
-    .page-title {
-        font-size:20px;
-        font-weight:700;
-        color:#0f172a;
-        margin:0;
+    .wallet-balance-value{
+      font-size:34px;
     }
-
-    .page-subtitle {
-        font-size:13px;
-        color:#64748b;
-        margin:4px 0 0;
-    }
-
-    .tag-driver {
-        font-size:12px;
-        background:#eff6ff;
-        border-radius:999px;
-        padding:4px 10px;
-        color:#1d4ed8;
-        border:1px solid #bfdbfe;
-        display:inline-flex;
-        align-items:center;
-        gap:6px;
-        white-space:nowrap;
-    }
-
-    .layout {
-        display:grid;
-        grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.6fr);
-        gap:14px;
-        align-items:flex-start;
-    }
-
-    .card {
-        background:#ffffff;
-        border-radius:16px;
-        padding:12px 14px;
-        border:1px solid #e5e7eb;
-        box-shadow:0 2px 6px rgba(15,23,42,0.06);
-    }
-
-    .card-title {
-        font-size:14px;
-        font-weight:600;
-        margin:0 0 8px;
-        color:#0f172a;
-        display:flex;
-        align-items:center;
-        gap:6px;
-    }
-
-    .card-title .emoji {
-        font-size:18px;
-    }
-
-    /* Résumé solde */
-    .balance-value {
-        font-size:26px;
-        font-weight:700;
-        color:#0f172a;
-    }
-
-    .balance-label {
-        font-size:12px;
-        text-transform:uppercase;
-        letter-spacing:.06em;
-        color:#6b7280;
-        margin-bottom:2px;
-    }
-
-    .pill-info {
-        display:inline-flex;
-        align-items:center;
-        gap:6px;
-        padding:3px 9px;
-        border-radius:999px;
-        background:#f3f4f6;
-        color:#4b5563;
-        font-size:11px;
-        margin-top:6px;
-    }
-
-    .pill-info span.dot {
-        width:8px;
-        height:8px;
-        border-radius:999px;
-        background:#22c55e;
-    }
-
-    .meta-grid {
-        display:grid;
-        grid-template-columns: 1fr 1fr;
-        gap:10px;
-        margin-top:10px;
-    }
-
-    .meta-block-label {
-        font-size:11px;
-        text-transform:uppercase;
-        letter-spacing:.06em;
-        color:#9ca3af;
-        margin-bottom:2px;
-    }
-
-    .meta-block-value {
-        font-size:13px;
-        font-weight:500;
-        color:#111827;
-    }
-
-    /* Boutons */
-    .btn {
-        display:inline-flex;
-        align-items:center;
-        justify-content:center;
-        padding:7px 12px;
-        border-radius:999px;
-        font-size:13px;
-        border:1px solid transparent;
-        cursor:pointer;
-        text-decoration:none;
-        white-space:nowrap;
-    }
-
-    .btn-primary {
-        background:linear-gradient(90deg,#ff7a00,#0056b3);
-        color:#fff;
-        border:none;
-    }
-
-    .btn-primary:hover {
-        opacity:0.96;
-    }
-
-    .btn-light {
-        background:#fff;
-        border-color:#e5e7eb;
-        color:#374151;
-    }
-
-    .btn-light:hover {
-        background:#f3f4f6;
-    }
-
-    .btn-sm {
-        padding:5px 10px;
-        font-size:12px;
-    }
-
-    .btn-icon {
-        gap:6px;
-    }
-
-    /* Historique */
-    .history-header {
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        gap:8px;
-        margin-bottom:6px;
-    }
-
-    .history-filters {
-        display:flex;
-        gap:6px;
-        flex-wrap:wrap;
-    }
-
-    .chip-filter {
-        padding:3px 9px;
-        border-radius:999px;
-        border:1px solid #e5e7eb;
-        font-size:11px;
-        background:#fff;
-        cursor:pointer;
-    }
-
-    .chip-filter.is-active {
-        background:#eff6ff;
-        border-color:#bfdbfe;
-        color:#1d4ed8;
-        font-weight:500;
-    }
-
-    table.history-table {
-        width:100%;
-        border-collapse:collapse;
-        font-size:12px;
-        margin-top:4px;
-    }
-
-    table.history-table th,
-    table.history-table td {
-        padding:6px 4px;
-        border-bottom:1px solid #e5e7eb;
-    }
-
-    table.history-table th {
-        background:#f9fafb;
-        color:#6b7280;
-        font-weight:600;
-        text-align:left;
-        font-size:11px;
-    }
-
-    table.history-table td.amount {
-        text-align:right;
-        white-space:nowrap;
-        font-weight:500;
-    }
-
-    table.history-table td.date {
-        white-space:nowrap;
-    }
-
-    .badge-direction-in {
-        display:inline-flex;
-        padding:2px 7px;
-        border-radius:999px;
-        font-size:10px;
-        background:#ecfdf3;
-        color:#166534;
-    }
-
-    .badge-direction-out {
-        display:inline-flex;
-        padding:2px 7px;
-        border-radius:999px;
-        font-size:10px;
-        background:#fef2f2;
-        color:#b91c1c;
-    }
-
-    .history-empty {
-        font-size:12px;
-        color:#9ca3af;
-        padding:6px 2px;
-    }
-
-    .order-link {
-        font-size:11px;
-        color:#2563eb;
-        text-decoration:none;
-    }
-
-    .order-link:hover {
-        text-decoration:underline;
-    }
-
-    @media (max-width: 880px) {
-        .layout {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    @media (max-width: 640px) {
-        .page {
-            padding:10px 8px 22px;
-        }
-        .meta-grid {
-            grid-template-columns: 1fr;
-        }
-        table.history-table th,
-        table.history-table td {
-            font-size:11px;
-        }
-    }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="page">
+<div class="wallet-page">
 
-    <!-- HEADER -->
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">Mon wallet chauffeur</h1>
-            <p class="page-subtitle">
-                Vos gains FAGNI sur les courses livrées. Solde disponible = montant que vous pouvez demander en retrait.
-            </p>
+  <section class="fagni-hero">
+    <div class="fagni-hero-main wallet-balance">
+      <div class="fagni-eyebrow">FAGNI • Wallet livreur</div>
+      <h1 class="fagni-title">Mon wallet chauffeur</h1>
+      <p class="fagni-subtitle">
+        Vos gains FAGNI sur les courses livrées. Le solde disponible correspond au montant que vous pouvez demander en retrait.
+      </p>
+
+      <div class="wallet-balance-value">
+        {% if wallet %}{{ wallet.balance|default:0|money }} FCFA{% else %}0 FCFA{% endif %}
+      </div>
+
+      <div class="wallet-balance-sub">
+        Solde disponible à l’instant T, après prise en compte des crédits et des retraits enregistrés.
+      </div>
+
+      <div class="wallet-mini-grid">
+        <div class="wallet-mini-card">
+          <div class="wallet-mini-label">Total gains crédités</div>
+          <div class="wallet-mini-value">
+            {% if total_credited %}{{ total_credited|money }} FCFA{% else %}0 FCFA{% endif %}
+          </div>
         </div>
-        <div style="text-align:right;">
-            {% if delivery_partner %}
-                <div class="tag-driver">
-                    🚴‍♂️ Livreur connecté : <strong>{{ delivery_partner.name|default:"Livreur FAGNI" }}</strong>
-                </div>
-            {% endif %}
+        <div class="wallet-mini-card">
+          <div class="wallet-mini-label">Total retiré</div>
+          <div class="wallet-mini-value">
+            {% if total_debited %}{{ total_debited|money }} FCFA{% else %}0 FCFA{% endif %}
+          </div>
         </div>
+      </div>
+
+      <div class="fagni-badges">
+        <span class="fagni-badge fagni-badge--glass">
+          <span class="fagni-dot fagni-dot--success"></span>
+          Solde synchronisé
+        </span>
+        {% if delivery_partner %}
+          <span class="fagni-badge fagni-badge--glass">🚴‍♂️ {{ delivery_partner.name|default:"Livreur FAGNI" }}</span>
+        {% endif %}
+      </div>
     </div>
 
-    {% if wallet %}
-        <div class="layout">
-            <!-- COLONNE GAUCHE : RÉSUMÉ SOLDE -->
-            <section class="card">
-                <h2 class="card-title">
-                    <span class="emoji">💰</span> Solde et synthèse
-                </h2>
+    <div class="fagni-hero-side">
+      <div>
+        <div class="fagni-eyebrow">Navigation rapide</div>
+        <h2 class="fagni-title" style="font-size:22px;color:#0f172a;">
+          {% if delivery_partner %}{{ delivery_partner.name|default:"Livreur" }}{% else %}Profil livreur{% endif %}
+        </h2>
+        <p class="fagni-subtitle" style="margin-top:8px;">
+          Revenus, retraits et historique des mouvements liés à votre activité terrain.
+        </p>
+      </div>
 
-                <div>
-                    <div class="balance-label">Solde disponible</div>
-                    <div class="balance-value">
-                        {{ wallet.balance|default:0|money }} FCFA
-                    </div>
+      <div class="fagni-btn-group">
+        <a href="{% url 'orders:driver_app' %}{% if driver %}?driver_id={{ driver.id }}{% endif %}" class="fagni-btn fagni-btn--light">
+          ← Retour App livreur
+        </a>
+        <a href="{% url 'orders:driver_missions_history' %}{% if driver %}?driver_id={{ driver.id }}{% endif %}" class="fagni-btn fagni-btn--light">
+          📜 Mes missions
+        </a>
+      </div>
+    </div>
+  </section>
 
-                    <div class="pill-info">
-                        <span class="dot"></span>
-                        <span>Montant prêt à être retiré (courses déjà comptabilisées).</span>
-                    </div>
-                </div>
+  {% if wallet %}
+    <div class="wallet-layout">
 
-                <div class="meta-grid">
-                    <div>
-                        <div class="meta-block-label">Total gains crédités</div>
-                        <div class="meta-block-value">
-                            {% if total_credited %}
-                                {{ total_credited|money }} FCFA
-                            {% else %}
-                                —
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div>
-                        <div class="meta-block-label">Total retiré</div>
-                        <div class="meta-block-value">
-                            {% if total_debited %}
-                                {{ total_debited|money }} FCFA
-                            {% else %}
-                                —
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-
-                <div style="margin-top:14px; display:flex; flex-wrap:wrap; gap:8px;">
-                    <button type="button" class="btn btn-primary btn-icon">
-                        ⬇️ Demander un retrait
-                    </button>
-                    <a href="{% url 'orders:driver_app' %}?driver_id={{ driver.id }}"
-                       class="btn btn-light btn-sm btn-icon">
-                        ← Retour à mes courses
-                    </a>
-                </div>
-
-                <p style="font-size:11px; color:#9ca3af; margin-top:8px;">
-                    Les montants sont exprimés en FCFA. Les demandes de retrait sont traitées par l’équipe FAGNI
-                    selon les conditions du contrat livreur.
-                </p>
-            </section>
-
-            <!-- COLONNE DROITE : HISTORIQUE -->
-            <section class="card">
-                <div class="history-header">
-                    <h2 class="card-title">
-                        <span class="emoji">📜</span> Historique des mouvements
-                    </h2>
-                    <div class="history-filters">
-                        <button type="button" class="chip-filter is-active" data-filter="all">
-                            Tous
-                        </button>
-                        <button type="button" class="chip-filter" data-filter="in">
-                            Entrées
-                        </button>
-                        <button type="button" class="chip-filter" data-filter="out">
-                            Sorties
-                        </button>
-                    </div>
-                </div>
-
-                {% if transactions %}
-                    <table class="history-table" id="wallet-history-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Mouvement</th>
-                                <th>Commande</th>
-                                <th style="text-align:right;">Montant</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for tx in transactions %}
-                                <tr data-direction="{{ tx.direction }}">
-                                    <td class="date">
-                                        {{ tx.created_at|date:"d/m/Y H:i" }}
-                                    </td>
-                                    <td>
-                                        {% if tx.direction == "in" %}
-                                            <span class="badge-direction-in">+ Entrée</span>
-                                        {% else %}
-                                            <span class="badge-direction-out">− Sortie</span>
-                                        {% endif %}
-                                        <br>
-                                        <small>
-                                            {% if tx.type == "topup" %}
-                                                Recharge / dépôt
-                                            {% elif tx.type == "payout" %}
-                                                Paiement / retrait
-                                            {% elif tx.type == "mlm_commission" %}
-                                                Commission MLM
-                                            {% elif tx.type == "adjustment" %}
-                                                Ajustement manuel
-                                            {% elif tx.type == "credit" %}
-                                                Crédit wallet
-                                            {% elif tx.type == "debit" %}
-                                                Débit wallet
-                                            {% else %}
-                                                {{ tx.type }}
-                                            {% endif %}
-                                            {% if tx.description %}
-                                                – {{ tx.description }}
-                                            {% endif %}
-                                        </small>
-                                    </td>
-                                    <td>
-                                        {% if tx.order_id %}
-                                            <a href="{% url 'orders:driver_order_detail' tx.order_id %}?driver_id={{ driver.id }}"
-                                               class="order-link">
-                                                {{ tx.order.code|default:tx.order_id }}
-                                            </a>
-                                        {% else %}
-                                            <span style="font-size:11px; color:#9ca3af;">
-                                                —
-                                            </span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="amount">
-                                        {% if tx.direction == "out" %}
-                                            − {{ tx.amount|money }} FCFA
-                                        {% else %}
-                                            + {{ tx.amount|money }} FCFA
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                {% else %}
-                    <p class="history-empty">
-                        Aucun mouvement encore enregistré sur votre wallet chauffeur.
-                        Vos gains apparaîtront ici au fur et à mesure de vos courses.
-                    </p>
-                {% endif %}
-            </section>
-        </div>
-    {% else %}
-        <section class="card">
-            <h2 class="card-title">
-                <span class="emoji">💳</span> Wallet non trouvé
-            </h2>
-            <p style="font-size:13px; color:#4b5563; margin-top:4px;">
-                Aucun wallet chauffeur n’est encore associé à votre profil.
-            </p>
-            <p style="font-size:12px; color:#6b7280; margin-top:4px;">
-                Si vous pensez que c’est une erreur, contactez l’équipe FAGNI ou votre référent opérationnel.
-            </p>
-            <a href="{% url 'orders:driver_app' %}?driver_id={{ driver.id }}"
-               class="btn btn-light btn-sm" style="margin-top:10px;">
-                ← Retour à mes courses
-            </a>
+      <div class="wallet-stack">
+        <section class="fagni-panel">
+          <div class="fagni-eyebrow" style="color:#64748b;">Synthèse</div>
+          <div class="wallet-summary-grid">
+            <div class="wallet-summary-item">
+              <div class="wallet-summary-label">Solde actuel</div>
+              <div class="wallet-summary-value">{{ wallet.balance|default:0|money }} FCFA</div>
+            </div>
+            <div class="wallet-summary-item">
+              <div class="wallet-summary-label">Mouvements affichés</div>
+              <div class="wallet-summary-value">{{ transactions|length|default:0 }}</div>
+            </div>
+            <div class="wallet-summary-item">
+              <div class="wallet-summary-label">Crédits</div>
+              <div class="wallet-summary-value success">{% if total_credited %}{{ total_credited|money }} FCFA{% else %}0 FCFA{% endif %}</div>
+            </div>
+            <div class="wallet-summary-item">
+              <div class="wallet-summary-label">Débits</div>
+              <div class="wallet-summary-value warning">{% if total_debited %}{{ total_debited|money }} FCFA{% else %}0 FCFA{% endif %}</div>
+            </div>
+          </div>
         </section>
-    {% endif %}
+
+        <section class="fagni-panel wallet-withdraw-box">
+          <div>
+            <div class="fagni-eyebrow" style="color:#64748b;">Retrait</div>
+            <h2 class="fagni-title" style="font-size:20px;color:#0f172a;">Demander un retrait</h2>
+            <p class="wallet-note" style="margin-top:8px;">
+              Soumettez une demande de retrait sur votre solde disponible. Le traitement est effectué selon les règles opérationnelles FAGNI.
+            </p>
+          </div>
+
+          {% if can_request_withdrawal %}
+            <form method="post" action="{% url 'wallets:driver_wallet_dashboard' %}?driver_id={{ driver.id }}" class="wallet-withdraw-form">
+              {% csrf_token %}
+              <div class="fagni-field">
+                <label for="withdraw_amount">Montant à retirer</label>
+                <input
+                  id="withdraw_amount"
+                  class="fagni-input"
+                  type="number"
+                  name="withdraw_amount"
+                  min="1"
+                  step="1"
+                  max="{{ wallet.balance|default:0 }}"
+                  placeholder="Ex. 5000"
+                  required
+                >
+              </div>
+              <button type="submit" class="fagni-btn fagni-btn--primary">⬇️ Demander un retrait</button>
+            </form>
+          {% else %}
+            <div class="wallet-empty">
+              Aucun retrait possible pour le moment. Votre solde doit être supérieur à zéro et conforme aux règles de retrait.
+            </div>
+          {% endif %}
+
+          <div class="wallet-note">
+            Les montants sont exprimés en FCFA. En cas d’écart ou d’anomalie, contactez l’équipe FAGNI.
+          </div>
+        </section>
+      </div>
+
+      <section class="fagni-panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+          <div>
+            <div class="fagni-eyebrow" style="color:#64748b;">Historique</div>
+            <h2 class="fagni-title" style="font-size:20px;color:#0f172a;">Mouvements du wallet</h2>
+          </div>
+
+          <div class="wallet-chip-group">
+            <button type="button" class="wallet-filter-btn is-active" data-filter="all">Tous</button>
+            <button type="button" class="wallet-filter-btn" data-filter="in">Entrées</button>
+            <button type="button" class="wallet-filter-btn" data-filter="out">Sorties</button>
+          </div>
+        </div>
+
+        {% if transactions %}
+          <div class="wallet-history-table-wrap">
+            <table class="wallet-history-table" id="wallet-history-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Mouvement</th>
+                  <th>Commande</th>
+                  <th style="text-align:right;">Montant</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for tx in transactions %}
+                  <tr data-direction="{{ tx.direction }}">
+                    <td class="wallet-date">{{ tx.created_at|date:"d/m/Y H:i" }}</td>
+                    <td>
+                      {% if tx.direction == "in" %}
+                        <span class="fagni-pill fagni-pill--success"><span class="dot"></span>Entrée</span>
+                      {% else %}
+                        <span class="fagni-pill fagni-pill--danger"><span class="dot"></span>Sortie</span>
+                      {% endif %}
+                      <div class="fagni-soft-note" style="margin-top:6px;">
+                        {% if tx.type == "topup" %}
+                          Recharge / dépôt
+                        {% elif tx.type == "payout" %}
+                          Paiement / retrait
+                        {% elif tx.type == "mlm_commission" %}
+                          Commission MLM
+                        {% elif tx.type == "delivery_income" %}
+                          Gain de livraison
+                        {% elif tx.type == "adjustment" %}
+                          Ajustement
+                        {% else %}
+                          {{ tx.type|default:"Mouvement wallet" }}
+                        {% endif %}
+                      </div>
+                    </td>
+                    <td>
+                      {% if tx.order %}
+                        <a class="wallet-order-link" href="{% url 'orders:driver_order_detail' order_id=tx.order.id %}?driver_id={{ driver.id }}">
+                          {{ tx.order.code|default:tx.order.id }}
+                        </a>
+                      {% else %}
+                        <span class="fagni-soft-note">—</span>
+                      {% endif %}
+                    </td>
+                    <td class="wallet-amount {% if tx.direction == 'in' %}in{% else %}out{% endif %}">
+                      {% if tx.direction == "in" %}+{% else %}-{% endif %}{{ tx.amount|money }} FCFA
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="wallet-empty">
+            Aucun mouvement trouvé pour ce wallet.
+          </div>
+        {% endif %}
+      </section>
+
+    </div>
+  {% else %}
+    <div class="fagni-panel">
+      <div class="fagni-empty">
+        <strong>💳 Wallet non trouvé</strong><br><br>
+        Aucun wallet chauffeur n’est encore associé à votre profil.<br>
+        Si vous pensez que c’est une erreur, contactez l’équipe FAGNI ou votre référent opérationnel.
+        <div style="margin-top:12px;">
+          <a href="{% url 'orders:driver_app' %}{% if selected_driver_id %}?driver_id={{ selected_driver_id }}{% endif %}" class="fagni-btn fagni-btn--light">
+            ← Retour à mes courses
+          </a>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    const filters = document.querySelectorAll(".chip-filter");
-    const rows = document.querySelectorAll("#wallet-history-table tbody tr");
+(function(){
+  const buttons = document.querySelectorAll(".wallet-filter-btn");
+  const rows = document.querySelectorAll("#wallet-history-table tbody tr");
 
-    if (!filters.length || !rows.length) {
-        return;
-    }
+  if(!buttons.length || !rows.length) return;
 
-    filters.forEach(btn => {
-        btn.addEventListener("click", function () {
-            const f = this.getAttribute("data-filter");
+  buttons.forEach(btn => {
+    btn.addEventListener("click", function(){
+      const filter = btn.getAttribute("data-filter") || "all";
 
-            filters.forEach(b => b.classList.remove("is-active"));
-            this.classList.add("is-active");
+      buttons.forEach(b => b.classList.remove("is-active"));
+      btn.classList.add("is-active");
 
-            rows.forEach(row => {
-                const dir = row.getAttribute("data-direction");
-                if (f === "all" || dir === f) {
-                    row.style.display = "";
-                } else {
-                    row.style.display = "none";
-                }
-            });
-        });
+      rows.forEach(row => {
+        const dir = row.getAttribute("data-direction") || "";
+        row.style.display = (filter === "all" || filter === dir) ? "" : "none";
+      });
     });
-});
+  });
+})();
 </script>
 {% endblock %}

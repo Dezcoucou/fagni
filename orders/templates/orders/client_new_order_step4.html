@@ -71,10 +71,17 @@
       <div class="co-section">
         <div class="co-grid2">
           <div class="co-kv">
-            <div class="co-k">Prestation</div>
+            <div class="co-k">Prestations</div>
             <div class="co-v">{{ amounts.prestation_total|floatformat:0 }} FCFA</div>
           </div>
 
+          <div class="co-kv">
+            <div class="co-k">Livraison</div>
+            <div class="co-v">{{ amounts.delivery_fee|floatformat:0 }} FCFA</div>
+          </div>
+        </div>
+
+        <div class="co-grid2" style="margin-top:10px;">
           <div class="co-kv co-kv--strong">
             <div class="co-k">Total TTC</div>
             <div class="co-v">{{ amounts.total_ttc|floatformat:0 }} FCFA</div>

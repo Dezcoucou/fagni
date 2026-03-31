@@ -1,1415 +1,971 @@
 {% extends "base.html" %}
-{% load static %}
-{% load money_filters %}
 
-{% block title %}Mes courses – App livreur FAGNI{% endblock %}
+{% block title %}FAGNI – App livreur{% endblock %}
 
-{% block extra_head %}
+{% block page_css %}
 <style>
   :root{
-    --fagni-orange:#ff7a00;
-    --fagni-blue:#0056b3;
-
-    --bg:#ffffff;
+    --fagni-orange:#f97316;
+    --fagni-blue:#2563eb;
+    --bg:#f4f7fb;
+    --card:#ffffff;
     --text:#0f172a;
     --muted:#64748b;
-
     --line:#e5e7eb;
-    --soft:#f3f4f6;
-    --shadow: 0 1px 4px rgba(15,23,42,0.05);
-    --shadow2: 0 10px 30px rgba(15,23,42,0.10);
+    --shadow:0 14px 34px rgba(15,23,42,.08);
+    --radius-xl:28px;
+    --radius-lg:22px;
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    background:
+      radial-gradient(circle at top right, rgba(37,99,235,.06), transparent 24%),
+      radial-gradient(circle at top left, rgba(249,115,22,.06), transparent 24%),
+      #f8fafc;
   }
 
   .page{
-    max-width:1050px;
+    max-width:780px;
     margin:0 auto 32px;
-    padding:12px 10px 24px;
+    padding:10px 8px 24px;
   }
 
-  .page-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-start;
-    gap:12px;
+  .dashboard-shell{
+    display:grid;
+    gap:16px;
     margin-bottom:18px;
   }
 
-  .export-actions{
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
-    justify-content:flex-end;
-  }
-  @media (max-width:960px){
-    .export-actions{ justify-content:flex-start; }
+  .dashboard-hero{
+    display:grid;
+    grid-template-columns:1.05fr .95fr;
+    gap:14px;
+    align-items:stretch;
   }
 
-  .page-title{
-    font-size:20px;
-    font-weight:800;
-    color:var(--text);
-    margin:0;
-    letter-spacing:-0.2px;
+  .dashboard-hero-main,
+  .dashboard-primary-card{
+    border-radius:var(--radius-xl);
+    padding:20px 18px;
+    border:1px solid rgba(255,255,255,.08);
+    box-shadow:0 16px 34px rgba(15,23,42,.14);
   }
 
-  .page-subtitle{
-    font-size:13px;
-    color:var(--muted);
-    margin:4px 0 0;
-    line-height:1.35;
+  .dashboard-hero-main{
+    background:linear-gradient(135deg,#0f172a 0%, #172554 48%, #1d4ed8 100%);
+    color:#fff;
   }
 
-  .page-header-right{
-    text-align:right;
+  .dashboard-primary-card{
+    background:linear-gradient(135deg,rgba(249,115,22,.96) 0%, rgba(239,68,68,.92) 100%);
+    color:#fff;
     display:flex;
     flex-direction:column;
-    gap:6px;
-    align-items:flex-end;
+    justify-content:space-between;
   }
-  .page-header-right > * { margin-top: 6px; }
-  .page-header-right > *:first-child { margin-top: 0; }
 
-  .tag-driver{
-    font-size:12px;
-    background:#eff6ff;
-    border-radius:999px;
-    padding:4px 10px;
-    color:#1d4ed8;
-    border:1px solid #bfdbfe;
+  .dashboard-eyebrow{
+    font-size:11px;
+    font-weight:900;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:rgba(255,255,255,.74);
+    margin-bottom:8px;
+  }
+
+  .dashboard-title{
+    margin:0;
+    font-size:28px;
+    line-height:1.08;
+    font-weight:900;
+    color:#fff;
+  }
+
+  .dashboard-subtitle{
+    margin:12px 0 0;
+    font-size:14px;
+    line-height:1.55;
+    color:rgba(255,255,255,.84);
+  }
+
+  .dashboard-status-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:18px;
+  }
+
+  .dashboard-status-pill,
+  .dashboard-period-pill{
     display:inline-flex;
     align-items:center;
-    gap:6px;
+    gap:8px;
+    padding:9px 12px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:900;
+    border:1px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.10);
+    color:#fff;
   }
 
-  .columns{
+  .dashboard-status-dot{
+    width:8px;
+    height:8px;
+    border-radius:999px;
+    background:#22c55e;
+    display:inline-block;
+    box-shadow:0 0 0 4px rgba(34,197,94,.18);
+  }
+
+  .dashboard-primary-label{
+    font-size:12px;
+    font-weight:900;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:rgba(255,255,255,.84);
+  }
+
+  .dashboard-primary-number{
+    font-size:18px;
+    line-height:1.2;
+    font-weight:900;
+    margin-top:10px;
+    color:#fff;
+  }
+
+  .dashboard-primary-helper{
+    margin-top:8px;
+    font-size:13px;
+    line-height:1.45;
+    color:rgba(255,255,255,.88);
+  }
+
+  .dashboard-main-cta{
+    margin-top:16px;
+    min-height:48px;
+    font-size:14px;
+    padding:12px 16px;
+    background:#fff !important;
+    color:#0f172a !important;
+    box-shadow:0 10px 24px rgba(15,23,42,.16);
+  }
+
+  .dashboard-kpis{
     display:grid;
-    grid-template-columns:repeat(3, minmax(0,1fr));
+    grid-template-columns:repeat(3,minmax(0,1fr));
     gap:12px;
   }
 
-  .column-title{
-    font-size:13px;
-    font-weight:800;
-    margin:0 0 6px;
-    display:flex;
-    align-items:center;
-    gap:8px;
-    color:#111827;
-    letter-spacing:-0.1px;
+  .dashboard-kpi-card{
+    background:linear-gradient(180deg,#ffffff 0%, #fbfcfe 100%);
+    border:1px solid #e8eef5;
+    border-radius:22px;
+    padding:16px 14px;
+    box-shadow:0 10px 24px rgba(15,23,42,.06);
   }
 
-  .column-title span.emoji{ font-size:16px; }
+  .dashboard-kpi-card-income{
+    border-color:rgba(34,197,94,.18);
+    background:linear-gradient(180deg,#f7fff9 0%, #effdf4 100%);
+  }
 
-  .col-badge{
-    margin-left:auto;
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
-    padding:3px 9px;
-    border-radius:999px;
-    background:#f3f4f6;
-    color:#374151;
+  .dashboard-kpi-card-warning{
+    border-color:rgba(249,115,22,.22);
+    background:linear-gradient(180deg,#fffaf5 0%, #fff7ed 100%);
+  }
+
+  .dashboard-kpi-card-update{
+    border-color:rgba(59,130,246,.16);
+    background:linear-gradient(180deg,#f8fbff 0%, #eef5ff 100%);
+  }
+
+  .dashboard-kpi-label{
     font-size:11px;
-    border:1px solid #e5e7eb;
     font-weight:900;
+    text-transform:uppercase;
+    letter-spacing:.07em;
+    color:#64748b;
+    margin-bottom:8px;
   }
 
-  .column-helper{
-    font-size:11px;
-    color:#6b7280;
+  .dashboard-kpi-value{
+    font-size:24px;
+    line-height:1.1;
+    font-weight:900;
+    color:#0f172a;
+  }
+
+  .dashboard-kpi-small{
+    font-size:16px;
+    line-height:1.35;
+  }
+
+  .dashboard-kpi-meta{
+    margin-top:7px;
+    font-size:12px;
+    color:#64748b;
+    line-height:1.45;
+  }
+
+  .missions-block{
+    margin-top:18px;
+  }
+
+  .missions-title{
+    font-size:20px;
+    font-weight:1000;
+    color:#0f172a;
     margin:0 0 10px;
   }
 
-  /* =============================
-     CARTE COURSE – FINITION UI
-     ============================= */
-  .card-course{
-    background:var(--bg);
-    border-radius:16px;
-    padding:10px 10px;
-    margin-bottom:8px;
-    border:1px solid var(--line);
-    box-shadow:var(--shadow);
+  .missions-subtitle{
+    font-size:12px;
+    color:#64748b;
+    margin:0 0 14px;
+    line-height:1.45;
+  }
+
+  .filters-bar{
     display:flex;
-    flex-direction:column;
+    flex-wrap:wrap;
     gap:8px;
+    margin:0 0 14px;
   }
 
-  .card-course.is-clickable{
+  .filter-chip{
+    appearance:none;
+    border:1px solid #e5e7eb;
+    background:#fff;
+    color:#334155;
+    border-radius:999px;
+    min-height:36px;
+    padding:0 12px;
+    font-size:12px;
+    font-weight:900;
     cursor:pointer;
-    transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
-  }
-  .card-course.is-clickable:hover{
-    transform: translateY(-1px);
-    box-shadow: var(--shadow2);
-    border-color: rgba(0,86,179,0.18);
-  }
-  .card-course.is-clickable:active{
-    transform: translateY(0px);
-    box-shadow: var(--shadow);
-  }
-  .card-course:focus-within{
-    outline: 2px solid rgba(0,86,179,0.25);
-    outline-offset: 2px;
   }
 
-  .course-header{
+  .filter-chip.active{
+    background:linear-gradient(90deg,var(--fagni-orange),var(--fagni-blue));
+    color:#fff;
+    border-color:transparent;
+  }
+
+  .card-stack{
+    display:grid;
+    gap:12px;
+  }
+
+  .card-course{
+    border:1px solid #e6edf5;
+    border-radius:22px;
+    background:linear-gradient(180deg,#ffffff 0%, #fbfdff 100%);
+    box-shadow:0 12px 28px rgba(15,23,42,.06);
+    overflow:hidden;
+    padding:14px;
+  }
+
+  .course-top{
     display:flex;
     justify-content:space-between;
     align-items:flex-start;
-    gap:8px;
+    gap:10px;
+    margin-bottom:8px;
+  }
+
+  .course-meta{
+    min-width:0;
   }
 
   .course-code{
-    font-size:13px;
-    font-weight:800;
-    color:#111827;
-    letter-spacing:-0.1px;
+    font-size:11px;
+    font-weight:900;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:#2563eb;
+    line-height:1.25;
   }
 
   .course-date{
+    margin-top:4px;
     font-size:11px;
-    color:#9ca3af;
-    margin-top:2px;
+    color:#94a3b8;
+    line-height:1.35;
   }
 
-  .status-pill{
-    padding:4px 10px;
-    border-radius:999px;
-    font-size:11px;
+  .course-client{
+    font-size:16px;
+    font-weight:900;
+    color:#0f172a;
+    line-height:1.3;
+    margin-bottom:6px;
+    word-break:break-word;
+  }
+
+  .course-address{
+    font-size:13px;
+    color:#334155;
+    line-height:1.45;
+    margin-bottom:10px;
+    word-break:break-word;
+  }
+
+  .course-middle{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    align-items:center;
+    margin-bottom:12px;
+  }
+
+  .status-pill,
+  .income-pill,
+  .price-pill{
     display:inline-flex;
     align-items:center;
     gap:6px;
-    white-space:nowrap;
+    min-height:28px;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:11px;
+    font-weight:900;
     border:1px solid transparent;
-    font-weight:700;
+    white-space:nowrap;
   }
-  .status-pill .dot{
-    width:7px;height:7px;border-radius:999px;display:inline-block;
+
+  .status-pill .dot,
+  .income-pill .dot,
+  .price-pill .dot{
+    width:7px;
+    height:7px;
+    border-radius:999px;
+    display:inline-block;
   }
 
   .status-pending{
-    background:#fffbeb;
-    color:#92400e;
-    border-color:#fde68a;
+    background:#fff7ed;
+    color:#9a3412;
+    border-color:#fed7aa;
   }
-  .status-pending .dot{ background:#f59e0b; }
+  .status-pending .dot{ background:#f97316; }
 
-  /* ✅ assigned = “prête à démarrer” (bleu) */
   .status-assigned{
-    background:#e0f2fe;
-    color:#075985;
-    border-color:#bae6fd;
-  }
-  .status-assigned .dot{ background:#0284c7; }
-
-  .status-in_progress{
-    background:#dbeafe;
+    background:#eff6ff;
     color:#1d4ed8;
     border-color:#bfdbfe;
   }
-  .status-in_progress .dot{ background:#2563eb; }
+  .status-assigned .dot{ background:#2563eb; }
 
-  .status-done{
-    background:#ecfdf3;
-    color:#166534;
-    border-color:#bbf7d0;
-  }
-  .status-done .dot{ background:#16a34a; }
-
-  /* Paiement */
-  .pay-pill{
-    padding:3px 9px;
-    border-radius:999px;
-    font-size:11px;
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
-    border:1px solid transparent;
-    font-weight:800;
-    margin-top:6px;
-    justify-content:flex-end;
-  }
-  .pay-pill .dot{ width:7px;height:7px;border-radius:999px;display:inline-block; }
-
-  /* =============================
-     BADGE REVENU (PAYÉ / ESTIMÉ)
-     ============================= */
-  .income-pill{
-    padding:3px 9px;
-    border-radius:999px;
-    font-size:11px;
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
-    border:1px solid transparent;
-    font-weight:900;
-  }
-
-  .income-pill .dot{ width:7px;height:7px;border-radius:999px;display:inline-block; }
-
-  .income-paid{
-    background:#ecfdf3;
-    color:#166534;
-    border-color:#bbf7d0;
-  }
-  .income-paid .dot{ background:#16a34a; }
-
-  .income-estimated{
+  .status-in_progress{
     background:#eef2ff;
-    color:#3730a3;
+    color:#4338ca;
     border-color:#c7d2fe;
   }
-  .income-estimated .dot{ background:#6366f1; }
+  .status-in_progress .dot{ background:#4f46e5; }
 
-  .income-partial{
-    background:#fff7ed;
-    color:#9a3412;
-    border-color:#fed7aa;
-  }
-  .income-partial .dot{ background:#f97316; }
-
-  .pay-paid{
-    background:#ecfdf3;
+  .status-done{
+    background:#ecfdf5;
     color:#166534;
     border-color:#bbf7d0;
   }
-  .pay-paid .dot{ background:#16a34a; }
+  .status-done .dot{ background:#22c55e; }
 
-  .pay-due{
+  .income-paid{
+    background:#ecfdf5;
+    color:#166534;
+    border-color:#bbf7d0;
+  }
+  .income-paid .dot{ background:#22c55e; }
+
+  .income-estimated{
+    background:#eff6ff;
+    color:#1d4ed8;
+    border-color:#bfdbfe;
+  }
+  .income-estimated .dot{ background:#2563eb; }
+
+  .income-missing,
+  .price-missing{
     background:#fff7ed;
     color:#9a3412;
     border-color:#fed7aa;
   }
-  .pay-due .dot{ background:#f97316; }
+  .income-missing .dot,
+  .price-missing .dot{ background:#f97316; }
 
-  .pay-calc{
-    background:#f3f4f6;
-    color:#374151;
-    border-color:#e5e7eb;
+  .price-pill{
+    background:#f8fafc;
+    color:#334155;
+    border-color:#e2e8f0;
   }
-  .pay-calc .dot{ background:#6b7280; }
-
-  .course-body{
-    font-size:12px;
-    color:#374151;
-  }
-
-  .course-line{
-    display:flex;
-    justify-content:space-between;
-    align-items:baseline;
-    margin-top:2px;
-    gap:10px;
-  }
-
-  .course-label{
-    font-size:11px;
-    color:#6b7280;
-    white-space:nowrap;
-  }
-
-  .course-value{
-    font-size:12px;
-    color:#111827;
-    font-weight:650;
-    white-space:nowrap;
-  }
-
-  .amount-client{ font-weight:850; }
-  .amount-driver{ color:#166534; font-weight:850; }
-  .amount-due{ color:#9a3412; font-weight:900; }
+  .price-pill .dot{ background:#64748b; }
 
   .course-footer{
     display:flex;
-    justify-content:space-between;
+    justify-content:flex-end;
     align-items:center;
-    margin-top:6px;
-    gap:8px;
+    gap:12px;
     flex-wrap:wrap;
   }
 
-  .course-tags{
-    display:flex;
-    flex-wrap:wrap;
-    gap:6px;
-  }
-
-  .tag-small{
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
-    padding:3px 9px;
-    border-radius:999px;
-    background:#f3f4f6;
-    color:#4b5563;
-    font-size:11px;
-    border:1px solid #e5e7eb;
-  }
-
-
-    /* Tags premium */
-    .tag-privacy{
-      background:#eef2ff;
-      border-color:#c7d2fe;
-      color:#3730a3;
-      font-weight:900;
-    }
-    .tag-weigh{
-      background:#f0fdf4;
-      border-color:#bbf7d0;
-      color:#166534;
-      font-weight:850;
-    }
-    .tag-evidence{
-      background:#fff7ed;
-      border-color:#fed7aa;
-      color:#9a3412;
-      font-weight:850;
-    }
-
-  /* =============================
-     BOUTONS – UNIFORMISATION
-     ============================= */
   .btn{
     display:inline-flex;
     align-items:center;
     justify-content:center;
-    padding:7px 12px;
+    min-height:40px;
+    padding:8px 16px;
     border-radius:999px;
     font-size:12px;
     border:1px solid transparent;
     cursor:pointer;
     text-decoration:none;
     white-space:nowrap;
-    font-weight:800;
-    transition: transform .12s ease, opacity .12s ease, background .12s ease, border-color .12s ease;
+    font-weight:900;
+    transition:transform .12s ease, opacity .12s ease, background .12s ease, border-color .12s ease, box-shadow .12s ease;
+    box-shadow:0 4px 12px rgba(15,23,42,.06);
   }
-  .btn:active{ transform: translateY(1px); }
-
-  .btn-light{
-    background:#fff;
-    border:1px solid #e5e7eb;
-    color:#374151;
-  }
-  .btn-light:hover{ background:#f9fafb; }
 
   .btn-primary{
     background:linear-gradient(90deg,var(--fagni-orange),var(--fagni-blue));
     color:#fff;
     border:none;
   }
-  .btn-primary:hover{ opacity:0.97; }
 
   .empty{
     font-size:12px;
-    color:#9ca3af;
-    padding:6px 2px;
+    color:#94a3b8;
+    padding:10px 2px;
+    text-align:center;
   }
 
-  @media (max-width:960px){
-    .columns{ grid-template-columns:1fr; }
-    .page-header{ flex-direction:column; align-items:stretch; }
-    .page-header-right{ align-items:flex-start; text-align:left; }
-  }
-
-  /* Wallet */
-  .btn-wallet-link{
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
-    padding:7px 12px;
-    border-radius:999px;
-    border:1px solid #e5e7eb;
-    background:#ffffff;
-    font-size:13px;
-    color:#374151;
-    text-decoration:none;
-    box-shadow:0 1px 3px rgba(15,23,42,0.08);
-    cursor:pointer;
-    font-weight:800;
-  }
-  .btn-wallet-link:hover{ background:#f9fafb; }
-
-  /* KPI LIVE */
-  .kpi-header{ align-items:flex-start !important; gap:10px; }
-
-  .kpi-meta{
+  .pager{
+    margin-top:14px;
     display:flex;
-    flex-direction:column;
-    align-items:flex-end;
-    gap:6px;
-    text-align:right;
-  }
-
-  .kpi-pill{
-    display:inline-flex;
     align-items:center;
-    padding:4px 10px;
-    border-radius:999px;
-    border:1px solid #e5e7eb;
-    background:#f9fafb;
-    font-size:11px;
-    color:#374151;
-    font-weight:800;
-  }
-
-  .kpi-sub{
-    font-size:11px;
-    color:#6b7280;
-  }
-
-  .kpi-grid{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:10px 14px;
-  }
-
-  .kpi-item{
-    display:flex;
     justify-content:space-between;
-    align-items:baseline;
     gap:10px;
-    padding:10px 12px;
-    border:1px solid #eef2f7;
-    border-radius:14px;
-    background:#ffffff;
+    flex-wrap:wrap;
   }
 
-  .kpi-wide{ grid-column:1 / -1; }
+  .pager-info{
+    font-size:12px;
+    color:#64748b;
+    font-weight:900;
+  }
 
-  .kpi-pulse{ animation:kpiPulse 280ms ease-out; }
-  @keyframes kpiPulse{
-    0%{ transform:translateY(0); opacity:0.65; }
-    100%{ transform:translateY(0); opacity:1; }
+  .pager-actions{
+    display:flex;
+    gap:8px;
+  }
+
+  .pager-btn{
+    min-width:100px;
+    min-height:40px;
+    border-radius:999px;
+    border:1px solid #e5e7eb;
+    background:#fff;
+    color:#0f172a;
+    font-weight:900;
+    cursor:pointer;
+  }
+
+  .pager-btn[disabled]{
+    opacity:.45;
+    cursor:not-allowed;
+  }
+
+  @media (max-width:760px){
+    .dashboard-hero{
+      grid-template-columns:1fr;
+    }
+
+    .dashboard-kpis{
+      grid-template-columns:1fr 1fr;
+    }
+  }
+
+  @media (max-width:640px){
+    .page{ padding:8px 4px 24px; }
+    .dashboard-title{ font-size:24px; }
+    .dashboard-kpis{ grid-template-columns:1fr; }
+    .dashboard-hero-main,
+    .dashboard-primary-card,
+    .dashboard-kpi-card,
+    .card-course{ border-radius:18px; }
+
+    .course-top,
+    .course-footer{
+      flex-direction:column;
+      align-items:flex-start;
+    }
+
+    .course-footer .btn{
+      width:100%;
+    }
   }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="page">
-  <div id="click-toast" style="position:sticky;top:8px;z-index:9999;background:#111827;color:#fff;padding:8px 10px;border-radius:12px;font-size:12px;display:none;margin-bottom:10px;"></div>
+  <div class="dashboard-shell">
 
-  <div class="page-header">
+    <section class="dashboard-hero">
+      <div class="dashboard-hero-main">
+        <div class="dashboard-eyebrow">FAGNI • App livreur</div>
+        <h1 class="dashboard-title">
+          {% if connected_driver %}{{ connected_driver.name|default:"Livreur" }}{% else %}Livreur{% endif %}
+        </h1>
+        <p class="dashboard-subtitle">
+          Listing terrain pour accéder vite à la bonne course, sans noyer l’écran.
+        </p>
 
-    <div>
-      <h1 class="page-title">Mes courses</h1>
-      <p class="page-subtitle">
-        Vue livreur : suivez vos courses en attente, en cours et terminées.
-        Ouvrez une course pour démarrer, terminer ou annuler l’itinéraire.
-      </p>
-    </div>
-
-    <div class="card-course kpi-card" style="margin-bottom:12px;">
-      <div class="course-header kpi-header">
-        <div class="course-code">📊 Mes stats (live)</div>
-        <div class="kpi-meta">
-          <span class="kpi-pill" id="kpi-updated">Chargement…</span>
-          <span class="kpi-sub" id="kpi-source">—</span>
+        <div class="dashboard-status-row">
+          <span class="dashboard-status-pill">
+            <span class="dashboard-status-dot"></span>
+            {% if connected_driver %}Connecté{% else %}Non connecté{% endif %}
+          </span>
+          <span class="dashboard-period-pill">Aujourd’hui</span>
         </div>
       </div>
 
-      <div class="course-body kpi-grid">
-        <div class="kpi-item">
-          <span class="course-label">En attente</span>
-          <span class="course-value" id="kpi-pending">—</span>
+      <div class="dashboard-primary-card">
+        <div>
+          <div class="dashboard-primary-label">Mission du moment</div>
+          <div class="dashboard-primary-number" id="hero-focus-title">Chargement…</div>
+          <div class="dashboard-primary-helper" id="hero-focus-sub">
+            Lecture de la mission prioritaire.
+          </div>
         </div>
 
-        <div class="kpi-item">
-          <span class="course-label">En cours</span>
-          <span class="course-value" id="kpi-in-progress">—</span>
-        </div>
-
-        <div class="kpi-item">
-          <span class="course-label">Terminées</span>
-          <span class="course-value" id="kpi-done">—</span>
-        </div>
-
-        <div class="kpi-item">
-          <span class="course-label">Distance totale</span>
-          <span class="course-value" id="kpi-distance">—</span>
-        </div>
-
-        <div class="kpi-item kpi-wide">
-          <span class="course-label">Mes gains (total)</span>
-          <span class="course-value amount-driver" id="kpi-income">—</span>
-        </div>
+        <a href="#mission-list" class="btn btn-primary dashboard-main-cta" id="hero-focus-cta">
+          Voir missions
+        </a>
       </div>
-    </div>
+    </section>
 
-    <div class="page-header-right">
+    <section class="dashboard-kpis">
+      <div class="dashboard-kpi-card">
+        <div class="dashboard-kpi-label">À accepter</div>
+        <div class="dashboard-kpi-value" id="kpi-accept">—</div>
+        <div class="dashboard-kpi-meta">Courses non encore acceptées</div>
+      </div>
 
-      {% if connected_driver %}
-        <a href="{% url 'orders:driver_missions_history' %}?driver_id={{ connected_driver.id }}"
-           class="btn-wallet-link">
-          📜 Mes missions
-        </a>
+      <div class="dashboard-kpi-card">
+        <div class="dashboard-kpi-label">À démarrer</div>
+        <div class="dashboard-kpi-value" id="kpi-start">—</div>
+        <div class="dashboard-kpi-meta">Courses acceptées prêtes au départ</div>
+      </div>
 
-        <a href="{% url 'wallets:driver_wallet_dashboard' %}?driver_id={{ connected_driver.id }}"
-           class="btn-wallet-link">
-          💰 Mon wallet livreur
-        </a>
-      {% endif %}
+      <div class="dashboard-kpi-card">
+        <div class="dashboard-kpi-label">En cours</div>
+        <div class="dashboard-kpi-value" id="kpi-in-progress">—</div>
+        <div class="dashboard-kpi-meta">Missions actives</div>
+      </div>
 
-      {% if request.user.is_staff %}
-        <div class="export-actions">
-          <a href="{% url 'orders:driver_app_export_csv' %}" class="btn btn-light js-export">
-            ⬇️ Export CSV
-          </a>
-          <a href="{% url 'orders:driver_app_export_xlsx' %}" class="btn btn-primary js-export">
-            ⬇️ Export XLSX
-          </a>
-        </div>
-      {% endif %}
+      <div class="dashboard-kpi-card dashboard-kpi-card-income">
+        <div class="dashboard-kpi-label">Gain visible</div>
+        <div class="dashboard-kpi-value dashboard-kpi-small" id="kpi-driver-visible">—</div>
+        <div class="dashboard-kpi-meta">Somme visible sur la liste</div>
+      </div>
 
-      {% if connected_driver %}
-        <span class="tag-driver">
-          🚴‍♂️ Livreur connecté :
-          <strong>{{ connected_driver.name|default:"Profil livreur" }}</strong>
-        </span>
-      {% else %}
-        <span class="text-muted" style="font-size:12px;">
-          Connecte-toi en tant que livreur pour voir tes courses et ton wallet.
-        </span>
-      {% endif %}
+      <div class="dashboard-kpi-card dashboard-kpi-card-warning">
+        <div class="dashboard-kpi-label">À chiffrer</div>
+        <div class="dashboard-kpi-value" id="kpi-unpriced">—</div>
+        <div class="dashboard-kpi-meta">Client ou gain livreur manquant</div>
+      </div>
 
-    </div>
+      <div class="dashboard-kpi-card dashboard-kpi-card-update">
+        <div class="dashboard-kpi-label">Mise à jour</div>
+        <div class="dashboard-kpi-value dashboard-kpi-small" id="kpi-updated">Chargement…</div>
+        <div class="dashboard-kpi-meta" id="kpi-source">Live</div>
+      </div>
+    </section>
 
   </div>
 
-  <div class="columns">
+  <section class="missions-block">
+    <h2 class="missions-title">🚚 Mes missions</h2>
+    <p class="missions-subtitle">Page listing + accès. La mission du moment est traitée ailleurs, ici on trie et on ouvre vite.</p>
 
-    <div class="column" data-status="pending">
-      <h2 class="column-title">
-        <span class="emoji">⏳</span> En attente
-        <span class="col-badge" id="badge-pending">0</span>
-      </h2>
-      <p class="column-helper">Courses à venir ou à prendre en charge.</p>
-      <div id="pending-list">
-        <p class="empty">Chargement…</p>
-      </div>
+    <div class="filters-bar" id="filters-bar">
+      <button class="filter-chip active" data-filter="all" type="button">Toutes</button>
+      <button class="filter-chip" data-filter="accept" type="button">À accepter</button>
+      <button class="filter-chip" data-filter="start" type="button">À démarrer</button>
+      <button class="filter-chip" data-filter="doing" type="button">En cours</button>
+      <button class="filter-chip" data-filter="done" type="button">Terminées</button>
+      <button class="filter-chip" data-filter="pricing" type="button">À chiffrer</button>
     </div>
 
-    <div class="column" data-status="in_progress">
-      <h2 class="column-title">
-        <span class="emoji">🚚</span> En cours
-        <span class="col-badge" id="badge-in-progress">0</span>
-      </h2>
-      <p class="column-helper">Courses actuellement en exécution.</p>
-      <div id="in-progress-list">
-        <p class="empty">Chargement…</p>
-      </div>
+    <div id="mission-list" class="card-stack">
+      <p class="empty">Chargement…</p>
     </div>
 
-    <div class="column" data-status="done">
-      <h2 class="column-title">
-        <span class="emoji">✅</span> Terminées
-        <span class="col-badge" id="badge-done">0</span>
-      </h2>
-      <p class="column-helper">Historique récent des courses achevées.</p>
-      <div id="done-list">
-        <p class="empty">Chargement…</p>
+    <div class="pager">
+      <div id="pager-info" class="pager-info"></div>
+      <div class="pager-actions">
+        <button id="prev-page" class="pager-btn" type="button">← Précédent</button>
+        <button id="next-page" class="pager-btn" type="button">Suivant →</button>
       </div>
     </div>
-
-  </div>
+  </section>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
 (function(){
   const DATA_URL = "/orders/driver-app/data/" + (window.location.search || "");
-  const refreshMs = 8000;
+  const PAGE_SIZE = 3;
+
+  let currentPage = 1;
+  let allOrders = [];
+  let filteredOrders = [];
+  let activeFilter = "all";
 
   const els = {
-    kpiPending: document.getElementById("kpi-pending"),
+    kpiAccept: document.getElementById("kpi-accept"),
+    kpiStart: document.getElementById("kpi-start"),
     kpiInProgress: document.getElementById("kpi-in-progress"),
-    kpiDone: document.getElementById("kpi-done"),
-    kpiDistance: document.getElementById("kpi-distance"),
-    kpiIncome: document.getElementById("kpi-income"),
+    kpiDriverVisible: document.getElementById("kpi-driver-visible"),
+    kpiUnpriced: document.getElementById("kpi-unpriced"),
     kpiSource: document.getElementById("kpi-source"),
     kpiUpdated: document.getElementById("kpi-updated"),
 
-    badgePending: document.getElementById("badge-pending"),
-    badgeInProgress: document.getElementById("badge-in-progress"),
-    badgeDone: document.getElementById("badge-done"),
+    heroFocusTitle: document.getElementById("hero-focus-title"),
+    heroFocusSub: document.getElementById("hero-focus-sub"),
+    heroFocusCta: document.getElementById("hero-focus-cta"),
 
-    listPending: document.getElementById("pending-list"),
-    listInProgress: document.getElementById("in-progress-list"),
-    listDone: document.getElementById("done-list"),
+    missionList: document.getElementById("mission-list"),
+    pagerInfo: document.getElementById("pager-info"),
+    prevPage: document.getElementById("prev-page"),
+    nextPage: document.getElementById("next-page"),
+    filtersBar: document.getElementById("filters-bar"),
   };
 
-  // ============================================================
-  //  AUTO-HEAL COLUMNS (le DOM "strip" class/attrs -> on répare)
-  // ============================================================
-  function repairColumns(){
-    const cols = document.querySelector(".columns");
-    if(!cols) return false;
-
-    const kids = [...cols.children].filter(n => n && n.nodeType === 1);
-
-    const map = [
-      { status:"pending",     sel:"#pending-list" },
-      { status:"in_progress", sel:"#in-progress-list" },
-      { status:"done",        sel:"#done-list" },
-    ];
-
-    let changed = false;
-
-    kids.forEach((d, i) => {
-      // Trouve le bon statut selon le contenu réel
-      const found = map.find(x => d.querySelector(x.sel)) || map[i];
-      const wantStatus = found?.status || null;
-
-      // Réapplique class .column si absent
-      if(!d.classList.contains("column")){
-        d.classList.add("column");
-        changed = true;
-      }
-
-      // Réapplique data-status si absent / différent
-      if(wantStatus && d.getAttribute("data-status") !== wantStatus){
-        d.setAttribute("data-status", wantStatus);
-        changed = true;
-      }
-    });
-
-    return changed;
-  }
-
-  function ensureAnimStyle(){
-    if (document.getElementById("driver-app-anim-style")) return;
-    const s = document.createElement("style");
-    s.id = "driver-app-anim-style";
-    s.textContent = `
-      .card-course { will-change: transform, opacity; }
-      .card-enter { opacity: 0; transform: translateY(8px); }
-      .card-enter-active { opacity: 1; transform: translateY(0); transition: opacity 180ms ease, transform 180ms ease; }
-      .card-exit { opacity: 1; transform: translateY(0); }
-      .card-exit-active { opacity: 0; transform: translateY(-6px); transition: opacity 160ms ease, transform 160ms ease; }
-    `;
-    document.head.appendChild(s);
-  }
-  ensureAnimStyle();
-
-  function escapeHtml(s){
-    return String(s ?? "").replace(/[&<>"'`=\/]/g, function (c) {
-      return ({
-        "&":"&amp;",
-        "<":"&lt;",
-        ">":"&gt;",
-        '"':"&quot;",
-        "'":"&#39;",
-        "`":"&#x60;",
-        "=":"&#x3D;",
-        "/":"&#x2F;"
-      })[c];
-    });
-  }
-
-  function money(n){
-    try { return new Intl.NumberFormat("fr-FR").format(Number(n || 0)); }
-    catch(e){ return String(n || 0); }
-  }
-
-  function timeNow(){
-    const d = new Date();
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mm = String(d.getMinutes()).padStart(2, "0");
-    const ss = String(d.getSeconds()).padStart(2, "0");
-    return `${hh}:${mm}:${ss}`;
-  }
-
-  
-  function driverOrderDetailUrl(orderId){
-    if(!orderId) return "#";
-    return withQuery(`/orders/driver/orders/${orderId}/`);
-  }
-
-function withQuery(url){
-    const currentQs = new URLSearchParams(window.location.search || "");
-    const currentDriverId = currentQs.get("driver_id") || "";
-
-    const u = new URL(url, window.location.origin);
-    const targetQs = new URLSearchParams(u.search || "");
-
-    for (const [k, v] of currentQs.entries()){
-      if (k === "driver_id") continue;
-      targetQs.set(k, v);
-    }
-
-    if (currentDriverId){
-      targetQs.set("driver_id", currentDriverId);
-    } else {
-      targetQs.delete("driver_id");
-    }
-
-    const qsStr = targetQs.toString();
-    u.search = qsStr ? `?${qsStr}` : "";
-    return u.pathname + u.search + u.hash;
-  }
-
-  function pulse(el){
-    if(!el) return;
-    el.classList.remove("kpi-pulse");
-    void el.offsetWidth;
-    el.classList.add("kpi-pulse");
-  }
-
-  function setText(el, value){
-    if(!el) return;
-    el.textContent = value;
-    pulse(el);
-  }
-
-  function statusPill(status){
-    if(status === "pending"){
-      return `<span class="status-pill status-pending"><span class="dot"></span>En attente</span>`;
-    }
-    if(status === "assigned"){
-      return `<span class="status-pill status-assigned"><span class="dot"></span>Assignée</span>`;
-    }
-    if(status === "in_progress"){
-      return `<span class="status-pill status-in_progress"><span class="dot"></span>En cours</span>`;
-    }
-    if(status === "done"){
-      return `<span class="status-pill status-done"><span class="dot"></span>Terminée</span>`;
-    }
-    return `<span class="status-pill"><span class="dot"></span>${escapeHtml(status || "—")}</span>`;
-  }
-
-  function payPill(label){
-    if(label === "PAYÉ"){
-      return `<span class="pay-pill pay-paid"><span class="dot"></span>PAYÉ</span>`;
-    }
-    if(label === "PARTIEL"){
-      return `<span class="pay-pill pay-due"><span class="dot"></span>PARTIEL</span>`;
-    }
-    if(label === "À CALCULER"){
-      return `<span class="pay-pill pay-calc"><span class="dot"></span>À CALCULER</span>`;
-    }
-    return `<span class="pay-pill pay-due"><span class="dot"></span>À ENCAISSER</span>`;
-  }
-    // ✅ revenu livreur: compatible cartes (driver_*) et KPI (total_*)
-    function incomeParts(obj){
-      const hasTotal = (obj && (obj.total_driver_income_paid !== undefined || obj.total_driver_income_potential !== undefined));
-      const paidRaw = hasTotal ? (obj.total_driver_income_paid ?? 0) : (obj.driver_income_paid ?? 0);
-      const potRaw  = hasTotal ? (obj.total_driver_income_potential ?? 0) : (obj.driver_income_potential ?? 0);
-
-      const paid = Math.max(0, Number(paidRaw || 0));
-      const pot  = Math.max(0, Number(potRaw  || 0));
-
-      const display = (paid > 0)
-        ? paid
-        : (hasTotal ? Number(obj.total_driver_income_display ?? obj.total_driver_income ?? 0) : pot);
-
-      return { paid, pot, display };
-    }
-
-
-
-  function incomePill(o){
-      const inc = incomeParts(o || {});
-      const paid = inc.paid;
-      const pot  = inc.pot;
-// cas 1: payé partiel
-    if (paid > 0 && pot > 0 && paid < pot){
-      const tip = `PAYÉ PARTIEL (wallet) • payé=${money(paid)} • potentiel=${money(pot)}`;
-      return `<span class="income-pill income-partial" title="${escapeHtml(tip)}"><span class="dot"></span>PARTIEL</span>`;
-    }
-
-    // cas 2: payé (wallet)
-    if (paid > 0){
-      const tip = `PAYÉ (wallet) • payé=${money(paid)} • potentiel=${money(pot)}`;
-      return `<span class="income-pill income-paid" title="${escapeHtml(tip)}"><span class="dot"></span>PAYÉ</span>`;
-    }
-
-    // cas 3: estimé (legs)
-    const tip = `ESTIMÉ (legs) • potentiel=${money(pot)} • payé=${money(paid)}`;
-    return `<span class="income-pill income-estimated" title="${escapeHtml(tip)}"><span class="dot"></span>ESTIMÉ</span>`;
-  }
-
-  function ctaForStatus(status){
-    if(status === "pending") return { label: "Démarrer →", cls: "btn-primary" };
-    if(status === "assigned") return { label: "Démarrer →", cls: "btn-primary" };
-    if(status === "in_progress") return { label: "Continuer →", cls: "btn-primary" };
-    return { label: "Voir le détail →", cls: "btn-light" };
-  }
-
-  function pickNumber(o, keys){
-    for(const k of keys){
-      const v = o?.[k];
-      if (v === null || v === undefined) continue;
-      const n = Number(v);
-      if (Number.isFinite(n)) return n;
+  function firstValue() {
+    for (const v of arguments) {
+      if (v !== undefined && v !== null && v !== "") return v;
     }
     return null;
   }
 
-  function computeTotalClient(o){
-    const direct = pickNumber(o, ["total_client_ttc","total_client_display","total_client","total_ttc","total"]);
-    if (direct !== null && direct > 0) return direct;
-
-    const services = pickNumber(o, [
-      "services_total_ttc","items_total_ttc","subtotal_ttc","subtotal_services_ttc",
-      "subtotal","sub_total","services_subtotal","items_subtotal"
-    ]) || 0;
-
-    const delivery = pickNumber(o, [
-      "delivery_fee_client","delivery_fee","delivery_total","shipping_fee","transport_fee"
-    ]) || 0;
-
-    const serviceFee = pickNumber(o, [
-      "service_fee","service_fee_client","platform_fee","fagni_fee"
-    ]) || 0;
-
-    const tva = pickNumber(o, [
-      "tva","vat","tax","tax_amount"
-    ]) || 0;
-
-    const total = Number(services) + Number(delivery) + Number(serviceFee) + Number(tva);
-    return (Number.isFinite(total) && total > 0) ? total : 0;
+  function asNumber(v){
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
   }
 
-  function cardHTML(o){
-    const isCalc = (o.pay_label === "À CALCULER");
+  function fmtMoney(v){
+    const n = asNumber(v);
+    return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
+  }
 
-    const totalNum = pickNumber(o, ["total_client_ttc","total_client_display","total_client"]) ?? computeTotalClient(o);
-    const totalSafe = (totalNum === null || isNaN(totalNum) || totalNum <= 0) ? null : totalNum;
+  function getClientAmount(o){
+    return firstValue(
+      o.total_client_ttc,
+      o.total_ttc_client,
+      o.total_amount,
+      o.total,
+      o.client_amount,
+      o.amount_client
+    );
+  }
 
-    let due = pickNumber(o, ["due_amount","amount_due"]);
-      if (due === null) {
-      const paidClient = (pickNumber(o, ["amount_paid","paid_amount","client_paid"]) || 0);
-        if (totalSafe !== null && isFinite(totalSafe)) {
-          due = Math.max(0, Number(totalSafe) - Number(paidClient));
-        } else {
-          due = (o.pay_label === "PAYÉ" || isCalc) ? 0 : 0;
-        }
-      }
-      due = Number(due || 0);
+  function getDriverAmount(o){
+    return firstValue(
+      o.driver_income,
+      o.driver_amount,
+      o.amount_driver_partner,
+      o.amount_driver_partner_resolved,
+      o.driver_logistic_cost
+    );
+  }
 
-    const totalHtml = isCalc || totalSafe === null
-      ? `<span class="course-value amount-client">—</span>`
-      : `<span class="course-value amount-client">${money(totalSafe)} FCFA</span>`;
+  function statusClass(status){
+    const s = String(status || "").toLowerCase();
+    if (s === "assigned") return "status-assigned";
+    if (s === "in_progress") return "status-in_progress";
+    if (s === "done") return "status-done";
+    return "status-pending";
+  }
 
-    const dueHtml = (isCalc || o.pay_label === "PAYÉ" || due <= 0)
-      ? `<span class="course-value">0 FCFA</span>`
-      : `<span class="course-value amount-due">${money(due)} FCFA</span>`;
+  function statusLabel(status){
+    const s = String(status || "").toLowerCase();
+    if (s === "assigned") return "À démarrer";
+    if (s === "in_progress") return "En cours";
+    if (s === "done") return "Terminée";
+    return "À accepter";
+  }
 
-    const tags = [];
-    const phone = escapeHtml(o.customer_phone || "");
-    const addr = escapeHtml(o.customer_address || "");
-    if(phone) tags.push(`<span class="tag-small">📞 ${phone}</span>`);
-    if(addr) tags.push(`<span class="tag-small">📍 ${addr}</span>`);
+  function inferFilter(o){
+    const s = String(o.status || "").toLowerCase();
+    const clientAmount = asNumber(getClientAmount(o));
+    const driverAmount = asNumber(getDriverAmount(o));
 
+    if (clientAmount <= 0 || driverAmount <= 0) return "pricing";
+    if (s === "in_progress") return "doing";
+    if (s === "assigned") return "start";
+    if (s === "done") return "done";
+    return "accept";
+  }
 
-      // 🔒 Privacy: phase laverie => infos client masquées
-      const masked = !!(o && o.privacy_masked);
-      if (masked){
-        tags.unshift(`<span class="tag-small tag-privacy">🔒 Phase laverie</span>`);
-      }
+  function getOrders(payload){
+    const buckets = [
+      ...(payload.orders_in_progress || []),
+      ...(payload.orders_pending || []),
+      ...(payload.orders_done || [])
+    ];
 
-      // ⚖️ Pesée
-      const w = (o && o.weighing) ? o.weighing : null;
-      if (w){
-        const wkg = Number(w.weight_kg || 0);
-        const confirmed = !!w.confirmed;
-        const st = String(w.status || "");
-        if (Number.isFinite(wkg) && wkg > 0){
-          const kgTxt = (wkg % 1 === 0) ? String(wkg.toFixed(0)) : String(wkg.toFixed(1));
-          tags.push(`<span class="tag-small tag-weigh">⚖️ ${kgTxt} kg${confirmed ? " ✅" : " ⏳"}</span>`);
-        } else if (st){
-          tags.push(`<span class="tag-small tag-weigh">⚖️ ${escapeHtml(st)}</span>`);
-        }
-      }
+    const seen = new Set();
+    const out = [];
 
-      // 📎 Preuves (compteur + détail en tooltip)
-      const ec = (o && o.evidence_counts) ? o.evidence_counts : null;
-      if (ec && typeof ec === "object"){
-        let total = 0;
-        const parts = [];
-        for (const k in ec){
-          const v = Number(ec[k] || 0);
-          if (Number.isFinite(v) && v > 0){
-            total += v;
-            parts.push(`${k}:${v}`);
-          }
-        }
-        if (total > 0){
-          const tip = parts.join(" • ");
-          tags.push(`<span class="tag-small tag-evidence" title="${escapeHtml(tip)}">📎 Preuves ${total}</span>`);
-        }
-      }
-    const created = o.created_at ? `Créée le ${escapeHtml(o.created_at)}` : "";
-    const name = escapeHtml(o.customer_name || "Client");
-    const code = escapeHtml(o.code || "");
-    const detailUrlRaw = String(o.detail_url || "#");
-    const detailUrlBase = withQuery(detailUrlRaw);
-    const back = encodeURIComponent(window.location.pathname + window.location.search);
-    const detailUrl = escapeHtml(detailUrlBase + (detailUrlBase.includes("?") ? "&" : "?") + "back=" + back);
+    for (const o of buckets){
+      const id = o && o.id;
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push(o);
+    }
 
-    const distNum = Number(o.driver_distance || 0);
-    const showDist = distNum > 0;
+    out.sort((a, b) => {
+      const pa = orderPriority(a);
+      const pb = orderPriority(b);
+      if (pa !== pb) return pa - pb;
+      return 0;
+    });
 
-    const paidNum = Number(o?.driver_income_paid ?? 0) ;
-    const potNum  = Number(o?.driver_income_potential ?? 0) 
-;
-    // ✅ Affichage: payé si dispo, sinon potentiel
-    const incomeNum = (paidNum > 0) ? paidNum : potNum;
-    const cta = ctaForStatus(o.status);
+    return out;
+  }
+
+  function orderPriority(o){
+    const f = inferFilter(o);
+    if (f === "doing") return 0;
+    if (f === "start") return 1;
+    if (f === "accept") return 2;
+    if (f === "pricing") return 3;
+    if (f === "done") return 4;
+    return 9;
+  }
+
+  function incomePill(amount){
+    const n = asNumber(amount);
+    if (n <= 0){
+      return {
+        cls: "income-missing",
+        text: "Gain à chiffrer"
+      };
+    }
+    return {
+      cls: "income-estimated",
+      text: fmtMoney(n)
+    };
+  }
+
+  function pricePill(amount){
+    const n = asNumber(amount);
+    if (n <= 0){
+      return {
+        cls: "price-missing",
+        text: "Client à chiffrer"
+      };
+    }
+    return {
+      cls: "price-pill",
+      text: "Client " + fmtMoney(n)
+    };
+  }
+
+  function renderMissionCard(o){
+    const detail = o.detail_url || "#";
+    const code = o.code || o.id || "—";
+    const customer = firstValue(o.customer_name, o.customer && o.customer.name, "Client");
+    const address = firstValue(
+      o.address_display,
+      o.pickup_address,
+      o.delivery_address,
+      o.customer_address,
+      o.customer && o.customer.address,
+      "Adresse non disponible"
+    );
+
+    const clientAmount = getClientAmount(o);
+    const driverAmount = getDriverAmount(o);
+    const clientP = pricePill(clientAmount);
+    const incomeP = incomePill(driverAmount);
+
+    const createdAt = firstValue(o.created_at_label, o.created_at, "—");
+    const sClass = statusClass(o.status);
+    const sLabel = statusLabel(o.status);
 
     return `
-      <div class="card-course is-clickable" data-href="${detailUrl}" data-order-id="${Number(o.id)}">
-        <div class="course-header">
-          <div>
+      <article class="card-course">
+        <div class="course-top">
+          <div class="course-meta">
             <div class="course-code">Course ${code}</div>
-            <div class="course-date">${created}</div>
+            <div class="course-date">${createdAt}</div>
           </div>
-          <div style="text-align:right;">
-            ${statusPill(o.status)}
-            ${payPill(o.pay_label)}
-          </div>
+          <span class="status-pill ${sClass}">
+            <span class="dot"></span>${sLabel}
+          </span>
         </div>
 
-        <div class="course-body">
-          <div class="course-line">
-            <span class="course-label">Client</span>
-            <span class="course-value">${name}</span>
-          </div>
+        <div class="course-client">${customer}</div>
+        <div class="course-address">${address}</div>
 
-          <div class="course-line">
-            <span class="course-label">Montant client</span>
-            ${totalHtml}
-          </div>
-
-          <div class="course-line">
-            <span class="course-label">À encaisser</span>
-            ${dueHtml}
-          </div>
-
-          <div class="course-line">
-            <span class="course-label">Mon revenu</span>
-            <span class="course-value amount-driver" style="display:flex; align-items:center; gap:8px;">
-              ${money(incomeNum)} FCFA
-              ${incomePill(o)}
-            </span>
-          </div>
-
-          ${showDist ? `
-          <div class="course-line">
-            <span class="course-label">Distance</span>
-            <span class="course-value">${distNum.toFixed(2)} km</span>
-          </div>
-          ` : ``}
+        <div class="course-middle">
+          <span class="${clientP.cls === 'price-pill' ? 'price-pill' : 'price-pill price-missing'}">
+            <span class="dot"></span>${clientP.text}
+          </span>
+          <span class="income-pill ${incomeP.cls}">
+            <span class="dot"></span>${incomeP.text}
+          </span>
         </div>
 
         <div class="course-footer">
-          <div class="course-tags">
-            ${tags.join("")}
-          </div>
-          <a class="btn btn-light" href="${escapeHtml((() => { const u = withQuery(`/orders/driver/weighing/${Number(o.id)}/`); return u + (u.includes('?') ? '&' : '?') + 'back=' + back; })())}">📎 Preuves / Pesée</a>
-<a class="btn ${cta.cls}" href="${detailUrl}">${escapeHtml(cta.label)}</a>
-          </div>
+          <a class="btn btn-primary" href="${detail}">Ouvrir</a>
         </div>
-      `;
-    }
-
-
-  const colState = {
-    pending: new Map(),
-    in_progress: new Map(),
-    done: new Map(),
-  };
-
-  function getCardEl(container, id){
-    return container ? container.querySelector(`.card-course[data-order-id="${id}"]`) : null;
+      </article>
+    `;
   }
 
-  function animateIn(el){
-    if(!el) return;
-    el.classList.add("card-enter");
-    requestAnimationFrame(() => {
-      el.classList.add("card-enter-active");
-      el.classList.remove("card-enter");
-      setTimeout(() => { el.classList.remove("card-enter-active"); }, 220);
+  function applyFilter(){
+    filteredOrders = activeFilter === "all"
+      ? [...allOrders]
+      : allOrders.filter(o => inferFilter(o) === activeFilter);
+
+    currentPage = 1;
+    renderPage();
+    syncFilterUi();
+  }
+
+  function syncFilterUi(){
+    if (!els.filtersBar) return;
+    els.filtersBar.querySelectorAll(".filter-chip").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.filter === activeFilter);
     });
   }
 
-  function animateOutAndRemove(el){
-    if(!el) return;
-    el.classList.add("card-exit");
-    requestAnimationFrame(() => {
-      el.classList.add("card-exit-active");
-      setTimeout(() => { el.remove(); }, 200);
-    });
-  }
-
-  function renderEmptyIfNeeded(container, emptyText){
-    if(!container) return;
-    const hasCard = container.querySelector(".card-course");
-    if(!hasCard){
-      container.innerHTML = `<p class="empty">${escapeHtml(emptyText)}</p>`;
-    } else {
-      const empty = container.querySelector(".empty");
-      if(empty) empty.remove();
-    }
-  }
-
-  function applyColumn(container, items, emptyText, key){
-    if(!container) return;
-
-    const empty = container.querySelector(".empty");
-    if(empty) empty.remove();
-
-    const next = new Map();
-    // 🔥 Tri: basé sur "reste à payer au livreur" (paid vs potentiel)
-      const arr = Array.isArray(items) ? [...items] : [];
-      function payRank(o){
-        const inc = incomeParts(o || {});
-        const paid = inc.paid;
-        const pot  = inc.pot;
-        // 0: partiel (reste)
-        if (paid > 0 && pot > 0 && paid < pot) return 0;
-        // 1: non payé mais potentiel > 0
-        if (paid <= 0 && pot > 0) return 1;
-        // 2: payé
-        if (paid > 0) return 2;
-        // 3: rien
-        return 3;
-      }
-      arr.sort((a,b) => {
-        const ra = payRank(a), rb = payRank(b);
-        if (ra !== rb) return ra - rb;
-        const ia = Number(a?.id || 0), ib = Number(b?.id || 0);
-        return ib - ia; // récent d'abord
-      });
-
-      for(const o of arr){
-
-      const id = Number(o.id);
-      next.set(id, cardHTML(o));
+  function renderPage(){
+    if (!filteredOrders.length){
+      els.missionList.innerHTML = '<p class="empty">Aucune mission à afficher dans cette catégorie.</p>';
+      if (els.pagerInfo) els.pagerInfo.textContent = "";
+      if (els.prevPage) els.prevPage.disabled = true;
+      if (els.nextPage) els.nextPage.disabled = true;
+      return;
     }
 
-    const prev = colState[key];
+    const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
+    if (currentPage > totalPages) currentPage = totalPages;
 
-    for(const [id] of prev.entries()){
-      if(!next.has(id)){
-        const el = getCardEl(container, id);
-        if(el) animateOutAndRemove(el);
-        prev.delete(id);
-      }
-    }
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const end = start + PAGE_SIZE;
+    const visible = filteredOrders.slice(start, end);
 
-    const frag = document.createDocumentFragment();
-    for(const [id, html] of next.entries()){
-      let el = getCardEl(container, id);
+    els.missionList.innerHTML = visible.map(renderMissionCard).join("");
 
-      if(!el){
-        const tmp = document.createElement("div");
-        tmp.innerHTML = html.trim();
-        el = tmp.firstElementChild;
-        if(el){
-          animateIn(el);
-          prev.set(id, html);
-        }
-      } else {
-        const old = prev.get(id);
-        if(old !== html){
-          const tmp = document.createElement("div");
-          tmp.innerHTML = html.trim();
-          const fresh = tmp.firstElementChild;
-          if(fresh){
-            el.replaceWith(fresh);
-            el = fresh;
-            animateIn(el);
-          }
-          prev.set(id, html);
-        }
-      }
-
-      if(el) frag.appendChild(el);
-    }
-
-    container.innerHTML = "";
-    container.appendChild(frag);
-
-    renderEmptyIfNeeded(container, emptyText);
+    if (els.pagerInfo) els.pagerInfo.textContent = "Page " + currentPage + " / " + totalPages;
+    if (els.prevPage) els.prevPage.disabled = currentPage <= 1;
+    if (els.nextPage) els.nextPage.disabled = currentPage >= totalPages;
   }
 
-  let busy = false;
+  function renderHeroFocus(){
+    if (!allOrders.length){
+      if (els.heroFocusTitle) els.heroFocusTitle.textContent = "Aucune mission";
+      if (els.heroFocusSub) els.heroFocusSub.textContent = "Rien d’actionnable pour le moment.";
+      return;
+    }
 
-  function goLogin(nextUrl){
-    const next = encodeURIComponent(nextUrl || (window.location.pathname + window.location.search));
-    window.location.href = `/accounts/login/?next=${next}`;
+    const focus = allOrders[0];
+    const filter = inferFilter(focus);
+    const customer = firstValue(focus.customer_name, focus.customer && focus.customer.name, "Client");
+    const detail = focus.detail_url || "#";
+
+    let title = customer;
+    let sub = "Mission disponible.";
+    if (filter === "doing") sub = "Mission déjà en cours. Ouvre-la pour continuer.";
+    else if (filter === "start") sub = "Mission acceptée. Tu peux partir maintenant.";
+    else if (filter === "accept") sub = "Mission en attente d’acceptation.";
+    else if (filter === "pricing") sub = "Mission visible mais non complètement chiffrée.";
+    else if (filter === "done") sub = "Dernière mission terminée visible.";
+
+    if (els.heroFocusTitle) els.heroFocusTitle.textContent = title;
+    if (els.heroFocusSub) els.heroFocusSub.textContent = sub;
+    if (els.heroFocusCta) els.heroFocusCta.href = detail;
   }
 
-  document.querySelectorAll("a.js-export").forEach(a => {
-    const href = a.getAttribute("href");
-    if(href) a.setAttribute("href", withQuery(href));
-  });
+  function renderKpis(){
+    const accept = allOrders.filter(o => inferFilter(o) === "accept").length;
+    const start = allOrders.filter(o => inferFilter(o) === "start").length;
+    const doing = allOrders.filter(o => inferFilter(o) === "doing").length;
+    const pricing = allOrders.filter(o => inferFilter(o) === "pricing").length;
 
-  async function refreshAll(){
-    if(busy) return;
-    busy = true;
-    repairColumns();
+    const visibleDriverSum = allOrders.reduce((acc, o) => {
+      const n = asNumber(getDriverAmount(o));
+      return acc + (n > 0 ? n : 0);
+    }, 0);
 
+    if (els.kpiAccept) els.kpiAccept.textContent = accept;
+    if (els.kpiStart) els.kpiStart.textContent = start;
+    if (els.kpiInProgress) els.kpiInProgress.textContent = doing;
+    if (els.kpiUnpriced) els.kpiUnpriced.textContent = pricing;
+    if (els.kpiDriverVisible) els.kpiDriverVisible.textContent = fmtMoney(visibleDriverSum);
+  }
+
+  function render(payload){
+    if (els.kpiUpdated) els.kpiUpdated.textContent = new Date().toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"});
+    if (els.kpiSource) els.kpiSource.textContent = "Live";
+
+    allOrders = getOrders(payload || {});
+    renderHeroFocus();
+    renderKpis();
+    applyFilter();
+  }
+
+  async function refresh(){
     try{
-      if(els.kpiSource) els.kpiSource.textContent = "Synchronisation…";
-
       const res = await fetch(DATA_URL, {
-        method: "GET",
-        credentials: "same-origin",
-        headers: {
-          "X-Requested-With": "XMLHttpRequest",
-          "Accept": "application/json"
-        },
-        cache: "no-store",
-        redirect: "follow"
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin"
       });
-
-      if (res.status === 401 || res.status === 403) {
-        goLogin(window.location.pathname + window.location.search);
-        return;
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const payload = await res.json();
+      render(payload || {});
+    }catch(err){
+      if (els.missionList){
+        els.missionList.innerHTML = '<p class="empty">Impossible de charger les missions.</p>';
       }
-      if(!res.ok) throw new Error("bad_status_" + res.status);
-
-      const ct = (res.headers.get("content-type") || "").toLowerCase();
-      if(!ct.includes("application/json")) {
-        goLogin(window.location.pathname + window.location.search);
-        return;
-      }
-
-      const data = await res.json();
-
-      const p = Number(data.pending ?? 0);
-      const ip = Number(data.in_progress ?? 0);
-      const d = Number(data.done ?? 0);
-
-      setText(els.kpiPending, p);
-      setText(els.kpiInProgress, ip);
-      setText(els.kpiDone, d);
-
-      setText(els.badgePending, p);
-      setText(els.badgeInProgress, ip);
-      setText(els.badgeDone, d);
-
-      setText(els.kpiDistance, `${Number(data.total_distance_km ?? 0).toFixed(2)} km`);
-      // KPI Revenu: afficher le "payé" (si dispo), sinon fallback (display/legacy). Sécurise les valeurs négatives.
-        const paidRaw = Number(data.total_driver_income_paid ?? 0);
-        const potRaw  = Number(data.total_driver_income_potential ?? 0);
-        const paid = Math.max(0, paidRaw);
-        const pot  = Math.max(0, potRaw);
-        const incomeMain = (paid > 0) ? paid : Number(data.total_driver_income_display ?? data.total_driver_income ?? 0);
-        setText(els.kpiIncome, `${money(incomeMain)} FCFA`);
-
-      if(els.kpiSource){
-        const sd = data.source_distance || "—";
-        const si = data.source_income || "—";
-        const paidRaw = Number(data.total_driver_income_paid ?? 0);
-        const potRaw  = Number(data.total_driver_income_potential ?? 0);
-        const paid = Math.max(0, paidRaw);
-        const pot  = Math.max(0, potRaw);
-        const hint = (paid > 0)
-          ? `payé=${money(paid)} • potentiel=${money(pot)}`
-          : `potentiel=${money(pot)} • payé=${money(paid)}`;
-        els.kpiSource.textContent = `Source: distance=${sd} • revenu=${si} (${hint})`;
-      }
-      if(els.kpiUpdated){
-        els.kpiUpdated.textContent = `Mis à jour à ${data.server_time || timeNow()}`;
-      }
-
-      repairColumns();
-
-      applyColumn(els.listPending, data.orders_pending, "Aucune course en attente.", "pending");
-      applyColumn(els.listInProgress, data.orders_in_progress, "Aucune course en cours.", "in_progress");
-      applyColumn(els.listDone, data.orders_done, "Aucune course terminée récemment.", "done");
-
-      const kpiCard = document.querySelector(".kpi-card");
-      if(kpiCard){
-        kpiCard.classList.remove("kpi-pulse");
-        void kpiCard.offsetWidth;
-        kpiCard.classList.add("kpi-pulse");
-      }
-
-    } catch(e){
-      if(els.kpiSource) els.kpiSource.textContent = "Hors ligne / erreur sync";
-      if(els.kpiUpdated) els.kpiUpdated.textContent = `Dernier essai ${timeNow()}`;
-      console.error("driver_app refresh error:", e);
-    } finally{
-      busy = false;
+      if (els.kpiSource) els.kpiSource.textContent = "Erreur";
     }
   }
-    // DEBUG CLICK (à retirer après)
-    function showToast(msg){
-      const t = document.getElementById("click-toast");
-      if(!t) return;
-      t.textContent = msg;
-      t.style.display = "block";
-      clearTimeout(window.__toastTimer);
-      window.__toastTimer = setTimeout(()=>{ t.style.display="none"; }, 2000);
-    }
 
-    document.addEventListener("click", function(ev){
-      const a = ev.target.closest("a.btn");
-      if(a){
-        showToast("CLICK BTN: " + a.textContent.trim());
-        console.log("[CLICK] btn:", a.textContent.trim(), "href=", a.getAttribute("href"));
-      }
-      const card = ev.target.closest(".card-course.is-clickable");
-      if(card){
-        showToast("CLICK CARD #" + card.getAttribute("data-order-id"));
-        console.log("[CLICK] card id=", card.getAttribute("data-order-id"), "href=", card.getAttribute("data-href"));
-          // Backup navigation (si un overlay empêche le clic natif)
-          const href = a && a.getAttribute("href");
-          if(href && href !== "#" && href !== "javascript:void(0)"){
-            setTimeout(()=>{ window.location.href = href; }, 0);
-          }
-
-      }
-    }, {passive:true});
-
-    document.addEventListener("click", function(ev){
-      const a = ev.target.closest("a.btn");
-      if(a){
-        showToast("CLICK BTN: " + a.textContent.trim());
-      }
-      const card = ev.target.closest(".card-course.is-clickable");
-      if(card){
-        showToast("CLICK CARD #" + card.getAttribute("data-order-id"));
-      }
-    }, {passive:true});
-
-    document.addEventListener("click", function(ev){
-    const card = ev.target.closest(".card-course.is-clickable");
-    if(!card) return;
-    if(ev.target.closest("a, button, input, select, textarea, label")) return;
-    const href = card.getAttribute("data-href");
-    if(href) window.location.href = href;
-  }, {passive:true});
-
-  refreshAll();
-  setInterval(refreshAll, refreshMs);
-
-  document.addEventListener("click", function(e){
-    const card = e.target.closest("[data-driver-order-id]");
-    if(!card) return;
-
-    const ignored = e.target.closest("a,button,input,select,textarea,label,summary");
-    if(ignored) return;
-
-    const orderId = card.getAttribute("data-driver-order-id");
-    if(orderId){
-      window.location.href = driverOrderDetailUrl(orderId);
-    }
-  });
-
-\n})();
-</script>
-
-<script>
-(function(){
-  const ENDPOINT = "/orders/driver/me/update-location/";
-  const PING_EVERY_MS = 15000; // 15s (ajuste si besoin)
-  const MAX_AGE_MS = 30000;    // position pas plus vieille que 30s
-  const TIMEOUT_MS = 10000;
-
-  let timer = null;
-  let lastSentKey = null;
-  let running = false;
-
-  function getCookie(name){
-    const m = document.cookie.match(new RegExp("(^|; )" + name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&") + "=([^;]*)"));
-    return m ? decodeURIComponent(m[2]) : null;
-  }
-  function csrf(){
-    return getCookie("csrftoken");
-  }
-
-  function log(msg, obj){
-    // optionnel: si tu ajoutes un div#gps-status, on écrit dedans
-    const el = document.getElementById("gps-status");
-    if (el) el.textContent = obj ? (msg + " " + JSON.stringify(obj)) : msg;
-    // console aussi
-    // eslint-disable-next-line no-console
-    console.log("[GPS]", msg, obj || "");
-  }
-
-  async function send(lat, lng){
-    // anti-spam: si variation minime, ne renvoie pas
-    const key = lat.toFixed(6) + "," + lng.toFixed(6);
-    if (key === lastSentKey) return;
-    lastSentKey = key;
-
-    const token = csrf();
-    if (!token){
-      log("CSRF manquant (pas connecté ou cookie absent)");
-      return;
-    }
-
-    const resp = await fetch(ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": token,
-      },
-      credentials: "same-origin",
-      body: JSON.stringify({lat, lng}),
-    });
-
-    const data = await resp.json().catch(()=>null);
-    if (!resp.ok){
-      log("Erreur API update-location", {status: resp.status, data});
-      return;
-    }
-    log("Position envoyée ✅", data);
-  }
-
-  function getPosition(){
-    return new Promise((resolve, reject)=>{
-      if (!navigator.geolocation) return reject(new Error("geolocation_not_supported"));
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: true,
-        timeout: TIMEOUT_MS,
-        maximumAge: MAX_AGE_MS,
-      });
+  if (els.prevPage){
+    els.prevPage.addEventListener("click", function(){
+      currentPage = Math.max(1, currentPage - 1);
+      renderPage();
     });
   }
 
-  async function tick(){
-    if (running) return;
-    running = true;
-    try{
-      const pos = await getPosition();
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      log("Position obtenue", {lat, lng, acc: pos.coords.accuracy});
-      await send(lat, lng);
-    }catch(e){
-      // erreurs fréquentes: Permission denied, timeout
-      log("GPS erreur", {message: e && e.message ? e.message : String(e)});
-    }finally{
-      running = false;
-    }
+  if (els.nextPage){
+    els.nextPage.addEventListener("click", function(){
+      const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
+      currentPage = Math.min(totalPages, currentPage + 1);
+      renderPage();
+    });
   }
 
-  // API simple pour boutons Start/Stop si tu veux
-  window.FAGNI_GPS = {
-    start(){
-      if (timer) return;
-      log("GPS: démarrage…");
-      tick();
-      timer = setInterval(tick, PING_EVERY_MS);
-    },
-    stop(){
-      if (!timer) return;
-      clearInterval(timer);
-      timer = null;
-      log("GPS: stoppé.");
-    }
-  };
+  if (els.filtersBar){
+    els.filtersBar.addEventListener("click", function(e){
+      const btn = e.target.closest(".filter-chip");
+      if (!btn) return;
+      activeFilter = btn.dataset.filter || "all";
+      applyFilter();
+    });
+  }
 
-  // auto start
-  window.FAGNI_GPS.start();
+  refresh();
+  setInterval(refresh, 8000);
 })();
 </script>
-
 {% endblock %}

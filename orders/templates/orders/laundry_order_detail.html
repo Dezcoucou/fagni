@@ -1,16 +1,374 @@
 {% extends "base.html" %}
+{% load static %}
+
 {% block title %}Commande blanchisserie – FAGNI{% endblock %}
 
+{% block extra_head %}
+<style>
+  .laundry-page{
+    max-width:900px;
+    margin:0 auto;
+    padding:16px;
+  }
+
+  .laundry-topbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+  }
+
+  .laundry-title{
+    margin:0;
+    font-size:28px;
+    line-height:1.1;
+    font-weight:1000;
+    color:#0f172a;
+  }
+
+  .laundry-sub{
+    margin-top:6px;
+    color:#64748b;
+    font-size:14px;
+    font-weight:700;
+  }
+
+  .laundry-actions{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .lang-select{
+    width:100%;
+    min-height:48px;
+    border-radius:14px;
+    border:1px solid #dbe3ee;
+    background:#fff;
+    padding:0 14px;
+    font-size:15px;
+    font-weight:800;
+    color:#0f172a;
+    margin-bottom:14px;
+  }
+
+  .hero-card,
+  .section-card,
+  .audio-card{
+    background:#fff;
+    border:1px solid #e5e7eb;
+    border-radius:20px;
+    padding:16px;
+    box-shadow:0 8px 24px rgba(15,23,42,.04);
+  }
+
+  .hero-card{
+    margin-bottom:14px;
+  }
+
+  .hero-head{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:flex-start;
+  }
+
+  .hero-order{
+    font-size:24px;
+    font-weight:1000;
+    color:#0f172a;
+  }
+
+  .hero-date{
+    font-size:13px;
+    color:#64748b;
+    font-weight:800;
+  }
+
+  .status-grid{
+    margin-top:14px;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:12px;
+  }
+
+  .status-box{
+    border:1px solid #e5e7eb;
+    border-radius:16px;
+    padding:14px;
+    background:#f8fafc;
+  }
+
+  .status-k{
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    font-weight:900;
+    color:#64748b;
+  }
+
+  .status-v{
+    margin-top:6px;
+    font-size:22px;
+    font-weight:1000;
+    color:#0f172a;
+    line-height:1.1;
+  }
+
+  .items-list{
+    margin:14px 0 0;
+    padding:0;
+    list-style:none;
+    display:grid;
+    gap:10px;
+  }
+
+  .item-row{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    align-items:center;
+    padding:14px;
+    border:1px solid #e5e7eb;
+    border-radius:16px;
+    background:#fff;
+  }
+
+  .item-name{
+    font-size:22px;
+    font-weight:900;
+    color:#0f172a;
+  }
+
+  .item-meta{
+    margin-top:4px;
+    font-size:13px;
+    color:#64748b;
+    font-weight:700;
+  }
+
+  .item-qty{
+    min-width:64px;
+    text-align:center;
+    border-radius:999px;
+    background:#eff6ff;
+    color:#1d4ed8;
+    padding:8px 12px;
+    font-size:16px;
+    font-weight:1000;
+  }
+
+  .audio-card{
+    margin-bottom:14px;
+    border-color:#bfdbfe;
+    background:linear-gradient(180deg,#eff6ff,#ffffff);
+  }
+
+  .audio-title{
+    font-size:22px;
+    font-weight:1000;
+    color:#0f172a;
+  }
+
+  .audio-sub{
+    margin-top:6px;
+    color:#475569;
+    font-size:14px;
+    line-height:1.5;
+    font-weight:700;
+  }
+
+  .audio-actions{
+    margin-top:12px;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+
+  .visual-steps{
+    margin-top:14px;
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:10px;
+  }
+
+  .visual-step{
+    border:1px solid #dbeafe;
+    border-radius:16px;
+    padding:14px;
+    background:#fff;
+    text-align:center;
+  }
+
+  .visual-step-ico{
+    font-size:28px;
+    line-height:1;
+  }
+
+  .visual-step-label{
+    margin-top:8px;
+    font-size:14px;
+    font-weight:1000;
+    color:#0f172a;
+  }
+
+  .actions-grid{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:12px;
+    margin-top:14px;
+  }
+
+  .action-form{
+    margin:0;
+  }
+
+  .action-btn{
+    width:100%;
+    min-height:110px;
+    border:none;
+    border-radius:18px;
+    font-size:22px;
+    font-weight:1000;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    cursor:pointer;
+    transition:.16s ease;
+    box-shadow:0 10px 20px rgba(15,23,42,.08);
+  }
+
+  .action-btn:hover{
+    transform:translateY(-1px);
+  }
+
+  .action-btn[disabled]{
+    opacity:.5;
+    cursor:not-allowed;
+    transform:none;
+    box-shadow:none;
+  }
+
+  .action-btn--start{
+    background:#2563eb;
+    color:#fff;
+  }
+
+  .action-btn--ready{
+    background:#16a34a;
+    color:#fff;
+  }
+
+  .action-btn--done{
+    background:#0f172a;
+    color:#fff;
+  }
+
+  .action-btn__icon{
+    font-size:26px;
+    line-height:1;
+  }
+
+  .action-btn__label{
+    line-height:1.1;
+  }
+
+  .helper-note{
+    margin-top:12px;
+    padding:12px 14px;
+    border-radius:14px;
+    background:#fff7ed;
+    border:1px solid #fed7aa;
+    color:#9a3412;
+    font-size:14px;
+    font-weight:800;
+  }
+
+  .voice-feedback{
+    margin-top:12px;
+    text-align:center;
+    color:#1d4ed8;
+    font-size:15px;
+    font-weight:900;
+    min-height:22px;
+  }
+
+  .empty-box{
+    margin-top:14px;
+    padding:14px;
+    border:1px dashed #cbd5e1;
+    border-radius:16px;
+    background:#f8fafc;
+    color:#64748b;
+    font-weight:800;
+  }
+
+  @media (max-width:760px){
+    .laundry-title{
+      font-size:24px;
+    }
+
+    .status-grid,
+    .audio-actions,
+    .visual-steps,
+    .actions-grid{
+      grid-template-columns:1fr;
+    }
+
+    .item-row{
+      flex-direction:column;
+      align-items:flex-start;
+    }
+
+    .item-qty{
+      min-width:0;
+    }
+
+    .laundry-actions{
+      width:100%;
+    }
+
+    .laundry-actions .btn{
+      width:100%;
+    }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div style="max-width:820px;margin:0 auto;padding:16px;">
-  <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;">
+<div class="laundry-page">
+  <select id="language-select" class="lang-select">
+    <option value="fr">Français</option>
+    <option value="dioula">Dioula</option>
+  </select>
+
+  
+<div style="margin-bottom:12px;">
+  <button id="btn-ultra-mode" style="
+    width:100%;
+    height:60px;
+    border:none;
+    border-radius:16px;
+    font-size:18px;
+    font-weight:1000;
+    background:#0f172a;
+    color:#fff;
+  ">
+    ⚡ Mode simple (recommandé)
+  </button>
+</div>
+<div class="laundry-topbar">
     <div>
-      <h1 style="margin:0;font-size:20px;font-weight:900;">🧺 Détail commande</h1>
-      <div style="margin-top:6px;color:#64748b;font-size:13px;font-weight:700;">
-        ⚠️ Aucune info client affichée (confidentialité).
-      </div>
+      <h1 class="laundry-title">🧺 Détail commande</h1>
+      <div class="laundry-sub">⚠️ Aucune information client affichée.</div>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+
+    <div class="laundry-actions">
       <a class="btn btn-light btn-sm" href="{% url 'orders:laundry_app' %}{% if laundry_id %}?laundry_id={{ laundry_id }}{% endif %}">← Retour</a>
       <a class="btn btn-light btn-sm" href="/accounts/logout/">🚪 Déconnexion</a>
     </div>
@@ -21,81 +379,723 @@
   {% endif %}
 
   {% if not order %}
-    <div style="margin-top:12px;padding:12px;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc;color:#64748b;font-weight:800;">
-      Commande non disponible.
-    </div>
+    <div class="empty-box">Commande non disponible.</div>
   {% else %}
-    <div style="margin-top:12px;padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#fff;">
-      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-        <div style="font-weight:900;">Commande #{{ order.id }}</div>
-        <div style="color:#64748b;font-size:12px;">{{ order.created_at|date:"d/m/Y H:i" }}</div>
+    <input type="hidden" id="ultra-status-raw" value="{% if order.status == 'done' %}done{% elif order.wash_complete_time %}ready{% elif order.status == 'in_progress' %}in_progress{% else %}pending{% endif %}">
+    <input type="hidden" id="ultra-ready-raw" value="{% if order.wash_complete_time %}1{% else %}0{% endif %}">
+    <section class="hero-card">
+      <div class="hero-head">
+        <div class="hero-order">Commande #{{ order.id }}</div>
+        <div class="hero-date">{{ order.created_at|date:"d/m/Y H:i" }}</div>
       </div>
 
-      <div style="margin-top:10px;color:#0f172a;font-weight:800;">
-        Statut : <span style="font-weight:900;">{{ order.status|default:"—" }}</span><br>
-        Prêt : <span style="font-weight:900;">{% if order.wash_complete_time %}✅ Oui{% else %}⏳ Non{% endif %}</span>
+      <div id="status-hero" style="
+        margin-top:12px;
+        padding:16px;
+        border-radius:16px;
+        background:#0f172a;
+        color:#fff;
+        font-size:22px;
+        font-weight:1000;
+        text-align:center;
+      ">
+        STATUT : {% if order.status == "done" %}
+Terminé
+{% elif order.wash_complete_time %}
+Prêt
+{% elif order.status == "in_progress" %}
+En cours
+{% else %}
+À traiter
+{% endif %}
       </div>
 
-      <div style="margin-top:12px;">
-        <div style="font-weight:900;margin-bottom:6px;">Articles</div>
+      <div class="status-grid">
+        <div class="status-box">
+          <div class="status-k">Statut</div>
+          <div class="status-v" id="status-text">{% if order.status == "done" %}
+Terminé
+{% elif order.wash_complete_time %}
+Prêt
+{% elif order.status == "in_progress" %}
+En cours
+{% else %}
+À traiter
+{% endif %}</div>
+        </div>
+        <div class="status-box">
+          <div class="status-k">Prêt</div>
+          <div class="status-v" id="ready-text">{% if order.wash_complete_time %}Oui{% else %}Non{% endif %}</div>
+        </div>
+      </div>
+
+      <ul class="items-list">
         {% if items %}
-          <ul style="margin:0;padding-left:18px;">
-            {% for it in items %}
-              <li style="margin:4px 0;">{{ it.designation }} × {{ it.quantity|default:1 }}</li>
-            {% endfor %}
-          </ul>
+          {% for it in items %}
+            <li class="item-row">
+              <div>
+                <div class="item-name">{{ it.label|default:"Article" }}</div>
+                <div class="item-meta">Article à traiter</div>
+              </div>
+              <div class="item-qty">x {{ it.qty|default:1 }}</div>
+            </li>
+          {% endfor %}
         {% else %}
-          <div style="color:#64748b;font-weight:700;">Aucun article.</div>
+          <li class="empty-box">Aucun article.</li>
         {% endif %}
+      </ul>
+    </section>
+
+    <section class="audio-card">
+      <div class="audio-title">🔊 Aide vocale</div>
+      <div class="audio-sub">
+        Utilise l’écoute vocale pour entendre la commande et les étapes.
       </div>
-    </div>
 
-    <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;">
-      <form method="post" style="flex:1;min-width:220px;">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="start">
-        <button class="btn btn-light btn-sm" style="width:100%;" {% if is_start_disabled %}disabled{% endif %}>
-          🧺 Marquer “En cours”
-        </button>
-      </form>
+      <div class="audio-actions">
+        <button type="button" class="btn btn-primary" id="play-guide-btn" style="width:100%;height:60px;font-size:18px;">▶️ Écouter</button>
+        <button type="button" class="btn btn-light" id="stop-guide-btn">⏹️ Arrêter</button>
+      </div>
 
-      <form method="post" style="flex:1;min-width:220px;">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="ready">
-        <button class="btn btn-light btn-sm" style="width:100%;" {% if is_ready_disabled %}disabled{% endif %}>
-          ✅ Marquer “Prêt”
-        </button>
-      </form>
+      <div class="visual-steps">
+        <div class="visual-step">
+          <div class="visual-step-ico">🧺</div>
+          <div class="visual-step-label">En cours</div>
+        </div>
+        <div class="visual-step">
+          <div class="visual-step-ico">✅</div>
+          <div class="visual-step-label">Prêt</div>
+        </div>
+        <div class="visual-step">
+          <div class="visual-step-ico">🏁</div>
+          <div class="visual-step-label">Terminé</div>
+        </div>
+      </div>
 
-      <form method="post" style="flex:1;min-width:220px;">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="done">
+      <div class="voice-feedback" id="voice-feedback"></div>
 
-        {% if not is_done_disabled %}
-          <button class="btn btn-primary btn-sm" style="width:100%;">🏁 Marquer “Terminé”</button>
-        {% else %}
-          <button class="btn btn-primary btn-sm" style="width:100%;" disabled>🏁 Marquer “Terminé”</button>
-          {% if not order.wash_complete_time %}
-            <div style="margin-top:6px;color:#64748b;font-size:12px;font-weight:700;">
-              ℹ️ Tu dois d’abord marquer “Prêt”.
-            </div>
-          {% endif %}
-        {% endif %}
-      </form>
-    </div>
+      <div style="margin-top:14px;padding:14px;border-radius:16px;border:1px solid #dbeafe;background:#ffffff;">
+        <div style="font-size:16px;font-weight:1000;color:#0f172a;">🎙️ Commande vocale</div>
+        <div style="margin-top:6px;font-size:14px;line-height:1.5;color:#475569;font-weight:700;">
+          Dis : <b>en cours</b>, <b>prêt</b> ou <b>terminé</b>.
+        </div>
 
-    <div style="margin-top:10px;color:#94a3b8;font-size:11px;font-weight:700;">
-      ⚠️ Aucune information client n’est affichée (règle de confidentialité).
-    </div>
-  {% endif %}
+        <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <button type="button" class="btn btn-dark" id="voice-start-btn" onclick="startVoiceRecognition()">🎤 Écouter ma voix</button>
+          <button type="button" class="btn btn-light" id="voice-stop-btn" onclick="stopVoiceRecognition()">⏹️ Stop écoute</button>
+        </div>
 
-<style>
-  button[disabled]{
-    opacity:.55 !important;
-    cursor:not-allowed !important;
-    pointer-events:none !important;
-  }
-</style>
+        <div id="voice-command-result" style="margin-top:12px;font-size:14px;font-weight:900;color:#1d4ed8;min-height:22px;">Module vocal en chargement…</div>
+
+        <form method="post" id="voice-command-form" style="display:none;margin-top:12px;">
+          {% csrf_token %}
+          <input type="hidden" name="action" id="voice-command-action">
+          <button type="submit" id="voice-command-submit" class="btn btn-primary" style="width:100%;">
+            ✅ Confirmer l’action détectée
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <div class="audio-title">Actions</div>
+      <div class="audio-sub">
+        Appuie sur un grand bouton pour faire avancer la commande.
+      </div>
+
+      
+<div style="margin-bottom:20px;">
+  <button id="one-button" style="
+    width:100%;
+    height:90px;
+    border:none;
+    border-radius:20px;
+    font-size:22px;
+    font-weight:1000;
+  ">
+    Chargement...
+  </button>
+</div>
+
+<div class="actions-grid">
+        <form method="post" class="action-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="start">
+          <button
+            type="submit"
+            class="action-btn action-btn--start"
+            {% if is_start_disabled %}disabled{% endif %}
+            onclick="speakAction('start')">
+            <span class="action-btn__icon">🧺</span>
+            <span class="action-btn__label">En cours</span>
+          </button>
+        </form>
+
+        <form method="post" class="action-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="ready">
+          <button
+            type="submit"
+            class="action-btn action-btn--ready"
+            {% if is_ready_disabled %}disabled{% endif %}
+            onclick="speakAction('ready')">
+            <span class="action-btn__icon">✅</span>
+            <span class="action-btn__label">Prêt</span>
+          </button>
+        </form>
+
+        <form method="post" class="action-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="done">
+          <button
+            type="submit"
+            class="action-btn action-btn--done"
+            {% if is_done_disabled %}disabled{% endif %}
+            onclick="speakAction('done')">
+            <span class="action-btn__icon">🏁</span>
+            <span class="action-btn__label">Terminé</span>
+          </button>
+        </form>
+      </div>
+
+      {% if is_done_disabled and not order.wash_complete_time %}
+        <div class="helper-note">ℹ️ Il faut d’abord appuyer sur “Prêt” avant “Terminé”.</div>
+      {% endif %}
+
+      <div class="helper-note" style="margin-top:10px;background:#f8fafc;border-color:#e2e8f0;color:#475569;">
+        ⚠️ Confidentialité : aucune information client n’est affichée.
+      </div>
+
+      <div style="margin-top:20px;padding:14px;border:1px solid #e2e8f0;border-radius:16px;">
+        <div style="font-weight:900;">📊 Performance du jour</div>
+        <div style="margin-top:8px;">
+          🧺 Traitées : {{ stats_today_count|default:0 }}
+        </div>
+        <div>
+          ⏱ Temps moyen : {{ stats_avg_time|default:"--" }}
+        </div>
+      </div>
+    </section>
+  
+<div id="ultra-mode" style="
+  display:none;
+  position:fixed;
+  inset:0;
+  background:#ffffff;
+  z-index:9999;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  gap:20px;
+">
+
+  <button onclick="closeUltra()" style="
+    position:absolute;
+    top:10px;
+    right:10px;
+    font-size:18px;
+  ">✖</button>
+
+  <div id="ultra-label" style="
+    font-size:22px;
+    font-weight:1000;
+  "></div>
+
+  <form method="post" id="ultra-form">
+    {% csrf_token %}
+    <input type="hidden" name="action" id="ultra-action">
+    <button id="ultra-btn" style="
+      width:280px;
+      height:140px;
+      border:none;
+      border-radius:24px;
+      font-size:26px;
+      font-weight:1000;
+    "></button>
+  </form>
 
 </div>
+{% endif %}
+</div>
+
+<script>
+(function(){
+  function getLang(){
+    var el = document.getElementById("language-select");
+    return el ? el.value : "fr";
+  }
+
+  function speak(text){
+    try{
+      if(!("speechSynthesis" in window)) return;
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = "fr-FR";
+      window.speechSynthesis.speak(u);
+    }catch(e){}
+  }
+
+  function setFeedback(text){
+    var box = document.getElementById("voice-feedback");
+    if(box) box.textContent = text;
+  }
+
+  function buildGuideText(){
+    var lang = getLang();
+    if(lang === "dioula"){
+      return "I ni ce. Fɛ ka commande lajɛ. Ni i bɛ baara daminɛ, i ka en cours ta. N'a labɛlen, i ka prêt ta. Kɔfɛ, i ka terminé ta.";
+    }
+    return "Bienvenue. Vérifie les articles. Appuie sur En cours pour démarrer. Appuie sur Prêt quand le linge est prêt. Appuie sur Terminé à la fin.";
+  }
+
+  window.speakAction = function(type){
+    var lang = getLang();
+    var text = "";
+
+    if(lang === "dioula"){
+      if(type === "start") text = "Baara daminɛra.";
+      if(type === "ready") text = "A labɛlen don.";
+      if(type === "done") text = "Commande banbali.";
+    } else {
+      if(type === "start") text = "Traitement en cours.";
+      if(type === "ready") text = "Commande prête.";
+      if(type === "done") text = "Commande terminée.";
+    }
+
+    if(text){
+      speak(text);
+      setFeedback(text);
+    }
+  };
+
+  document.addEventListener("DOMContentLoaded", function(){
+    var playBtn = document.getElementById("play-guide-btn");
+    var stopBtn = document.getElementById("stop-guide-btn");
+
+    if(playBtn){
+      playBtn.addEventListener("click", function(){
+        speak(buildGuideText());
+        setFeedback("Lecture vocale activée.");
+      });
+    }
+
+    if(stopBtn){
+      stopBtn.addEventListener("click", function(){
+        try{
+          window.speechSynthesis.cancel();
+        }catch(e){}
+        setFeedback("Lecture arrêtée.");
+      });
+    }
+  });
+
+// ULTRA MODE
+
+// 🎯 GUIDAGE INTELLIGENT
+
+function autoGuide(){
+  const status = getStatus();
+  const ready = isReady();
+  const lang = getLang();
+
+  let text = "";
+
+  if(lang === "dioula"){
+    if(!status || status.includes("pending")){
+      text = "I bɛ se ka baara daminɛ. Bɔ En cours.";
+    }else if(status.includes("progress") && !ready){
+      text = "Ni fini ye labɛlen, bɔ Prêt.";
+    }else if(ready && !status.includes("done")){
+      text = "Bɔ Terminé ka commande ban.";
+    }
+  }else{
+    if(!status || status.includes("pending")){
+      text = "Appuie sur EN COURS pour démarrer.";
+    }else if(status.includes("progress") && !ready){
+      text = "Quand le linge est prêt, appuie sur PRÊT.";
+    }else if(ready && !status.includes("done")){
+      text = "Appuie sur TERMINÉ pour finaliser.";
+    }
+  }
+
+  if(text){
+    speak(text);
+    setFeedback(text);
+  }
+}
+
+function openUltra(){
+  var modal = document.getElementById("ultra-mode");
+  if(modal){
+    modal.style.display = "flex";
+  }
+  updateUltra();
+  setTimeout(autoGuide, 500);
+}
+
+function closeUltra(){
+  var modal = document.getElementById("ultra-mode");
+  if(modal){
+    modal.style.display = "none";
+  }
+}
+
+function getStatus(){
+  var el = document.getElementById("ultra-status-raw");
+  return el ? String(el.value || "").toLowerCase().trim() : "";
+}
+
+function isReady(){
+  var el = document.getElementById("ultra-ready-raw");
+  return el ? String(el.value || "").trim() === "1" : false;
+}
+
+function updateUltra(){
+  var status = getStatus();
+
+  var btn = document.getElementById("ultra-btn");
+  var action = document.getElementById("ultra-action");
+  var label = document.getElementById("ultra-label");
+
+  if(!btn || !action || !label) return;
+
+  if(status === "done"){
+    label.innerText = "✅ Commande déjà terminée";
+    btn.innerText = "🏁 TERMINÉ";
+    btn.style.background = "#0f172a";
+    btn.style.color = "#fff";
+    action.value = "done";
+    return;
+  }
+
+  if(status === "ready"){
+    label.innerText = "👉 Terminer la commande";
+    btn.innerText = "🏁 TERMINÉ";
+    btn.style.background = "#0f172a";
+    btn.style.color = "#fff";
+    action.value = "done";
+    return;
+  }
+
+  if(status === "in_progress"){
+    label.innerText = "👉 Marquer prêt";
+    btn.innerText = "✅ PRÊT";
+    btn.style.background = "#16a34a";
+    btn.style.color = "#fff";
+    action.value = "ready";
+    return;
+  }
+
+  label.innerText = "👉 Démarrer";
+  btn.innerText = "🧺 EN COURS";
+  btn.style.background = "#2563eb";
+  btn.style.color = "#fff";
+  action.value = "start";
+}
+
+document.addEventListener("DOMContentLoaded", function(){
+  var btn = document.getElementById("btn-ultra-mode");
+  if(btn){
+    btn.onclick = function(){
+      openUltra();
+    };
+  }
+});
+
+})();
+</script>
+
+<script>
+(function(){
+  let FAGNI_VOICE_RECO = null;
+
+  function voiceResult(msg){
+    const el = document.getElementById("voice-command-result");
+    if(el) el.textContent = msg;
+  }
+
+  function normalizeVoiceText(value){
+    return String(value || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+  }
+
+  function mapVoiceCommand(text){
+    const t = normalizeVoiceText(text);
+
+    if (t.includes("termine") || t.includes("terminer") || t.includes("fini") || t.includes("finir")) {
+      return {action: "done", label: "🏁 TERMINÉ"};
+    }
+    if (t.includes("pret") || t.includes("prete") || t.includes("ready")) {
+      return {action: "ready", label: "✅ PRÊT"};
+    }
+    if (t.includes("en cours") || t.includes("demarrer") || t.includes("commencer") || t.includes("debut")) {
+      return {action: "start", label: "🧺 EN COURS"};
+    }
+    return null;
+  }
+
+  function getCurrentLaundryStage(){
+    const rawStatusEl = document.getElementById("ultra-status-raw");
+    const readyEl = document.getElementById("ultra-ready-raw");
+
+    const rawStatus = rawStatusEl ? String(rawStatusEl.value || "").toLowerCase().trim() : "";
+    const ready = readyEl ? String(readyEl.value || "").trim() === "1" : false;
+
+    if(rawStatus === "done"){
+      return "done";
+    }
+    if(ready){
+      return "ready";
+    }
+    if(rawStatus === "in_progress" || rawStatus.indexOf("progress") >= 0){
+      return "in_progress";
+    }
+    return "pending";
+  }
+
+  function getAllowedVoiceAction(){
+    const stage = getCurrentLaundryStage();
+    if(stage === "pending") return "start";
+    if(stage === "in_progress") return "ready";
+    if(stage === "ready") return "done";
+    return null;
+  }
+
+  function getAllowedVoiceLabel(action){
+    if(action === "start") return "🧺 EN COURS";
+    if(action === "ready") return "✅ PRÊT";
+    if(action === "done") return "🏁 TERMINÉ";
+    return "";
+  }
+
+  function getVoiceGuidanceText(){
+    const allowed = getAllowedVoiceAction();
+    if(allowed === "start") return "Dis seulement : en cours.";
+    if(allowed === "ready") return "Dis seulement : prêt.";
+    if(allowed === "done") return "Dis seulement : terminé.";
+    return "Aucune action vocale disponible. La commande est déjà terminée.";
+  }
+
+  function setVoiceCommand(command, heardText){
+    const result = document.getElementById("voice-command-result");
+    const form = document.getElementById("voice-command-form");
+    const action = document.getElementById("voice-command-action");
+    const submit = document.getElementById("voice-command-submit");
+
+    if(!result || !form || !action || !submit) return;
+
+    const allowed = getAllowedVoiceAction();
+
+    if(!allowed){
+      form.style.display = "none";
+      result.textContent = "Commande déjà terminée. Aucune action vocale disponible.";
+      return;
+    }
+
+    if(!command){
+      form.style.display = "none";
+      result.textContent = "Commande non reconnue. " + getVoiceGuidanceText();
+      return;
+    }
+
+    if(command.action !== allowed){
+      form.style.display = "none";
+      result.textContent = "Action non autorisée maintenant. " + getVoiceGuidanceText();
+      return;
+    }
+
+    action.value = command.action;
+    submit.textContent = "✅ Confirmer : " + command.label;
+    form.style.display = "";
+    result.textContent = "Commande reconnue : " + command.label + (heardText ? " — " + heardText : "");
+  }
+
+  window.startVoiceRecognition = function(){
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if(!SpeechRecognition){
+      voiceResult("Reconnaissance vocale non disponible sur ce navigateur.");
+      return;
+    }
+
+    if(!FAGNI_VOICE_RECO){
+      try{
+        FAGNI_VOICE_RECO = new SpeechRecognition();
+        FAGNI_VOICE_RECO.lang = "fr-FR";
+        FAGNI_VOICE_RECO.interimResults = false;
+        FAGNI_VOICE_RECO.maxAlternatives = 3;
+        FAGNI_VOICE_RECO.continuous = false;
+
+        FAGNI_VOICE_RECO.onstart = function(){
+          voiceResult("🎤 J’écoute… " + getVoiceGuidanceText());
+        };
+
+        FAGNI_VOICE_RECO.onresult = function(event){
+          let heard = "";
+          try{
+            heard = event.results[0][0].transcript || "";
+          }catch(e){}
+          const command = mapVoiceCommand(heard);
+          setVoiceCommand(command, heard);
+        };
+
+        FAGNI_VOICE_RECO.onerror = function(event){
+          const code = event && event.error ? event.error : "unknown";
+          voiceResult("Erreur vocale : " + code);
+        };
+
+        FAGNI_VOICE_RECO.onend = function(){};
+      }catch(e){
+        voiceResult("Impossible d’initialiser la commande vocale.");
+        return;
+      }
+    }
+
+    try{
+      setVoiceCommand(null, "");
+      FAGNI_VOICE_RECO.start();
+    }catch(e){
+      voiceResult("Impossible de démarrer l’écoute.");
+    }
+  };
+
+  window.stopVoiceRecognition = function(){
+    if(FAGNI_VOICE_RECO){
+      try{
+        FAGNI_VOICE_RECO.stop();
+        voiceResult("Écoute arrêtée.");
+      }catch(e){
+        voiceResult("Arrêt impossible.");
+      }
+    } else {
+      voiceResult("Aucune écoute en cours.");
+    }
+  };
+
+  document.addEventListener("DOMContentLoaded", function(){
+    const startBtn = document.getElementById("voice-start-btn");
+    const stopBtn = document.getElementById("voice-stop-btn");
+    if(startBtn && !startBtn.onclick){
+      startBtn.onclick = window.startVoiceRecognition;
+    }
+    if(stopBtn && !stopBtn.onclick){
+      stopBtn.onclick = window.stopVoiceRecognition;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(SpeechRecognition){
+      voiceResult("Commande vocale prête. " + getVoiceGuidanceText());
+    } else {
+      voiceResult("Reconnaissance vocale non disponible sur ce navigateur.");
+    }
+  });
+})();
+</script>
+
+
+<script>
+(function(){
+  function byId(id){
+    return document.getElementById(id);
+  }
+
+  function getRawStatus(){
+    var el = byId("ultra-status-raw");
+    return el ? String(el.value || "").toLowerCase().trim() : "";
+  }
+
+  function getReadyFlag(){
+    var el = byId("ultra-ready-raw");
+    return el ? String(el.value || "").trim() === "1" : false;
+  }
+
+  function getStage(){
+    var status = getRawStatus();
+    var ready = getReadyFlag();
+
+    if(status === "done") return "done";
+    if(ready) return "ready";
+    if(status === "in_progress" || status.indexOf("progress") >= 0) return "in_progress";
+    return "pending";
+  }
+
+  window.updateOneButton = function(){
+    var btn = byId("one-button");
+    if(!btn) return;
+
+    var stage = getStage();
+
+    btn.disabled = false;
+    btn.style.color = "#fff";
+
+    if(stage === "pending"){
+      btn.innerText = "🧺 DÉMARRER";
+      btn.dataset.action = "start";
+      btn.style.background = "#2563eb";
+      return;
+    }
+
+    if(stage === "in_progress"){
+      btn.innerText = "✅ MARQUER PRÊT";
+      btn.dataset.action = "ready";
+      btn.style.background = "#16a34a";
+      return;
+    }
+
+    if(stage === "ready"){
+      btn.innerText = "🏁 TERMINER";
+      btn.dataset.action = "done";
+      btn.style.background = "#0f172a";
+      return;
+    }
+
+    btn.innerText = "✔ TERMINÉ";
+    btn.dataset.action = "";
+    btn.disabled = true;
+    btn.style.background = "#94a3b8";
+  };
+
+  window.submitOneButtonAction = function(){
+    var btn = byId("one-button");
+    if(!btn) return false;
+
+    var action = btn.dataset.action;
+    if(!action) return false;
+
+    var form = document.createElement("form");
+    form.method = "POST";
+
+    var csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+    if(csrf){
+      var token = document.createElement("input");
+      token.type = "hidden";
+      token.name = "csrfmiddlewaretoken";
+      token.value = csrf.value;
+      form.appendChild(token);
+    }
+
+    var a = document.createElement("input");
+    a.type = "hidden";
+    a.name = "action";
+    a.value = action;
+    form.appendChild(a);
+
+    document.body.appendChild(form);
+    form.submit();
+    return false;
+  };
+
+  document.addEventListener("DOMContentLoaded", function(){
+    var btn = byId("one-button");
+    if(btn){
+      btn.onclick = window.submitOneButtonAction;
+    }
+    window.updateOneButton();
+  });
+})();
+</script>
+
 {% endblock %}

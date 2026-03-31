@@ -43,6 +43,9 @@ from django.utils.dateparse import parse_date
 from django.utils.encoding import smart_str
 
 from orders.utils.pricing import compute_order_amounts
+from orders.utils import build_order_canonical_snapshot
+from orders.utils.address_rules import clean_address_or_empty, is_probably_valid_address
+
 from orders.utils.settings_loader import get_pricing_settings
 from orders.utils.geocoding import ensure_order_geocoded
 from orders.utils.geo import resolve_pickup_coords, resolve_delivery_coords, resolve_provider_coords
@@ -60,7 +63,11 @@ from .models import (
     LogisticsConfig,
 )
 from partners.models import LaundryPartner, DeliveryPartner
+from mlm.services import generate_mlm_commissions_for_order
+from wallets.models import Wallet
+from mlm.models import ReferralLink, ReferralCommission
 from .assignment import assign_best_driver, assign_best_laundry
+from .utils import build_order_display_context
 from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -85,7 +92,36 @@ logger = logging.getLogger(__name__)
 #  Helpers AJAX / Client auth
 # =========================
 
+
+def _build_client_display_items(order):
+    rows = []
+    try:
+        qs = order.items.all()
+    except Exception:
+        return rows
+
+    for it in qs:
+        label = (
+            getattr(it, "name", None)
+            or getattr(it, "designation", None)
+            or "Article"
+        )
+        qty = getattr(it, "quantity", None) or 1
+        price = (
+            getattr(it, "total_price", None)
+            or getattr(it, "unit_price", None)
+            or 0
+        )
+        rows.append({
+            "label": label,
+            "qty": qty,
+            "price": price,
+        })
+    return rows
+
+
 CLIENT_PHONE_COOKIE = "client_phone"
+CLIENT_REF_COOKIE = "client_ref_code"
 
 
 def _is_json_request(request) -> bool:
@@ -104,6 +140,12 @@ def _client_phone(request) -> str | None:
     if phone:
         phone = phone.strip()
     return phone or None
+
+
+def _client_ref_code(request) -> str | None:
+    ref = request.GET.get("ref") or request.COOKIES.get(CLIENT_REF_COOKIE)
+    ref = (ref or "").strip().upper()
+    return ref or None
 
 
 def client_login_required(view_func):
@@ -128,21 +170,35 @@ _client_required = client_login_required
 def client_login(request):
     """
     Login client minimal: on saisit un téléphone => pose cookie client_phone.
-    (Tu peux durcir plus tard: OTP, code SMS, etc.)
+    Capture aussi un éventuel code de parrainage entrant (?ref=CODE).
     """
-    if request.method == "GET":
-        return render(request, "orders/client_login.html", {"ok": True})
+    incoming_ref = (request.GET.get("ref") or request.COOKIES.get(CLIENT_REF_COOKIE) or "").strip().upper()
 
+    if request.method == "GET":
+        resp = render(request, "orders/client_login.html", {"ok": True, "incoming_ref": incoming_ref})
+        if incoming_ref:
+            resp.set_cookie(
+                CLIENT_REF_COOKIE,
+                incoming_ref,
+                max_age=30 * 24 * 3600,
+                httponly=True,
+                samesite="Lax",
+            )
+        return resp
 
     phone = (request.POST.get("phone") or "").strip()
+    incoming_ref = (request.POST.get("incoming_ref") or incoming_ref or "").strip().upper()
+
     if not phone:
-        # en JSON si AJAX
         if _is_json_request(request):
             return JsonResponse({"ok": False, "error": "missing_phone"}, status=400)
-        return render(request, "orders/client_login.html", {"ok": False, "error": "missing_phone"})
+        return render(
+            request,
+            "orders/client_login.html",
+            {"ok": False, "error": "missing_phone", "incoming_ref": incoming_ref},
+        )
 
-    resp = redirect("orders:client_home")  # adapte si tu as un autre nom de route
-    # cookie 7 jours, HTTPOnly (safe), SameSite Lax
+    resp = redirect("orders:client_home")
     resp.set_cookie(
         CLIENT_PHONE_COOKIE,
         phone,
@@ -150,6 +206,16 @@ def client_login(request):
         httponly=True,
         samesite="Lax",
     )
+
+    if incoming_ref:
+        resp.set_cookie(
+            CLIENT_REF_COOKIE,
+            incoming_ref,
+            max_age=30 * 24 * 3600,
+            httponly=True,
+            samesite="Lax",
+        )
+
     return resp
 
 
@@ -157,6 +223,146 @@ def client_login(request):
 def client_logout(request):
     resp = redirect("orders:client_login")
     resp.delete_cookie(CLIENT_PHONE_COOKIE)
+    return resp
+
+
+@client_login_required
+def client_wallet(request):
+    phone = _client_phone(request)
+    customer = Customer.objects.filter(phone=phone).order_by("-id").first()
+    if not customer:
+        messages.error(request, "Session client invalide. Reconnecte-toi.")
+        return redirect("orders:client_login")
+
+    wallet = (
+        Wallet.objects
+        .filter(owner_type="customer", customer=customer)
+        .order_by("-id")
+        .first()
+    )
+
+    if wallet:
+        transactions = (
+            WalletTransaction.objects
+            .filter(wallet=wallet)
+            .select_related("order")
+            .order_by("-created_at")[:50]
+        )
+        balance = getattr(wallet, "balance", Decimal("0.00")) or Decimal("0.00")
+    else:
+        transactions = []
+        balance = Decimal("0.00")
+
+    ctx = {
+        "phone": phone,
+        "customer": customer,
+        "wallet": wallet,
+        "balance": balance,
+        "transactions": transactions,
+    }
+    resp = render(request, "orders/client_wallet.html", ctx)
+    resp["Cache-Control"] = "no-store"
+    return resp
+
+
+@client_login_required
+def client_referrals(request):
+    phone = _client_phone(request)
+    customer = Customer.objects.filter(phone=phone).order_by("-id").first()
+    if not customer:
+        messages.error(request, "Session client invalide. Reconnecte-toi.")
+        return redirect("orders:client_login")
+
+    def _clean_phone_for_code(value: str) -> str:
+        raw = re.sub(r"\D+", "", str(value or ""))
+        if raw:
+            return raw[-8:]
+        return f"{customer.id:04d}"
+
+    def _build_referral_code() -> str:
+        base = f"FAGNI-{_clean_phone_for_code(getattr(customer, 'phone', ''))}"
+        code = base
+        i = 2
+        while ReferralLink.objects.exclude(customer=customer).filter(referral_code=code).exists():
+            code = f"{base}-{i}"
+            i += 1
+        return code
+
+    activate_now = (request.GET.get("activate_ref") or "").strip() == "1"
+
+    profile = (
+        ReferralLink.objects
+        .select_related("customer", "sponsor")
+        .filter(customer=customer)
+        .order_by("-id")
+        .first()
+    )
+
+    if not profile and activate_now:
+        profile = ReferralLink.objects.create(
+            customer=customer,
+            referral_code=_build_referral_code(),
+            actor_type="client",
+        )
+        messages.success(request, "Ton code de parrainage FAGNI est maintenant activé.")
+
+    if profile:
+        direct_referrals = list(
+            profile.direct_referrals
+            .select_related("customer")
+            .order_by("-created_at")[:50]
+        )
+
+        commissions = list(
+            ReferralCommission.objects
+            .filter(beneficiary_profile=profile)
+            .select_related("order", "order__customer")
+            .order_by("-created_at")[:50]
+        )
+
+        total_commissions = (
+            ReferralCommission.objects
+            .filter(beneficiary_profile=profile)
+            .aggregate(total=Sum("commission_amount"))
+            .get("total")
+            or 0
+        )
+
+        referral_url = f"https://fagni.app/invite/{profile.referral_code}"
+        referral_whatsapp_text = (
+            "Je t’invite à utiliser FAGNI pour ton linge 👌\n"
+            "Utilise mon lien de parrainage pour découvrir le service :\n"
+            f"{referral_url}"
+        )
+        referral_whatsapp_url = (
+            "https://wa.me/?text=" + quote(referral_whatsapp_text)
+        )
+    else:
+        direct_referrals = []
+        commissions = []
+        total_commissions = 0
+        referral_url = ""
+        referral_whatsapp_text = ""
+        referral_whatsapp_url = ""
+
+    projected_gain_low = 10000
+    projected_gain_high = 30000
+
+    ctx = {
+        "phone": phone,
+        "customer": customer,
+        "profile": profile,
+        "direct_referrals": direct_referrals,
+        "commissions": commissions,
+        "total_commissions": total_commissions,
+        "referral_url": referral_url,
+        "referral_whatsapp_text": referral_whatsapp_text,
+        "referral_whatsapp_url": referral_whatsapp_url,
+        "projected_gain_low": projected_gain_low,
+        "projected_gain_high": projected_gain_high,
+    }
+    resp = render(request, "orders/client_referrals.html", ctx)
+    resp["Cache-Control"] = "no-store"
     return resp
 
 
@@ -373,7 +579,6 @@ def client_order_live_status(request, order_id: int):
         "evidence_counts": evidence_counts,
         "rating": rating,
     })
-
 
 
 @require_http_methods(["POST"])
@@ -888,7 +1093,7 @@ def fagni_compute_fees(total_ht: Decimal):
     else:
         service_fee = Decimal('0')
 
-    # Frais de livraison : pour l’instant min fixe si total > 0
+    # Frais de livraison : pour l'instant min fixe si total > 0
     default_delivery_min = getattr(settings, 'FAGNI_DELIVERY_MIN_FEE', '0')
     try:
         DELIVERY_MIN = Decimal(str(default_delivery_min))
@@ -1379,7 +1584,6 @@ def ops_dashboard(request):
             })
 
 
-
     # Alertes drivers (offline > 10min) — global
     ACTIVE_MS = 10 * 60  # 10 minutes en secondes
     drivers_offline = []
@@ -1466,6 +1670,7 @@ def ops_weighing_resolve(request, order_id: int):
 
     order = get_object_or_404(Order, pk=order_id)
 
+    
 
     ow, _ = OrderWeighing.objects.get_or_create(order=order)
     # Garde-fou : page de résolution seulement pour les pesées "contestées"
@@ -1527,9 +1732,9 @@ def ops_weighing_resolve(request, order_id: int):
         "scale_url": scale_url,
         "latest_issue": latest_issue,
         "latest_scale": latest_scale,
+        "snapshot": snapshot,
     }
     return render(request, "orders/ops_weighing_resolve.html", ctx)
-
 
 
 # ============================================================
@@ -1686,7 +1891,6 @@ def ops_planning(request):
     return render(request, "orders/ops_planning.html", context)
 
 
-
 @require_POST
 @login_required
 def ops_update_step(request, order_id, action):
@@ -1702,6 +1906,7 @@ def ops_update_step(request, order_id, action):
     """
     order = get_object_or_404(Order, pk=order_id)
 
+    
     # POST only (évite clic direct / appels GET)
     if request.method != "POST":
         messages.error(request, "Action refusée (méthode invalide).")
@@ -1782,7 +1987,7 @@ def ops_update_step(request, order_id, action):
     if (not skip_pricing_guard) and (not has_items):
         messages.error(
             request,
-            "Commande non chiffrée (aucun article / prestation). Ajoute au moins 1 prestation avant de valider l’OPS."
+            "Commande non chiffrée (aucun article / prestation). Ajoute au moins 1 prestation avant de valider l'OPS."
         )
         return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}")
 
@@ -1818,7 +2023,7 @@ def ops_update_step(request, order_id, action):
         pass
 
     # ------------------------------------------------------------
-    # 4) ✅ VALIDER L’ÉTAPE
+    # 4) ✅ VALIDER L'ÉTAPE
     # ------------------------------------------------------------
     # Ne pas écraser wash_complete_time si déjà renseigné (cas wash_done)
     if (action != "wash_done") or (not already_done):
@@ -1840,7 +2045,7 @@ def ops_update_step(request, order_id, action):
         try:
             from orders.models import DeliveryLeg
     
-            # 1) s’assurer qu’un return existe
+            # 1) s'assurer qu'un return existe
             DeliveryLeg.objects.get_or_create(
                 order=order,
                 leg_type="return",
@@ -2063,7 +2268,7 @@ def order_mark_paid(request, order_id):
                 pay_amt = None
 
 
-        # Référence idempotente si l’utilisateur ne saisit rien
+        # Référence idempotente si l'utilisateur ne saisit rien
         ref_eff = ref or f"BO-PAID-{order.id}-{timezone.now().strftime('%Y%m%d%H%M%S')}"
 
         if remaining > 0:
@@ -2612,7 +2817,7 @@ def export_finance_xlsx(request):
 def _safe_dec(value):
     """
     Convertit en Decimal en gérant None / types bizarres.
-    Renvoie Decimal('0') si la valeur n’est pas convertible.
+    Renvoie Decimal('0') si la valeur n'est pas convertible.
     """
     if value is None:
         return Decimal("0")
@@ -2726,7 +2931,7 @@ def _compute_order_pricing(order):
 
     # ✅ Réconciliation breakdown (legacy) :
     # Si la DB a un total TTC > computed_total et que service_fee est à 0,
-    # on tente d’expliquer l’écart comme "service FAGNI manquant".
+    # on tente d'expliquer l'écart comme "service FAGNI manquant".
     # Cas typique: vat_fagni=90 => service≈500 (TVA 18%).
     if stored_total > 0 and computed_total > 0:
         delta = stored_total - computed_total  # ce qui manque dans le breakdown
@@ -2744,7 +2949,7 @@ def _compute_order_pricing(order):
             if inferred > 0 and abs(inferred - delta) <= Decimal("1"):
                 service_fee = inferred
             else:
-                # 2) Sinon: si delta reste "raisonnable", on l’affecte au service_fee
+                # 2) Sinon: si delta reste "raisonnable", on l'affecte au service_fee
                 cap = max(Decimal("5000"), (items_total + delivery_fee) * Decimal("0.5"))
                 if delta <= cap:
                     service_fee = delta
@@ -3060,7 +3265,7 @@ def finance_dashboard(request):
         "logistic_margin_total": logistic_margin_total,
         "service_fee_total": service_fee_total,
 
-        "vat_rate": vat_rate,  # utile si tu veux l’afficher
+        "vat_rate": vat_rate,  # utile si tu veux l'afficher
     }
 
     return render(request, "orders/finance_dashboard.html", context)
@@ -3998,7 +4203,7 @@ def create(request):
     - Client (nom, téléphone, adresse, lat/lng)
     - Lignes de prestations issues du catalogue
     - Photos multiples par ligne (photos_0, photos_1, ...)
-    - Assignation automatique d’un livreur si possible
+    - Assignation automatique d'un livreur si possible
     - Code parrain (referral_code)
     - Logistique : collecte / livraison validées (Bloc 1)
     """
@@ -4039,7 +4244,7 @@ def create(request):
         delivery_date_val = ""
         delivery_slot_val = ""
 
-    # Contexte de base (utilisé aussi en cas d’erreur POST)
+    # Contexte de base (utilisé aussi en cas d'erreur POST)
     context = {
         "service_categories": service_categories,
         "service_items": service_items,
@@ -4092,18 +4297,22 @@ def create(request):
     # --- POST : on traite la commande ---
     phone = (request.POST.get("client_phone") or "").strip()
     name = (request.POST.get("client_name") or "").strip()
-    address = (request.POST.get("client_address") or "").strip()
+    address = clean_address_or_empty((request.POST.get("client_address") or "").strip())
 
     lat_raw = (request.POST.get("client_lat") or "").strip()
     lng_raw = (request.POST.get("client_lng") or "").strip()
 
-    delivery_address_input = (request.POST.get("delivery_address") or "").strip()
+    delivery_address_input = clean_address_or_empty((request.POST.get("delivery_address") or "").strip())
     referral_code = referral_initial
     notes = (request.POST.get("order_notes") or "").strip()
 
     # 1) Validation minimale client
     if not phone or not name:
         context["error"] = "Merci de renseigner au moins le nom et le téléphone du client."
+        return render(request, "orders/create.html", context)
+
+    if not is_probably_valid_address(address):
+        context["error"] = "Merci de renseigner une adresse de collecte plus précise."
         return render(request, "orders/create.html", context)
 
     # 2) Création / mise à jour du client
@@ -4156,10 +4365,10 @@ def create(request):
     )
 
     # 4) Adresses collecte / livraison + géolocalisation
-    order.pickup_address = address or customer.address or ""
+    order.pickup_address = clean_address_or_empty(address or customer.address or "")
 
     if delivery_address_input:
-        order.delivery_address = delivery_address_input
+        order.delivery_address = clean_address_or_empty(delivery_address_input)
     else:
         # Si rien saisi, livraison = collecte
         order.delivery_address = order.pickup_address
@@ -4174,7 +4383,7 @@ def create(request):
     except (TypeError, ValueError):
         order.pickup_lng = None
 
-    # Pour l’instant, si aucune lat/lng spécifique pour la livraison :
+    # Pour l'instant, si aucune lat/lng spécifique pour la livraison :
     # - si adresse livraison = collecte → on copie
     delivery_lat_raw = request.POST.get("delivery_lat") or ""
     delivery_lng_raw = request.POST.get("delivery_lng") or ""
@@ -4198,7 +4407,7 @@ def create(request):
             request.POST, config
         )
     except ValidationError as e:
-        # On supprime la commande vide, on remonte l’erreur à l’UI
+        # On supprime la commande vide, on remonte l'erreur à l'UI
         order.delete()
         context["error"] = str(e)
         return render(request, "orders/create.html", context)
@@ -4234,7 +4443,7 @@ def create(request):
     # 1) Géocodage (avant assignation)
     ensure_order_geocoded(order, save=True)
 
-    # 2) Assignation automatique d’une blanchisserie (si autorisée) + raison
+    # 2) Assignation automatique d'une blanchisserie (si autorisée) + raison
     try:
         from orders.assignment import pick_best_laundry
         laundry, laundry_reason = pick_best_laundry(order)
@@ -4249,7 +4458,7 @@ def create(request):
         # order.laundry_partner_unassigned_reason = laundry_reason
         pass
 
-    # 3) Assignation automatique d’un livreur (si autorisée) + raison
+    # 3) Assignation automatique d'un livreur (si autorisée) + raison
     try:
         from orders.assignment import pick_best_driver
         driver, reason = pick_best_driver(order)
@@ -4258,6 +4467,67 @@ def create(request):
 
     if driver:
         order.delivery_partner = driver
+
+    # 3.b) Préparation logistique initiale
+    # - persiste les partenaires auto-assignés
+    # - synchronise les DeliveryLeg standard
+    # - normalise les statuts de jambes
+    try:
+        update_fields = []
+        if hasattr(order, "laundry_partner_id"):
+            update_fields.append("laundry_partner")
+        if hasattr(order, "delivery_partner_id"):
+            update_fields.append("delivery_partner")
+        if update_fields:
+            order.save(update_fields=update_fields)
+        else:
+            order.save()
+    except Exception:
+        order.save()
+
+    try:
+        from orders.models import sync_delivery_legs_for_order
+        sync_delivery_legs_for_order(order)
+    except Exception:
+        pass
+
+    try:
+        from orders.service_layer.legs import normalize_order_legs
+        normalize_order_legs(order, save=True)
+    except Exception:
+        pass
+
+    # 3.c) Bootstrap statut global commande
+    # Si la commande a déjà une assignation partenaire/logistique,
+    # on la sort de "pending" pour refléter un traitement réel en cours.
+    try:
+        has_laundry = bool(getattr(order, "laundry_partner_id", None))
+        has_driver = bool(getattr(order, "delivery_partner_id", None))
+        if getattr(order, "status", None) == "pending" and (has_laundry or has_driver):
+            order.status = "in_progress"
+            order.save(update_fields=["status"])
+
+            try:
+                _ensure_pickup_mission_for_order(order)
+            except Exception:
+                pass
+
+            # 🔥 RESYNC FINAL (clé du bug)
+            try:
+                from orders.models import sync_delivery_legs_for_order, DeliveryLeg
+                from orders.service_layer.legs import normalize_order_legs
+
+                sync_delivery_legs_for_order(order)
+                normalize_order_legs(order, save=True)
+
+                if getattr(order, "delivery_partner_id", None):
+                    DeliveryLeg.objects.filter(order=order).exclude(status="canceled").update(
+                        driver_id=order.delivery_partner_id
+                    )
+            except Exception:
+                pass
+    except Exception:
+        pass
 
     # 9) Lignes de commande (PRIX VERROUILLÉS CÔTÉ SERVEUR)
     service_ids = request.POST.getlist("service_id[]")
@@ -4859,6 +5129,42 @@ def client_home(request):
         "active_orders_count": active_orders_count,
         "unpaid_orders_count": unpaid_orders_count,
     }
+
+    # LOT 17B — adresse courte pour affichage home client
+    def _short_client_address(v):
+        raw = str(v or "").strip()
+        if not raw:
+            return "—"
+
+        parts = [x.strip() for x in raw.split(",") if x.strip()]
+
+        # Exemple:
+        # 44, Rue..., Riviera 3, Riviéra 3, Cocody, Abidjan, Côte d’Ivoire
+        # => on préfère une zone utile au client: "Riviéra 3, Cocody"
+        if len(parts) >= 4:
+            return ", ".join(parts[-4:-2])
+
+        if len(parts) >= 2:
+            return ", ".join(parts[-2:])
+
+        return raw if raw else "Adresse à confirmer"
+
+    try:
+        _orders_for_home = list(orders)
+    except Exception:
+        _orders_for_home = []
+
+    for _o in _orders_for_home:
+        full_addr = (
+            getattr(_o, "pickup_address", None)
+            or getattr(getattr(_o, "customer", None), "address", None)
+            or ""
+        )
+        try:
+            _o.pickup_address_short = _short_client_address(full_addr)
+        except Exception:
+            _o.pickup_address_short = "Adresse à confirmer"
+
     return render(request, "orders/client_home.html", ctx)
 
 
@@ -4906,7 +5212,7 @@ def client_new_order(request):
 
     if request.method == "POST":
         name = _clean_str(request.POST.get("name"))
-        address = _clean_str(request.POST.get("address"))
+        address = clean_address_or_empty(_clean_str(request.POST.get("address")))
         notes = _clean_str(request.POST.get("notes"))
 
         pickup_lat = _clean_float(request.POST.get("pickup_lat"))
@@ -4917,8 +5223,8 @@ def client_new_order(request):
 
         if not name:
             error = "Merci de renseigner ton nom."
-        elif not address:
-            error = "Merci de renseigner ton adresse."
+        elif not is_probably_valid_address(address):
+            error = "Merci de renseigner une adresse plus précise."
         else:
             customer_defaults = {
                 "name": name,
@@ -4945,6 +5251,52 @@ def client_new_order(request):
                 phone=phone,
                 defaults=customer_defaults,
             )
+
+            # -------------------------------------------------
+            # LOT 22B : rattachement sponsor si code referral entrant
+            # -------------------------------------------------
+            incoming_ref = _client_ref_code(request)
+            existing_profile = (
+                ReferralLink.objects
+                .select_related("customer", "sponsor")
+                .filter(customer=customer)
+                .order_by("-id")
+                .first()
+            )
+
+            if not existing_profile:
+                sponsor_profile = None
+                if incoming_ref:
+                    sponsor_profile = (
+                        ReferralLink.objects
+                        .select_related("customer")
+                        .filter(referral_code=incoming_ref)
+                        .exclude(customer=customer)
+                        .order_by("-id")
+                        .first()
+                    )
+
+                def _clean_phone_for_code(value: str) -> str:
+                    raw = re.sub(r"\D+", "", str(value or ""))
+                    if raw:
+                        return raw[-8:]
+                    return f"{customer.id:04d}"
+
+                def _build_customer_referral_code() -> str:
+                    base = f"FAGNI-{_clean_phone_for_code(getattr(customer, 'phone', ''))}"
+                    code_ = base
+                    i = 2
+                    while ReferralLink.objects.exclude(customer=customer).filter(referral_code=code_).exists():
+                        code_ = f"{base}-{i}"
+                        i += 1
+                    return code_
+
+                ReferralLink.objects.create(
+                    customer=customer,
+                    referral_code=_build_customer_referral_code(),
+                    actor_type="client",
+                    sponsor=sponsor_profile,
+                )
 
             code = uuid.uuid4().hex[:8].upper()
             while Order.objects.filter(code=code).exists():
@@ -5001,6 +5353,11 @@ def client_new_order(request):
             except Exception:
                 pass
 
+            try:
+                _ensure_pickup_mission_for_order(order)
+            except Exception:
+                pass
+
             return redirect("orders:client_new_order_step2", order_id=order.id)
 
     return render(request, "orders/client_new_order.html", {
@@ -5009,7 +5366,53 @@ def client_new_order(request):
         "error": error,
         "name_init": name_init,
         "address_init": address_init,
+        "google_maps_api_key": getattr(settings, "GOOGLE_MAPS_API_KEY", ""),
     })
+
+
+
+def _ensure_pickup_mission_for_order(order):
+    """
+    Crée une mission logistique de collecte si elle n'existe pas déjà.
+    Retourne la mission ou None.
+    """
+    try:
+        from logistics.models import Mission
+        existing = Mission.objects.filter(
+            order=order,
+            mission_type="pickup_from_customer",
+        ).first()
+        if existing:
+            return existing
+
+        from logistics.adapters import (
+            get_order_source_address_v2,
+            get_order_destination_address_v2,
+            get_order_contact_name,
+            get_order_contact_phone,
+        )
+        from logistics.services import create_mission_for_order
+
+        source_address = get_order_source_address_v2(order)
+        destination_address = get_order_destination_address_v2(order)
+
+        if source_address is None or destination_address is None:
+            return None
+
+        mission = create_mission_for_order(
+            order=order,
+            mission_type="pickup_from_customer",
+            source_address=source_address,
+            destination_address=destination_address,
+            contact_name=get_order_contact_name(order),
+            contact_phone=get_order_contact_phone(order),
+            priority="normal",
+            instructions="Mission de collecte créée automatiquement depuis la commande",
+            sequence_index=1,
+        )
+        return mission
+    except Exception:
+        return None
 
 
 # -------------------------------------------------------------------
@@ -5027,20 +5430,42 @@ def _client_order_amounts(order: Order) -> dict:
     """
     Montants côté client = proxy vers le moteur canonique (_compute_order_pricing).
 
-    Objectif: 1 seule source de vérité pour éviter toute divergence.
+    Règle UX FAGNI :
+    - le client voit uniquement des montants TTC cohérents
+    - pas de TVA séparée
+    - pas de service fee séparé
+    - Prestations affichées + Livraison = Total TTC
     """
     pricing = _compute_order_pricing(order)
 
-    # prestation_total côté client = items_total (plus fiable que prestation_total si data legacy)
-    prestation_total = pricing.get("items_total", Decimal("0"))
+    total_ttc = pricing.get("total_client", Decimal("0")) or Decimal("0")
+    delivery_fee = pricing.get("delivery_fee", Decimal("0")) or Decimal("0")
+
+    try:
+        total_ttc = Decimal(str(total_ttc))
+    except Exception:
+        total_ttc = Decimal("0")
+
+    try:
+        delivery_fee = Decimal(str(delivery_fee))
+    except Exception:
+        delivery_fee = Decimal("0")
+
+    display_prestation_total = total_ttc - delivery_fee
+    if display_prestation_total < Decimal("0"):
+        display_prestation_total = Decimal("0")
 
     return {
-        "prestation_total": prestation_total,
-        "service_fee": pricing.get("service_fee", Decimal("0")),
-        "delivery_fee": pricing.get("delivery_fee", Decimal("0")),
-        "express_extra_fee": pricing.get("express_extra_fee", Decimal("0")),
-        "vat_fagni": pricing.get("vat_fagni", Decimal("0")),
-        "total_ttc": pricing.get("total_client", Decimal("0")),
+        # affichage client
+        "prestation_total": display_prestation_total,
+        "delivery_fee": delivery_fee,
+        "total_ttc": total_ttc,
+
+        # valeurs internes conservées si besoin ailleurs
+        "_items_total_internal": pricing.get("items_total", Decimal("0")),
+        "_service_fee_internal": pricing.get("service_fee", Decimal("0")),
+        "_express_extra_fee_internal": pricing.get("express_extra_fee", Decimal("0")),
+        "_vat_fagni_internal": pricing.get("vat_fagni", Decimal("0")),
     }
 
 
@@ -5059,6 +5484,7 @@ def client_order_payment_ui_json(request, order_id):
     order = get_object_or_404(Order, id=order_id)
 
     
+    
     # Sécurité alignée sur client_order_detail (phone session)
     phone = _client_phone(request)
     if not phone:
@@ -5074,38 +5500,37 @@ def client_order_payment_ui_json(request, order_id):
         return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
 
 
-    amounts = _client_order_amounts(order)  # {'total_ttc': Decimal, ...}
-    total = amounts.get("total_ttc") or Decimal("0")
-    paid  = getattr(order, "amount_paid", None) or Decimal("0")
+    snapshot = build_order_canonical_snapshot(order)
 
-    # normalise
     try:
-        total = Decimal(str(total))
+        total = Decimal(str(snapshot.get("total_client_ttc", 0) or 0))
     except Exception:
         total = Decimal("0")
     try:
-        paid = Decimal(str(paid))
+        paid = Decimal(str(snapshot.get("amount_paid", 0) or 0))
     except Exception:
         paid = Decimal("0")
+    try:
+        remain = Decimal(str(snapshot.get("amount_due", 0) or 0))
+    except Exception:
+        remain = Decimal("0")
 
     if paid < 0:
         paid = Decimal("0")
     if total < 0:
         total = Decimal("0")
-
-    remain = total - paid
     if remain < 0:
         remain = Decimal("0")
 
     if total <= 0:
         payment_ui = "waiting_amount"
         payment_status_ui = "unpaid"
+    elif not snapshot.get("can_pay", False) or paid >= total:
+        payment_ui = "paid"
+        payment_status_ui = "paid"
     elif paid <= 0:
         payment_ui = "unpaid"
         payment_status_ui = "unpaid"
-    elif paid >= total:
-        payment_ui = "paid"
-        payment_status_ui = "paid"
     else:
         payment_ui = "partial"
         payment_status_ui = "partial"
@@ -5138,27 +5563,97 @@ def client_order_payment_ui_json(request, order_id):
 
 def _client_order_timeline(order: Order) -> list:
     """
-    Timeline basée sur timestamps si présents, sinon fallback sur status.
-    Champs optionnels : pickup_time, wash_complete_time, delivered_time
+    Timeline client pilotée prioritairement par les DeliveryLegs,
+    avec fallback doux sur quelques timestamps / status bruts.
     """
     created = getattr(order, "created_at", None)
     t_pickup = getattr(order, "pickup_time", None)
     t_wash = getattr(order, "wash_complete_time", None)
     t_deliv = getattr(order, "delivered_time", None)
 
-    st = (getattr(order, "status", "") or "").lower()
+    st = (getattr(order, "status", "") or "").strip().lower()
 
-    # fallback "done" si status final
-    pickup_done = bool(t_pickup) or st in ("in_progress", "done")
-    wash_done = bool(t_wash) or st in ("done",)
-    deliv_done = bool(t_deliv) or st in ("done",)
+    try:
+        legs = list(order.legs.all())
+    except Exception:
+        legs = []
 
-    return [
-        {"key": "created", "label": "Commande créée", "done": bool(created), "ts": created},
-        {"key": "pickup", "label": "Collecte effectuée", "done": pickup_done, "ts": t_pickup},
-        {"key": "wash", "label": "Lavage terminé", "done": wash_done, "ts": t_wash},
-        {"key": "delivered", "label": "Livrée", "done": deliv_done, "ts": t_deliv},
+    pickup_leg = None
+    return_leg = None
+    for leg in legs:
+        lt = (getattr(leg, "leg_type", None) or "").strip().lower()
+        if lt == "pickup" and pickup_leg is None:
+            pickup_leg = leg
+        elif lt == "return" and return_leg is None:
+            return_leg = leg
+
+    pickup_status = (getattr(pickup_leg, "status", None) or "").strip().lower()
+    return_status = (getattr(return_leg, "status", None) or "").strip().lower()
+
+    pickup_done = bool(t_pickup) or pickup_status == "done"
+    pickup_active = pickup_status in {"assigned", "in_progress"}
+
+    return_done = bool(t_deliv) or return_status == "done"
+    return_active = return_status in {"assigned", "in_progress"}
+
+    wash_done = bool(t_wash)
+    wash_active = False
+
+    # Si collecte terminée et retour pas encore lancé/fini => traitement
+    if pickup_done and not return_done and not return_active:
+        wash_active = True
+
+    # Fallback sur statut brut si besoin
+    if st == "done":
+        pickup_done = True
+        wash_done = True
+        return_done = True
+        pickup_active = False
+        wash_active = False
+        return_active = False
+    elif st in {"in_progress", "processing"}:
+        if not pickup_done and not return_active and not return_done:
+            pickup_active = True
+
+    steps = [
+        {
+            "key": "created",
+            "label": "Commande créée",
+            "done": bool(created),
+            "active": False,
+            "ts": created,
+        },
+        {
+            "key": "pickup",
+            "label": "Collecte effectuée" if pickup_done else "Collecte en cours",
+            "done": pickup_done,
+            "active": (not pickup_done and pickup_active),
+            "ts": t_pickup,
+        },
+        {
+            "key": "wash",
+            "label": "Lavage terminé" if wash_done else "Traitement en cours",
+            "done": wash_done,
+            "active": (not wash_done and wash_active),
+            "ts": t_wash,
+        },
+        {
+            "key": "delivered",
+            "label": "Livrée" if return_done else ("Livraison en cours" if return_active else "En attente de livraison"),
+            "done": return_done,
+            "active": (not return_done and return_active),
+            "ts": t_deliv,
+        },
     ]
+
+    # S'il n'y a aucune étape active explicite, active la première non terminée
+    if not any(step.get("active") for step in steps):
+        for step in steps:
+            if not step.get("done"):
+                step["active"] = True
+                break
+
+    return steps
 
 
 # -------------------------------------------------------------------
@@ -5168,148 +5663,308 @@ def _client_order_timeline(order: Order) -> list:
 @ensure_csrf_cookie
 @client_login_required
 def client_order_detail(request, order_id: int):
-    """
-    Détail côté client : statut + timeline + legs + paiement/montants.
-    Sécurisé : seulement si la commande appartient au téléphone session.
-    """
     phone = _client_phone(request)
+    if not phone:
+        return redirect("orders:client_login")
 
-    customer = Customer.objects.filter(phone=phone).order_by("-id").first()
-    if not customer:
-        from django.contrib import messages
-        messages.error(request, 'Session client invalide. Reconnecte-toi.')
-        return redirect("orders:client_home")
     order = (
         Order.objects
-        .select_related("customer", "laundry_partner", "delivery_partner")
+        .select_related("customer")
         .filter(pk=order_id, customer__phone=phone)
         .first()
     )
     if not order:
-        from django.contrib import messages
-        messages.error(request, "Commande introuvable ou accès non autorisé.")
         return redirect("orders:client_home")
 
-    # ---- DEBUG: plain mode to detect blank-screen source ----
-    if request.GET.get("plain") == "1":
-        from django.http import HttpResponse
-        code = getattr(order, "code", None) or str(order.id)
-        html = f"""<!doctype html>
-<html lang="fr">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>PLAIN {code}</title>
-</head>
-<body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#fff;color:#111;padding:16px">
-  <h1>PLAIN OK</h1>
-  <div>order_id: {order.id}</div>
-  <div>code: {code}</div>
-  <div>phone(session): {phone}</div>
-  <div>customer_phone: {getattr(order.customer,'phone',None)}</div>
-  <hr>
-  <div>Si tu vois ceci, Django rend OK → le “blanc” vient d’un CSS/JS/overlay.</div>
-</body>
-</html>"""
-        return HttpResponse(html)
-    # ---- END DEBUG ----
+    customer = getattr(order, "customer", None)
 
-
-    # legs (simple)
-    legs = list(
-        DeliveryLeg.objects
-        .filter(order=order)
-        .order_by("id")
-        .values("id", "leg_type", "status", "driver_amount", "driver_id")
-    )
-
-    # montants (canon)
     amounts = _client_order_amounts(order)
-    total = amounts.get("total_ttc") or DECIMAL_ZERO
-    paid = getattr(order, "amount_paid", None) or DECIMAL_ZERO
+    snapshot = build_order_canonical_snapshot(order)
+
+    legs = []
     try:
-        total = Decimal(str(total))
+        legs = list(
+            order.delivery_legs.all().values(
+                "id", "leg_type", "status", "driver_amount", "driver_id"
+            )
+        )
     except Exception:
-        total = DECIMAL_ZERO
+        legs = []
+
+    legs_ui = []
     try:
-        paid = Decimal(str(paid))
+        driver_ids = [x.get("driver_id") for x in legs if x.get("driver_id")]
+        driver_name_by_id = {}
+        if driver_ids:
+            from partners.models import DeliveryPartner
+            for d in DeliveryPartner.objects.filter(id__in=driver_ids):
+                driver_name_by_id[d.id] = getattr(d, "name", "") or f"Livreur #{d.id}"
+
+        def _leg_type_label(v):
+            return {
+                "pickup": "Collecte",
+                "laundry_in": "Arrivée blanchisserie",
+                "laundry_out": "Sortie blanchisserie",
+                "return": "Livraison",
+            }.get(v, "Logistique")
+
+        def _client_leg_status_label(v):
+            return {
+                "pending": ("En attente", "pending"),
+                "assigned": ("Affectée", "progress"),
+                "accepted": ("Acceptée", "progress"),
+                "picked_up": ("Collectée", "done"),
+                "in_progress": ("En cours", "progress"),
+                "done": ("Terminée", "done"),
+                "completed": ("Terminée", "done"),
+                "canceled": ("Annulée", "danger"),
+            }.get(v, ("En attente", "pending"))
+
+        for leg in legs:
+            st_label, st_class = _client_leg_status_label(leg.get("status"))
+            legs_ui.append({
+                **leg,
+                "leg_type_label": _leg_type_label(leg.get("leg_type")),
+                "status_label": st_label,
+                "status_class": st_class,
+                "driver_name": driver_name_by_id.get(leg.get("driver_id"), "Livreur partenaire"),
+            })
+    except Exception:
+        legs_ui = []
+
+    items = []
+    try:
+        for it in order.items.all():
+            items.append({
+                "label": getattr(it, "label", None) or getattr(it, "name", None) or "Article",
+                "qty": getattr(it, "quantity", 0) or 0,
+                "price": getattr(it, "unit_price", 0) or 0,
+            })
+    except Exception:
+        items = []
+
+    timeline = [
+        {
+            "key": "created",
+            "label": "Commande créée",
+            "done": True,
+            "active": False,
+            "ts": getattr(order, "created_at", None),
+        },
+        {
+            "key": "pickup",
+            "label": "Collecte en cours" if snapshot.get("status_canonical") in ["submitted", "in_processing"] else "Collecte",
+            "done": False,
+            "active": snapshot.get("status_canonical") in ["submitted", "in_processing"],
+            "ts": None,
+        },
+        {
+            "key": "wash",
+            "label": "Traitement en cours",
+            "done": snapshot.get("status_canonical") == "ready",
+            "active": snapshot.get("status_canonical") == "in_processing",
+            "ts": None,
+        },
+        {
+            "key": "delivered",
+            "label": "En attente de livraison",
+            "done": snapshot.get("status_canonical") == "done",
+            "active": snapshot.get("status_canonical") == "ready",
+            "ts": None,
+        },
+    ]
+
+    hero_title = "Suivi de commande"
+    hero_text = snapshot.get("display_address") or "Commande en cours"
+
+    live_tracking_title = "Suivi en cours"
+    live_tracking_text = "Ta commande est en cours de traitement."
+
+    try:
+        if snapshot.get("status_canonical") == "in_processing":
+            live_tracking_title = "Collecte en cours"
+            live_tracking_text = "Le livreur affecté gère actuellement la collecte de ta commande."
+            hero_title = "Collecte planifiée"
+            hero_text = "Un livreur va passer récupérer ton linge."
+        elif snapshot.get("status_canonical") == "ready":
+            live_tracking_title = "Commande prête"
+            live_tracking_text = "La commande est prête pour la livraison."
+        elif snapshot.get("status_canonical") == "done":
+            live_tracking_title = "Commande terminée"
+            live_tracking_text = "Ta commande a été finalisée."
+    except Exception:
+        pass
+
+    partner_tracking = {
+        "pickup": {
+            "title": "Collecte",
+            "icon": "🚚",
+            "partner": {"name": "Livreur partenaire", "phone": "", "city": "", "address": "", "is_assigned": False},
+            "status": "En attente",
+            "status_raw": "pending",
+        },
+        "laundry": {
+            "title": "Blanchisserie",
+            "icon": "🧺",
+            "partner": {"name": "Blanchisserie partenaire FAGNI", "phone": "", "city": "", "address": "", "is_assigned": False},
+            "status": "En attente",
+            "status_raw": "pending",
+        },
+        "return": {
+            "title": "Livraison",
+            "icon": "📦",
+            "partner": {"name": "Livreur partenaire", "phone": "", "city": "", "address": "", "is_assigned": False},
+            "status": "En attente",
+            "status_raw": "pending",
+        },
+    }
+
+    map_summary = {
+        "pickup_address": snapshot.get("display_address") or "Adresse non renseignée",
+        "driver_name": "Livreur partenaire",
+        "laundry_name": "Blanchisserie partenaire FAGNI",
+    }
+
+    try:
+        paid = Decimal(str(snapshot.get("amount_paid", 0) or 0))
     except Exception:
         paid = DECIMAL_ZERO
 
-    remain = total - paid
+    ctx = {
+        "phone": phone,
+        "customer": customer,
+        "display_address": snapshot.get("display_address") or "Adresse non renseignée",
+        "order": order,
+        "legs": legs,
+        "legs_ui": legs_ui,
+        "items": items,
+        "amounts": amounts,
+        "payment_status": snapshot.get("payment_status_raw"),
+        "payment_ui": snapshot.get("payment_status_canonical"),
+        "payment_label": snapshot.get("payment_label"),
+        "pay_pill_class": "pay-ok" if snapshot.get("is_paid") else "pay-wait",
+        "paid_amount": paid,
+        "total_amount": snapshot.get("total_client_ttc", DECIMAL_ZERO),
+        "remain_amount": snapshot.get("amount_due", DECIMAL_ZERO),
+        "timeline": timeline,
+        "hero_title": hero_title,
+        "hero_text": hero_text,
+        "snapshot": snapshot,
+        "partner_tracking": partner_tracking,
+        "live_tracking_title": live_tracking_title,
+        "live_tracking_text": live_tracking_text,
+        "tracking_title": live_tracking_title,
+        "tracking_text": live_tracking_text,
+        "map_summary": map_summary,
+    }
+
+    try:
+        ctx.update(build_order_display_context(order, customer, amounts, paid))
+    except Exception:
+        pass
+
+    resp = render(request, "orders/client_order_detail.html", ctx)
+    resp["Cache-Control"] = "no-store"
+    return resp
+
+
+def client_order_detail_json(request, order_id: int):
+    """
+    JSON léger pour rafraîchir l'état paiement / résumé commande côté page détail client.
+    """
+    phone = _client_phone(request)
+    if not phone:
+        resp = JsonResponse({"ok": False, "error": "not_authenticated"}, status=401)
+        resp["Cache-Control"] = "no-store"
+        return resp
+
+    order = (
+        Order.objects
+        .select_related("customer")
+        .filter(pk=order_id, customer__phone=phone)
+        .first()
+    )
+    if not order:
+        resp = JsonResponse({"ok": False, "error": "order_not_found"}, status=404)
+        resp["Cache-Control"] = "no-store"
+        return resp
+
+    snapshot = build_order_canonical_snapshot(order)
+
+    try:
+        total = Decimal(str(snapshot.get("total_client_ttc", 0) or 0))
+    except Exception:
+        total = DECIMAL_ZERO
+
+    try:
+        paid = Decimal(str(snapshot.get("amount_paid", 0) or 0))
+    except Exception:
+        paid = DECIMAL_ZERO
+
+    try:
+        remain = Decimal(str(snapshot.get("amount_due", 0) or 0))
+    except Exception:
+        remain = DECIMAL_ZERO
+
+    if total < DECIMAL_ZERO:
+        total = DECIMAL_ZERO
+    if paid < DECIMAL_ZERO:
+        paid = DECIMAL_ZERO
     if remain < DECIMAL_ZERO:
         remain = DECIMAL_ZERO
 
-    # statut paiement canonique basé sur amounts + amount_paid
-    # (on garde order.payment_status seulement pour compat/info)
-    payment_status_raw = getattr(order, "payment_status", None)
-
     if total <= DECIMAL_ZERO:
-        payment_ui = "waiting_amount"   # pas de total => estimation / attente
+        payment_ui = "waiting_amount"
         pay_pill_class = "pay-wait"
         payment_label = "En attente"
+    elif not snapshot.get("can_pay", False) and paid >= total:
+        payment_ui = "paid"
+        pay_pill_class = "pay-ok"
+        payment_label = "Payé"
+    elif paid <= DECIMAL_ZERO:
+        payment_ui = "unpaid"
+        pay_pill_class = "pay-wait"
+        payment_label = "Paiement en attente"
     else:
-        if paid <= DECIMAL_ZERO:
-            payment_ui = "unpaid"
-            pay_pill_class = "pay-wait"
-            payment_label = "Paiement en attente"
-        elif paid >= total:
-            payment_ui = "paid"
-            pay_pill_class = "pay-ok"
-            payment_label = "Payé"
-        else:
-            payment_ui = "partial"
-            pay_pill_class = "pay-wait"
-            payment_label = "Paiement partiel"
+        payment_ui = "partial"
+        pay_pill_class = "pay-wait"
+        payment_label = "Paiement partiel"
 
-    # timeline
-    timeline = _client_order_timeline(order)
+    payload = {
+        "ok": True,
+        "order_id": order.id,
+        "code": snapshot.get("code"),
+        "status": {
+            "raw": snapshot.get("status_raw"),
+            "canonical": snapshot.get("status_canonical"),
+            "label": snapshot.get("status_label"),
+        },
+        "payment": {
+            "raw": snapshot.get("payment_status_raw"),
+            "canonical": snapshot.get("payment_status_canonical"),
+            "label": payment_label,
+            "ui": payment_ui,
+            "pill_class": pay_pill_class,
+            "can_pay": bool(snapshot.get("can_pay", False)),
+            "is_paid": bool(snapshot.get("is_paid", False)),
+        },
+        "amounts": {
+            "total_ttc": float(total),
+            "amount_paid": float(paid),
+            "amount_due": float(remain),
+        },
+    }
 
-    # items
-    items = order.items.all().order_by("id")
-
-    resp = render(request, "orders/client_order_detail.html", {
-        "phone": phone,
-        "customer": customer,
-        "order": order,
-        "legs": legs,
-        "items": items,
-
-        "amounts": amounts,
-
-        # ✅ paiement canonique pour template (ne dépend plus du champ payment_status)
-        "payment_status": payment_status_raw,   # compat si tu l’utilises ailleurs
-        "payment_ui": payment_ui,
-        "payment_label": payment_label,
-        "pay_pill_class": pay_pill_class,
-
-        # ✅ chiffres canon (pour badge + détails)
-        "paid_amount": paid,
-        "total_amount": total,
-        "remain_amount": remain,
-
-        "timeline": timeline,
-    })
-
-
-
-
-
+    resp = JsonResponse(payload)
     resp["Cache-Control"] = "no-store"
-
-
-
-
-
-
     return resp
-    return resp# -------------------------------------------------------------------
-# ✅ Paiement client (V1) — simulate + cash
-# -------------------------------------------------------------------
+
+
 
 @require_POST
 @client_login_required
 def client_order_pay_simulate(request, order_id: int):
+
     """
     Paiement simulé (MVP) : marque la commande comme payée (amount_paid = total_ttc).
     Sécurisé par phone cookie.
@@ -5332,10 +5987,10 @@ def client_order_pay_simulate(request, order_id: int):
         resp["Cache-Control"] = "no-store"
         return resp
 
-    amounts = _client_order_amounts(order)
-    total = amounts.get("total_ttc") or DECIMAL_ZERO
+    snapshot = build_order_canonical_snapshot(order)
+
     try:
-        total = Decimal(str(total))
+        total = Decimal(str(snapshot.get("total_client_ttc", 0) or 0))
     except Exception:
         total = DECIMAL_ZERO
 
@@ -5344,16 +5999,14 @@ def client_order_pay_simulate(request, order_id: int):
         resp["Cache-Control"] = "no-store"
         return resp
 
-    # LOT_3_1_GUARD_DOUBLE_PAY_OK — already paid guard
     try:
-        paid_now = getattr(order, "amount_paid", None) or DECIMAL_ZERO
-        paid_now = Decimal(str(paid_now))
+        paid_now = Decimal(str(snapshot.get("amount_paid", 0) or 0))
         if paid_now < DECIMAL_ZERO:
             paid_now = DECIMAL_ZERO
     except Exception:
         paid_now = DECIMAL_ZERO
 
-    if paid_now >= total:
+    if not snapshot.get("can_pay", False) or paid_now >= total:
         resp = JsonResponse({"ok": False, "error": "already_paid"}, status=409)
         resp["Cache-Control"] = "no-store"
         return resp
@@ -5374,18 +6027,27 @@ def client_order_pay_simulate(request, order_id: int):
         except Exception:
             order.save()
 
-    remain = total - (getattr(order, "amount_paid", DECIMAL_ZERO) or DECIMAL_ZERO)
-    if remain < DECIMAL_ZERO:
-        remain = DECIMAL_ZERO
+        # LOT 22C — déclenchement MLM à la validation du paiement
+        try:
+            generate_mlm_commissions_for_order(order)
+        except Exception:
+            pass
+
+    try:
+        order.refresh_from_db()
+    except Exception:
+        pass
+
+    snap = build_order_canonical_snapshot(order)
 
     resp = JsonResponse({
         "ok": True,
-        "payment_ui": "paid",
-        "payment_status": "paid",
+        "payment_ui": "paid" if snap.get("payment_status_canonical") == "paid" else "partial",
+        "payment_status": snap.get("payment_status_canonical"),
         "amounts": {
-            "total_ttc": float(total),
-            "amount_paid": float(total),
-            "amount_remaining": float(remain),
+            "total_ttc": float(Decimal(str(snap.get("total_client_ttc", 0) or 0))),
+            "amount_paid": float(Decimal(str(snap.get("amount_paid", 0) or 0))),
+            "amount_remaining": float(Decimal(str(snap.get("amount_due", 0) or 0))),
         },
     })
     resp["Cache-Control"] = "no-store"
@@ -5482,6 +6144,8 @@ def client_order_pay_cash(request, order_id: int):
         return resp
 
     with transaction.atomic():
+        previous_payment_status = getattr(order, "payment_status", None)
+
         paid = getattr(order, "amount_paid", None) or DECIMAL_ZERO
         try:
             paid = Decimal(str(paid))
@@ -5515,21 +6179,29 @@ def client_order_pay_cash(request, order_id: int):
         except Exception:
             order.save()
 
-    remain = total - (getattr(order, "amount_paid", DECIMAL_ZERO) or DECIMAL_ZERO)
-    if remain < DECIMAL_ZERO:
-        remain = DECIMAL_ZERO
+        # LOT 22C — MLM uniquement si la commande vient juste de devenir payée
+        try:
+            if previous_payment_status != "paid" and getattr(order, "payment_status", None) == "paid":
+                generate_mlm_commissions_for_order(order)
+        except Exception:
+            pass
 
-    payment_ui = "paid" if (getattr(order, "amount_paid", DECIMAL_ZERO) or DECIMAL_ZERO) >= total else "partial"
+    try:
+        order.refresh_from_db()
+    except Exception:
+        pass
+
+    snap = build_order_canonical_snapshot(order)
 
     resp = JsonResponse({
         "ok": True,
-        "payment_ui": payment_ui,
-        "payment_status": getattr(order, "payment_status", None),
+        "payment_ui": "paid" if snap.get("payment_status_canonical") == "paid" else "partial",
+        "payment_status": snap.get("payment_status_canonical"),
         "note": note,
         "amounts": {
-            "total_ttc": float(total),
-            "amount_paid": float(getattr(order, "amount_paid", DECIMAL_ZERO) or DECIMAL_ZERO),
-            "amount_remaining": float(remain),
+            "total_ttc": float(Decimal(str(snap.get("total_client_ttc", 0) or 0))),
+            "amount_paid": float(Decimal(str(snap.get("amount_paid", 0) or 0))),
+            "amount_remaining": float(Decimal(str(snap.get("amount_due", 0) or 0))),
         },
     })
     resp["Cache-Control"] = "no-store"
@@ -5906,6 +6578,7 @@ def delete(request):
 def update_status(request, order_id):
     order = get_object_or_404(Order, pk=order_id)
 
+    
     new_status = request.POST.get("status")
     valid_status = dict(Order.STATUS_CHOICES).keys()
 
@@ -5996,8 +6669,17 @@ def _build_invoice_context(order):
     # ✅ exposer "express_client" pour les templates existants
     express_client = express_amount
 
+    # --- LOT 5C : couche d'affichage client TTC unifiée ---
+    display_delivery_amount = delivery_amount
+    display_express_amount = express_amount
+
+    display_prestations_amount = _q(total_ttc_client - display_delivery_amount - display_express_amount)
+    if display_prestations_amount < Decimal("0"):
+        display_prestations_amount = Decimal("0")
+
     # (Optionnel mais utile partout) : lignes standardisées
     invoice_lines = {
+        # interne / canon
         "prestations": prestations_amount,
         "delivery": delivery_amount,
         "service": service_amount,
@@ -6005,6 +6687,12 @@ def _build_invoice_context(order):
         "vat": vat_amount,
         "total_ht": total_ht_client,
         "total_ttc": total_ttc_client,
+
+        # affichage client
+        "display_prestations": display_prestations_amount,
+        "display_delivery": display_delivery_amount,
+        "display_express": display_express_amount,
+        "display_total_ttc": total_ttc_client,
     }
 
     return {
@@ -6022,6 +6710,12 @@ def _build_invoice_context(order):
         "vat_amount": vat_amount,
         "total_ht_client": total_ht_client,
         "total_ttc_client": total_ttc_client,
+
+        # affichage client unifié
+        "display_prestations_amount": display_prestations_amount,
+        "display_delivery_amount": display_delivery_amount,
+        "display_express_amount": display_express_amount,
+        "display_total_ttc": total_ttc_client,
 
         # Compat historique
         "express_client": express_client,
@@ -6054,7 +6748,7 @@ def order_invoice_pdf(request, order_id):
     except Exception:
         pass
 
-    items = order.items.all().order_by("id")
+    items = _build_client_display_items(order)
 
     # ✅ Source unique (comme ticket_pdf / ticket_thermal)
     ctx = _build_invoice_context(order)
@@ -6274,7 +6968,7 @@ def safe_decimal(value, default=Decimal("0")):
 
 def update(request, order_id):
     """
-    Édition d’une commande EXISTANTE.
+    Édition d'une commande EXISTANTE.
 
     Objectifs :
     - Garder les OrderItem existants + leurs photos.
@@ -6387,7 +7081,7 @@ def update(request, order_id):
             except (TypeError, ValueError, InvalidOperation):
                 unit_price = Decimal("0")
 
-            # Ligne invalide (nouvelle) : on n’en crée pas
+            # Ligne invalide (nouvelle) : on n'en crée pas
             if quantity <= 0 or unit_price <= 0:
                 if existing_item:
                     kept_ids.add(existing_item.id)
@@ -6665,7 +7359,7 @@ def _get_driver_app_context(request):
 @login_required
 def order_scan_redirect(request, order_code):
     """
-    Lors d’un scan QR, on retrouve la commande via son code unique.
+    Lors d'un scan QR, on retrouve la commande via son code unique.
     Puis redirection vers la vue livreur, si le livreur est bien assigné.
     """
     # 1) Retrouver la commande
@@ -6674,6 +7368,7 @@ def order_scan_redirect(request, order_code):
         code__iexact=order_code
     )
 
+    
     # 2) Vérifier le livreur connecté
     user_email = (request.user.email or "").strip().lower()
 
@@ -6684,9 +7379,9 @@ def order_scan_redirect(request, order_code):
             "Aucun profil livreur associé à cet email (%s)." % user_email
         )
 
-    # 3) Vérifier que c’est bien SA course
+    # 3) Vérifier que c'est bien SA course
     if order.delivery_partner_id != delivery_partner.id:
-        return HttpResponseForbidden("Vous n’êtes pas assigné à cette course.")
+        return HttpResponseForbidden("Vous n'êtes pas assigné à cette course.")
 
     # 4) Redirection vers sa page
     return redirect("orders:driver_order_detail", order_id=order.id)
@@ -7032,7 +7727,7 @@ def normalize_order_legs(order, driver=None):
         # canceled/done ne bougent plus
         if c in ("canceled", "done"):
             return c
-        # on n’accepte que si ça avance
+        # on n'accepte que si ça avance
         return t if STATUS_RANK.get(t, 1) > STATUS_RANK.get(c, 1) else c
 
     from django.db import transaction
@@ -7281,26 +7976,15 @@ def driver_order_detail(request, order_id):
     if not request.user.is_staff:
         # Sans assignation : on refuse (sinon on ne sait pas "qui" a le droit)
         if not assigned_driver:
-            return render(
-                request,
-                "orders/driver_wallet.html",
-                {"error_message": "Commande non assignée à un livreur : accès refusé côté livreur."},
-            )
+            return redirect("orders:driver_hub")
 
         # driver_id obligatoire et doit matcher l'assignation
+        # 🔓 fallback automatique
         if not selected_driver_id:
-            return render(
-                request,
-                "orders/driver_wallet.html",
-                {"error_message": "Livreur non identifié (driver_id manquant). Ouvre l’app livreur puis clique sur la course."},
-            )
+            selected_driver_id = str(assigned_driver.id)
 
         if str(assigned_driver.id) != str(selected_driver_id):
-            return render(
-                request,
-                "orders/driver_wallet.html",
-                {"error_message": "Accès refusé : cette commande n’est pas assignée à ton profil livreur."},
-            )
+            return redirect("orders:driver_hub")
 
     else:
         # Staff : si la commande n'a pas de livreur assigné, on peut fallback sur ?driver_id (optionnel)
@@ -7612,7 +8296,7 @@ def driver_order_detail(request, order_id):
         # ✅ affichage métier
         "driver_leg_amount": driver_leg_amount_done,   # ce que la page utilisait déjà
         "driver_leg_amount_done": driver_leg_amount_done,
-        "driver_leg_amount_all": driver_leg_amount_all,  # potentiel (si tu veux l’afficher dans le template)
+        "driver_leg_amount_all": driver_leg_amount_all,  # potentiel (si tu veux l'afficher dans le template)
 
         "driver_mission_type_label": driver_mission_type_label,
         "driver_wallet": driver_wallet,
@@ -7949,7 +8633,7 @@ def driver_app_data(request):
         # - paid = net wallet déjà crédité
         # - potential = somme estimée (legs)
         # => on affiche la projection la plus haute (cohérence KPI + UI)
-        # ✅ afficher TOUJOURS le payé s’il existe, même si < potentiel
+        # ✅ afficher TOUJOURS le payé s'il existe, même si < potentiel
         if income_paid > 0:
             income_out = _safe_float(income_paid)
         else:
@@ -8683,9 +9367,8 @@ def driver_me_app(request):
     return render(request, "orders/driver_me.html", context)
 
 
-
 # ===============================================
-#  HUB LIVREUR – POINT D’ENTRÉE / TABLEAU DE BORD
+#  HUB LIVREUR – POINT D'ENTRÉE / TABLEAU DE BORD
 # ===============================================
 @login_required
 def driver_hub(request):
@@ -8695,6 +9378,9 @@ def driver_hub(request):
     - actions utiles
     - dernières courses
     """
+    from django.db.models import Case, When, Value, IntegerField
+    from django.core.paginator import Paginator
+
     connected_driver = _get_connected_driver(request)
 
     context = {
@@ -8712,6 +9398,11 @@ def driver_hub(request):
             "total_driver_income": Decimal("0.0"),
         },
         "last_orders": [],
+        "current_leg": None,
+        "current_order": None,
+        "current_mission_label": "Aucune mission active",
+        "current_mission_hint": "Aucune action terrain en cours pour le moment.",
+        "current_mission_cta": None,
     }
 
     if not connected_driver:
@@ -8762,11 +9453,27 @@ def driver_hub(request):
         "total_driver_income": total_driver_income,
     }
 
-    last_orders = list(qs[:10])
+    page_number = request.GET.get("page") or 1
+    paginator = Paginator(qs, 5)
+    last_orders_page = paginator.get_page(page_number)
+    last_orders = list(last_orders_page.object_list)
+
+    mission_ctx = _build_driver_mission_context(request, connected_driver)
+    current_leg = mission_ctx.get("leg")
+    current_order = mission_ctx.get("order")
+    current_mission_label = mission_ctx.get("mission_state_label")
+    current_mission_hint = mission_ctx.get("mission_hint")
+    current_mission_cta = mission_ctx.get("mission_cta")
 
     context.update({
         "stats": stats,
         "last_orders": last_orders,
+        "last_orders_page": last_orders_page,
+        "current_leg": current_leg,
+        "current_order": current_order,
+        "current_mission_label": current_mission_label,
+        "current_mission_hint": current_mission_hint,
+        "current_mission_cta": current_mission_cta,
     })
 
     return render(request, "orders/driver_hub.html", context)
@@ -8777,7 +9484,7 @@ def driver_hub(request):
 @login_required
 def driver_me_data(request):
     """
-    Endpoint JSON pour l’auto-refresh des KPI de driver_me_app.
+    Endpoint JSON pour l'auto-refresh des KPI de driver_me_app.
 
     Montants harmonisés FAGNI :
     - Revenu livreur = amount_driver_partner (fallback driver_logistic_cost)
@@ -9173,7 +9880,7 @@ def driver_history_me(request):
             service_fee = _d(data.get("service_fee_ht")) or _d(getattr(o, "service_fee", None))
             delivery_fee = _d(data.get("delivery_fee_client")) or _d(getattr(o, "delivery_fee", None))
             vat_fagni = _d(data.get("vat_fagni")) or _d(getattr(o, "vat_fagni", None))
-            express_for_client = _d(data.get("express_for_client"))  # si tu veux l’inclure dans tc fallback
+            express_for_client = _d(data.get("express_for_client"))  # si tu veux l'inclure dans tc fallback
 
             tc = items_total + service_fee + delivery_fee + express_for_client + vat_fagni
 
@@ -9464,7 +10171,7 @@ def driver_missions_history(request):
             "customer_phone": getattr(getattr(o, "customer", None), "phone", "") or "",
             "customer_address": getattr(getattr(o, "customer", None), "address", "") or "",
             "laundry_name": getattr(getattr(o, "laundry_partner", None), "name", "") or "",
-            "detail_url": reverse('orders:driver_order_detail', args=[o.id]) + "?back=" + quote(reverse('orders:driver_hub')),
+            "detail_url": reverse("orders:driver_order_detail", args=[o.id]) + "?back=" + quote(reverse('orders:driver_hub')),
         })
 
     # 6) Filtres Python (mission_status + remaining)
@@ -10005,7 +10712,7 @@ def update_leg_status(leg, action, user=None):
             return True, "Mission déjà terminée."
 
     elif action == "start":
-        # 🔒 Le livreur doit d’abord ACCEPT (pending → assigned)
+        # 🔒 Le livreur doit d'abord ACCEPT (pending → assigned)
         if leg.status == "assigned":
             leg.status = "in_progress"
             if not getattr(leg, "started_at", None):
@@ -10112,8 +10819,6 @@ def update_leg_status(leg, action, user=None):
             pass
 
 
-
-
     # ✅ Auto-sync après transition
     try:
         order = getattr(leg, "order", None)
@@ -10130,15 +10835,13 @@ def update_leg_status(leg, action, user=None):
     except Exception:
         pass
 
-    # 🔒 Normalisation après transition (ex: cancel d’un leg ancien)
+    # 🔒 Normalisation après transition (ex: cancel d'un leg ancien)
     try:
         normalize_order_legs(getattr(leg, "order", None), driver=getattr(leg, "driver", None))
     except Exception:
         pass
 
     return True, f"Statut mis à jour : {old_status} → {leg.status}"
-
-
 
 
 def _redirect_back(request, fallback_name, **kwargs):
@@ -10161,18 +10864,32 @@ def driver_leg_action(request, leg_id, action):
     order = leg.order
     driver = leg.driver
 
+    # 🔒 Parcours livreur verrouillé : toujours revenir vers driver_app
+    requested_driver_id = (
+        (request.GET.get("driver_id") or "").strip()
+        or (request.POST.get("driver_id") or "").strip()
+        or str(getattr(driver, "id", "") or "")
+    )
+
+    flow_back = reverse("orders:driver_app")
+    if requested_driver_id:
+        flow_back = f"{flow_back}?driver_id={requested_driver_id}"
+
+    def _driver_flow_redirect():
+        return redirect(flow_back)
+
     # 🔒 Permission : soit staff, soit le livreur assigné connecté (via DeliveryPartner.user)
     if not request.user.is_staff:
         dp_user = getattr(driver, "user", None)
         if dp_user is not None and dp_user != request.user:
             messages.error(request, "Accès refusé.")
-            return _redirect_back(request, "orders:driver_app")
+            return _driver_flow_redirect()
 
     # 🔐 Actions autorisées (garde-fou param)
     action = (action or "").lower().strip()
     if action not in {"accept", "start", "finish", "cancel"}:
         messages.error(request, "Action inconnue.")
-        return _redirect_back(request, "orders:driver_order_detail", order_id=order.id)
+        return _driver_flow_redirect()
 
     # 🔒 Verrouillage transitions : pickup → return → done
     # Règles:
@@ -10183,18 +10900,18 @@ def driver_leg_action(request, leg_id, action):
         # Si commande déjà terminée : aucune action
         if getattr(order, "status", None) == "done":
             messages.info(request, "Commande déjà terminée.")
-            return _redirect_back(request, "orders:driver_order_detail", order_id=order.id)
+            return _driver_flow_redirect()
 
         # Si la jambe est annulée, on bloque accept/start/finish (freeze côté model)
         if (leg.status or "").strip() in ("canceled", "cancelled") and action in {"accept", "start", "finish"}:
             messages.error(request, "Cette mission est annulée.")
-            return _redirect_back(request, "orders:driver_order_detail", order_id=order.id)
+            return _driver_flow_redirect()
 
         # Verrou sur RETURN
         if (leg.leg_type or "").strip() == "return" and action in {"accept", "start", "finish"}:
             if not getattr(order, "wash_complete_time", None):
                 messages.error(request, "Retour impossible : linge pas encore marqué prêt par la blanchisserie.")
-                return _redirect_back(request, "orders:driver_order_detail", order_id=order.id)
+                return _driver_flow_redirect()
 
             pickup_done = DeliveryLeg.objects.filter(
                 order=order,
@@ -10203,7 +10920,7 @@ def driver_leg_action(request, leg_id, action):
             ).exists()
             if not pickup_done:
                 messages.error(request, "Retour impossible : la collecte (pickup) n'est pas terminée.")
-                return _redirect_back(request, "orders:driver_order_detail", order_id=order.id)
+                return _driver_flow_redirect()
 
     except Exception:
         logger.exception("driver_leg_action: transition guard failed (leg_id=%s action=%s)", leg_id, action)
@@ -10225,14 +10942,12 @@ def driver_leg_action(request, leg_id, action):
                     from django.contrib import messages
                     messages.error(request, "Impossible de terminer : ajoute au moins une photo preuve (non-litige) avant de valider.")
 
-                    from django.urls import reverse
                     from urllib.parse import quote
 
-                    back_src = (request.POST.get("back") or request.GET.get("back") or "")
-                    back = quote((back_src or ""), safe="")
+                    back = quote(flow_back, safe="")
                     url = reverse("orders:driver_weighing", kwargs={"order_id": order.id})
 
-                    full_url = f"{url}?leg_id={leg.id}&back={back}"
+                    full_url = f"{url}?leg_id={leg.id}&driver_id={requested_driver_id}&back={back}"
 
                     # Si submit via fetch/AJAX, renvoyer JSON pour que le front navigue
                     if request.headers.get("x-requested-with") == "XMLHttpRequest":
@@ -10258,7 +10973,7 @@ def driver_leg_action(request, leg_id, action):
     except Exception:
         logger.exception("driver_leg_action: update_leg_status failed (leg_id=%s action=%s)", leg_id, action)
         messages.error(request, "Erreur interne : action impossible pour le moment.")
-        return _redirect_back(request, "orders:driver_order_detail", order_id=order.id)
+        return _driver_flow_redirect()
 
     from django.contrib import messages
     if changed:
@@ -10267,7 +10982,7 @@ def driver_leg_action(request, leg_id, action):
         messages.info(request, msg)
 
     # ↩️ Redirection : priorité à ?back=…, sinon détail de la course
-    return _redirect_back(request, "orders:driver_order_detail", order_id=order.id)
+    return _driver_flow_redirect()
 
 
 @login_required
@@ -10597,10 +11312,11 @@ def export_top_clients_xlsx(request):
 @transaction.atomic
 def change_status(request, order_id):
     """
-    Change proprement le statut d’une commande + timestamps automatiques.
+    Change proprement le statut d'une commande + timestamps automatiques.
     """
     order = get_object_or_404(Order, pk=order_id)
 
+    
     new_status = request.POST.get("status")
     next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or "/"
 
@@ -10874,7 +11590,7 @@ def driver_map_data(request):
         status = "available"
         if active_order:
             status = "busy"
-        # stale si pas d’update récente (15 min)
+        # stale si pas d'update récente (15 min)
         if (age_seconds is not None) and (age_seconds > 15 * 60) and (not active_order):
             status = "stale"
 
@@ -10942,7 +11658,6 @@ def _sanitize_evidence_kind(kind, OrderEvidencePhoto):
     return kind if kind in allowed else "pickup_items"
 
 
-
 @login_required
 @require_http_methods(["GET", "POST"])
 def driver_weighing(request, order_id):
@@ -10957,21 +11672,43 @@ def driver_weighing(request, order_id):
 
     order = get_object_or_404(Order, pk=order_id)
 
+    
     # 🔐 Sécurité: seul le livreur assigné (ou staff) peut accéder
 
-    if not _can_driver_touch_order(request, order):
+    # 🔓 MODE SOUPLE (fix accès pesée)
+    # On autorise l'accès si:
+    # - staff
+    # - OU livreur connecté (même si assignation imparfaite)
+    if not request.user.is_staff:
+        assigned_driver = getattr(order, "delivery_partner", None)
+        user_driver_id = (
+            getattr(request.user, "delivery_partner_id", None)
+            or getattr(request.user, "driver_id", None)
+            or (request.GET.get("driver_id") or "").strip()
+            or (request.POST.get("driver_id") or "").strip()
+        )
 
-        try:
+        if assigned_driver and user_driver_id:
+            try:
+                if str(assigned_driver.id) != str(user_driver_id):
+                    messages.warning(request, "Cette course ne t'est pas assignée.")
+                    return redirect(reverse("orders:driver_app") + (f"?driver_id={user_driver_id}" if user_driver_id else ""))
+            except Exception:
+                pass
 
-            messages.warning(request, "Accès refusé (commande non assignée).")
-
-        except Exception:
-
-            pass
-
-        return redirect("orders:driver_hub")
 
     ow, _created = OrderWeighing.objects.get_or_create(order=order)
+
+    # leg optionnel pour lier la pesée / preuve à la mission active
+    leg_obj = None
+    raw_leg_id = (request.GET.get("leg_id") or request.POST.get("leg_id") or "").strip()
+    if raw_leg_id.isdigit():
+        try:
+            leg_obj = DeliveryLeg.objects.filter(pk=int(raw_leg_id), order=order).first()
+        except Exception:
+            leg_obj = None
+
+    back_url = (request.GET.get("back") or request.POST.get("back") or "").strip()
 
     # Si déjà confirmé, on bloque l'édition côté livreur
     is_locked = (ow.status == "confirmed")
@@ -10981,7 +11718,17 @@ def driver_weighing(request, order_id):
     if request.method == "POST":
         if is_locked:
             messages.warning(request, "Pesée confirmée : modification désactivée.")
-            return redirect("orders:driver_weighing", order_id=order.id)
+            if back_url and url_has_allowed_host_and_scheme(back_url, allowed_hosts={request.get_host()}):
+                return redirect(back_url)
+            url = reverse("orders:driver_weighing", kwargs={"order_id": order.id})
+            qs = []
+            if raw_leg_id:
+                qs.append(f"leg_id={raw_leg_id}")
+            if back_url:
+                qs.append(f"back={back_url}")
+            if qs:
+                url += "?" + "&".join(qs)
+            return redirect(url)
 
         raw_weight = (request.POST.get("weight_kg") or "").strip()
         notes = (request.POST.get("notes") or "").strip()
@@ -10996,7 +11743,17 @@ def driver_weighing(request, order_id):
 
         if weight is None:
             messages.warning(request, "Poids invalide. Exemple attendu : 3.50")
-            return redirect("orders:driver_weighing", order_id=order.id)
+            if back_url and url_has_allowed_host_and_scheme(back_url, allowed_hosts={request.get_host()}):
+                return redirect(back_url)
+            url = reverse("orders:driver_weighing", kwargs={"order_id": order.id})
+            qs = []
+            if raw_leg_id:
+                qs.append(f"leg_id={raw_leg_id}")
+            if back_url:
+                qs.append(f"back={back_url}")
+            if qs:
+                url += "?" + "&".join(qs)
+            return redirect(url)
 
         # Update weighing
         ow.weight_kg = weight
@@ -11022,8 +11779,25 @@ def driver_weighing(request, order_id):
                 caption="Photo balance (pesée) – livreur",
             )
 
-        messages.success(request, "Pesée livreur enregistrée.")
-        return redirect("orders:driver_weighing", order_id=order.id)
+        messages.success(request, "✅ Pesée enregistrée")
+
+        # 🔁 retour automatique mission
+        driver_id = request.GET.get("driver_id") or request.POST.get("driver_id")
+        url = reverse("orders:driver_app")
+        if driver_id:
+            url += f"?driver_id={driver_id}"
+        return redirect(url)
+        if back_url and url_has_allowed_host_and_scheme(back_url, allowed_hosts={request.get_host()}):
+            return redirect(back_url)
+        url = reverse("orders:driver_weighing", kwargs={"order_id": order.id})
+        qs = []
+        if raw_leg_id:
+            qs.append(f"leg_id={raw_leg_id}")
+        if back_url:
+            qs.append(f"back={back_url}")
+        if qs:
+            url += "?" + "&".join(qs)
+        return redirect(url)
 
     evidence = OrderEvidencePhoto.objects.filter(order=order).order_by("-created_at")[:50]
 
@@ -11041,9 +11815,14 @@ def driver_weighing(request, order_id):
             "order": order,
             "weighing": ow,
             "evidence": evidence,
-            "driver_id": getattr(request.user, "id", None),
+            "driver_id": (
+                (request.GET.get("driver_id") or request.POST.get("driver_id") or "").strip()
+                or str(getattr(getattr(order, "delivery_partner", None), "id", "") or "")
+            ),
             "is_locked": is_locked,
             "latest_issue": latest_issue,
+            "leg_obj": leg_obj,
+            "back_url": back_url,
         },
     )
 
@@ -11066,13 +11845,22 @@ def driver_evidence_upload(request, order_id):
 
     order = get_object_or_404(Order, pk=order_id)
 
-    # 🔐 Sécurité: seul le livreur assigné (ou staff) peut uploader
-    if not _can_driver_touch_order(request, order):
-        try:
-            messages.warning(request, "Accès refusé (commande non assignée).")
-        except Exception:
-            pass
-        return redirect("orders:driver_hub")
+    # 🔓 MODE SOUPLE (aligné sur driver_weighing)
+    if not request.user.is_staff:
+        assigned_driver = getattr(order, "delivery_partner", None)
+        user_driver_id = (
+            getattr(request.user, "delivery_partner_id", None)
+            or getattr(request.user, "driver_id", None)
+            or (request.POST.get("driver_id") or request.GET.get("driver_id") or "").strip()
+        )
+
+        if assigned_driver and user_driver_id:
+            try:
+                if str(assigned_driver.id) != str(user_driver_id):
+                    messages.warning(request, "Cette course ne t'est pas assignée.")
+                    return redirect(reverse("orders:driver_app") + (f"?driver_id={user_driver_id}" if user_driver_id else ""))
+            except Exception:
+                pass
 
     kind = _sanitize_evidence_kind(request.POST.get("kind"), OrderEvidencePhoto)
     caption = (request.POST.get("caption") or "").strip()
@@ -11095,7 +11883,19 @@ def driver_evidence_upload(request, order_id):
 
     if not files:
         messages.warning(request, "Aucune photo reçue.")
-        return redirect("orders:driver_weighing", order_id=order.id)
+        back = (request.GET.get("back") or request.POST.get("back") or "").strip()
+        if back and url_has_allowed_host_and_scheme(back, allowed_hosts={request.get_host()}):
+            return redirect(back)
+        url = reverse("orders:driver_weighing", kwargs={"order_id": order.id})
+        qs = []
+        raw_leg_id = (request.POST.get("leg_id") or request.GET.get("leg_id") or "").strip()
+        if raw_leg_id:
+            qs.append(f"leg_id={raw_leg_id}")
+        if back:
+            qs.append(f"back={back}")
+        if qs:
+            url += "?" + "&".join(qs)
+        return redirect(url)
 
     for f in files:
         OrderEvidencePhoto.objects.create(
@@ -11115,7 +11915,14 @@ def driver_evidence_upload(request, order_id):
     if back and url_has_allowed_host_and_scheme(back, allowed_hosts={request.get_host()}):
         return redirect(back)
 
-    return redirect("orders:driver_weighing", order_id=order.id)
+    
+    # 🔁 retour automatique mission après upload
+    driver_id = request.GET.get("driver_id") or request.POST.get("driver_id")
+    url = reverse("orders:driver_app")
+    if driver_id:
+        url += f"?driver_id={driver_id}"
+    return redirect(url)
+
 
 def _safe_decimal(v, default="0"):
     try:
@@ -11160,7 +11967,7 @@ def _resolve_laundry_for_user(request):
             laundry = q.filter(email__iexact=user_name).first() or q.filter(name__iexact=user_name).first()
 
         if laundry is None:
-            error = "Aucune blanchisserie liée à ce compte. Contacte l’admin pour associer ton compte à une blanchisserie."
+            error = "Aucune blanchisserie liée à ce compte. Contacte l'admin pour associer ton compte à une blanchisserie."
     else:
         laundry_id = (request.GET.get("laundry_id") or "").strip()
         if not laundry_id:
@@ -11202,6 +12009,24 @@ def laundry_weighing(request, order_id):
 
     order = get_object_or_404(Order, id=order_id)
 
+    selected_driver_id = (request.GET.get("driver_id") or "").strip()
+    assigned_driver = getattr(order, "delivery_partner", None)
+
+    if not request.user.is_staff:
+        # fallback automatique côté livreur
+        if assigned_driver and not selected_driver_id:
+            selected_driver_id = str(assigned_driver.id)
+
+        # 🔥 CAS 1 : commande non assignée → on autorise (mode souple)
+        if not assigned_driver:
+            pass
+
+        # 🔥 CAS 2 : assignée à quelqu’un d’autre → bloqué
+        elif selected_driver_id and str(assigned_driver.id) != str(selected_driver_id):
+            return redirect("orders:driver_hub")
+
+
+    
     # Sécurité: la commande doit appartenir à cette blanchisserie
     if getattr(order, "laundry_partner_id", None) != laundry.id:
         return render(request, "orders/laundry_order_detail.html", {
@@ -11209,7 +12034,7 @@ def laundry_weighing(request, order_id):
             "order": None,
             "items": [],
             "totals": {"total_fcfa": 0},
-            "error": "Accès refusé : cette commande n’est pas attribuée à ta blanchisserie.",
+            "error": "Accès refusé : cette commande n'est pas attribuée à ta blanchisserie.",
             "laundry_id": str(laundry.id),
             "evidence": [],
         })
@@ -11264,7 +12089,7 @@ def laundry_weighing(request, order_id):
                         pass
 
         if action == "start":
-            # Passe en "en cours" (sans casser si status n’existe pas)
+            # Passe en "en cours" (sans casser si status n'existe pas)
             if hasattr(order, "status"):
                 try:
                     order.status = "laundry_in_progress"
@@ -11299,6 +12124,7 @@ def laundry_weighing_confirm(request, order_id):
         return redirect("orders:laundry_app")
 
     order = get_object_or_404(Order, id=order_id)
+
     if getattr(order, "laundry_partner_id", None) != laundry.id:
         return HttpResponseRedirect(f"{reverse('orders:laundry_app')}?laundry_id={laundry.id}")
 
@@ -11372,6 +12198,7 @@ def laundry_weighing_dispute(request, order_id):
         return redirect("orders:laundry_app")
 
     order = get_object_or_404(Order, id=order_id)
+
     if getattr(order, "laundry_partner_id", None) != laundry.id:
         return HttpResponseRedirect(f"{reverse('orders:laundry_app')}?laundry_id={laundry.id}")
 
@@ -11506,15 +12333,23 @@ def client_new_order_step3(request, order_id: int):
     if category:
         services = ServiceItem.objects.filter(category=category, is_active=True).order_by("name")
 
-    existing_items = order.items.all().order_by("id")
+    existing_items = _build_client_display_items(order)
 
     # Pré-remplissage des quantités par service (pour l'UI step3)
     qty_by_service = {}
     try:
         for it in existing_items:
             sid = getattr(it, "service_id", None)
+            qty = getattr(it, "quantity", None)
             if sid:
-                quantities[sid] = it.quantity
+                qty_by_service[sid] = qty
+                continue
+
+            if isinstance(it, dict):
+                sid = it.get("service_id")
+                qty = it.get("quantity", 0)
+                if sid:
+                    qty_by_service[sid] = qty
     except Exception:
         qty_by_service = {}
 
@@ -11522,9 +12357,9 @@ def client_new_order_step3(request, order_id: int):
 
     if request.method == "POST":
         if not category:
-            error = "Aucune catégorie de service n’est disponible. Ajoute une catégorie dans l’admin."
+            error = "Aucune catégorie de service n'est disponible. Ajoute une catégorie dans l'admin."
         elif not services.exists():
-            error = "Aucun article actif dans cette catégorie. Ajoute des articles dans l’admin."
+            error = "Aucun article actif dans cette catégorie. Ajoute des articles dans l'admin."
         else:
             changed = False
 
@@ -11581,8 +12416,20 @@ def client_new_order_step3(request, order_id: int):
     # Pré-remplissage des quantités déjà ajoutées
     qty_by_service = {}
     for it in existing_items:
-        if it.service_id:
-            qty_by_service[it.service_id] = it.quantity
+        try:
+            service_id = getattr(it, "service_id", None)
+            quantity = getattr(it, "quantity", None)
+            if service_id:
+                qty_by_service[service_id] = quantity
+                continue
+        except Exception:
+            pass
+
+        if isinstance(it, dict):
+            service_id = it.get("service_id")
+            quantity = it.get("quantity", 0)
+            if service_id:
+                qty_by_service[service_id] = quantity
 
     return render(request, "orders/client_new_order_step3.html", {
         "order": order,
@@ -11626,11 +12473,16 @@ def client_new_order_step4(request, order_id: int):
         return redirect("orders:client_order_detail", order_id=order.id)
 
     amounts = _client_order_amounts(order)
-    items = order.items.all().order_by("id")
+    items = _build_client_display_items(order)
 
 
     # Si aucun article, on renvoie vers Step3 (évite le recap vide)
-    if not items.exists():
+    try:
+        has_items = items.exists()
+    except Exception:
+        has_items = bool(items)
+
+    if not has_items:
         try:
             from django.contrib import messages
             messages.error(request, "Ajoute au moins un article avant de confirmer la commande.")
@@ -11644,11 +12496,40 @@ def client_new_order_step4(request, order_id: int):
         try:
             items_total = Decimal('0')
             for it in items:
-                q = Decimal(str(getattr(it, 'quantity', 0) or 0))
-                u = Decimal(str(getattr(it, 'unit_price', 0) or 0))
-                if q < 0: q = Decimal('0')
-                if u < 0: u = Decimal('0')
-                items_total += (q * u)
+                if isinstance(it, dict):
+                    q_raw = it.get('quantity', None)
+                    if q_raw is None:
+                        q_raw = it.get('qty', 0)
+
+                    u_raw = it.get('unit_price', None)
+                    if u_raw is None:
+                        u_raw = it.get('price', 0)
+
+                    line_total = it.get('total', None)
+
+                    q = Decimal(str(q_raw or 0))
+                    u = Decimal(str(u_raw or 0))
+
+                    if q < 0:
+                        q = Decimal('0')
+                    if u < 0:
+                        u = Decimal('0')
+
+                    if line_total is not None:
+                        lt = Decimal(str(line_total or 0))
+                        if lt < 0:
+                            lt = Decimal('0')
+                        items_total += lt
+                    else:
+                        items_total += (q * u)
+                else:
+                    q = Decimal(str(getattr(it, 'quantity', 0) or 0))
+                    u = Decimal(str(getattr(it, 'unit_price', 0) or 0))
+                    if q < 0:
+                        q = Decimal('0')
+                    if u < 0:
+                        u = Decimal('0')
+                    items_total += (q * u)
         except Exception:
             items_total = Decimal('0')
 
@@ -11675,6 +12556,88 @@ def client_new_order_step4(request, order_id: int):
 
         try:
             order.update_financials(save=True)
+        except Exception:
+            pass
+
+        # Finalisation logistique alignée sur create(request)
+        try:
+            ensure_order_geocoded(order, save=True)
+        except Exception:
+            pass
+
+        try:
+            from orders.assignment import pick_best_laundry
+            laundry, _laundry_reason = pick_best_laundry(order)
+        except Exception:
+            laundry, _laundry_reason = None, None
+
+        if laundry:
+            try:
+                order.laundry_partner = laundry
+            except Exception:
+                pass
+
+        try:
+            from orders.assignment import pick_best_driver
+            driver, _driver_reason = pick_best_driver(order)
+        except Exception:
+            driver, _driver_reason = None, None
+
+        if driver:
+            try:
+                order.delivery_partner = driver
+            except Exception:
+                pass
+
+        try:
+            update_fields = []
+            if hasattr(order, "laundry_partner_id"):
+                update_fields.append("laundry_partner")
+            if hasattr(order, "delivery_partner_id"):
+                update_fields.append("delivery_partner")
+            if update_fields:
+                order.save(update_fields=update_fields)
+            else:
+                order.save()
+        except Exception:
+            try:
+                order.save()
+            except Exception:
+                pass
+
+        try:
+            from orders.models import sync_delivery_legs_for_order
+            sync_delivery_legs_for_order(order)
+        except Exception:
+            pass
+
+        try:
+            from orders.service_layer.legs import normalize_order_legs
+            normalize_order_legs(order, save=True)
+        except Exception:
+            pass
+
+        try:
+            has_laundry = bool(getattr(order, "laundry_partner_id", None))
+            has_driver = bool(getattr(order, "delivery_partner_id", None))
+            if getattr(order, "status", None) == "pending" and (has_laundry or has_driver):
+                order.status = "in_progress"
+                order.save(update_fields=["status"])
+
+                # 🔥 RESYNC FINAL (clé du bug)
+                try:
+                    from orders.models import sync_delivery_legs_for_order, DeliveryLeg
+                    from orders.service_layer.legs import normalize_order_legs
+
+                    sync_delivery_legs_for_order(order)
+                    normalize_order_legs(order, save=True)
+
+                    if getattr(order, "delivery_partner_id", None):
+                        DeliveryLeg.objects.filter(order=order).exclude(status="canceled").update(
+                            driver_id=order.delivery_partner_id
+                        )
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -11752,9 +12715,9 @@ def laundry_app(request):
             laundry = q.filter(email__iexact=user_name).first() or q.filter(name__iexact=user_name).first()
 
         if laundry is None:
-            error = "Aucune blanchisserie liée à ce compte. Contacte l’admin pour associer ton compte à une blanchisserie."
+            error = "Aucune blanchisserie liée à ce compte. Contacte l'admin pour associer ton compte à une blanchisserie."
     else:
-        # 2) Staff: peut cibler n’importe quelle blanchisserie via querystring
+        # 2) Staff: peut cibler n'importe quelle blanchisserie via querystring
         laundry_id = (request.GET.get("laundry_id") or "").strip()
         if not laundry_id:
             error = "laundry_id manquant. Exemple: /orders/laundry/app/?laundry_id=1"
@@ -11778,13 +12741,37 @@ def laundry_app(request):
             .order_by("-id")
         )
 
+    orders_list = list(orders_qs[:200])
+
+    stats_todo = 0
+    stats_doing = 0
+    stats_ready = 0
+    stats_done = 0
+
+    for o in orders_list:
+        st = (getattr(o, "status", "") or "").lower().strip()
+        ready = bool(getattr(o, "wash_complete_time", None))
+
+        if st == "done":
+            stats_done += 1
+        elif ready:
+            stats_ready += 1
+        elif st == "in_progress":
+            stats_doing += 1
+        else:
+            stats_todo += 1
+
     return render(
         request,
         "orders/laundry_app.html",
         {
             "laundry": laundry,
-            "orders": list(orders_qs[:200]),
+            "orders": orders_list,
             "error": error,
+            "stats_todo": stats_todo,
+            "stats_doing": stats_doing,
+            "stats_ready": stats_ready,
+            "stats_done": stats_done,
         },
     )
 
@@ -11799,10 +12786,20 @@ def laundry_order_detail(request, order_id):
 
     laundry = None
     error = None
-    laundry_id = None
+    laundry_id = (request.GET.get("laundry_id") or "").strip()
 
-    # 1) Déduire blanchisserie pour utilisateur non-staff
-    if not getattr(request.user, "is_staff", False):
+    # 0) Fallback explicite via ?laundry_id=XX même en dev / non-staff
+    if laundry_id:
+        try:
+            lid = int(laundry_id)
+            laundry = LaundryPartner.objects.filter(id=lid).first()
+            if not laundry:
+                error = "Blanchisserie introuvable (laundry_id invalide)."
+        except Exception:
+            error = "laundry_id invalide (doit être un entier)."
+
+    # 1) Si rien trouvé, déduire via le compte connecté
+    if laundry is None:
         user_email = (getattr(request.user, "email", "") or "").strip().lower()
         user_name = (getattr(request.user, "username", "") or "").strip().lower()
 
@@ -11813,20 +12810,8 @@ def laundry_order_detail(request, order_id):
             laundry = q.filter(email__iexact=user_name).first() or q.filter(name__iexact=user_name).first()
 
         if laundry is None:
-            error = "Aucune blanchisserie liée à ce compte. Contacte l’admin pour associer ton compte à une blanchisserie."
-    else:
-        # 2) Staff : peut cibler via ?laundry_id=XX (facultatif)
-        laundry_id = (request.GET.get("laundry_id") or "").strip()
-        if laundry_id:
-            try:
-                lid = int(laundry_id)
-                laundry = LaundryPartner.objects.filter(id=lid).first()
-                if not laundry:
-                    error = "Blanchisserie introuvable (laundry_id invalide)."
-            except Exception:
-                error = "laundry_id invalide (doit être un entier)."
+            error = "Aucune blanchisserie liée à ce compte. Contacte l'admin pour associer ton compte à une blanchisserie."
 
-    # Si pas de laundry, on affiche une page propre
     if not laundry:
         return render(request, "orders/laundry_order_detail.html", {
             "order": None,
@@ -11836,7 +12821,6 @@ def laundry_order_detail(request, order_id):
             "laundry_id": laundry_id or "",
         })
 
-    # Récupère la commande uniquement si elle appartient à cette blanchisserie
     order = (
         Order.objects
         .select_related("laundry_partner")
@@ -11901,7 +12885,15 @@ def laundry_order_detail(request, order_id):
     except Exception:
         logger.exception("laundry_order_detail auto-repair failed for order %s", getattr(order, "id", None))
 
-    items = order.items.all().order_by("id")
+    items = _build_client_display_items(order)
+
+    # États UI des boutons
+    status = getattr(order, "status", "") or ""
+    ready = bool(getattr(order, "wash_complete_time", None))
+
+    is_start_disabled = status in ("in_progress", "done")
+    is_ready_disabled = ready or status == "done"
+    is_done_disabled = (not ready) or status == "done"
 
     # Actions V1 (bloquées par règles)
     if request.method == "POST":
@@ -11988,7 +12980,7 @@ def laundry_order_detail(request, order_id):
 
                     qs_reactivate.exclude(id__in=paid_leg_ids).update(status="pending")
 
-                    # Bonus safe: s’assurer qu’un pickup existe
+                    # Bonus safe: s'assurer qu'un pickup existe
                     DeliveryLeg.objects.get_or_create(
                         order=order,
                         leg_type="pickup",
@@ -11998,33 +12990,28 @@ def laundry_order_detail(request, order_id):
                     logger.exception("READY action failed for order %s", getattr(order, "id", None))
 
         # 3) DONE : autorisé seulement si prêt
+
+        # 3) DONE : autorisé uniquement si prêt
         elif action == "done":
-            # ✅ Côté blanchisserie, "DONE" = lavage terminé (pas livraison terminée)
-            if already_ready and (cur != "done"):
+            if getattr(order, "wash_complete_time", None):
                 try:
-                    if not order.wash_complete_time:
-                        order.wash_complete_time = timezone.now()
-                        order.save(update_fields=["wash_complete_time"])
-
-                    # Ne PAS forcer order.status="done" ici.
-                    # On garde in_progress (ou pending) et on laisse le sync via legs décider.
-                    from orders.models import sync_order_status_from_legs
-                    sync_order_status_from_legs(order, save=True)
-
+                    set_status("done")
+                    order.save(update_fields=["status"])
                 except Exception:
-                    pass
+                    try:
+                        order.status = "done"
+                        order.save()
+                    except Exception:
+                        pass
+
+        # Recharge l'objet après action POST pour éviter tout affichage stale
+        try:
+            order.refresh_from_db()
+        except Exception:
+            pass
 
         return redirect(f"{request.path}?laundry_id={laundry.id}")
 
-    cur = (order.status or "").strip()
-    already_ready = bool(getattr(order, "wash_complete_time", None))
-
-    choices = getattr(Order._meta.get_field("status"), "choices", []) or []
-    allowed_values = {c[0] for c in choices if isinstance(c, (list, tuple)) and c}
-
-    is_start_disabled = already_ready or (cur in ("in_progress", "done")) or ("in_progress" not in allowed_values)
-    is_ready_disabled = already_ready or (cur == "done")
-    is_done_disabled = (cur == "done") or (not already_ready) or ("done" not in allowed_values)
 
     return render(request, "orders/laundry_order_detail.html", {
         "order": order,
@@ -12057,8 +13044,8 @@ def ops_order_confirm_wave_paid(request, order_id: int):
 
     Notes:
     - Idempotent: si déjà soldée => OK sans recréer.
-    - On n’essaie pas d’effacer la session "client" (wave_declared_*), car l’ops n’a pas cette session.
-      Côté UI, dès que paid, on n’affiche plus "declared".
+    - On n'essaie pas d'effacer la session "client" (wave_declared_*), car l'ops n'a pas cette session.
+      Côté UI, dès que paid, on n'affiche plus "declared".
     """
     from decimal import Decimal
     from django.db.models import Sum
@@ -12095,7 +13082,7 @@ def ops_order_confirm_wave_paid(request, order_id: int):
     amt = int(remaining)
 
     # Reference idempotente (1 par "solde wave ops")
-    # Si tu as un checkout_id plus tard, tu pourras l’ajouter ici.
+    # Si tu as un checkout_id plus tard, tu pourras l'ajouter ici.
     ref = f"WAVE-OPS-{order.id}-SOLDE"
 
     # Idempotence DB applicative: order+reference
@@ -12112,7 +13099,7 @@ def ops_order_confirm_wave_paid(request, order_id: int):
 
     # Si déjà existant mais montant différent (cas rare: total_client_ttc a changé),
     # on ne "modifie" pas un Payment existant (ça éviter des boucles / incohérences).
-    # On renvoie juste l’état actuel.
+    # On renvoie juste l'état actuel.
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         return JsonResponse({
             "ok": True,
@@ -12126,3 +13113,420 @@ def ops_order_confirm_wave_paid(request, order_id: int):
 
 
 # --- LOT_3_1_GUARD_DOUBLE_PAY_OK ---
+
+
+@require_POST
+def laundry_update_status(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
+
+    action = request.POST.get("action")
+
+    if action == "accept":
+        order.status = "accepted"
+    elif action == "start":
+        order.status = "in_progress"
+    elif action == "done":
+        order.status = "done"
+
+    order.save()
+
+    return JsonResponse({
+        "success": True,
+        "new_status": order.status
+    })
+
+
+# ============================================================
+# Dashboard Superviseur Blanchisserie
+# ============================================================
+@login_required
+@require_http_methods(["GET"])
+def laundry_supervisor_dashboard(request):
+    """
+    Dashboard superviseur dédié au pilotage blanchisserie.
+    - staff: peut cibler ?laundry_id=XX
+    - non-staff: on déduit la blanchisserie via email/username
+    - aucune information client sensible affichée
+    """
+    laundry = None
+    error = None
+
+    if not getattr(request.user, "is_staff", False):
+        user_email = (getattr(request.user, "email", "") or "").strip().lower()
+        user_name = (getattr(request.user, "username", "") or "").strip().lower()
+
+        q = LaundryPartner.objects.all()
+        if user_email:
+            laundry = q.filter(email__iexact=user_email).first()
+        if laundry is None and user_name:
+            laundry = q.filter(email__iexact=user_name).first() or q.filter(name__iexact=user_name).first()
+
+        if laundry is None:
+            error = "Aucune blanchisserie liée à ce compte. Contacte l'admin pour associer ton compte à une blanchisserie."
+    else:
+        laundry_id = (request.GET.get("laundry_id") or "").strip()
+        if not laundry_id:
+            error = "laundry_id manquant. Exemple: /orders/laundry/supervisor/?laundry_id=1"
+        else:
+            try:
+                lid = int(laundry_id)
+                laundry = LaundryPartner.objects.filter(id=lid).first()
+                if not laundry:
+                    error = "Blanchisserie introuvable (laundry_id invalide)."
+            except Exception:
+                error = "laundry_id invalide (doit être un entier)."
+
+    orders_qs = Order.objects.none()
+    orders_list = []
+
+    stats_todo = 0
+    stats_doing = 0
+    stats_ready = 0
+    stats_done = 0
+
+    recent_orders = []
+    alerts = []
+    recommendation = "Situation normale."
+
+    if laundry:
+        orders_qs = (
+            Order.objects
+            .select_related("laundry_partner")
+            .prefetch_related("items")
+            .filter(laundry_partner_id=laundry.id)
+            .order_by("-id")
+        )
+
+        orders_list = list(orders_qs[:300])
+
+        for o in orders_list:
+            st = (getattr(o, "status", "") or "").lower().strip()
+            ready = bool(getattr(o, "wash_complete_time", None))
+
+            if st == "done":
+                stats_done += 1
+            elif ready:
+                stats_ready += 1
+            elif st == "in_progress":
+                stats_doing += 1
+            else:
+                stats_todo += 1
+
+        recent_orders = orders_list[:12]
+
+        if stats_todo > 0 and stats_doing == 0:
+            alerts.append("Aucune commande n'est actuellement en cours de traitement.")
+            recommendation = "Démarrer rapidement au moins une commande."
+        elif stats_doing > 5:
+            alerts.append("Beaucoup de commandes sont en cours en même temps.")
+            recommendation = "Stabiliser le flux et finaliser les commandes prêtes."
+        elif stats_ready > 0:
+            alerts.append("Certaines commandes sont prêtes et attendent la fin de traitement.")
+            recommendation = "Finaliser les commandes prêtes en priorité."
+        elif stats_todo == 0 and stats_doing == 0 and stats_ready == 0:
+            recommendation = "Toutes les commandes visibles semblent traitées."
+        else:
+            recommendation = "Poursuivre le traitement normal des commandes."
+
+    return render(
+        request,
+        "orders/laundry_supervisor_dashboard.html",
+        {
+            "laundry": laundry,
+            "error": error,
+            "orders": recent_orders,
+            "stats_todo": stats_todo,
+            "stats_doing": stats_doing,
+            "stats_ready": stats_ready,
+            "stats_done": stats_done,
+            "alerts": alerts,
+            "recommendation": recommendation,
+        },
+    )
+
+
+
+def _resolve_driver_for_request(request):
+    """
+    Retourne le DeliveryPartner courant :
+    - non staff : driver connecté
+    - staff : fallback via ?driver_id=
+    """
+    from partners.models import DeliveryPartner
+
+    driver = _get_connected_driver(request)
+    if not driver and getattr(request.user, "is_staff", False):
+        driver_id = (request.GET.get("driver_id") or "").strip()
+        if driver_id.isdigit():
+            driver = DeliveryPartner.objects.filter(pk=int(driver_id)).first()
+    return driver
+
+
+def _select_driver_active_leg(driver, order=None):
+    """
+    Source unique de vérité FAGNI pour choisir UNE mission active visible.
+
+    Règles métier :
+    - statuts visibles : pending / assigned / in_progress
+    - une livraison n'est visible que si wash_complete_time est renseigné
+    - priorité de statut : in_progress > assigned > pending
+    - priorité métier :
+        1) livraison prête / en cours
+        2) collecte
+    """
+    from django.db.models import Case, When, Value, IntegerField, Q
+
+    if not driver:
+        return None
+
+    qs = (
+        DeliveryLeg.objects
+        .select_related("order", "order__customer", "order__laundry_partner", "driver")
+        .filter(driver=driver, status__in=["pending", "assigned", "in_progress"])
+        .exclude(status="canceled")
+    )
+
+    if order is not None:
+        qs = qs.filter(order=order)
+
+    # Livraison invisible tant que le linge n'est pas prêt
+    qs = qs.exclude(
+        Q(leg_type__in=["return", "delivery"]) &
+        Q(order__wash_complete_time__isnull=True)
+    )
+
+    qs = qs.annotate(
+        global_priority=Case(
+            # 1. mission en cours
+            When(status="in_progress", then=Value(0)),
+
+            # 2. livraison déjà acceptée
+            When(
+                status="assigned",
+                leg_type__in=["return", "delivery"],
+                order__wash_complete_time__isnull=False,
+                then=Value(1)
+            ),
+
+            # 3. livraison prête à accepter
+            When(
+                status="pending",
+                leg_type__in=["return", "delivery"],
+                order__wash_complete_time__isnull=False,
+                then=Value(2)
+            ),
+
+            # 4. collecte déjà acceptée
+            When(
+                status="assigned",
+                leg_type="pickup",
+                then=Value(3)
+            ),
+
+            # 5. collecte à accepter
+            When(
+                status="pending",
+                leg_type="pickup",
+                then=Value(4)
+            ),
+
+            default=Value(9),
+            output_field=IntegerField(),
+        ),
+    ).order_by("global_priority", "order__created_at", "id")
+
+    return qs.first()
+
+
+def _build_driver_mission_context(request, driver, order=None):
+    """
+    Construit un contexte homogène pour :
+    - driver_app_v3
+    - driver_mission_v3
+    - driver_hub
+    """
+    from urllib.parse import quote
+
+    base = {
+        "driver": driver,
+        "order": None,
+        "leg": None,
+        "next_action": None,
+        "next_action_label": None,
+        "mission_type_label": None,
+        "mission_state_label": "✅ Aucune mission active",
+        "mission_state_tone": "gray",
+        "mission_hint": "Tu n’as aucune action terrain à faire pour le moment.",
+        "address_display": None,
+        "maps_url": None,
+        "proof_url": None,
+        "mission_cta": None,
+    }
+
+    if not driver:
+        return base
+
+    leg = _select_driver_active_leg(driver, order=order)
+    current_order = getattr(leg, "order", None)
+
+    if not leg or not current_order:
+        if order is not None:
+            base["mission_state_label"] = "⏸️ Aucune mission active sur cette commande"
+            if getattr(order, "wash_complete_time", None):
+                base["mission_hint"] = "Cette commande ne présente plus d’action livreur en attente."
+            else:
+                base["mission_hint"] = "Collecte terminée ou aucune action livreur disponible pour le moment."
+        return base
+
+    leg_type = (getattr(leg, "leg_type", "") or "").strip().lower()
+    st = (getattr(leg, "status", "") or "").strip().lower()
+    customer = getattr(current_order, "customer", None)
+
+    pickup_address = getattr(current_order, "pickup_address", None) or getattr(customer, "address", None)
+    delivery_address = getattr(current_order, "delivery_address", None) or getattr(customer, "address", None)
+
+    address_display = pickup_address if leg_type == "pickup" else delivery_address
+    maps_url = None
+    if address_display:
+        maps_url = "https://www.google.com/maps/search/?api=1&query=" + quote(str(address_display))
+
+    back = reverse("orders:driver_app")
+    if getattr(driver, "id", None):
+        back = f"{back}?driver_id={driver.id}"
+
+    proof_url = reverse("orders:driver_weighing", kwargs={"order_id": current_order.id})
+
+    params = []
+
+    if getattr(leg, "id", None):
+        params.append(f"leg_id={leg.id}")
+
+    if getattr(driver, "id", None):
+        params.append(f"driver_id={driver.id}")
+
+    if back:
+        params.append(f"back={quote(back, safe='')}")
+
+    if params:
+        proof_url = proof_url + "?" + "&".join(params)
+
+    mission_cta = reverse("orders:driver_mission_v3", kwargs={"order_id": current_order.id})
+    if getattr(driver, "id", None):
+        mission_cta = f"{mission_cta}?driver_id={driver.id}"
+
+    ACTION_LABELS = {
+        "accept": "✅ Accepter mission",
+        "start": "🚀 Démarrer",
+        "finish": "✅ Terminer mission",
+    }
+
+    next_action = None
+    next_action_label = None
+
+    if st == "pending":
+        next_action = "accept"
+        next_action_label = ACTION_LABELS["accept"]
+
+    elif st == "assigned":
+        next_action = "start"
+        if leg_type == "pickup":
+            next_action_label = "🚀 Démarrer collecte"
+        else:
+            next_action_label = "🚀 Démarrer livraison"
+
+    elif st == "in_progress":
+        next_action = "finish"
+        if leg_type == "pickup":
+            next_action_label = "✅ Collecte terminée"
+        else:
+            next_action_label = "✅ Livraison terminée"
+
+    if leg_type == "pickup":
+        mission_type_label = "Collecte"
+        mission_state_tone = "green"
+
+        if st == "pending":
+            mission_state_label = "🟢 Collecte à faire"
+            mission_hint = "Accepte puis démarre la collecte chez le client."
+        elif st == "assigned":
+            mission_state_label = "🟢 Collecte à démarrer"
+            mission_hint = "Rends-toi chez le client pour récupérer le linge."
+        elif st == "in_progress":
+            mission_state_label = "🟢 Collecte en cours"
+            mission_hint = "Ajoute une preuve puis valide la collecte."
+        else:
+            mission_state_label = "🟢 Collecte"
+            mission_hint = "Mission de collecte."
+    else:
+        mission_type_label = "Livraison"
+        mission_state_tone = "blue"
+
+        if st == "pending":
+            mission_state_label = "🔵 Livraison à faire"
+            mission_hint = "Le linge est prêt. Accepte puis démarre la livraison."
+        elif st == "assigned":
+            mission_state_label = "🔵 Livraison à démarrer"
+            mission_hint = "Le linge est prêt. Lance maintenant la remise au client."
+        elif st == "in_progress":
+            mission_state_label = "🔵 Livraison en cours"
+            mission_hint = "Ajoute une preuve de remise puis valide la livraison."
+        else:
+            mission_state_label = "🔵 Livraison"
+            mission_hint = "Mission de livraison."
+
+    base.update({
+        "order": current_order,
+        "leg": leg,
+        "next_action": next_action,
+        "next_action_label": next_action_label,
+        "mission_type_label": mission_type_label,
+        "mission_state_label": mission_state_label,
+        "mission_state_tone": mission_state_tone,
+        "mission_hint": mission_hint,
+        "address_display": address_display,
+        "maps_url": maps_url,
+        "proof_url": proof_url,
+        "mission_cta": mission_cta,
+    })
+    return base
+
+
+
+# ============================================================
+#  DRIVER V3 — MISSION UNIQUE
+# ============================================================
+@login_required
+@require_http_methods(["GET"])
+def driver_app_v3(request):
+    """
+    App livreur V3 :
+    - affiche uniquement la mission active prioritaire
+    - logique métier unifiée FAGNI
+    """
+    driver = _resolve_driver_for_request(request)
+    ctx = _build_driver_mission_context(request, driver)
+    return render(request, "orders/driver_mission.html", ctx)
+
+
+@login_required
+@require_http_methods(["GET"])
+def driver_mission_v3(request, order_id):
+    """
+    Détail mission V3 centré sur UNE course et UNE mission visible.
+    """
+    driver = _resolve_driver_for_request(request)
+
+    if not driver:
+        return HttpResponseForbidden("Aucun livreur connecté.")
+
+    order = get_object_or_404(
+        Order.objects.select_related("customer", "laundry_partner", "delivery_partner"),
+        pk=order_id
+    )
+
+    if not getattr(request.user, "is_staff", False):
+        if getattr(order, "delivery_partner_id", None) and getattr(driver, "id", None) != getattr(order, "delivery_partner_id", None):
+            return HttpResponseForbidden("Accès refusé.")
+
+    ctx = _build_driver_mission_context(request, driver, order=order)
+    return render(request, "orders/driver_mission.html", ctx)

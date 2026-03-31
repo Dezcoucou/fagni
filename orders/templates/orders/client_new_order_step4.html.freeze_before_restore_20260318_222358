@@ -1,0 +1,196 @@
+{% extends "orders/client_base.html" %}
+{% load money_filters %}
+
+{% block title %}Nouvelle commande – Étape 4{% endblock %}
+
+{% block content %}
+<!-- CLIENT_NEW_ORDER_STEP4_TEMPLATE_OK_20260222 -->
+<div class="page co-page">
+
+  <div class="co-head">
+    <div>
+      <h1 class="co-title">Récapitulatif</h1>
+      <p class="co-subtitle">Étape 4/4 — Vérifier puis confirmer</p>
+    </div>
+
+    <div class="co-head__actions">
+      <a class="btn btn-light" href="{% url 'orders:client_new_order_step3' order.id %}">← Modifier</a>
+    </div>
+  </div>
+
+  {% with has_items=items|length %}
+  <form method="post" class="co-form">
+    {% csrf_token %}
+
+    <div class="card co-card">
+
+      <!-- 1) Articles -->
+      <div class="co-card__head">
+        <div>
+          <div class="co-card__title">Articles sélectionnés</div>
+          <div class="co-card__sub">{{ items|length }} ligne(s)</div>
+        </div>
+
+        {% if has_items %}
+          <span class="badge-status badge-status--in_progress">Vérification</span>
+        {% else %}
+          <span class="badge-status badge-status--pay-unknown">Vide</span>
+        {% endif %}
+      </div>
+
+      <div class="co-section">
+        {% if not has_items %}
+          <div class="co-warn">
+            Aucun article ajouté. Retourne à l’étape 3 pour sélectionner au moins un article.
+          </div>
+        {% endif %}
+
+        <div class="co-items">
+          {% for it in items %}
+            <div class="co-item">
+              <div class="co-item__left">
+                <div class="co-item__name">{{ it.designation }}</div>
+                <div class="co-item__meta">
+                  {{ it.quantity }} × {{ it.unit_price|floatformat:0 }} FCFA
+                </div>
+                <div class="co-pill">Qté: {{ it.quantity }}</div>
+              </div>
+
+              <div class="co-item__right">
+                <div class="co-item__k">Total</div>
+                <div class="co-item__total">{{ it.total|floatformat:0 }} FCFA</div>
+              </div>
+            </div>
+          {% empty %}
+            {# on garde le warn plus haut #}
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- 2) Totaux -->
+      <div class="co-section">
+        <div class="co-grid2">
+          <div class="co-kv">
+            <div class="co-k">Prestation</div>
+            <div class="co-v">{{ amounts.prestation_total|floatformat:0 }} FCFA</div>
+          </div>
+
+          <div class="co-kv co-kv--strong">
+            <div class="co-k">Total TTC</div>
+            <div class="co-v">{{ amounts.total_ttc|floatformat:0 }} FCFA</div>
+          </div>
+        </div>
+
+        <div class="co-grid2" style="margin-top:10px;">
+          <div class="co-kv">
+            <div class="co-k">Mode de livraison</div>
+            <div class="co-v">
+              {% if order.delivery_mode == "express" %}
+                Express (24h)
+              {% elif order.delivery_mode == "scheduled" %}
+                Programmée
+              {% else %}
+                Standard (48h)
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="co-kv">
+            <div class="co-k">Créneau</div>
+            <div class="co-v">
+              {% if order.delivery_mode == "scheduled" and order.scheduled_delivery_at %}
+                {{ order.scheduled_delivery_at|date:"d/m/Y H:i" }}
+              {% else %}
+                —
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3) Infos client -->
+      <div class="co-section">
+        <div class="co-grid2">
+          <div class="co-kv">
+            <div class="co-k">Client</div>
+            <div class="co-v">
+              {% if order.customer %}
+                {{ order.customer }}
+              {% else %}
+                —
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="co-kv">
+            <div class="co-k">Adresse</div>
+            <div class="co-v">
+              {% if order.customer and order.customer.address %}
+                {{ order.customer.address }}
+              {% else %}
+                —
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        {% if order.notes %}
+          <div class="co-kv" style="margin-top:10px">
+            <div class="co-k">Notes</div>
+            <div class="co-v">{{ order.notes }}</div>
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- 4) Actions (sans submit : single submit = sticky) -->
+      <div class="co-actions">
+        <a class="btn btn-light" href="{% url 'orders:client_new_order_step3' order.id %}">← Modifier les articles</a>
+        <div class="co-actions__spacer"></div>
+        <div class="hint">
+          Après confirmation : paiement <strong>Wave</strong> si nécessaire.
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Sticky total : SEUL bouton submit -->
+    <div class="co-sticky" role="region" aria-label="Total et confirmation">
+      <div>
+        <div class="co-sticky__k">Total TTC</div>
+        <div class="co-sticky__v">{{ amounts.total_ttc|floatformat:0 }} FCFA</div>
+        <div class="co-sticky__mini">Confirme pour finaliser (paiement Wave si besoin)</div>
+      </div>
+
+      <div class="co-sticky__spacer"></div>
+
+      <button
+        class="btn btn-premium"
+        type="submit"
+        {% if not has_items %}disabled aria-disabled="true"{% endif %}
+      >
+        Confirmer
+      </button>
+    </div>
+
+  </form>
+  {% endwith %}
+
+</div>
+
+    <script>
+  document.addEventListener("DOMContentLoaded", function() {
+    const form = document.querySelector("form");
+    const btn = document.querySelector('button[type="submit"]');
+
+    if (form && btn) {
+      form.addEventListener("submit", function() {
+        btn.disabled = true;
+        btn.innerHTML = "Redirection vers paiement sécurisé...";
+        btn.style.opacity = "0.7";
+      });
+    }
+  });
+  </script>
+
+
+{% endblock %}

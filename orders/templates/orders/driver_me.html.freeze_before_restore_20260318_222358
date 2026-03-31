@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block content %}
+
+<style>
+    body {
+        background: #f5f5f7;
+    }
+
+    .driver-page {
+        max-width: 900px;
+        margin: 24px auto 32px;
+        padding: 0 12px;
+    }
+
+    .driver-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .driver-header-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .driver-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #ff7a00, #0056b3);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 18px;
+        text-transform: uppercase;
+    }
+
+    .driver-title-block h1 {
+        margin: 0;
+        font-size: 18px;
+    }
+
+    .driver-title-block p {
+        margin: 2px 0 0;
+        font-size: 12px;
+        color: #666;
+    }
+
+    .driver-header-right {
+        text-align: right;
+        font-size: 11px;
+        color: #666;
+    }
+
+    .driver-header-right .driver-date {
+        font-weight: 600;
+        color: #333;
+    }
+
+    .card {
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        padding: 14px 16px 16px;
+        margin-bottom: 14px;
+    }
+
+    .driver-kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    @media (max-width: 800px) {
+        .driver-kpi-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 520px) {
+        .driver-kpi-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+
+    .driver-kpi-card {
+        border-radius: 10px;
+        padding: 10px 12px;
+        background: #f9fafb;
+    }
+
+    .driver-kpi-card--primary {
+        background: linear-gradient(135deg, #0056b3, #003f82);
+        color: #fff;
+    }
+
+    .driver-kpi-card--orange {
+        background: #fff7e6;
+    }
+
+    .driver-kpi-card--green {
+        background: #e6f7f1;
+    }
+
+    .driver-kpi-card--blue {
+        background: #e9f3ff;
+    }
+
+    .driver-kpi-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        margin-bottom: 4px;
+        opacity: .9;
+    }
+
+    .driver-kpi-value {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 2px;
+    }
+
+    .driver-kpi-unit {
+        font-size: 11px;
+        font-weight: 400;
+        margin-left: 4px;
+    }
+
+    .driver-kpi-sub {
+        font-size: 11px;
+        opacity: .85;
+    }
+
+    .driver-section-title {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0 0 2px;
+    }
+
+    .driver-section-subtitle {
+        font-size: 12px;
+        color: #666;
+        margin: 0 0 8px;
+    }
+
+    .driver-orders-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        border-radius: 10px;
+        border: 1px solid #eee;
+        background: #fff;
+    }
+
+    .driver-orders-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        min-width: 720px;
+    }
+
+    .driver-orders-table thead {
+        background: #fafafa;
+    }
+
+    .driver-orders-table th,
+    .driver-orders-table td {
+        padding: 7px 8px;
+        border-bottom: 1px solid #f0f0f0;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .driver-orders-table th {
+        font-weight: 600;
+        font-size: 12px;
+        color: #555;
+        text-align: left;
+    }
+
+    .driver-orders-table tbody tr:hover {
+        background: #f9fbff;
+    }
+
+    .driver-col-number {
+        text-align: right;
+    }
+
+    .driver-order-link {
+        color: #0056b3;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .driver-order-link:hover {
+        text-decoration: underline;
+    }
+
+    .badge-status {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 7px;
+        border-radius: 999px;
+        font-size: 11px;
+    }
+
+    .badge-status--pending {
+        background: #fff7e6;
+        color: #ad6800;
+    }
+
+    .badge-status--in_progress {
+        background: #e6f4ff;
+        color: #0050b3;
+    }
+
+    .badge-status--done {
+        background: #f6ffed;
+        color: #237804;
+    }
+
+    .badge-status--canceled {
+        background: #fff1f0;
+        color: #a8071a;
+    }
+
+    .driver-empty-text {
+        font-size: 13px;
+        color: #666;
+        margin: 0;
+    }
+
+    .page-actions {
+        max-width: 900px;
+        margin: 0 auto 24px;
+        padding: 0 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .page-actions .btn {
+        font-size: 13px;
+    }
+</style>
+
+<div class="driver-page">
+
+    <!-- HEADER -->
+    <div class="driver-header">
+        <div class="driver-header-left">
+            <div class="driver-avatar">
+                {% if driver.name %}
+                    {{ driver.name|first }}
+                {% else %}
+                    {{ driver.email|default:"F"|first }}
+                {% endif %}
+            </div>
+            <div class="driver-title-block">
+                <h1>Mon espace livreur</h1>
+                <p>
+                    Bienvenue
+                    {% if driver.name %}{{ driver.name }}{% else %}livreur FAGNI{% endif %} – suivi de tes courses et revenus.
+                </p>
+            </div>
+        </div>
+        <div class="driver-header-right">
+            <div>Aujourd’hui</div>
+            <div class="driver-date">
+                {{ today|date:"d/m/Y" }}
+            </div>
+        </div>
+    </div>
+
+    <!-- KPIs -->
+    <section class="card">
+        <div class="driver-kpi-grid">
+            <article class="driver-kpi-card driver-kpi-card--primary">
+                <div class="driver-kpi-label">Courses complétées</div>
+                <div class="driver-kpi-value">
+                    {{ stats.total_orders|default:0|intcomma }}
+                </div>
+                <div class="driver-kpi-sub">
+                    Total historique de tes commandes livrées.
+                </div>
+            </article>
+
+            <article class="driver-kpi-card driver-kpi-card--orange">
+                <div class="driver-kpi-label">Courses ce mois-ci</div>
+                <div class="driver-kpi-value">
+                    {{ stats.month_orders|default:0|intcomma }}
+                </div>
+                <div class="driver-kpi-sub">
+                    Volume de commandes sur le mois courant.
+                </div>
+            </article>
+
+            <article class="driver-kpi-card driver-kpi-card--blue">
+                <div class="driver-kpi-label">Distance totale</div>
+                <div class="driver-kpi-value">
+                    {{ stats.total_distance_km|default:0|floatformat:"1" }}
+                    <span class="driver-kpi-unit">km</span>
+                </div>
+                <div class="driver-kpi-sub">
+                    Distance aller / retour cumulée.
+                </div>
+            </article>
+
+            <article class="driver-kpi-card driver-kpi-card--green">
+                <div class="driver-kpi-label">Revenus totaux</div>
+                <div class="driver-kpi-value">
+                    {{ stats.total_income|default:0|floatformat:0|intcomma }}
+                    <span class="driver-kpi-unit">FCFA</span>
+                </div>
+                <div class="driver-kpi-sub">
+                    Somme des revenus logistiques (courses livrées).
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <!-- LISTE DES COMMANDES DU LIVREUR -->
+    <section class="card">
+        <h2 class="driver-section-title">Mes dernières courses</h2>
+        <p class="driver-section-subtitle">
+            Historique des commandes où tu es le livreur FAGNI.
+        </p>
+
+        {% if orders %}
+            <div class="driver-orders-wrapper">
+                <table class="driver-orders-table">
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Date</th>
+                            <th>Client</th>
+                            <th>Statut</th>
+                            <th class="driver-col-number">Total client</th>
+                            <th class="driver-col-number">Revenu livreur</th>
+                            <th>Blanchisserie</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for o in orders %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'orders:detail' o.id %}" class="driver-order-link">
+                                        {{ o.code|default:o.id }}
+                                    </a>
+                                </td>
+                                <td>
+                                    {% if o.created_at %}
+                                        {{ o.created_at|date:"d/m/Y H:i" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ o.customer.name|default:"-" }}
+                                </td>
+                                <td>
+                                    <span class="badge-status badge-status--{{ o.status }}">
+                                        {{ o.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="driver-col-number">
+                                    {{ o.total|default:0|floatformat:0|intcomma }} FCFA
+                                </td>
+                                <td class="driver-col-number">
+                                    {{ o.driver_logistic_cost|default:0|floatformat:0|intcomma }} FCFA
+                                </td>
+                                <td>
+                                    {% if o.laundry_partner %}
+                                        {{ o.laundry_partner.name|default:o.laundry_partner.email }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="driver-empty-text">
+                Aucune course trouvée pour ce livreur.
+            </p>
+        {% endif %}
+    </section>
+</div>
+
+<div class="page-actions">
+    <a href="{% url 'orders:driver_hub' %}" class="btn btn-light">
+        ⬅️ Retour au Hub livreur
+    </a>
+    <a href="{% url 'orders:dashboard' %}" class="btn btn-light">
+        📊 Dashboard opérations
+    </a>
+    <a href="{% url 'orders:finance_dashboard' %}" class="btn btn-light">
+        💰 Dashboard finance
+    </a>
+</div>
+
+{% endblock %}

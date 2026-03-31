@@ -66,7 +66,7 @@ def _get_current_driver(request) -> DeliveryPartner | None:
     Récupère le livreur courant à partir de driver_id dans l'URL.
     Exemple : /wallets/driver/me/?driver_id=12
     """
-    driver_id = request.GET.get("driver_id")
+    driver_id = request.GET.get("driver_id") or request.session.get("active_driver_id")
     if not driver_id:
         return None
 
@@ -88,11 +88,13 @@ def driver_wallet_dashboard(request):
     - Non-staff : driver_id est requis (sinon page d'erreur)
     """
     user = request.user
-    selected_driver_id = (request.GET.get("driver_id") or "").strip()
+    selected_driver_id = (request.GET.get("driver_id") or request.session.get("active_driver_id") or "").strip()
 
     driver = None
     if selected_driver_id:
         driver = DeliveryPartner.objects.filter(pk=selected_driver_id).first()
+    if driver:
+        request.session["active_driver_id"] = str(driver.id)
 
     # Sécurité : sans driver_id, on ne peut pas deviner le livreur
     if not driver:

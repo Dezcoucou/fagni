@@ -9,6 +9,13 @@ from django.conf import settings
 from django.utils import timezone
 from partners.models import LaundryPartner, DeliveryPartner, RelayPointPartner
 from .finance import compute_order_financials
+from .domain_canonical import (
+    SERVICE_TYPE_CHOICES_WITH_BLANK,
+    infer_service_type_from_order_item,
+    map_order_status_to_canonical,
+)
+from orders.utils.address_rules import clean_address_or_empty
+
 from .services import recompute_order_distance_from_legs
 
 
@@ -2279,6 +2286,11 @@ class Order(models.Model):
                 photos.append(p)
         return photos
 
+
+    @property
+    def canonical_status(self):
+        return map_order_status_to_canonical(getattr(self, "status", None))
+
     # ---------- Service fee FAGNI ----------
     def compute_service_fee(self):
         """
@@ -2650,6 +2662,24 @@ class Order(models.Model):
 
         payment_just_paid = False
         status_just_done = False
+
+        # ============================================================
+        # ✅ GARDE-FOU ADRESSES
+        # - normalise les champs adresse
+        # - supprime les valeurs manifestement invalides ("Co", etc.)
+        # - non destructif pour le reste du flux
+        # ============================================================
+        try:
+            if hasattr(self, "pickup_address"):
+                self.pickup_address = clean_address_or_empty(getattr(self, "pickup_address", None))
+        except Exception:
+            pass
+
+        try:
+            if hasattr(self, "delivery_address"):
+                self.delivery_address = clean_address_or_empty(getattr(self, "delivery_address", None))
+        except Exception:
+            pass
 
 
         # ============================================================
@@ -3307,6 +3337,16 @@ class OrderItem(models.Model):
         verbose_name="Prestation cataloguée",
     )
 
+    service_type = models.CharField(
+        "Type de service canonique",
+        max_length=32,
+        choices=SERVICE_TYPE_CHOICES_WITH_BLANK,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Champ canonique FAGNI (pressing, cordonnerie, chaussures, retouche).",
+    )
+
     designation = models.CharField("Désignation", max_length=120)
     quantity = models.PositiveIntegerField("Quantité", default=1)
 
@@ -3327,6 +3367,11 @@ class OrderItem(models.Model):
         verbose_name = "Ligne de commande"
         verbose_name_plural = "Lignes de commande"
 
+
+    @property
+    def canonical_service_type(self):
+        return (self.service_type or infer_service_type_from_order_item(self) or "pressing").strip()
+
     def __str__(self):
         return f"{self.designation} x{self.quantity}"
 
@@ -3337,6 +3382,11 @@ class OrderItem(models.Model):
         return (q * p).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     def save(self, *args, **kwargs):
+        if not (self.service_type or "").strip():
+            try:
+                self.service_type = infer_service_type_from_order_item(self)
+            except Exception:
+                self.service_type = "pressing"
         self.total = self.line_total
         super().save(*args, **kwargs)
 

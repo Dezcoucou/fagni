@@ -1,0 +1,422 @@
+{% extends "base.html" %}
+{% load money_filters %}
+
+{% block title %}Course {{ order.code }} – FAGNI{% endblock %}
+
+{% block page_css %}
+<style>
+  .driver-detail-page{
+    max-width:1180px;
+    margin:0 auto;
+    padding:10px 6px 24px;
+  }
+
+  .driver-detail-layout{
+    display:grid;
+    grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr);
+    gap:14px;
+    align-items:start;
+  }
+
+  .driver-detail-stack{
+    display:grid;
+    gap:14px;
+  }
+
+  .driver-detail-sticky{
+    position:sticky;
+    top:14px;
+    display:grid;
+    gap:14px;
+  }
+
+  .driver-status-line{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    align-items:center;
+    margin-top:16px;
+  }
+
+  .driver-primary-action{
+    margin-top:16px;
+  }
+
+  .driver-timeline{
+    display:grid;
+    gap:10px;
+  }
+
+  .driver-step{
+    display:grid;
+    grid-template-columns:18px 1fr;
+    gap:10px;
+    align-items:start;
+  }
+
+  .driver-step-left{
+    position:relative;
+    display:flex;
+    justify-content:center;
+  }
+
+  .driver-step-left::after{
+    content:"";
+    position:absolute;
+    top:18px;
+    bottom:-14px;
+    width:2px;
+    background:#e5e7eb;
+  }
+
+  .driver-step:last-child .driver-step-left::after{
+    display:none;
+  }
+
+  .driver-step-dot{
+    width:14px;
+    height:14px;
+    border-radius:999px;
+    background:#cbd5e1;
+    border:2px solid #fff;
+    box-shadow:0 0 0 2px #e5e7eb;
+    margin-top:2px;
+    z-index:1;
+  }
+
+  .driver-step.done .driver-step-dot{
+    background:#16a34a;
+    box-shadow:0 0 0 2px #bbf7d0;
+  }
+
+  .driver-step.active .driver-step-dot{
+    background:#f97316;
+    box-shadow:0 0 0 2px #fed7aa;
+  }
+
+  .driver-step-title{
+    font-size:13px;
+    font-weight:900;
+    color:#111827;
+  }
+
+  .driver-step-sub{
+    margin-top:2px;
+    font-size:12px;
+    color:#64748b;
+    line-height:1.45;
+  }
+
+  .driver-map-shell{
+    border-radius:18px;
+    overflow:hidden;
+    border:1px solid #e5e7eb;
+    background:#f8fafc;
+    min-height:250px;
+  }
+
+  .driver-map-shell iframe{
+    width:100%;
+    height:250px;
+    border:0;
+    display:block;
+  }
+
+  .driver-grid-2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+
+  .driver-info-row{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    align-items:flex-start;
+    padding:8px 0;
+    border-bottom:1px solid #f1f5f9;
+    font-size:13px;
+  }
+
+  .driver-info-row:last-child{
+    border-bottom:none;
+    padding-bottom:0;
+  }
+
+  .driver-info-label{
+    color:#64748b;
+    font-weight:700;
+  }
+
+  .driver-info-value{
+    color:#111827;
+    font-weight:900;
+    text-align:right;
+  }
+
+  .driver-client-name{
+    font-size:18px;
+    font-weight:950;
+    color:#0f172a;
+    line-height:1.15;
+  }
+
+  .driver-client-meta{
+    margin-top:6px;
+    display:grid;
+    gap:6px;
+    font-size:13px;
+    color:#475569;
+  }
+
+  .driver-actions-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-top:14px;
+  }
+
+  .driver-summary-dark{
+    background:linear-gradient(135deg,#0f172a 0%, #172554 46%, #2563eb 100%);
+    color:#fff;
+    border:1px solid rgba(255,255,255,.08);
+  }
+
+  .driver-summary-dark .fagni-eyebrow{
+    color:rgba(255,255,255,.74);
+  }
+
+  .driver-summary-dark .fagni-title{
+    color:#fff;
+  }
+
+  .driver-summary-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-top:14px;
+  }
+
+  .driver-summary-box{
+    background:rgba(255,255,255,.10);
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:16px;
+    padding:12px;
+  }
+
+  .driver-summary-label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:rgba(255,255,255,.70);
+    font-weight:900;
+  }
+
+  .driver-summary-value{
+    margin-top:6px;
+    font-size:18px;
+    font-weight:950;
+    color:#fff;
+  }
+
+  .driver-summary-sub{
+    margin-top:4px;
+    font-size:12px;
+    color:rgba(255,255,255,.82);
+  }
+
+  @media (max-width:980px){
+    .driver-detail-layout{
+      grid-template-columns:1fr;
+    }
+
+    .driver-detail-sticky{
+      position:static;
+    }
+  }
+
+  @media (max-width:760px){
+    .driver-grid-2,
+    .driver-summary-grid,
+    .driver-actions-grid{
+      grid-template-columns:1fr;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="driver-detail-page">
+
+  <section class="fagni-hero">
+    <div class="fagni-hero-main">
+      <div class="fagni-eyebrow">FAGNI • Détail mission livreur</div>
+      <h1 class="fagni-title">Course {{ order.code }}</h1>
+      <p class="fagni-subtitle">
+        Vue opérationnelle de la course : progression, localisation, client, distance et revenu logistique.
+      </p>
+
+      <div class="driver-status-line">
+        {% if order.status == "pending" %}
+          <span class="fagni-pill fagni-pill--pending"><span class="dot"></span>{{ order.get_status_display|default:"En attente" }}</span>
+        {% elif order.status == "in_progress" %}
+          <span class="fagni-pill fagni-pill--progress"><span class="dot"></span>{{ order.get_status_display|default:"En cours" }}</span>
+        {% elif order.status == "done" %}
+          <span class="fagni-pill fagni-pill--done"><span class="dot"></span>{{ order.get_status_display|default:"Terminée" }}</span>
+        {% else %}
+          <span class="fagni-pill fagni-pill--neutral"><span class="dot"></span>{{ order.get_status_display|default:order.status }}</span>
+        {% endif %}
+
+        <span class="fagni-badge fagni-badge--glass">📍 Mission terrain</span>
+      </div>
+
+      <div class="driver-primary-action">
+        <a href="#" class="fagni-btn fagni-btn--primary">Démarrer livraison</a>
+      </div>
+    </div>
+
+    <div class="fagni-hero-side">
+      <div>
+        <div class="fagni-eyebrow">Navigation rapide</div>
+        <h2 class="fagni-title" style="font-size:22px;color:#0f172a;">Mission {{ order.code }}</h2>
+        <p class="fagni-subtitle" style="margin-top:8px;">
+          Accès direct au dashboard, aux missions et au wallet livreur.
+        </p>
+      </div>
+
+      <div class="fagni-btn-group">
+        <a href="{% url 'orders:driver_app' %}" class="fagni-btn fagni-btn--light">← App livreur</a>
+        <a href="{% url 'orders:driver_missions_history' %}" class="fagni-btn fagni-btn--light">📜 Mes missions</a>
+        <a href="{{ driver_wallet_url|default:'#' }}" class="fagni-btn fagni-btn--light">💼 Wallet</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="driver-detail-layout">
+
+    <div class="driver-detail-stack">
+
+      <section class="fagni-panel">
+        <div class="fagni-eyebrow" style="color:#64748b;">Progression</div>
+        <h2 class="fagni-title" style="font-size:20px;color:#0f172a;">Timeline de la course</h2>
+
+        <div class="driver-timeline" style="margin-top:14px;">
+          <div class="driver-step {% if order.status != 'pending' %}done{% endif %}">
+            <div class="driver-step-left"><div class="driver-step-dot"></div></div>
+            <div>
+              <div class="driver-step-title">Assignée</div>
+              <div class="driver-step-sub">La course a été affectée au livreur.</div>
+            </div>
+          </div>
+
+          <div class="driver-step {% if order.status == 'in_progress' or order.status == 'done' %}done{% endif %}">
+            <div class="driver-step-left"><div class="driver-step-dot"></div></div>
+            <div>
+              <div class="driver-step-title">Collecte effectuée</div>
+              <div class="driver-step-sub">Les articles ont été récupérés puis orientés vers le traitement.</div>
+            </div>
+          </div>
+
+          <div class="driver-step active">
+            <div class="driver-step-left"><div class="driver-step-dot"></div></div>
+            <div>
+              <div class="driver-step-title">Blanchisserie</div>
+              <div class="driver-step-sub">Commande en phase de traitement ou de préparation retour.</div>
+            </div>
+          </div>
+
+          <div class="driver-step">
+            <div class="driver-step-left"><div class="driver-step-dot"></div></div>
+            <div>
+              <div class="driver-step-title">Livraison</div>
+              <div class="driver-step-sub">Dernière étape avant remise finale au client.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="fagni-panel">
+        <div class="fagni-eyebrow" style="color:#64748b;">Carte</div>
+        <h2 class="fagni-title" style="font-size:20px;color:#0f172a;">Localisation de mission</h2>
+
+        <div class="driver-map-shell" style="margin-top:14px;">
+          <iframe
+            src="https://maps.google.com/maps?q={{ order.pickup_lat }},{{ order.pickup_lng }}&z=14&output=embed">
+          </iframe>
+        </div>
+      </section>
+
+      <section class="fagni-panel">
+        <div class="fagni-eyebrow" style="color:#64748b;">Client</div>
+        <h2 class="fagni-title" style="font-size:20px;color:#0f172a;">Informations client</h2>
+
+        <div style="margin-top:14px;">
+          <div class="driver-client-name">{{ order.customer.name }}</div>
+
+          <div class="driver-client-meta">
+            <div>📞 {{ order.customer.phone }}</div>
+            <div>📍 {{ order.customer.address }}</div>
+          </div>
+
+          <div class="driver-actions-grid">
+            <a href="tel:{{ order.customer.phone }}" class="fagni-btn fagni-btn--light">Appeler</a>
+            <a href="https://www.google.com/maps?q={{ order.pickup_lat }},{{ order.pickup_lng }}" class="fagni-btn fagni-btn--light" target="_blank" rel="noopener">Ouvrir GPS</a>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <div class="driver-detail-sticky">
+
+      <section class="fagni-panel driver-summary-dark">
+        <div class="fagni-eyebrow">Synthèse mission</div>
+        <h2 class="fagni-title" style="font-size:20px;">Résumé rapide</h2>
+
+        <div class="driver-summary-grid">
+          <div class="driver-summary-box">
+            <div class="driver-summary-label">Distance</div>
+            <div class="driver-summary-value">{{ order.distance_km|default:"0" }} km</div>
+            <div class="driver-summary-sub">Distance estimée ou cumulée</div>
+          </div>
+
+          <div class="driver-summary-box">
+            <div class="driver-summary-label">Gain</div>
+            <div class="driver-summary-value">
+              {{ order.driver_logistic_cost|fcfa }}
+            </div>
+            <div class="driver-summary-sub">Revenu logistique associé</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="fagni-panel">
+        <div class="fagni-eyebrow" style="color:#64748b;">Détails</div>
+        <h2 class="fagni-title" style="font-size:20px;color:#0f172a;">Informations clés</h2>
+
+        <div style="margin-top:12px;">
+          <div class="driver-info-row">
+            <div class="driver-info-label">Code course</div>
+            <div class="driver-info-value">{{ order.code }}</div>
+          </div>
+          <div class="driver-info-row">
+            <div class="driver-info-label">Statut</div>
+            <div class="driver-info-value">{{ order.get_status_display|default:order.status }}</div>
+          </div>
+          <div class="driver-info-row">
+            <div class="driver-info-label">Distance</div>
+            <div class="driver-info-value">{{ order.distance_km|default:"0" }} km</div>
+          </div>
+          <div class="driver-info-row">
+            <div class="driver-info-label">Gain logistique</div>
+            <div class="driver-info-value">{{ order.driver_logistic_cost|fcfa }}</div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

@@ -5,20 +5,39 @@
 
 {% block content %}
 <style>
-  body{background:#f5f7fb;}
+  :root{
+    --bg:#f6f8fc;
+    --card:#ffffff;
+    --line:#e5e7eb;
+    --text:#0f172a;
+    --muted:#64748b;
+    --orange:#ff7a00;
+    --orange-dark:#dd6400;
+    --navy:#0f172a;
+    --blue:#1d4ed8;
+    --green:#16a34a;
+    --shadow:0 10px 24px rgba(15,23,42,.08);
+  }
+
+  body{ background:var(--bg); }
+
   .driver-page{
-    max-width:920px;
-    margin:0 auto 92px;
+    max-width:540px;
+    margin:0 auto 110px;
     padding:12px 12px 24px;
   }
+
   .hero{
     border-radius:22px;
     padding:16px;
-    background:linear-gradient(135deg,#0f172a 0%, #2b1605 35%, #ff7a00 100%);
     color:#fff;
-    box-shadow:0 12px 28px rgba(15,23,42,.18);
+    background:
+      radial-gradient(circle at top right, rgba(255,255,255,.12), transparent 28%),
+      linear-gradient(135deg,#0f172a 0%,#2b1605 34%,#ff7a00 100%);
+    box-shadow:0 14px 28px rgba(15,23,42,.18);
     margin-bottom:14px;
   }
+
   .hero-top{
     display:flex;
     justify-content:space-between;
@@ -26,94 +45,213 @@
     align-items:flex-start;
     flex-wrap:wrap;
   }
+
   .hero-kicker{
     font-size:11px;
     text-transform:uppercase;
     letter-spacing:.08em;
-    opacity:.88;
-    font-weight:800;
-  }
-  .hero-title{
-    font-size:22px;
-    line-height:1.1;
     font-weight:900;
-    margin:6px 0 4px;
+    opacity:.9;
   }
+
+  .hero-title{
+    margin-top:6px;
+    font-size:24px;
+    line-height:1.06;
+    font-weight:1000;
+    letter-spacing:-.02em;
+  }
+
   .hero-sub{
+    margin-top:6px;
     font-size:12px;
-    line-height:1.5;
+    line-height:1.45;
     opacity:.92;
-    max-width:520px;
+    max-width:360px;
   }
-  .hero-pill{
-    border:1px solid rgba(255,255,255,.18);
-    background:rgba(255,255,255,.08);
-    padding:8px 12px;
+
+  .hero-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:7px 10px;
     border-radius:999px;
-    font-size:12px;
-    font-weight:800;
+    border:1px solid rgba(255,255,255,.18);
+    background:rgba(255,255,255,.10);
+    font-size:11px;
+    font-weight:900;
     white-space:nowrap;
+  }
+
+  .hero-stats{
+    margin-top:14px;
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:10px;
+  }
+
+  .hero-meta-row{
+    margin-top:10px;
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+
+  .hero-soft-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:7px 10px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.16);
+    background:rgba(255,255,255,.08);
+    font-size:11px;
+    font-weight:900;
+    white-space:nowrap;
+  }
+
+  .hero-stat{
+    border:1px solid rgba(255,255,255,.12);
+    background:rgba(255,255,255,.10);
+    border-radius:16px;
+    padding:10px 12px;
+  }
+
+  .hero-stat-label{
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    font-weight:900;
+    opacity:.82;
+  }
+
+  .hero-stat-value{
+    margin-top:4px;
+    font-size:20px;
+    line-height:1.05;
+    font-weight:1000;
+  }
+
+  .hero-stat-sub{
+    margin-top:4px;
+    font-size:11px;
+    line-height:1.35;
+    opacity:.9;
+  }
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:14px;
+    box-shadow:var(--shadow);
+    margin-bottom:14px;
+  }
+
+  .section-head{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    align-items:flex-start;
+    margin-bottom:10px;
+  }
+
+  .section-title{
+    margin:0;
+    font-size:18px;
+    font-weight:1000;
+    color:var(--text);
+    letter-spacing:-.01em;
+  }
+
+  .section-sub{
+    margin-top:4px;
+    font-size:12px;
+    color:var(--muted);
+    line-height:1.4;
+  }
+
+  .mission-card{
+    border-radius:18px;
+    border:2px solid #ff7a00;
+    background:linear-gradient(180deg,#ffffff,#fff8f1);
+    padding:14px;
+    box-shadow:0 10px 25px rgba(255,122,0,.16);
+  }
+
+  .mission-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:6px 10px;
+    border-radius:999px;
+    background:#eff6ff;
+    color:#1d4ed8;
+    font-size:11px;
+    font-weight:900;
+    margin-bottom:8px;
+  }
+
+  .mission-title{
+    font-size:14px;
+    font-weight:900;
+    color:var(--text);
+    line-height:1.35;
+  }
+
+  .mission-hint{
+    margin-top:6px;
+    font-size:12px;
+    color:var(--muted);
+    line-height:1.45;
+  }
+
+  .mission-actions{
+    margin-top:12px;
+    display:grid;
+    gap:10px;
   }
 
   .kpi-grid{
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
     gap:10px;
-    margin-top:14px;
   }
+
   .kpi{
-    background:#fff;
-    border:1px solid #e5e7eb;
-    border-radius:18px;
+    border:1px solid #e8edf3;
+    border-radius:16px;
     padding:12px;
-    box-shadow:0 8px 20px rgba(15,23,42,.05);
+    min-height:94px;
+    background:#fff;
   }
+
+  .kpi.orange{ background:linear-gradient(180deg,#fff,#fff7ed); border-color:#fed7aa; }
+  .kpi.blue{ background:linear-gradient(180deg,#fff,#eff6ff); border-color:#bfdbfe; }
+  .kpi.green{ background:linear-gradient(180deg,#fff,#ecfdf3); border-color:#bbf7d0; }
+
   .kpi-label{
-    font-size:11px;
-    color:#64748b;
+    font-size:10px;
     text-transform:uppercase;
-    letter-spacing:.05em;
-    font-weight:800;
+    letter-spacing:.06em;
+    color:#94a3b8;
+    font-weight:900;
   }
+
   .kpi-value{
     margin-top:4px;
     font-size:22px;
     line-height:1.05;
-    font-weight:900;
-    color:#0f172a;
-  }
-  .kpi-sub{
-    margin-top:6px;
-    font-size:12px;
-    color:#64748b;
-    line-height:1.45;
+    font-weight:1000;
+    color:var(--text);
   }
 
-  .section{
-    background:#fff;
-    border:1px solid #e5e7eb;
-    border-radius:22px;
-    padding:14px;
-    box-shadow:0 8px 20px rgba(15,23,42,.05);
-    margin-bottom:14px;
-  }
-  .section-head{
-    display:flex;
-    justify-content:space-between;
-    gap:8px;
-    align-items:flex-start;
-    margin-bottom:10px;
-  }
-  .section-title{
-    font-size:18px;
-    font-weight:900;
-    color:#0f172a;
-    margin:0;
-  }
-  .section-sub{
-    font-size:12px;
-    color:#64748b;
-    margin-top:4px;
+  .kpi-sub{
+    margin-top:5px;
+    font-size:11px;
+    line-height:1.4;
+    color:var(--muted);
   }
 
   .action-grid{
@@ -121,54 +259,91 @@
     grid-template-columns:repeat(2,minmax(0,1fr));
     gap:10px;
   }
+
   .action-card{
-    text-decoration:none;
-    color:inherit;
-    border:1px solid #e5e7eb;
-    border-radius:18px;
-    padding:14px;
-    background:#fff;
     display:flex;
     gap:10px;
     align-items:flex-start;
-    box-shadow:0 3px 10px rgba(15,23,42,.04);
+    text-decoration:none;
+    color:inherit;
+    border:1px solid #e5e7eb;
+    border-radius:16px;
+    padding:13px;
+    background:#fff;
   }
+
   .action-card.primary{
-    background:linear-gradient(135deg,#203a76 0%, #1e3a8a 100%);
     color:#fff;
     border-color:#1d4ed8;
+    background:linear-gradient(135deg,#203a76 0%,#1e3a8a 100%);
   }
-  .action-ico{font-size:20px;line-height:1;}
-  .action-title{font-size:14px;font-weight:900;}
-  .action-text{font-size:12px;line-height:1.45;color:#64748b;margin-top:3px;}
-  .action-card.primary .action-text{color:rgba(255,255,255,.85);}
+
+  .action-ico{
+    width:40px;
+    height:40px;
+    border-radius:12px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:18px;
+    background:#fff7ed;
+    flex:0 0 auto;
+  }
+
+  .action-card.primary .action-ico{
+    background:rgba(255,255,255,.14);
+  }
+
+  .action-title{
+    font-size:14px;
+    font-weight:900;
+    line-height:1.25;
+  }
+
+  .action-text{
+    margin-top:3px;
+    font-size:12px;
+    line-height:1.4;
+    color:var(--muted);
+  }
+
+  .action-card.primary .action-text{
+    color:rgba(255,255,255,.84);
+  }
 
   .orders-list{
     display:grid;
     gap:10px;
   }
+
   .order-card{
     border:1px solid #e5e7eb;
     border-radius:18px;
     padding:12px;
     background:#fff;
   }
+
   .order-head{
     display:flex;
     justify-content:space-between;
-    gap:8px;
+    gap:10px;
     align-items:flex-start;
+    flex-wrap:wrap;
   }
+
   .order-code{
     font-size:14px;
-    font-weight:900;
-    color:#0f172a;
+    font-weight:1000;
+    color:var(--text);
+    word-break:break-word;
   }
+
   .order-date{
+    margin-top:3px;
     font-size:11px;
-    color:#64748b;
-    margin-top:2px;
+    color:var(--muted);
   }
+
   .status{
     display:inline-flex;
     align-items:center;
@@ -180,10 +355,11 @@
     border:1px solid transparent;
     white-space:nowrap;
   }
-  .status.pending{background:#fff7ed;color:#9a3412;border-color:#fed7aa;}
-  .status.in_progress{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;}
-  .status.done{background:#ecfdf3;color:#166534;border-color:#bbf7d0;}
-  .status.canceled{background:#fef2f2;color:#991b1b;border-color:#fecaca;}
+
+  .status.pending{ background:#fff7ed; color:#9a3412; border-color:#fed7aa; }
+  .status.in_progress{ background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+  .status.done{ background:#ecfdf3; color:#166534; border-color:#bbf7d0; }
+  .status.canceled{ background:#fef2f2; color:#991b1b; border-color:#fecaca; }
 
   .order-grid{
     display:grid;
@@ -191,52 +367,120 @@
     gap:10px;
     margin-top:10px;
   }
+
   .meta-k{
     font-size:10px;
     text-transform:uppercase;
     letter-spacing:.05em;
     color:#94a3b8;
-    font-weight:800;
+    font-weight:900;
   }
+
   .meta-v{
     margin-top:3px;
     font-size:13px;
-    color:#0f172a;
     font-weight:800;
+    color:var(--text);
     line-height:1.35;
+    word-break:break-word;
   }
 
   .btn-line{
     margin-top:12px;
     display:flex;
     justify-content:flex-end;
+    gap:8px;
+    flex-wrap:wrap;
   }
+
   .btn{
     display:inline-flex;
     align-items:center;
     justify-content:center;
-    min-height:42px;
+    min-height:46px;
     padding:0 14px;
     border-radius:999px;
     text-decoration:none;
     font-size:13px;
-    font-weight:900;
+    font-weight:1000;
     border:1px solid transparent;
   }
-  .btn-dark{background:#0f172a;color:#fff;}
-  .btn-light{background:#fff;color:#0f172a;border-color:#e5e7eb;}
+
+  .btn-dark{
+    background:var(--navy);
+    color:#fff;
+  }
+
+  .btn-light{
+    background:#fff;
+    color:var(--text);
+    border-color:#e5e7eb;
+  }
+
+  .btn-orange{
+    background:var(--orange);
+    color:#fff;
+  }
+
+  .empty-state{
+    border:1px dashed #d7dee8;
+    border-radius:18px;
+    padding:18px;
+    text-align:center;
+    background:#f8fafc;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  .pager{
+    margin-top:12px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+
+  .pager-info{
+    font-size:12px;
+    color:var(--muted);
+    font-weight:800;
+  }
+
+  .pager-actions{
+    display:flex;
+    gap:8px;
+  }
+
+  .pager-btn{
+    min-width:92px;
+    min-height:40px;
+    border-radius:999px;
+    border:1px solid #e5e7eb;
+    background:#fff;
+    color:var(--text);
+    font-weight:900;
+    cursor:pointer;
+  }
+
+  .pager-btn[disabled]{
+    opacity:.45;
+    cursor:not-allowed;
+  }
 
   .bottom-nav{
     position:fixed;
-    left:0; right:0; bottom:0;
+    left:0;
+    right:0;
+    bottom:0;
     z-index:50;
     padding:10px 10px calc(10px + env(safe-area-inset-bottom));
-    background:linear-gradient(180deg, rgba(245,247,251,0), rgba(245,247,251,.92) 30%, rgba(245,247,251,1) 100%);
+    background:linear-gradient(180deg, rgba(246,248,252,0), rgba(246,248,252,.92) 30%, rgba(246,248,252,1) 100%);
   }
+
   .bottom-wrap{
-    max-width:920px;
+    max-width:540px;
     margin:0 auto;
-    background:rgba(255,255,255,.95);
+    background:rgba(255,255,255,.96);
     backdrop-filter:blur(12px);
     border:1px solid #e5e7eb;
     border-radius:22px;
@@ -244,8 +488,9 @@
     display:grid;
     grid-template-columns:repeat(4,1fr);
     gap:8px;
-    box-shadow:0 16px 34px rgba(15,23,42,.12);
+    box-shadow:0 14px 30px rgba(15,23,42,.12);
   }
+
   .nav-item{
     min-height:56px;
     border-radius:16px;
@@ -259,38 +504,104 @@
     font-size:11px;
     font-weight:900;
   }
+
   .nav-item.active{
     background:#fff7ed;
-    color:#dd6400;
+    color:var(--orange-dark);
   }
 
-  @media (max-width:760px){
-    .kpi-grid,.action-grid,.order-grid{grid-template-columns:1fr;}
-    .hero-title{font-size:20px;}
+  @media (max-width:640px){
+    .driver-page{ padding:12px 10px 24px; }
+    .hero-title{ font-size:22px; }
+    .hero-stats, .kpi-grid, .action-grid, .order-grid{ grid-template-columns:1fr; }
+    .btn-line .btn{ width:100%; }
   }
 </style>
 
 <div class="driver-page">
+
   <section class="hero">
     <div class="hero-top">
       <div>
         <div class="hero-kicker">FAGNI • App livreur</div>
         <div class="hero-title">
-          Bonjour {% if connected_driver and connected_driver.name %}{{ connected_driver.name }}{% else %}livreur{% endif %}
+          Bonjour {% if connected_driver and connected_driver.name %}{{ connected_driver.name }}{% elif driver and driver.name %}{{ driver.name }}{% else %}livreur{% endif %}
         </div>
         <div class="hero-sub">
-          Ton espace pilote simple : courses, revenus, wallet et profil.
+          Ton cockpit terrain simple pour suivre ta mission, tes chiffres utiles et tes dernières courses.
         </div>
       </div>
-      <div class="hero-pill">Période • {{ period_display|default:"Aujourd'hui" }}</div>
+
+      <div>
+        <div class="hero-chip">Période • {{ period_display|default:"Aujourd'hui" }}</div>
+      </div>
+    </div>
+
+    <div class="hero-meta-row">
+      <div class="hero-soft-pill">🕒 Dernière mise à jour : maintenant</div>
+      <div class="hero-soft-pill">🎯 Objectif du jour : {{ stats.done_orders|default:0 }} mission(s) terminée(s)</div>
+    </div>
+
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-label">Actives</div>
+        <div class="hero-stat-value">{{ stats.pending_orders|default:0|add:stats.in_progress_orders|default:0 }}</div>
+        <div class="hero-stat-sub">{{ stats.pending_orders|default:0 }} attente · {{ stats.in_progress_orders|default:0 }} en cours</div>
+      </div>
+
+      <div class="hero-stat">
+        <div class="hero-stat-label">Terminées</div>
+        <div class="hero-stat-value">{{ stats.done_orders|default:0 }}</div>
+        <div class="hero-stat-sub">Missions clôturées</div>
+      </div>
+
+      <div class="hero-stat">
+        <div class="hero-stat-label">Revenus</div>
+        <div class="hero-stat-value">{{ stats.total_driver_income|default:0|fcfa }}</div>
+        <div class="hero-stat-sub">Estimation cumulée</div>
+      </div>
     </div>
   </section>
 
-  <section class="section">
+  <section class="card">
     <div class="section-head">
       <div>
-        <h2 class="section-title">Mes indicateurs clés</h2>
-        <div class="section-sub">Vue rapide de ton activité.</div>
+        <h2 class="section-title">Mission du moment</h2>
+        <div class="section-sub">Le raccourci terrain le plus important pour toi.</div>
+      </div>
+    </div>
+
+    {% if current_mission_cta %}
+      <div class="mission-card">
+        <div class="mission-badge">{{ current_mission_label|default:"Mission active" }}</div>
+        <div class="mission-title">
+          {% if current_mission and current_mission.order and current_mission.order.code %}
+            📦 {{ current_mission.order.code }}
+          {% elif current_mission_order and current_mission_order.code %}
+            📦 {{ current_mission_order.code }}
+          {% else %}
+            📦 Ouvrir la mission en cours
+          {% endif %}
+        </div>
+        {% if current_mission_hint %}
+          <div class="mission-hint">{{ current_mission_hint }}</div>
+        {% endif %}
+        <div class="mission-actions">
+          <a href="{{ current_mission_cta }}" class="btn btn-orange">▶ Ouvrir ma mission</a>
+        </div>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        ✅ Aucune mission immédiate. Tu peux consulter l’historique ou ton wallet.
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <div class="section-head">
+      <div>
+        <h2 class="section-title">Indicateurs essentiels</h2>
+        <div class="section-sub">Seulement les chiffres utiles pour piloter ta journée.</div>
       </div>
     </div>
 
@@ -304,7 +615,7 @@
         </div>
       </article>
 
-      <article class="kpi">
+      <article class="kpi orange">
         <div class="kpi-label">Courses actives</div>
         <div class="kpi-value">{{ stats.pending_orders|default:0|add:stats.in_progress_orders|default:0 }}</div>
         <div class="kpi-sub">
@@ -313,7 +624,7 @@
         </div>
       </article>
 
-      <article class="kpi">
+      <article class="kpi blue">
         <div class="kpi-label">Distance cumulée</div>
         <div class="kpi-value">{{ stats.total_distance_km|default:0|floatformat:"1" }} km</div>
         <div class="kpi-sub">
@@ -321,28 +632,28 @@
         </div>
       </article>
 
-      <article class="kpi">
+      <article class="kpi green">
         <div class="kpi-label">Revenus logistiques</div>
         <div class="kpi-value">{{ stats.total_driver_income|default:0|fcfa }}</div>
-        <div class="kpi-sub">Estimation sur l’ensemble des courses.</div>
+        <div class="kpi-sub">Vision globale de tes gains.</div>
       </article>
     </div>
   </section>
 
-  <section class="section">
+  <section class="card">
     <div class="section-head">
       <div>
         <h2 class="section-title">Actions rapides</h2>
-        <div class="section-sub">Uniquement les actions utiles au livreur.</div>
+        <div class="section-sub">Seulement l’essentiel.</div>
       </div>
     </div>
 
     <div class="action-grid">
-      <a href="{% url 'orders:driver_app' %}" class="action-card primary">
-        <div class="action-ico">📋</div>
+      <a href="{% if current_mission_cta %}{{ current_mission_cta }}{% else %}{% url 'orders:driver_app' %}{% endif %}" class="action-card primary">
+        <div class="action-ico">▶</div>
         <div>
-          <div class="action-title">Mes courses</div>
-          <div class="action-text">Voir toutes tes courses actives, terminées et annulées.</div>
+          <div class="action-title">Ma mission</div>
+          <div class="action-text">Accéder directement à l’action terrain du moment.</div>
         </div>
       </a>
 
@@ -350,15 +661,15 @@
         <div class="action-ico">💼</div>
         <div>
           <div class="action-title">Mon wallet</div>
-          <div class="action-text">Consulter ton solde et tes mouvements.</div>
+          <div class="action-text">Consulter ton solde et les mouvements liés à tes missions.</div>
         </div>
       </a>
 
       <a href="{% url 'orders:driver_history_me' %}" class="action-card">
-        <div class="action-ico">📜</div>
+        <div class="action-ico">🕘</div>
         <div>
-          <div class="action-title">Historique perso</div>
-          <div class="action-text">Retrouver tes dernières courses livrées.</div>
+          <div class="action-title">Historique</div>
+          <div class="action-text">Retrouver rapidement tes dernières missions.</div>
         </div>
       </a>
 
@@ -366,25 +677,25 @@
         <div class="action-ico">👤</div>
         <div>
           <div class="action-title">Mon profil</div>
-          <div class="action-text">Voir tes infos, stats et résumé personnel.</div>
+          <div class="action-text">Voir tes informations et ton résumé personnel.</div>
         </div>
       </a>
     </div>
   </section>
 
-  <section class="section">
+  <section class="card">
     <div class="section-head">
       <div>
-        <h2 class="section-title">Dernières courses</h2>
-        <div class="section-sub">Tes dernières missions.</div>
+        <h2 class="section-title">Dernières missions</h2>
+        <div class="section-sub">Bloc secondaire, juste pour consultation rapide.</div>
       </div>
       <a class="btn btn-light" href="{% url 'orders:driver_app' %}">Voir tout</a>
     </div>
 
     {% if last_orders %}
-      <div class="orders-list">
+      <div id="ordersList" class="orders-list">
         {% for order in last_orders %}
-          <article class="order-card">
+          <article class="order-card js-order-card">
             <div class="order-head">
               <div>
                 <div class="order-code">{{ order.code|default:order.id }}</div>
@@ -399,22 +710,14 @@
               <div>
                 <div class="meta-k">Client</div>
                 <div class="meta-v">
-                  {% if order.customer and order.customer.name %}
-                    {{ order.customer.name }}
-                  {% else %}
-                    Client inconnu
-                  {% endif %}
+                  {% if order.customer and order.customer.name %}{{ order.customer.name }}{% else %}Client inconnu{% endif %}
                 </div>
               </div>
 
               <div>
                 <div class="meta-k">Téléphone</div>
                 <div class="meta-v">
-                  {% if order.customer and order.customer.phone %}
-                    {{ order.customer.phone }}
-                  {% else %}
-                    —
-                  {% endif %}
+                  {% if order.customer and order.customer.phone %}{{ order.customer.phone }}{% else %}—{% endif %}
                 </div>
               </div>
 
@@ -423,6 +726,10 @@
                 <div class="meta-v">
                   {% if order.customer and order.customer.address %}
                     {{ order.customer.address }}
+                  {% elif order.pickup_address %}
+                    {{ order.pickup_address }}
+                  {% elif order.delivery_address %}
+                    {{ order.delivery_address }}
                   {% else %}
                     —
                   {% endif %}
@@ -444,31 +751,87 @@
             </div>
 
             <div class="btn-line">
-              <a class="btn btn-dark" href="{% url 'orders:driver_order_detail' order.id %}">Ouvrir la course</a>
+              <a class="btn btn-dark" href="{% url 'orders:driver_order_detail' order.id %}{% if connected_driver %}?driver_id={{ connected_driver.id }}{% elif driver %}?driver_id={{ driver.id }}{% endif %}">
+                Voir
+              </a>
             </div>
           </article>
         {% endfor %}
       </div>
+
+      <div class="pager">
+        <div id="pagerInfo" class="pager-info"></div>
+        <div class="pager-actions">
+          <button id="prevPageBtn" class="pager-btn" type="button">← Précédent</button>
+          <button id="nextPageBtn" class="pager-btn" type="button">Suivant →</button>
+        </div>
+      </div>
     {% else %}
-      <div class="section-sub">Aucune course disponible pour le moment.</div>
+      <div class="empty-state">
+        Aucune mission récente à afficher.
+      </div>
     {% endif %}
   </section>
+
 </div>
 
-<nav class="bottom-nav" aria-label="Navigation livreur">
+<div class="bottom-nav">
   <div class="bottom-wrap">
-    <a class="nav-item active" href="{% url 'orders:driver_hub' %}">
-      <span>🏠</span><span>Accueil</span>
+    <a href="{% url 'orders:driver_hub' %}" class="nav-item active">
+      <span>🏠</span>
+      <span>Accueil</span>
     </a>
-    <a class="nav-item" href="{% url 'orders:driver_app' %}">
-      <span>📋</span><span>Courses</span>
+    <a href="{% url 'orders:driver_app' %}" class="nav-item">
+      <span>📋</span>
+      <span>Courses</span>
     </a>
-    <a class="nav-item" href="{% url 'orders:driver_wallet' %}">
-      <span>💼</span><span>Wallet</span>
+    <a href="{% url 'orders:driver_wallet' %}" class="nav-item">
+      <span>💼</span>
+      <span>Wallet</span>
     </a>
-    <a class="nav-item" href="{% url 'orders:driver_me_app' %}">
-      <span>👤</span><span>Profil</span>
+    <a href="{% url 'orders:driver_me_app' %}" class="nav-item">
+      <span>👤</span>
+      <span>Profil</span>
     </a>
   </div>
-</nav>
+</div>
+
+<script>
+(function(){
+  const pageSize = 5;
+  const cards = Array.from(document.querySelectorAll('.js-order-card'));
+  if (!cards.length) return;
+
+  let currentPage = 1;
+  const totalPages = Math.max(1, Math.ceil(cards.length / pageSize));
+  const prevBtn = document.getElementById('prevPageBtn');
+  const nextBtn = document.getElementById('nextPageBtn');
+  const pagerInfo = document.getElementById('pagerInfo');
+
+  function renderPage(page){
+    currentPage = Math.min(Math.max(1, page), totalPages);
+
+    cards.forEach((card, index) => {
+      const start = (currentPage - 1) * pageSize;
+      const end = start + pageSize;
+      card.style.display = (index >= start && index < end) ? '' : 'none';
+    });
+
+    if (pagerInfo){
+      pagerInfo.textContent = "Page " + currentPage + " / " + totalPages;
+    }
+    if (prevBtn) prevBtn.disabled = currentPage <= 1;
+    if (nextBtn) nextBtn.disabled = currentPage >= totalPages;
+  }
+
+  if (prevBtn){
+    prevBtn.addEventListener('click', function(){ renderPage(currentPage - 1); });
+  }
+  if (nextBtn){
+    nextBtn.addEventListener('click', function(){ renderPage(currentPage + 1); });
+  }
+
+  renderPage(1);
+})();
+</script>
 {% endblock %}

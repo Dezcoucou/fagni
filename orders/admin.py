@@ -31,6 +31,7 @@ from .config_models import (
 
 
 from orders.service_layer.payouts import trigger_driver_payout_for_leg
+from logistics.orchestrator import run_minimal_v2_flow
 
 try:
     from orders.service_layer.subscriptions import materialize_cycle_to_order, complete_cycle_order_pricing
@@ -438,12 +439,6 @@ class SubscriptionCycleAdmin(admin.ModelAdmin):
 
 
 # ============================================================
-#  COMMANDES
-# ============================================================
-
-
-
-# ============================================================
 #  DELIVERY LEGS (POD/POP / drivers)
 # ============================================================
 
@@ -548,6 +543,8 @@ class OrderAdmin(admin.ModelAdmin):
         "admin_recompute_financials",
         "admin_catchup_wallets_paid",
         "admin_catchup_driver_payout_legs",
+        "admin_run_v2_flow",
+        "admin_run_v2_flow_with_incident",
     )
 
     def get_readonly_fields(self, request, obj=None):
@@ -719,6 +716,98 @@ class OrderAdmin(admin.ModelAdmin):
                     skipped += 1
 
         messages.success(request, f"Rattrapage payout legs : {updated} OK. Ignorées/erreurs : {skipped}.")
+
+
+    @admin.action(description="🧪 Exécuter flux V2 minimal")
+    def admin_run_v2_flow(self, request, queryset):
+        success_count = 0
+        error_count = 0
+
+        for order in queryset:
+            try:
+                result = run_minimal_v2_flow(order=order, create_incident_flag=False)
+                mission = result.get("mission")
+                partner_job = result.get("partner_job")
+                quote = result.get("quote")
+
+                self.message_user(
+                    request,
+                    (
+                        f"✅ Order #{order.pk} → "
+                        f"Mission={getattr(mission, 'code', '-')}, "
+                        f"PartnerJob={getattr(partner_job, 'code', '-')}, "
+                        f"Quote=#{getattr(quote, 'id', '-')}"
+                    ),
+                    level=messages.SUCCESS,
+                )
+                success_count += 1
+            except Exception as e:
+                self.message_user(
+                    request,
+                    f"❌ Order #{order.pk} : {e}",
+                    level=messages.ERROR,
+                )
+                error_count += 1
+
+        if success_count:
+            self.message_user(
+                request,
+                f"Flux V2 minimal exécuté sur {success_count} commande(s).",
+                level=messages.SUCCESS,
+            )
+        if error_count:
+            self.message_user(
+                request,
+                f"{error_count} commande(s) en erreur pendant le flux V2.",
+                level=messages.WARNING,
+            )
+
+    @admin.action(description="🧪 Exécuter flux V2 minimal + incident")
+    def admin_run_v2_flow_with_incident(self, request, queryset):
+        success_count = 0
+        error_count = 0
+
+        for order in queryset:
+            try:
+                result = run_minimal_v2_flow(order=order, create_incident_flag=True)
+                mission = result.get("mission")
+                partner_job = result.get("partner_job")
+                quote = result.get("quote")
+                incident = result.get("incident")
+
+                self.message_user(
+                    request,
+                    (
+                        f"✅ Order #{order.pk} → "
+                        f"Mission={getattr(mission, 'code', '-')}, "
+                        f"PartnerJob={getattr(partner_job, 'code', '-')}, "
+                        f"Quote=#{getattr(quote, 'id', '-')}, "
+                        f"Incident=#{getattr(incident, 'id', '-')}"
+                    ),
+                    level=messages.SUCCESS,
+                )
+                success_count += 1
+            except Exception as e:
+                self.message_user(
+                    request,
+                    f"❌ Order #{order.pk} : {e}",
+                    level=messages.ERROR,
+                )
+                error_count += 1
+
+        if success_count:
+            self.message_user(
+                request,
+                f"Flux V2 + incident exécuté sur {success_count} commande(s).",
+                level=messages.SUCCESS,
+            )
+        if error_count:
+            self.message_user(
+                request,
+                f"{error_count} commande(s) en erreur pendant le flux V2 + incident.",
+                level=messages.WARNING,
+            )
+
 
     # ============================================================
     #  READONLY / FORM

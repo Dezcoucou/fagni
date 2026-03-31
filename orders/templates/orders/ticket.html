@@ -192,15 +192,11 @@
 
     <div class="ticket-totals">
         <div class="line">
-            <span>Sous-total prestations (HT) :</span>
+            <span>Prestations :</span>
             <span>{{ order.prestation_total|default:0|floatformat:0 }} FCFA</span>
         </div>
         <div class="line">
-            <span>Service FAGNI (HT) :</span>
-            <span>{{ order.service_fee|default:0|floatformat:0 }} FCFA</span>
-        </div>
-        <div class="line">
-            <span>Frais de livraison :</span>
+            <span>Livraison :</span>
             <span>{{ order.delivery_fee|default:0|floatformat:0 }} FCFA</span>
         </div>
 
@@ -211,17 +207,11 @@
         </div>
         {% endif %}
 
-        {% if order.vat_fagni and order.vat_fagni > 0 %}
-        <div class="line">
-            <span>TVA FAGNI :</span>
-            <span>{{ order.vat_fagni|floatformat:0 }} FCFA</span>
-        </div>
-        {% endif %}
-
         <div class="line grand">
-            <span>Total TTC client :</span>
+            <span>Total TTC :</span>
             <span>{{ order.total_client_ttc|default:0|floatformat:0 }} FCFA</span>
         </div>
+        
     </div>
 
     {% if order.notes %}

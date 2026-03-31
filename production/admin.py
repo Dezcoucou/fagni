@@ -1,0 +1,42 @@
+from django.contrib import admin
+from .models import PartnerJob, WeighingRecord
+
+
+@admin.register(PartnerJob)
+class PartnerJobAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "code",
+        "order",
+        "partner",
+        "status",
+        "received_at",
+        "processing_started_at",
+        "ready_at",
+        "handed_over_at",
+        "created_at",
+    )
+    search_fields = ("code", "order__id", "partner__name", "notes")
+    list_filter = ("status", "partner", "created_at", "ready_at")
+    ordering = ("-created_at",)
+    autocomplete_fields = ("order", "partner")
+
+
+@admin.register(WeighingRecord)
+class WeighingRecordAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "order",
+        "partner_job",
+        "mission",
+        "performed_by_role",
+        "weighing_stage",
+        "gross_weight",
+        "net_weight",
+        "unit",
+        "recorded_at",
+    )
+    search_fields = ("order__id", "partner_job__code", "mission__code", "notes")
+    list_filter = ("performed_by_role", "weighing_stage", "unit", "recorded_at")
+    ordering = ("-recorded_at",)
+    autocomplete_fields = ("order", "partner_job", "mission")

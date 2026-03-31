@@ -1,0 +1,1774 @@
+{% extends "orders/client_base.html" %}
+{% load static money_filters %}
+
+{% block title %}Commande {{ order.code|default:order.id }} – Client FAGNI{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+  :root{
+    --bg:#f4f7fb;
+    --card:#ffffff;
+    --text:#0f172a;
+    --muted:#64748b;
+    --line:#e2e8f0;
+
+    --orange:#ff7a00;
+    --orange-2:#dd6400;
+    --orange-bg:#fff7ed;
+
+    --green:#16a34a;
+    --green-bg:#ecfdf5;
+
+    --blue:#0f172a;
+    --blue-2:#1e293b;
+    --blue-bg:#eff6ff;
+
+    --red:#dc2626;
+    --red-bg:#fef2f2;
+
+    --yellow:#d97706;
+    --yellow-bg:#fffbeb;
+
+    --shadow:0 12px 30px rgba(15,23,42,.08);
+    --shadow-soft:0 8px 20px rgba(15,23,42,.06);
+
+    --radius-xl:26px;
+    --radius-lg:22px;
+    --radius-md:18px;
+    --radius-sm:14px;
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    background:var(--bg);
+    color:var(--text);
+  }
+
+  .detail-page{
+    max-width:1100px;
+    margin:0 auto;
+    padding:12px 10px 120px;
+  }
+
+  .topbar{
+    position:sticky;
+    top:10px;
+    z-index:40;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:14px;
+    padding:12px 14px;
+    margin-bottom:14px;
+    border-radius:999px;
+    background:rgba(255,255,255,.88);
+    backdrop-filter:blur(14px);
+    border:1px solid rgba(255,255,255,.8);
+    box-shadow:var(--shadow-soft);
+  }
+
+  .topbar-brand{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    min-width:0;
+  }
+
+  .topbar-logo{
+    width:42px;
+    height:42px;
+    border-radius:14px;
+    overflow:hidden;
+    border:1px solid var(--line);
+    background:#fff;
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .topbar-logo img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+  }
+
+  .topbar-copy{
+    min-width:0;
+  }
+
+  .topbar-title{
+    font-size:14px;
+    font-weight:1000;
+    line-height:1.1;
+    color:var(--text);
+  }
+
+  .topbar-sub{
+    margin-top:2px;
+    font-size:11px;
+    font-weight:700;
+    color:var(--muted);
+    line-height:1.2;
+  }
+
+  .topbar-actions{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+    align-items:center;
+  }
+
+  .btn{
+    appearance:none;
+    border:1px solid transparent;
+    border-radius:999px;
+    min-height:44px;
+    padding:0 16px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    text-decoration:none;
+    cursor:pointer;
+    font-size:13px;
+    font-weight:900;
+    transition:.16s ease;
+    white-space:nowrap;
+  }
+
+  .btn:hover{ transform:translateY(-1px); }
+  .btn:active{ transform:translateY(0); }
+
+  .btn-primary{
+    color:#fff;
+    background:linear-gradient(135deg,var(--orange),var(--orange-2));
+    box-shadow:0 10px 22px rgba(255,122,0,.22);
+  }
+
+  .btn-dark{
+    color:#fff;
+    background:var(--blue);
+    box-shadow:0 10px 22px rgba(15,23,42,.18);
+  }
+
+  .btn-light{
+    color:var(--text);
+    background:#fff;
+    border-color:var(--line);
+  }
+
+  .btn-danger-light{
+    color:#991b1b;
+    background:#fff;
+    border-color:#fecaca;
+  }
+
+  .btn-xs{
+    min-height:36px;
+    padding:0 12px;
+    font-size:12px;
+  }
+
+  .notice{
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+    padding:14px 16px;
+    margin-bottom:14px;
+    border-radius:20px;
+    border:1px solid var(--line);
+    background:#fff;
+    box-shadow:var(--shadow-soft);
+  }
+
+  .notice__icon{
+    width:28px;
+    height:28px;
+    border-radius:999px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:14px;
+    font-weight:1000;
+    flex:0 0 auto;
+  }
+
+  .notice__title{
+    margin:0;
+    font-size:13px;
+    font-weight:1000;
+    color:var(--text);
+  }
+
+  .notice__desc{
+    margin:3px 0 0;
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.45;
+    font-weight:700;
+  }
+
+  .notice--ok{
+    background:var(--green-bg);
+    border-color:#bbf7d0;
+  }
+
+  .notice--ok .notice__icon{
+    background:var(--green);
+    color:#fff;
+  }
+
+  .notice--warn{
+    background:var(--yellow-bg);
+    border-color:#fde68a;
+  }
+
+  .notice--warn .notice__icon{
+    background:#f59e0b;
+    color:#111827;
+  }
+
+  .notice--err{
+    background:var(--red-bg);
+    border-color:#fecaca;
+  }
+
+  .notice--err .notice__icon{
+    background:var(--red);
+    color:#fff;
+  }
+
+  .hero{
+    display:grid;
+    grid-template-columns:minmax(0,1.55fr) minmax(320px,.95fr);
+    gap:14px;
+    margin-bottom:14px;
+  }
+
+  .hero-main,
+  .hero-side,
+  .section-card{
+    background:var(--card);
+    border:1px solid rgba(226,232,240,.95);
+    border-radius:var(--radius-xl);
+    box-shadow:var(--shadow);
+  }
+
+  .hero-main{
+    padding:22px;
+    background:
+      radial-gradient(circle at top right, rgba(255,122,0,.10), transparent 32%),
+      linear-gradient(180deg,#fff,#fcfcfd);
+  }
+
+  .hero-side{
+    padding:20px;
+  }
+
+  .hero-pills{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+  }
+
+  .pill{
+    min-height:32px;
+    padding:0 12px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background:#fff;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-size:11px;
+    font-weight:900;
+    color:#334155;
+  }
+
+  .hero-title{
+    margin:0;
+    max-width:760px;
+    font-size:28px;
+    line-height:1.08;
+    font-weight:1000;
+    letter-spacing:-.03em;
+    color:var(--text);
+  }
+
+  .hero-sub{
+    margin-top:10px;
+    max-width:760px;
+    font-size:14px;
+    line-height:1.65;
+    color:var(--muted);
+    font-weight:700;
+  }
+
+  .hero-kpis{
+    margin-top:18px;
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:12px;
+  }
+
+  .hero-kpi{
+    padding:16px;
+    border-radius:20px;
+    background:#fff;
+    border:1px solid var(--line);
+    box-shadow:0 6px 18px rgba(15,23,42,.04);
+  }
+
+  .hero-kpi__k{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    font-weight:900;
+    color:var(--muted);
+  }
+
+  .hero-kpi__v{
+    margin-top:6px;
+    font-size:17px;
+    line-height:1.35;
+    font-weight:1000;
+    color:var(--text);
+    word-break:break-word;
+  }
+
+  .summary-head,
+  .section-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+
+  .summary-title,
+  .section-title{
+    margin:0;
+    font-size:18px;
+    line-height:1.15;
+    font-weight:1000;
+    color:var(--text);
+  }
+
+  .summary-sub,
+  .section-sub{
+    margin-top:4px;
+    font-size:12px;
+    line-height:1.5;
+    color:var(--muted);
+    font-weight:700;
+  }
+
+  .summary-list,
+  .money-list{
+    margin-top:14px;
+    display:grid;
+    gap:10px;
+  }
+
+  .summary-row,
+  .money-row{
+    display:flex;
+    justify-content:space-between;
+    gap:14px;
+    align-items:flex-start;
+    padding:12px 0;
+    border-bottom:1px solid #eef2f7;
+  }
+
+  .summary-row:last-child,
+  .money-row:last-child{
+    border-bottom:none;
+  }
+
+  .summary-row__k,
+  .money-k{
+    font-size:12px;
+    font-weight:800;
+    color:var(--muted);
+  }
+
+  .summary-row__v,
+  .money-v{
+    font-size:14px;
+    font-weight:1000;
+    color:var(--text);
+    text-align:right;
+    white-space:nowrap;
+  }
+
+  .money-row.total .money-k,
+  .money-row.total .money-v{
+    color:var(--text);
+    font-size:16px;
+    font-weight:1000;
+  }
+
+  .state-chip{
+    min-height:34px;
+    padding:0 12px;
+    border-radius:999px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-size:12px;
+    font-weight:1000;
+    border:1px solid transparent;
+    white-space:nowrap;
+  }
+
+  .state-chip--paid{
+    color:#166534;
+    background:var(--green-bg);
+    border-color:#bbf7d0;
+  }
+
+  .state-chip--warn{
+    color:#9a3412;
+    background:var(--orange-bg);
+    border-color:#fed7aa;
+  }
+
+  .summary-actions,
+  .evidence-actions,
+  .support-actions,
+  .item-actions,
+  .modal-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  .summary-actions{
+    margin-top:16px;
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns:minmax(0,1.45fr) minmax(320px,.9fr);
+    gap:14px;
+  }
+
+  .section-card{
+    padding:20px;
+    margin-bottom:14px;
+  }
+
+  .status-badge{
+    min-height:34px;
+    padding:0 12px;
+    border-radius:999px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    font-size:12px;
+    font-weight:1000;
+    border:1px solid transparent;
+    white-space:nowrap;
+  }
+
+  .status-dot{
+    width:8px;
+    height:8px;
+    border-radius:999px;
+    display:inline-block;
+  }
+
+  .status-badge.pending{
+    color:#92400e;
+    background:var(--yellow-bg);
+    border-color:#fde68a;
+  }
+
+  .status-badge.pending .status-dot{ background:#f59e0b; }
+
+  .status-badge.progress{
+    color:#9a3412;
+    background:var(--orange-bg);
+    border-color:#fed7aa;
+  }
+
+  .status-badge.progress .status-dot{ background:var(--orange); }
+
+  .status-badge.done{
+    color:#166534;
+    background:var(--green-bg);
+    border-color:#bbf7d0;
+  }
+
+  .status-badge.done .status-dot{ background:var(--green); }
+
+  .status-badge.canceled{
+    color:#991b1b;
+    background:var(--red-bg);
+    border-color:#fecaca;
+  }
+
+  .status-badge.canceled .status-dot{ background:var(--red); }
+
+  .timeline-list{
+    margin-top:14px;
+    display:grid;
+    gap:14px;
+    padding-left:24px;
+  }
+
+  .timeline-step{
+    position:relative;
+    padding:0 0 0 6px;
+  }
+
+  .timeline-step::before{
+    content:"";
+    position:absolute;
+    left:-22px;
+    top:7px;
+    width:10px;
+    height:10px;
+    border-radius:999px;
+    background:#cbd5e1;
+    box-shadow:0 0 0 6px #f8fafc;
+  }
+
+  .timeline-step.done::before{
+    background:var(--green);
+  }
+
+  .timeline-step.active::before{
+    background:var(--orange);
+  }
+
+  .timeline-step__title{
+    font-size:14px;
+    font-weight:1000;
+    color:var(--text);
+  }
+
+  .timeline-step__desc{
+    margin-top:4px;
+    font-size:12px;
+    line-height:1.5;
+    color:var(--muted);
+    font-weight:700;
+  }
+
+  .item-list,
+  .legs-list{
+    margin-top:14px;
+    display:grid;
+    gap:12px;
+  }
+
+  .item-card,
+  .leg-card{
+    padding:16px;
+    border-radius:20px;
+    border:1px solid var(--line);
+    background:#fff;
+    box-shadow:0 6px 18px rgba(15,23,42,.04);
+  }
+
+  .item-head,
+  .leg-head{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    align-items:flex-start;
+    flex-wrap:wrap;
+  }
+
+  .item-name,
+  .leg-title{
+    font-size:15px;
+    font-weight:1000;
+    color:var(--text);
+    line-height:1.35;
+  }
+
+  .item-meta,
+  .leg-meta,
+  .support-note,
+  .muted-note{
+    margin-top:4px;
+    font-size:12px;
+    line-height:1.5;
+    color:var(--muted);
+    font-weight:700;
+  }
+
+  .item-total{
+    font-size:20px;
+    line-height:1;
+    font-weight:1000;
+    color:var(--text);
+    white-space:nowrap;
+  }
+
+  .item-actions{
+    margin-top:12px;
+  }
+
+  .leg-mini{
+    min-height:30px;
+    padding:0 10px;
+    border-radius:999px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border:1px solid var(--line);
+    background:#fff;
+    color:#334155;
+    font-size:11px;
+    font-weight:900;
+  }
+
+  .proof-box,
+  .rating-placeholder,
+  .empty-box{
+    margin-top:14px;
+    padding:16px;
+    border-radius:18px;
+    border:1px dashed #cbd5e1;
+    background:#f8fafc;
+    color:#475569;
+    font-size:13px;
+    line-height:1.55;
+    font-weight:700;
+  }
+
+  .money-note{
+    margin-top:14px;
+    padding:14px 16px;
+    border-radius:18px;
+    background:#fff7ed;
+    border:1px solid #fed7aa;
+    color:#9a3412;
+    font-size:12px;
+    line-height:1.6;
+    font-weight:700;
+  }
+
+  .ok-strip{
+    margin-top:14px;
+    min-height:44px;
+    padding:0 16px;
+    border-radius:16px;
+    display:flex;
+    align-items:center;
+    background:var(--green-bg);
+    border:1px solid #bbf7d0;
+    color:#166534;
+    font-size:13px;
+    font-weight:1000;
+  }
+
+  .modal{
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:80;
+    padding:18px;
+    background:rgba(15,23,42,.56);
+  }
+
+  .modal.is-open{
+    display:block;
+  }
+
+  .modal-card{
+    max-width:540px;
+    margin:8vh auto 0;
+    background:#fff;
+    border-radius:24px;
+    border:1px solid var(--line);
+    box-shadow:0 24px 60px rgba(15,23,42,.24);
+    padding:18px;
+  }
+
+  .modal-head{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    align-items:flex-start;
+    margin-bottom:12px;
+  }
+
+  .modal-title{
+    margin:0;
+    font-size:17px;
+    font-weight:1000;
+    color:var(--text);
+  }
+
+  .modal-sub{
+    margin:4px 0 0;
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.45;
+    font-weight:700;
+  }
+
+  .field{
+    margin-top:12px;
+  }
+
+  .field label{
+    display:block;
+    margin-bottom:6px;
+    color:#334155;
+    font-size:12px;
+    font-weight:900;
+  }
+
+  .field input,
+  .field select{
+    width:100%;
+    min-height:46px;
+    border-radius:14px;
+    border:1px solid var(--line);
+    background:#fff;
+    padding:0 14px;
+    color:var(--text);
+    font-size:14px;
+    font-weight:800;
+  }
+
+  .field input[type="file"]{
+    min-height:auto;
+    padding:12px 12px;
+  }
+
+  .modal-actions{
+    margin-top:14px;
+  }
+
+  .feedback{
+    margin-top:10px;
+    font-size:12px;
+    font-weight:900;
+    display:none;
+  }
+
+  .feedback.ok{
+    display:block;
+    color:#166534;
+  }
+
+  .feedback.err{
+    display:block;
+    color:#991b1b;
+  }
+
+  .sticky-pay{
+    position:fixed;
+    left:0;
+    right:0;
+    bottom:0;
+    z-index:50;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg, rgba(244,247,251,0), rgba(244,247,251,.92) 22%, rgba(244,247,251,1) 100%);
+  }
+
+  .sticky-pay__inner{
+    max-width:1100px;
+    margin:0 auto;
+    background:rgba(255,255,255,.94);
+    backdrop-filter:blur(14px);
+    border:1px solid rgba(226,232,240,.95);
+    border-radius:999px;
+    box-shadow:0 16px 36px rgba(15,23,42,.14);
+    padding:10px 12px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
+
+  .sticky-pay__copy{
+    min-width:0;
+  }
+
+  .sticky-pay__k{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--muted);
+    font-weight:900;
+  }
+
+  .sticky-pay__v{
+    margin-top:2px;
+    font-size:20px;
+    line-height:1;
+    font-weight:1000;
+    color:var(--text);
+  }
+
+  .sticky-paid{
+    min-height:42px;
+    padding:0 16px;
+    border-radius:999px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--green-bg);
+    border:1px solid #bbf7d0;
+    color:#166534;
+    font-size:13px;
+    font-weight:1000;
+    white-space:nowrap;
+  }
+
+  @media (max-width:860px){
+    .hero,
+    .grid{
+      grid-template-columns:1fr;
+    }
+
+    .hero-kpis{
+      grid-template-columns:1fr;
+    }
+
+    .topbar{
+      border-radius:24px;
+      align-items:flex-start;
+      flex-direction:column;
+    }
+
+    .topbar-actions{
+      width:100%;
+      justify-content:flex-start;
+    }
+  }
+
+  @media (max-width:640px){
+    .detail-page{
+      padding:10px 8px 108px;
+    }
+
+    .hero-main,
+    .hero-side,
+    .section-card{
+      border-radius:20px;
+    }
+
+    .hero-main,
+    .hero-side,
+    .section-card{
+      padding:16px;
+    }
+
+    .hero-title{
+      font-size:23px;
+      line-height:1.08;
+    }
+
+    .summary-title,
+    .section-title{
+      font-size:18px;
+    }
+
+    .summary-row,
+    .money-row{
+      flex-direction:column;
+      align-items:flex-start;
+      gap:4px;
+    }
+
+    .summary-row__v,
+    .money-v{
+      text-align:left;
+      white-space:normal;
+    }
+
+    .item-head,
+    .leg-head,
+    .section-head,
+    .summary-head{
+      flex-direction:column;
+      align-items:flex-start;
+    }
+
+    .item-total{
+      font-size:18px;
+    }
+
+    .btn{
+      width:100%;
+    }
+
+    .topbar-actions .btn{
+      width:auto;
+    }
+
+    .summary-actions .btn,
+    .evidence-actions .btn,
+    .support-actions .btn,
+    .item-actions .btn,
+    .modal-actions .btn{
+      flex:1 1 100%;
+    }
+
+    .sticky-pay__inner{
+      border-radius:24px;
+      align-items:flex-start;
+      flex-direction:column;
+    }
+
+    .sticky-paid,
+    .sticky-pay__inner .btn{
+      width:100%;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="detail-page">
+
+  {% if payment_ui == "paid" or remain_amount|default:0 <= 0 %}
+    <div class="notice notice--ok" id="waveNotice" data-wave="success" data-order="{{ order.id }}">
+      <div class="notice__icon">✓</div>
+      <div>
+        <p class="notice__title">Paiement confirmé</p>
+        <p class="notice__desc">Merci. Ton paiement a été validé pour cette commande.</p>
+      </div>
+    </div>
+  {% elif request.GET.wave == "declared" %}
+    <div class="notice notice--warn" id="waveNotice" data-wave="declared" data-order="{{ order.id }}">
+      <div class="notice__icon">✓</div>
+      <div>
+        <p class="notice__title">Paiement déclaré</p>
+        <p class="notice__desc">Nous vérifions ton paiement Wave. La confirmation s’affichera automatiquement.</p>
+      </div>
+    </div>
+  {% elif request.GET.wave == "error" %}
+    <div class="notice notice--err" id="waveNotice" data-wave="error" data-order="{{ order.id }}">
+      <div class="notice__icon">!</div>
+      <div>
+        <p class="notice__title">Paiement non confirmé</p>
+        <p class="notice__desc">Nous n’avons pas pu confirmer le paiement. Réessaie ou contacte le support.</p>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="hero">
+    <section class="hero-main">
+      <div class="hero-pills">
+        <span class="pill">Commande {{ order.code|default:order.id }}</span>
+
+        {% if order.status == "done" %}
+          <span class="pill">Terminée</span>
+        {% elif order.status == "in_progress" %}
+          <span class="pill">En cours</span>
+        {% elif order.status == "canceled" %}
+          <span class="pill">Annulée</span>
+        {% else %}
+          <span class="pill">En attente</span>
+        {% endif %}
+
+        {% if order.payment_status == "paid" %}
+          <span class="pill">Paiement confirmé</span>
+        {% endif %}
+      </div>
+
+      <h1 class="hero-title">Ta commande, ton paiement et ta logistique dans une seule page claire.</h1>
+      <div class="hero-sub">
+        Suis l’avancement de ton linge, visualise tes prestations, contrôle ton paiement et retrouve les missions de collecte et de retour sans friction.
+      </div>
+
+      <div class="hero-kpis">
+        <div class="hero-kpi">
+          <div class="hero-kpi__k">Total client</div>
+          <div class="hero-kpi__v" id="heroTotal">{{ amounts.total_ttc|fcfa }}</div>
+        </div>
+
+        <div class="hero-kpi">
+          <div class="hero-kpi__k">Créée le</div>
+          <div class="hero-kpi__v">{{ order.created_at|date:"d/m/Y H:i" }}</div>
+        </div>
+
+        <div class="hero-kpi">
+          <div class="hero-kpi__k">Adresse</div>
+          <div class="hero-kpi__v">{{ order.pickup_address|default:customer.address|default:"—" }}</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="hero-side">
+      <div class="summary-head">
+        <div>
+          <h2 class="summary-title">Résumé</h2>
+          <div class="summary-sub">Lecture rapide de l’état général de la commande.</div>
+        </div>
+
+        {% if order.payment_status == "paid" %}
+          <span class="state-chip state-chip--paid" id="payStateChip">Payé</span>
+        {% else %}
+          <span class="state-chip state-chip--warn" id="payStateChip">À suivre</span>
+        {% endif %}
+      </div>
+
+      <div class="summary-list">
+        <div class="summary-row">
+          <div class="summary-row__k">Statut</div>
+          <div class="summary-row__v" id="summaryStatus">
+            {% if order.status == "done" %}
+              Terminée
+            {% elif order.status == "in_progress" %}
+              En cours
+            {% elif order.status == "canceled" %}
+              Annulée
+            {% else %}
+              En attente
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="summary-row">
+          <div class="summary-row__k">Paiement</div>
+          <div class="summary-row__v" id="summaryPayment">
+            {% if order.payment_status == "paid" %}Confirmé{% else %}En attente{% endif %}
+          </div>
+        </div>
+
+        <div class="summary-row">
+          <div class="summary-row__k">Déjà payé</div>
+          <div class="summary-row__v" id="payPaid">{{ paid_amount|default:0|fcfa }}</div>
+        </div>
+
+        <div class="summary-row">
+          <div class="summary-row__k">Reste à payer</div>
+          <div class="summary-row__v" id="payRemain">{{ remain_amount|default:0|fcfa }}</div>
+        </div>
+      </div>
+
+      <div class="summary-actions">
+        <a class="btn btn-primary btn-xs" href="{% url 'orders:client_home' %}">← Mes commandes</a>
+        <a class="btn btn-light btn-xs" href="{% url 'orders:client_new_order' %}">➕ Nouvelle commande</a>
+      </div>
+    </section>
+  </div>
+
+  <div class="grid">
+    <div>
+      <section class="section-card">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Suivi</h2>
+            <div class="section-sub">Avancement global de la commande FAGNI.</div>
+          </div>
+
+          <span id="orderStatusPill" class="status-badge {% if order.status == 'done' %}done{% elif order.status == 'in_progress' %}progress{% elif order.status == 'canceled' %}canceled{% else %}pending{% endif %}">
+            <span class="status-dot"></span>
+            <span id="orderStatus">
+              {% if order.status == "done" %}
+                Terminée
+              {% elif order.status == "in_progress" %}
+                En cours
+              {% elif order.status == "canceled" %}
+                Annulée
+              {% else %}
+                En attente
+              {% endif %}
+            </span>
+          </span>
+        </div>
+
+        <div class="timeline-list" id="timelineBox">
+          {% with order_status=order.status|default:"pending" %}
+            <div class="timeline-step done">
+              <div class="timeline-step__title">Commande reçue</div>
+              <div class="timeline-step__desc">Ta demande a bien été enregistrée dans FAGNI.</div>
+            </div>
+
+            <div class="timeline-step {% if order_status == 'in_progress' or order_status == 'done' %}done{% elif order_status == 'pending' %}active{% endif %}">
+              <div class="timeline-step__title">Collecte</div>
+              <div class="timeline-step__desc">Un livreur récupère ou va récupérer tes articles.</div>
+            </div>
+
+            <div class="timeline-step {% if order_status == 'done' %}done{% elif order_status == 'in_progress' %}active{% endif %}">
+              <div class="timeline-step__title">Pressing</div>
+              <div class="timeline-step__desc">Les articles sont en cours de traitement chez le partenaire.</div>
+            </div>
+
+            <div class="timeline-step {% if order_status == 'done' %}done{% endif %}">
+              <div class="timeline-step__title">Retour livraison</div>
+              <div class="timeline-step__desc">La commande repart vers toi dès qu’elle est prête.</div>
+            </div>
+
+            <div class="timeline-step {% if order_status == 'done' %}active{% endif %}">
+              <div class="timeline-step__title">Livrée</div>
+              <div class="timeline-step__desc">Commande terminée et remise au client.</div>
+            </div>
+          {% endwith %}
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Prestations</h2>
+            <div class="section-sub">Articles associés à cette commande.</div>
+          </div>
+
+          {% if not locked %}
+            <a class="btn btn-light btn-xs" href="{% url 'orders:client_order_item_new' order.id %}">➕ Ajouter</a>
+          {% endif %}
+        </div>
+
+        <div class="item-list" id="itemsBox">
+          {% if items %}
+            {% for it in items %}
+              <div class="item-card">
+                <div class="item-head">
+                  <div>
+                    <div class="item-name">{{ it.designation|default:"—" }}</div>
+                    <div class="item-meta">Qté : {{ it.quantity }} • PU : {{ it.unit_price|fcfa }}</div>
+                  </div>
+                  <div class="item-total">{{ it.total|fcfa }}</div>
+                </div>
+
+                {% if not locked %}
+                  <div class="item-actions">
+                    <a class="btn btn-light btn-xs" href="{% url 'orders:client_order_item_edit' order.id it.id %}">Modifier</a>
+                    <a class="btn btn-danger-light btn-xs" href="{% url 'orders:client_order_item_delete' order.id it.id %}">Supprimer</a>
+                  </div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty-box">Aucune prestation pour le moment.</div>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Livraison</h2>
+            <div class="section-sub">Missions logistiques liées à la commande.</div>
+          </div>
+        </div>
+
+        <div class="legs-list" id="legsBox">
+          {% if legs %}
+            {% for l in legs %}
+              <div class="leg-card">
+                <div class="leg-head">
+                  <div>
+                    <div class="leg-title">
+                      {% if l.leg_type == "pickup" %}
+                        Collecte
+                      {% elif l.leg_type == "return" %}
+                        Retour livraison
+                      {% else %}
+                        {{ l.leg_type }}
+                      {% endif %}
+                      —
+                      {% if l.status == "assigned" %}
+                        Affectée
+                      {% elif l.status == "pending" %}
+                        En attente
+                      {% elif l.status == "done" %}
+                        Terminée
+                      {% elif l.status == "in_progress" %}
+                        En cours
+                      {% else %}
+                        {{ l.status }}
+                      {% endif %}
+                    </div>
+                    <div class="leg-meta">Mission #{{ l.id }}</div>
+                  </div>
+
+                  <div class="leg-mini">#{{ l.id }}</div>
+                </div>
+
+                <div class="item-actions">
+                  {% if l.driver_id %}
+                    <span class="leg-mini">Livreur : #{{ l.driver_id }}</span>
+                  {% endif %}
+                  {% if l.driver_amount and l.driver_amount|floatformat:0 != "0" %}
+                    <span class="leg-mini">Mission : {{ l.driver_amount|fcfa }}</span>
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty-box">Aucune mission affichée pour le moment.</div>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+
+    <div>
+      <section class="section-card">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Paiement</h2>
+            <div class="section-sub">Prix client global, sans ligne TVA séparée.</div>
+          </div>
+
+          {% if order.payment_status == "paid" %}
+            <span class="state-chip state-chip--paid">Payé</span>
+          {% else %}
+            <span class="state-chip state-chip--warn">En attente</span>
+          {% endif %}
+        </div>
+
+        <div class="money-list">
+          <div class="money-row">
+            <div class="money-k">Prestations</div>
+            <div class="money-v" id="amtPrest">{{ amounts.prestation_total|fcfa }}</div>
+          </div>
+
+          <div class="money-row">
+            <div class="money-k">Livraison</div>
+            <div class="money-v" id="amtDeliv">{{ amounts.delivery_fee|fcfa }}</div>
+          </div>
+
+          <div class="money-row">
+            <div class="money-k">Service FAGNI</div>
+            <div class="money-v" id="amtFee">{{ amounts.service_fee|fcfa }}</div>
+          </div>
+
+          {% if amounts.express_extra_fee and amounts.express_extra_fee|floatformat:0 != "0" %}
+            <div class="money-row" id="rowExpress">
+              <div class="money-k">Express</div>
+              <div class="money-v" id="amtExpress">{{ amounts.express_extra_fee|fcfa }}</div>
+            </div>
+          {% else %}
+            <div class="money-row" id="rowExpress" style="display:none;">
+              <div class="money-k">Express</div>
+              <div class="money-v" id="amtExpress">0 FCFA</div>
+            </div>
+          {% endif %}
+
+          <div class="money-row total">
+            <div class="money-k">Total client</div>
+            <div class="money-v" id="amtTotal">{{ amounts.total_ttc|fcfa }}</div>
+          </div>
+
+          <div class="money-row">
+            <div class="money-k">Déjà payé</div>
+            <div class="money-v">{{ paid_amount|default:0|fcfa }}</div>
+          </div>
+
+          <div class="money-row">
+            <div class="money-k">Reste à payer</div>
+            <div class="money-v">{{ remain_amount|default:0|fcfa }}</div>
+          </div>
+        </div>
+
+        <div class="money-note">
+          <strong>Information client :</strong> Ecolowash Africa, entreprise porteuse du projet FAGNI, est une SARL à la TEE. En conséquence, cette page n’affiche pas de ligne TVA séparée : le prix affiché au client est un prix global.
+        </div>
+
+        {% if order.payment_status == "paid" %}
+          <div class="ok-strip">● Paiement confirmé pour cette commande</div>
+        {% else %}
+          <div class="evidence-actions" style="margin-top:14px;">
+            <button class="btn btn-primary btn-xs" id="btnPaySimulate" type="button">💳 Payer maintenant</button>
+            <a class="btn btn-light btn-xs" href="{% url 'orders:client_order_pay_wave_page' order.id %}">🌊 Payer par Wave</a>
+            <button class="btn btn-light btn-xs" id="btnPayCashOpen" type="button">💵 Déclarer cash</button>
+          </div>
+          <div class="feedback" id="payMsg"></div>
+        {% endif %}
+      </section>
+
+      <section class="section-card">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Preuves & photos</h2>
+            <div class="section-sub">Collecte, laverie, livraison.</div>
+          </div>
+        </div>
+
+        <div class="proof-box" id="evidenceBox">Aucune preuve photo pour le moment.</div>
+
+        <div class="evidence-actions" style="margin-top:14px;">
+          <button class="btn btn-primary btn-xs" id="btnEvidenceOpen" type="button">📸 Ajouter une preuve</button>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Évaluation</h2>
+            <div class="section-sub">Ton avis aidera à améliorer l’expérience FAGNI.</div>
+          </div>
+        </div>
+
+        <div class="rating-placeholder" id="ratingBox">
+          L’évaluation sera disponible après la livraison.
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Besoin d’aide ?</h2>
+            <div class="section-sub">Support pilote FAGNI.</div>
+          </div>
+        </div>
+
+        <div class="support-actions">
+          <a class="btn btn-light btn-xs" href="#" onclick="return false;">💬 WhatsApp support</a>
+          <a class="btn btn-light btn-xs" href="#" onclick="return false;">📞 Appeler</a>
+        </div>
+
+        <div class="muted-note" style="margin-top:12px;">
+          En cas de besoin, contacte l’équipe FAGNI pour le suivi, le paiement ou la livraison.
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="modal" id="payCashModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h3 class="modal-title">Déclarer un paiement cash</h3>
+          <div class="modal-sub">Saisis le montant encaissé. Acompte possible.</div>
+        </div>
+        <button class="btn btn-light btn-xs" id="btnPayCashClose" type="button">✕</button>
+      </div>
+
+      <div class="field">
+        <label for="payCashAmount">Montant</label>
+        <input id="payCashAmount" type="number" min="0" step="1" placeholder="Montant en FCFA">
+      </div>
+
+      <div class="field">
+        <label for="payCashNote">Note</label>
+        <input id="payCashNote" type="text" placeholder="Ex : reçu par livreur">
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-xs" id="btnPayCashSend" type="button">Valider</button>
+        <button class="btn btn-light btn-xs" id="btnPayCashCancel" type="button">Annuler</button>
+      </div>
+
+      <div class="feedback" id="payCashErr"></div>
+      <div class="feedback" id="payCashOk"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="evidenceModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h3 class="modal-title">Ajouter une preuve photo</h3>
+          <div class="modal-sub">Choisis l’étape et ajoute une ou plusieurs photos.</div>
+        </div>
+        <button class="btn btn-light btn-xs" id="btnEvidenceClose" type="button">✕</button>
+      </div>
+
+      <div class="field">
+        <label for="evidenceKind">Étape</label>
+        <select id="evidenceKind">
+          <option value="pickup">Collecte</option>
+          <option value="laundry">Laverie</option>
+          <option value="dropoff">Livraison</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="evidenceFiles">Photos</label>
+        <input id="evidenceFiles" type="file" accept="image/*" multiple>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-xs" id="btnEvidenceSend" type="button">Envoyer</button>
+        <button class="btn btn-light btn-xs" id="btnEvidenceCancel" type="button">Annuler</button>
+      </div>
+
+      <div class="feedback" id="evidenceErr"></div>
+      <div class="feedback" id="evidenceOk"></div>
+    </div>
+  </div>
+</div>
+
+<div class="sticky-pay">
+  <div class="sticky-pay__inner">
+    <div class="sticky-pay__copy">
+      <div class="sticky-pay__k">Total client</div>
+      <div class="sticky-pay__v">{{ amounts.total_ttc|fcfa }}</div>
+    </div>
+
+    {% if order.payment_status != "paid" %}
+      <button class="btn btn-primary" id="btnPaySimulateSticky" type="button">Payer maintenant</button>
+    {% else %}
+      <div class="sticky-paid">✓ Payé</div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+(function(){
+  const liveUrl = "{% url 'orders:client_order_live' order.id %}";
+  const paySimUrl = "{% url 'orders:client_order_pay_simulate' order.id %}";
+  const payCashUrl = "{% url 'orders:client_order_pay_cash' order.id %}";
+  const evidencePostUrl = "{% url 'orders:client_order_evidence_upload' order.id %}";
+
+  const btnPaySim = document.getElementById("btnPaySimulate");
+  const btnPaySimSticky = document.getElementById("btnPaySimulateSticky");
+  const payMsg = document.getElementById("payMsg");
+
+  const payCashModal = document.getElementById("payCashModal");
+  const btnPayCashOpen = document.getElementById("btnPayCashOpen");
+  const btnPayCashClose = document.getElementById("btnPayCashClose");
+  const btnPayCashCancel = document.getElementById("btnPayCashCancel");
+  const btnPayCashSend = document.getElementById("btnPayCashSend");
+  const payCashAmount = document.getElementById("payCashAmount");
+  const payCashNote = document.getElementById("payCashNote");
+  const payCashErr = document.getElementById("payCashErr");
+  const payCashOk = document.getElementById("payCashOk");
+
+  const evidenceModal = document.getElementById("evidenceModal");
+  const btnEvidenceOpen = document.getElementById("btnEvidenceOpen");
+  const btnEvidenceClose = document.getElementById("btnEvidenceClose");
+  const btnEvidenceCancel = document.getElementById("btnEvidenceCancel");
+  const btnEvidenceSend = document.getElementById("btnEvidenceSend");
+  const evidenceKind = document.getElementById("evidenceKind");
+  const evidenceFiles = document.getElementById("evidenceFiles");
+  const evidenceErr = document.getElementById("evidenceErr");
+  const evidenceOk = document.getElementById("evidenceOk");
+  const evidenceBox = document.getElementById("evidenceBox");
+
+  const orderStatus = document.getElementById("orderStatus");
+  const summaryStatus = document.getElementById("summaryStatus");
+  const summaryPayment = document.getElementById("summaryPayment");
+  const orderStatusPill = document.getElementById("orderStatusPill");
+  const heroTotal = document.getElementById("heroTotal");
+  const amtPrest = document.getElementById("amtPrest");
+  const amtDeliv = document.getElementById("amtDeliv");
+  const amtFee = document.getElementById("amtFee");
+  const amtExpress = document.getElementById("amtExpress");
+  const amtTotal = document.getElementById("amtTotal");
+  const rowExpress = document.getElementById("rowExpress");
+  const payPaid = document.getElementById("payPaid");
+  const payRemain = document.getElementById("payRemain");
+  const payStateChip = document.getElementById("payStateChip");
+
+  function getCookie(name){
+    const parts = (`; ${document.cookie}`).split(`; ${name}=`);
+    if(parts.length === 2) return parts.pop().split(";").shift();
+    return "";
+  }
+
+  function fmtMoney(v){
+    try{
+      const n = Number(v || 0);
+      return Math.round(n).toLocaleString("fr-FR") + " FCFA";
+    }catch(e){
+      return (v || 0) + " FCFA";
+    }
+  }
+
+  function showFeedback(el, msg, ok){
+    if(!el) return;
+    el.textContent = msg || "";
+    el.className = "feedback " + (ok ? "ok" : "err");
+  }
+
+  function hideFeedback(el){
+    if(!el) return;
+    el.textContent = "";
+    el.className = "feedback";
+  }
+
+  function openModal(el){
+    if(el) el.classList.add("is-open");
+  }
+
+  function closeModal(el){
+    if(el) el.classList.remove("is-open");
+  }
+
+  function statusLabel(raw){
+    const s = String(raw || "").toLowerCase();
+    if(s === "done") return ["Terminée", "done"];
+    if(s === "in_progress") return ["En cours", "progress"];
+    if(s === "canceled") return ["Annulée", "canceled"];
+    return ["En attente", "pending"];
+  }
+
+  function paymentLabel(raw){
+    const s = String(raw || "").toLowerCase();
+    if(s.includes("paid")) return "Confirmé";
+    if(s.includes("partial")) return "Partiel";
+    return "En attente";
+  }
+
+  function setStatusUI(raw){
+    const out = statusLabel(raw);
+    const label = out[0];
+    const cls = out[1];
+
+    if(orderStatus) orderStatus.textContent = label;
+    if(summaryStatus) summaryStatus.textContent = label;
+
+    if(orderStatusPill){
+      orderStatusPill.classList.remove("pending","progress","done","canceled");
+      orderStatusPill.classList.add(cls);
+    }
+  }
+
+  function setAmountsUI(amounts){
+    if(!amounts) return;
+
+    if(amtPrest) amtPrest.textContent = fmtMoney(amounts.prestation_total || 0);
+    if(amtDeliv) amtDeliv.textContent = fmtMoney(amounts.delivery_fee || 0);
+    if(amtFee) amtFee.textContent = fmtMoney(amounts.service_fee || 0);
+    if(amtTotal) amtTotal.textContent = fmtMoney(amounts.total_ttc || 0);
+    if(heroTotal) heroTotal.textContent = fmtMoney(amounts.total_ttc || 0);
+
+    const express = Number(amounts.express_extra_fee || 0);
+    if(rowExpress && amtExpress){
+      if(express > 0){
+        rowExpress.style.display = "";
+        amtExpress.textContent = fmtMoney(express);
+      }else{
+        rowExpress.style.display = "none";
+      }
+    }
+  }
+
+  async function doPaySimulate(){
+    const buttons = [btnPaySim, btnPaySimSticky].filter(Boolean);
+
+    try{
+      buttons.forEach(b => { b.disabled = true; b.style.opacity = "0.7"; });
+      showFeedback(payMsg, "Traitement du paiement…", true);
+
+      const csrf = getCookie("csrftoken");
+      const res = await fetch(paySimUrl, {
+        method:"POST",
+        headers:{
+          ...(csrf ? {"X-CSRFToken": csrf} : {}),
+          "X-Requested-With":"XMLHttpRequest",
+          "Accept":"application/json",
+        },
+        credentials:"same-origin",
+        cache:"no-store",
+      });
+
+      const data = await res.json().catch(()=>null);
+
+      if(!res.ok || !data || data.ok !== true){
+        if(data && data.error === "already_paid"){
+          showFeedback(payMsg, "✅ Commande déjà payée.", true);
+          setTimeout(function(){ window.location.reload(); }, 450);
+          return;
+        }
+        showFeedback(payMsg, "Paiement impossible.", false);
+        return;
+      }
+
+      showFeedback(payMsg, "✅ Paiement confirmé.", true);
+      setTimeout(function(){ window.location.reload(); }, 450);
+    }catch(e){
+      showFeedback(payMsg, "Connexion instable. Réessaie.", false);
+    }finally{
+      buttons.forEach(b => { b.disabled = false; b.style.opacity = "1"; });
+    }
+  }
+
+  async function doPayCash(){
+    hideFeedback(payCashErr);
+    hideFeedback(payCashOk);
+
+    const amt = Number(payCashAmount?.value || 0);
+    if(!amt || amt <= 0){
+      showFeedback(payCashErr, "Montant invalide.", false);
+      return;
+    }
+
+    try{
+      if(btnPayCashSend){
+        btnPayCashSend.disabled = true;
+        btnPayCashSend.style.opacity = "0.7";
+      }
+
+      const csrf = getCookie("csrftoken");
+      const fd = new FormData();
+      fd.append("amount", String(Math.round(amt)));
+      fd.append("note", String(payCashNote?.value || ""));
+
+      const res = await fetch(payCashUrl, {
+        method:"POST",
+        headers:{
+          ...(csrf ? {"X-CSRFToken": csrf} : {}),
+          "X-Requested-With":"XMLHttpRequest",
+          "Accept":"application/json",
+        },
+        body:fd,
+        credentials:"same-origin",
+        cache:"no-store",
+      });
+
+      const data = await res.json().catch(()=>null);
+      if(!res.ok || !data || data.ok !== true){
+        showFeedback(payCashErr, "Paiement impossible.", false);
+        return;
+      }
+
+      showFeedback(payCashOk, "✅ Paiement enregistré.", true);
+      setTimeout(function(){ window.location.reload(); }, 550);
+    }catch(e){
+      showFeedback(payCashErr, "Erreur réseau. Réessaie.", false);
+    }finally{
+      if(btnPayCashSend){
+        btnPayCashSend.disabled = false;
+        btnPayCashSend.style.opacity = "1";
+      }
+    }
+  }
+
+  async function sendEvidence(){
+    hideFeedback(evidenceErr);
+    hideFeedback(evidenceOk);
+
+    if(!evidenceFiles || !evidenceFiles.files || evidenceFiles.files.length === 0){
+      showFeedback(evidenceErr, "Sélectionne au moins une photo.", false);
+      return;
+    }
+
+    try{
+      if(btnEvidenceSend){
+        btnEvidenceSend.disabled = true;
+        btnEvidenceSend.style.opacity = "0.7";
+      }
+
+      const csrf = getCookie("csrftoken");
+      const fd = new FormData();
+      const kind = String(evidenceKind?.value || "pickup");
+
+      fd.append("kind", kind);
+      for(const f of evidenceFiles.files){
+        fd.append("files", f);
+        fd.append("photos", f);
+      }
+
+      const res = await fetch(evidencePostUrl, {
+        method:"POST",
+        headers:{
+          ...(csrf ? {"X-CSRFToken": csrf} : {}),
+          "X-Requested-With":"XMLHttpRequest",
+          "Accept":"application/json",
+        },
+        body:fd,
+        credentials:"same-origin",
+        cache:"no-store",
+      });
+
+      const data = await res.json().catch(()=>null);
+      if(!res.ok || !data || data.ok !== true){
+        showFeedback(evidenceErr, "Upload impossible.", false);
+        return;
+      }
+
+      showFeedback(evidenceOk, "✅ Photo(s) ajoutée(s).", true);
+      if(evidenceBox){
+        evidenceBox.textContent = "Des preuves ont été ajoutées à cette commande.";
+      }
+      setTimeout(function(){ closeModal(evidenceModal); }, 500);
+    }catch(e){
+      showFeedback(evidenceErr, "Erreur réseau. Réessaie.", false);
+    }finally{
+      if(btnEvidenceSend){
+        btnEvidenceSend.disabled = false;
+        btnEvidenceSend.style.opacity = "1";
+      }
+    }
+  }
+
+  async function refreshLive(){
+    try{
+      const res = await fetch(liveUrl, {
+        method:"GET",
+        credentials:"same-origin",
+        headers:{
+          "Accept":"application/json",
+          "X-Requested-With":"XMLHttpRequest"
+        },
+        cache:"no-store",
+      });
+      if(!res.ok) return;
+
+      const data = await res.json().catch(()=>null);
+      if(!data || data.ok !== true) return;
+
+      if(data.order_status){
+        setStatusUI(data.order_status);
+      }
+
+      if(data.payment_status){
+        const payLabel = paymentLabel(data.payment_status);
+        if(summaryPayment) summaryPayment.textContent = payLabel;
+
+        if(payStateChip){
+          if(String(data.payment_status).toLowerCase().includes("paid")){
+            payStateChip.textContent = "Payé";
+            payStateChip.classList.remove("state-chip--warn");
+            payStateChip.classList.add("state-chip--paid");
+          }else{
+            payStateChip.textContent = "En attente";
+            payStateChip.classList.remove("state-chip--paid");
+            payStateChip.classList.add("state-chip--warn");
+          }
+        }
+      }
+
+      if(data.amounts){
+        setAmountsUI(data.amounts);
+      }
+
+      if(typeof data.paid_amount !== "undefined" && payPaid){
+        payPaid.textContent = fmtMoney(data.paid_amount || 0);
+      }
+
+      if(typeof data.remain_amount !== "undefined" && payRemain){
+        payRemain.textContent = fmtMoney(data.remain_amount || 0);
+      }
+    }catch(e){}
+  }
+
+  if(btnPaySim) btnPaySim.addEventListener("click", doPaySimulate);
+  if(btnPaySimSticky) btnPaySimSticky.addEventListener("click", doPaySimulate);
+
+  if(btnPayCashOpen) btnPayCashOpen.addEventListener("click", function(){ openModal(payCashModal); });
+  if(btnPayCashClose) btnPayCashClose.addEventListener("click", function(){ closeModal(payCashModal); });
+  if(btnPayCashCancel) btnPayCashCancel.addEventListener("click", function(){ closeModal(payCashModal); });
+  if(btnPayCashSend) btnPayCashSend.addEventListener("click", doPayCash);
+
+  if(btnEvidenceOpen) btnEvidenceOpen.addEventListener("click", function(){ openModal(evidenceModal); });
+  if(btnEvidenceClose) btnEvidenceClose.addEventListener("click", function(){ closeModal(evidenceModal); });
+  if(btnEvidenceCancel) btnEvidenceCancel.addEventListener("click", function(){ closeModal(evidenceModal); });
+  if(btnEvidenceSend) btnEvidenceSend.addEventListener("click", sendEvidence);
+
+  [payCashModal, evidenceModal].forEach(function(modal){
+    if(!modal) return;
+    modal.addEventListener("click", function(e){
+      if(e.target === modal){
+        closeModal(modal);
+      }
+    });
+  });
+
+  refreshLive();
+  setInterval(refreshLive, 7000);
+})();
+</script>
+{% endblock %}

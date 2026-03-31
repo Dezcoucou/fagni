@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Tableau de bord logistique FAGNI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body{
+            font-family:Arial, sans-serif;
+            margin:24px;
+            background:#f8fafc;
+            color:#0f172a;
+        }
+        h1,h2{ margin-bottom:12px; }
+        a{ color:#0f172a; }
+        .stats{
+            display:grid;
+            grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+            gap:12px;
+            margin-bottom:24px;
+        }
+        .card{
+            background:#fff;
+            border:1px solid #e2e8f0;
+            border-radius:14px;
+            padding:16px;
+            box-shadow:0 4px 16px rgba(15,23,42,.06);
+        }
+        .label{
+            font-size:12px;
+            color:#64748b;
+            text-transform:uppercase;
+            font-weight:700;
+            margin-bottom:8px;
+        }
+        .value{
+            font-size:28px;
+            font-weight:800;
+        }
+        .grid{
+            display:grid;
+            grid-template-columns:1.2fr .8fr;
+            gap:16px;
+        }
+        @media (max-width: 980px){
+            .grid{ grid-template-columns:1fr; }
+        }
+        .filters{
+            display:grid;
+            grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+            gap:12px;
+            margin-bottom:18px;
+            background:#fff;
+            border:1px solid #e2e8f0;
+            border-radius:14px;
+            padding:14px;
+            box-shadow:0 4px 16px rgba(15,23,42,.06);
+        }
+        .filters label{
+            display:block;
+            font-size:12px;
+            font-weight:700;
+            color:#475569;
+            margin-bottom:6px;
+        }
+        .filters input,
+        .filters select{
+            width:100%;
+            padding:10px 12px;
+            border:1px solid #cbd5e1;
+            border-radius:10px;
+            font-size:14px;
+            background:#fff;
+            box-sizing:border-box;
+        }
+        .filter-actions{
+            display:flex;
+            gap:10px;
+            align-items:end;
+            flex-wrap:wrap;
+        }
+        .btn{
+            display:inline-block;
+            padding:10px 14px;
+            border-radius:10px;
+            border:1px solid #cbd5e1;
+            background:#0f172a;
+            color:#fff;
+            text-decoration:none;
+            font-size:14px;
+            font-weight:700;
+            cursor:pointer;
+        }
+        .btn.secondaire{
+            background:#fff;
+            color:#0f172a;
+        }
+        table{
+            width:100%;
+            border-collapse:collapse;
+            background:#fff;
+            border:1px solid #e2e8f0;
+            border-radius:14px;
+            overflow:hidden;
+        }
+        th, td{
+            padding:12px;
+            border-bottom:1px solid #e2e8f0;
+            text-align:left;
+            font-size:14px;
+            vertical-align:top;
+        }
+        th{
+            background:#f1f5f9;
+            font-weight:800;
+        }
+        tr:last-child td{
+            border-bottom:none;
+        }
+        .badge{
+            display:inline-block;
+            padding:6px 10px;
+            border-radius:999px;
+            font-size:12px;
+            font-weight:800;
+        }
+        .badge.assigned{ background:#e2e8f0; color:#334155; }
+        .badge.accepted{ background:#dbeafe; color:#1d4ed8; }
+        .badge.en_route{ background:#ede9fe; color:#6d28d9; }
+        .badge.arrived{ background:#fef3c7; color:#92400e; }
+        .badge.in_progress{ background:#cffafe; color:#155e75; }
+        .badge.awaiting_validation{ background:#fde68a; color:#92400e; }
+        .badge.completed{ background:#dcfce7; color:#166534; }
+        .badge.failed{ background:#fee2e2; color:#991b1b; }
+        .badge.sent{ background:#dcfce7; color:#166534; }
+        .badge.pending{ background:#fef3c7; color:#92400e; }
+        .badge.error,
+        .badge.failed-send{ background:#fee2e2; color:#991b1b; }
+
+        .pagination{
+            display:flex;
+            flex-wrap:wrap;
+            gap:8px;
+            margin-top:16px;
+            align-items:center;
+        }
+        .pagination a, .pagination span{
+            padding:8px 12px;
+            border-radius:10px;
+            border:1px solid #cbd5e1;
+            background:#fff;
+            text-decoration:none;
+            color:#0f172a;
+            font-size:14px;
+        }
+        .pagination .current{
+            background:#0f172a;
+            color:#fff;
+            border-color:#0f172a;
+        }
+        .muted{ color:#64748b; }
+        .breakdown-list{
+            display:grid;
+            gap:10px;
+        }
+        .breakdown-item{
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            padding:10px 12px;
+            border:1px solid #e2e8f0;
+            border-radius:12px;
+            background:#fff;
+        }
+        .stack{
+            display:grid;
+            gap:16px;
+        }
+        .small{
+            font-size:12px;
+            color:#64748b;
+        }
+        .link-mission{
+            font-weight:700;
+            text-decoration:none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Tableau de bord logistique FAGNI</h1>
+
+    <div class="stats">
+        <div class="card">
+            <div class="label">Total missions</div>
+            <div class="value">{{ stats.total }}</div>
+        </div>
+        <div class="card">
+            <div class="label">Terminées</div>
+            <div class="value">{{ stats.completed }}</div>
+        </div>
+        <div class="card">
+            <div class="label">En cours</div>
+            <div class="value">{{ stats.in_progress }}</div>
+        </div>
+        <div class="card">
+            <div class="label">Échouées</div>
+            <div class="value">{{ stats.failed }}</div>
+        </div>
+        <div class="card">
+            <div class="label">PDF envoyés</div>
+            <div class="value">{{ stats.pdf_sent }}</div>
+        </div>
+        <div class="card">
+            <div class="label">PDF échoués</div>
+            <div class="value">{{ stats.pdf_failed }}</div>
+        </div>
+    </div>
+
+    <form method="get" class="filters">
+        <div>
+            <label for="q">Recherche code mission</label>
+            <input id="q" type="text" name="q" value="{{ filters.q }}" placeholder="Ex: MSN-502">
+        </div>
+
+        <div>
+            <label for="status">Statut</label>
+            <select id="status" name="status">
+                <option value="">Tous</option>
+                {% for value, label in mission_status_choices %}
+                    <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label for="date_from">Date début</label>
+            <input id="date_from" type="date" name="date_from" value="{{ filters.date_from }}">
+        </div>
+
+        <div>
+            <label for="date_to">Date fin</label>
+            <input id="date_to" type="date" name="date_to" value="{{ filters.date_to }}">
+        </div>
+
+        <div class="filter-actions">
+            <button class="btn" type="submit">Filtrer</button>
+            <a class="btn secondaire" href="{% url 'logistics:dashboard' %}">Réinitialiser</a>
+        </div>
+    </form>
+
+    <div class="grid">
+        <div class="stack">
+            <div>
+                <h2>Missions (pagination 10)</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Code mission</th>
+                            <th>Statut</th>
+                            <th>Date création</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in missions %}
+                        <tr>
+                            <td>{{ m.id }}</td>
+                            <td>
+                                <a class="link-mission" href="{% url 'logistics:driver_mission_v2' m.id %}">
+                                    {{ m.code }}
+                                </a>
+                            </td>
+                            <td>
+                                <span class="badge {{ m.status }}">
+                                    {% if m.status == "assigned" %}Assignée
+                                    {% elif m.status == "accepted" %}Acceptée
+                                    {% elif m.status == "en_route" %}En route
+                                    {% elif m.status == "arrived" %}Arrivée
+                                    {% elif m.status == "in_progress" %}En cours
+                                    {% elif m.status == "awaiting_validation" %}En attente de validation
+                                    {% elif m.status == "completed" %}Terminée
+                                    {% elif m.status == "failed" %}Échouée
+                                    {% else %}{{ m.status }}
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td>{{ m.created_at|date:"d/m/Y H:i" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4">Aucune mission disponible.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <div class="pagination">
+                    {% if page_obj.has_previous %}
+                        <a href="?page=1&q={{ filters.q }}&status={{ filters.status }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}">« Première</a>
+                        <a href="?page={{ page_obj.previous_page_number }}&q={{ filters.q }}&status={{ filters.status }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}">‹ Précédente</a>
+                    {% endif %}
+
+                    <span class="current">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}&q={{ filters.q }}&status={{ filters.status }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}">Suivante ›</a>
+                        <a href="?page={{ page_obj.paginator.num_pages }}&q={{ filters.q }}&status={{ filters.status }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}">Dernière »</a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div>
+                <h2>Derniers envois PDF</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Mission</th>
+                            <th>Canal</th>
+                            <th>Statut</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in recent_pdf_logs %}
+                        <tr>
+                            <td>
+                                <a class="link-mission" href="{% url 'logistics:driver_mission_v2' log.mission.id %}">
+                                    {{ log.mission.code }}
+                                </a>
+                                <div class="small">{{ log.recipient }}</div>
+                            </td>
+                            <td>{{ log.channel }}</td>
+                            <td>
+                                <span class="badge {% if log.status == 'sent' %}sent{% elif log.status == 'pending' %}pending{% else %}failed-send{% endif %}">
+                                    {% if log.status == "sent" %}Envoyé
+                                    {% elif log.status == "pending" %}En attente
+                                    {% else %}Échec
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td>{{ log.created_at|date:"d/m/Y H:i" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4">Aucun envoi enregistré.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div>
+            <h2>Répartition par statut</h2>
+            <div class="breakdown-list">
+                {% for item in status_breakdown %}
+                    <div class="breakdown-item">
+                        <span>{{ item.label }}</span>
+                        <span class="badge {{ item.status }}">{{ item.total }}</span>
+                    </div>
+                {% empty %}
+                    <div class="card muted">Aucune donnée disponible.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

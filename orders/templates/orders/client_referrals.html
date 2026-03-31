@@ -1,0 +1,565 @@
+{% extends "orders/client_base.html" %}
+{% load humanize %}
+
+{% block title %}Parrainage – FAGNI{% endblock %}
+
+{% block content %}
+<style>
+  .cr-page{
+    max-width:1100px;
+    margin:0 auto;
+    padding:18px 12px 110px;
+  }
+  .cr-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-bottom:16px;
+  }
+  .cr-title{
+    margin:0;
+    font-size:28px;
+    line-height:1.05;
+    font-weight:1000;
+    color:#0f172a;
+  }
+  .cr-sub{
+    margin-top:6px;
+    color:#64748b;
+    font-size:14px;
+    line-height:1.5;
+    font-weight:700;
+  }
+  .cr-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  .cr-grid{
+    display:grid;
+    grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);
+    gap:16px;
+  }
+  .cr-stack{
+    display:grid;
+    gap:16px;
+  }
+
+  .cr-card{
+    border:1px solid #e2e8f0;
+    border-radius:24px;
+    background:#fff;
+    padding:18px;
+    box-shadow:0 18px 40px rgba(15,23,42,.06);
+  }
+
+  .cr-hero{
+    background:linear-gradient(135deg,#ff7a00,#ea580c);
+    color:#fff;
+    border:none;
+    overflow:hidden;
+    position:relative;
+  }
+  .cr-hero::after{
+    content:"";
+    position:absolute;
+    inset:auto -60px -60px auto;
+    width:180px;
+    height:180px;
+    border-radius:50%;
+    background:rgba(255,255,255,.10);
+    filter:blur(4px);
+  }
+  .cr-eyebrow{
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    font-weight:1000;
+    opacity:.82;
+  }
+  .cr-code{
+    margin-top:10px;
+    font-size:30px;
+    line-height:1;
+    font-weight:1000;
+    word-break:break-word;
+  }
+  .cr-link{
+    margin-top:10px;
+    font-size:13px;
+    line-height:1.6;
+    color:#ffedd5;
+    font-weight:700;
+    word-break:break-all;
+  }
+  .cr-hero-actions{
+    margin-top:14px;
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    position:relative;
+    z-index:1;
+  }
+
+  .cr-mini-grid{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:12px;
+  }
+  .cr-mini{
+    border:1px solid #e2e8f0;
+    border-radius:20px;
+    background:#fff;
+    padding:16px;
+    box-shadow:0 12px 28px rgba(15,23,42,.05);
+  }
+  .cr-mini-k{
+    font-size:12px;
+    color:#64748b;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    font-weight:1000;
+  }
+  .cr-mini-v{
+    margin-top:8px;
+    font-size:26px;
+    line-height:1;
+    color:#0f172a;
+    font-weight:1000;
+  }
+  .cr-mini-m{
+    margin-top:8px;
+    color:#64748b;
+    font-size:12px;
+    line-height:1.5;
+    font-weight:700;
+  }
+
+  .cr-section-title{
+    margin:0;
+    font-size:18px;
+    font-weight:1000;
+    color:#0f172a;
+  }
+  .cr-section-sub{
+    margin-top:6px;
+    color:#64748b;
+    font-size:13px;
+    line-height:1.5;
+    font-weight:700;
+  }
+
+  .cr-list{
+    margin-top:14px;
+    display:grid;
+    gap:12px;
+  }
+  .cr-row{
+    border:1px solid #e2e8f0;
+    border-radius:18px;
+    padding:14px;
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    align-items:flex-start;
+    background:#fff;
+  }
+  .cr-row-k{
+    font-size:14px;
+    font-weight:900;
+    color:#0f172a;
+  }
+  .cr-row-m{
+    margin-top:4px;
+    font-size:12px;
+    color:#64748b;
+    line-height:1.5;
+    font-weight:700;
+  }
+  .cr-row-v{
+    text-align:right;
+    font-size:14px;
+    font-weight:1000;
+    color:#0f172a;
+    white-space:nowrap;
+  }
+
+  .cr-note{
+    margin-top:12px;
+    padding:12px 14px;
+    border-radius:16px;
+    background:#eff6ff;
+    border:1px solid #bfdbfe;
+    color:#1e3a8a;
+    font-size:13px;
+    line-height:1.6;
+    font-weight:700;
+  }
+  .cr-empty{
+    margin-top:14px;
+    border:1px dashed #cbd5e1;
+    border-radius:18px;
+    padding:18px;
+    background:#f8fafc;
+    color:#475569;
+    font-size:14px;
+    line-height:1.6;
+    font-weight:700;
+  }
+  .cr-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    min-height:30px;
+    padding:0 12px;
+    border-radius:999px;
+    background:#eff6ff;
+    border:1px solid #bfdbfe;
+    color:#1d4ed8;
+    font-size:11px;
+    font-weight:1000;
+    white-space:nowrap;
+  }
+
+  .cr-steps{
+    display:grid;
+    gap:12px;
+    margin-top:14px;
+  }
+  .cr-step{
+    border:1px solid #e2e8f0;
+    border-radius:18px;
+    padding:14px;
+    background:#fff;
+  }
+  .cr-step-title{
+    font-size:14px;
+    font-weight:900;
+    color:#0f172a;
+  }
+  .cr-step-desc{
+    margin-top:5px;
+    color:#64748b;
+    font-size:12px;
+    line-height:1.55;
+    font-weight:700;
+  }
+
+  @media (max-width: 860px){
+    .cr-grid{ grid-template-columns:1fr; }
+    .cr-mini-grid{ grid-template-columns:1fr; }
+    .cr-actions{ width:100%; }
+    .cr-actions .fagni-btn{ width:100%; }
+    .cr-hero-actions .fagni-btn{ width:100%; }
+  }
+</style>
+
+<div class="cr-page">
+  <div class="cr-head">
+    <div>
+      <h1 class="cr-title">Parrainage</h1>
+      <div class="cr-sub">Développe ton réseau, suis tes filleuls et visualise tes commissions FAGNI.</div>
+    </div>
+    <div class="cr-actions">
+      <a class="fagni-btn fagni-btn--light" href="{% url 'orders:client_home' %}">← Retour</a>
+      <a class="fagni-btn fagni-btn--primary" href="{% url 'orders:client_new_order' %}">➕ Nouvelle commande</a>
+    </div>
+  </div>
+
+  {% if profile %}
+    <div class="cr-grid">
+      <div class="cr-stack">
+        <section class="cr-card cr-hero">
+          <div class="cr-eyebrow">Code de parrainage actif</div>
+          <div class="cr-code">{{ profile.referral_code }}</div>
+          <div class="cr-link">{{ referral_url }}</div>
+
+          <div style="margin-top:16px;">
+  <a class="fagni-btn fagni-btn--primary" style="font-size:16px;padding:14px 18px;" href="{{ referral_whatsapp_url }}" target="_blank">
+    🚀 Inviter maintenant et gagner de l’argent
+  </a>
+</div>
+<div class="cr-hero-actions">
+            <a class="fagni-btn fagni-btn--light" href="{{ referral_whatsapp_url }}" target="_blank" rel="noopener">
+              📲 Partager sur WhatsApp
+            </a>
+            <a class="fagni-btn fagni-btn--light" href="{% url 'orders:client_wallet' %}">
+              💼 Voir mon wallet
+            </a>
+          </div>
+        
+<div class="cr-note" style="margin-top:14px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);color:#fff;">
+  ⚡ Plus tu invites tôt, plus tu développes ton réseau et tes revenus.
+</div>
+
+</section>
+
+        <div class="cr-mini-grid">
+          <section class="cr-mini">
+            <div class="cr-mini-k">Filleuls directs</div>
+            <div class="cr-mini-v">{{ direct_referrals|length }}</div>
+            <div class="cr-mini-m">Clients que tu as déjà rattachés à ton code.</div>
+          </section>
+
+          <section class="cr-mini">
+            <div class="cr-mini-k">Commissions cumulées</div>
+            <div class="cr-mini-v">{{ total_commissions|floatformat:0|intcomma }} FCFA</div>
+            <div class="cr-mini-m">Montant généré par ton activité de parrainage.</div>
+          </section>
+
+          <section class="cr-mini">
+            <div class="cr-mini-k">Profil</div>
+            <div class="cr-mini-v" style="font-size:20px;">{{ profile.get_actor_type_display }}</div>
+            <div class="cr-mini-m">Ton statut actuel dans le programme FAGNI.</div>
+          </section>
+        </div>
+
+        <section class="cr-card">
+          <h2 class="cr-section-title">Mes filleuls récents</h2>
+          <div class="cr-section-sub">Les personnes déjà rattachées à ton code de parrainage.</div>
+
+          {% if direct_referrals %}
+            <div class="cr-list">
+              {% for child in direct_referrals %}
+                <div class="cr-row">
+                  <div>
+                    <div class="cr-row-k">
+                      {% if child.customer %}
+                        {{ child.customer.name|default:"Client FAGNI" }}
+                      {% else %}
+                        Profil affilié
+                      {% endif %}
+                    </div>
+                    <div class="cr-row-m">
+                      Code : {{ child.referral_code }}<br>
+                      Créé le {{ child.created_at|date:"d/m/Y H:i" }}
+                    </div>
+                  </div>
+                  <div class="cr-row-v">
+                    {% if child.customer and child.customer.phone %}
+                      {{ child.customer.phone }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="cr-empty">Aucun filleul direct pour le moment. Commence par partager ton lien.</div>
+          {% endif %}
+        </section>
+
+        <section class="cr-card">
+          <h2 class="cr-section-title">Dernières commissions</h2>
+<div class="cr-note">
+  💰 Chaque commande de ton réseau te génère une commission automatiquement.
+</div>
+
+          <div class="cr-section-sub">Les gains liés aux commandes de ton réseau.</div>
+
+          {% if commissions %}
+            <div class="cr-list">
+              {% for c in commissions %}
+                <div class="cr-row">
+                  <div>
+                    <div class="cr-row-k">Commission niveau {{ c.level }}</div>
+                    <div class="cr-row-m">
+                      {{ c.created_at|date:"d/m/Y H:i" }}
+                      {% if c.order %} • Commande {{ c.order.code|default:c.order.id }}{% endif %}
+                    </div>
+                  </div>
+                  <div class="cr-row-v">+ {{ c.commission_amount|floatformat:0|intcomma }} FCFA</div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="cr-empty">Aucune commission disponible pour le moment.</div>
+          {% endif %}
+        </section>
+      </div>
+
+      <div class="cr-stack">
+        <section class="cr-card">
+          <h2 class="cr-section-title">Résumé rapide</h2>
+<div class="cr-note">
+  🚀 10 filleuls actifs peuvent générer plusieurs dizaines de milliers FCFA par mois.
+</div>
+
+          <div class="cr-list">
+            <div class="cr-row">
+              <div>
+                <div class="cr-row-k">Code actif</div>
+                <div class="cr-row-m">Ton identifiant de partage FAGNI</div>
+              </div>
+              <div class="cr-row-v">{{ profile.referral_code }}</div>
+            </div>
+
+            <div class="cr-row">
+              <div>
+                <div class="cr-row-k">Canal conseillé</div>
+                <div class="cr-row-m">Partage simple et rapide</div>
+              </div>
+              <div class="cr-row-v"><span class="cr-pill">WhatsApp</span></div>
+            </div>
+
+            <div class="cr-row">
+              <div>
+                <div class="cr-row-k">Potentiel de gain</div>
+                <div class="cr-row-m">Projection simple de démarrage</div>
+              </div>
+              <div class="cr-row-v">{{ projected_gain_low|intcomma }} à {{ projected_gain_high|intcomma }} FCFA</div>
+            </div>
+          </div>
+
+          <div class="cr-note">
+            Plus tu partages ton code, plus tu peux générer des commissions sur les commandes de ton réseau.
+          </div>
+        </section>
+
+        <section class="cr-card">
+          <h2 class="cr-section-title">Comment ça marche</h2>
+          <div class="cr-steps">
+            <div class="cr-step">
+              <div class="cr-step-title">1. Partage ton code</div>
+              <div class="cr-step-desc">Envoie ton lien FAGNI à tes proches via WhatsApp ou tout autre canal.</div>
+            </div>
+            <div class="cr-step">
+              <div class="cr-step-title">2. Tes proches créent leur compte</div>
+              <div class="cr-step-desc">Ils passent commande avec ton lien ou ton code de parrainage.</div>
+            </div>
+            <div class="cr-step">
+              <div class="cr-step-title">3. Tu gagnes des commissions</div>
+              <div class="cr-step-desc">Quand leurs commandes sont validées, tes commissions remontent dans ton espace.</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="cr-card">
+          <h2 class="cr-section-title">Actions utiles</h2>
+          <div class="cr-list">
+            <div class="cr-row">
+              <div>
+                <div class="cr-row-k">Inviter mes proches</div>
+                <div class="cr-row-m">Diffuse ton parrainage immédiatement</div>
+              </div>
+              <a class="fagni-btn fagni-btn--primary" href="{{ referral_whatsapp_url }}" target="_blank" rel="noopener">Partager</a>
+            </div>
+
+            <div class="cr-row">
+              <div>
+                <div class="cr-row-k">Voir mon wallet</div>
+                <div class="cr-row-m">Suivre mes mouvements et avantages</div>
+              </div>
+              <a class="fagni-btn fagni-btn--light" href="{% url 'orders:client_wallet' %}">Wallet</a>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  {% else %}
+    <div class="cr-grid">
+      <div class="cr-stack">
+        <section class="cr-card cr-hero">
+          <div class="cr-eyebrow">Programme de parrainage FAGNI</div>
+          <div class="cr-code" style="font-size:24px;">Invite, fais commander, gagne</div>
+          <div class="cr-link">Transforme ton réseau en source de revenus simple avec FAGNI.</div>
+
+          <div class="cr-hero-actions">
+            <a class="fagni-btn fagni-btn--primary" href="?activate_ref=1">
+              🔓 Activer mon code de parrainage
+            </a>
+            <a class="fagni-btn fagni-btn--light" href="{% url 'orders:client_new_order' %}">
+              ➕ Créer une commande
+            </a>
+          </div>
+        </section>
+
+        <div class="cr-mini-grid">
+          <section class="cr-mini">
+            <div class="cr-mini-k">Objectif</div>
+            <div class="cr-mini-v" style="font-size:20px;">Développer ton réseau</div>
+            <div class="cr-mini-m">Invite tes proches à utiliser FAGNI simplement.</div>
+          </section>
+
+          <section class="cr-mini">
+            <div class="cr-mini-k">Potentiel</div>
+            <div class="cr-mini-v">{{ projected_gain_low|intcomma }} à {{ projected_gain_high|intcomma }} FCFA</div>
+            <div class="cr-mini-m">Projection indicative quand tes filleuls commencent à commander.</div>
+          </section>
+
+          <section class="cr-mini">
+            <div class="cr-mini-k">Activation</div>
+            <div class="cr-mini-v" style="font-size:20px;">En 1 clic</div>
+            <div class="cr-mini-m">Ton code personnel peut être généré immédiatement.</div>
+          </section>
+        </div>
+
+        <section class="cr-card">
+          <h2 class="cr-section-title">Pourquoi activer mon code ?</h2>
+          <div class="cr-list">
+            <div class="cr-row">
+              <div>
+                <div class="cr-row-k">💰 Gagner des commissions</div>
+                <div class="cr-row-m">Tu peux toucher des gains sur les commandes de ton réseau.</div>
+              </div>
+            </div>
+            <div class="cr-row">
+              <div>
+                <div class="cr-row-k">📲 Partager facilement</div>
+                <div class="cr-row-m">Ton lien est prêt pour WhatsApp et les partages rapides.</div>
+              </div>
+            </div>
+            <div class="cr-row">
+              <div>
+                <div class="cr-row-k">🚀 Démarrer maintenant</div>
+                <div class="cr-row-m">Ton profil peut être activé sans procédure complexe.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="cr-stack">
+        <section class="cr-card">
+          <h2 class="cr-section-title">Activation rapide</h2>
+          <div class="cr-empty" style="margin-top:14px;">
+            Tu n’as pas encore activé ton profil de parrainage.
+
+            <br><br>
+            👉 Invite tes proches à utiliser FAGNI<br>
+            👉 Gagne des commissions sur leurs commandes<br>
+            👉 Crée une source de revenus complémentaire
+
+            <br><br>
+            <a class="fagni-btn fagni-btn--primary" href="?activate_ref=1">
+              🔓 Activer mon code de parrainage
+            </a>
+          </div>
+        </section>
+
+        <section class="cr-card">
+          <h2 class="cr-section-title">Comment ça marche</h2>
+          <div class="cr-steps">
+            <div class="cr-step">
+              <div class="cr-step-title">1. Active ton profil</div>
+              <div class="cr-step-desc">Un code personnel FAGNI est généré pour toi.</div>
+            </div>
+            <div class="cr-step">
+              <div class="cr-step-title">2. Partage ton lien</div>
+              <div class="cr-step-desc">Diffuse ton code à tes proches pour qu’ils rejoignent FAGNI.</div>
+            </div>
+            <div class="cr-step">
+              <div class="cr-step-title">3. Suis tes gains</div>
+              <div class="cr-step-desc">Tes futurs gains apparaîtront ici et dans ton wallet client.</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

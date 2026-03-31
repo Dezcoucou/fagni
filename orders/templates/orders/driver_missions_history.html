@@ -3,45 +3,488 @@
 
 {% block title %}Mes missions – Historique{% endblock %}
 
+{% block page_css %}
+<style>
+  body{
+    background:
+      radial-gradient(circle at top right, rgba(37,99,235,.06), transparent 24%),
+      radial-gradient(circle at top left, rgba(249,115,22,.06), transparent 24%),
+      #f8fafc;
+  }
+
+  .missions-page{
+    max-width:1180px;
+    margin:0 auto;
+    padding:10px 6px 24px;
+  }
+
+  .hero{
+    display:grid;
+    grid-template-columns:minmax(0,1.35fr) minmax(280px,.9fr);
+    gap:14px;
+    margin-bottom:16px;
+  }
+
+  .hero-main,
+  .hero-side{
+    border-radius:24px;
+    padding:20px 18px;
+    box-shadow:0 14px 30px rgba(15,23,42,.10);
+  }
+
+  .hero-main{
+    background:linear-gradient(135deg,#0f172a 0%, #172554 48%, #1d4ed8 100%);
+    color:#fff;
+    border:1px solid rgba(255,255,255,.08);
+  }
+
+  .hero-side{
+    background:linear-gradient(180deg,#ffffff 0%, #fbfcfe 100%);
+    border:1px solid #e8eef5;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    gap:12px;
+  }
+
+  .hero-eyebrow{
+    font-size:11px;
+    font-weight:900;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:rgba(255,255,255,.72);
+    margin-bottom:8px;
+  }
+
+  .hero-title{
+    margin:0;
+    font-size:28px;
+    line-height:1.08;
+    font-weight:900;
+    color:#fff;
+  }
+
+  .hero-subtitle{
+    margin:10px 0 0;
+    font-size:14px;
+    line-height:1.55;
+    color:rgba(255,255,255,.84);
+    max-width:700px;
+  }
+
+  .hero-badges{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:16px;
+  }
+
+  .hero-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 12px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:900;
+    border:1px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.10);
+    color:#fff;
+  }
+
+  .hero-dot{
+    width:8px;
+    height:8px;
+    border-radius:999px;
+    background:#22c55e;
+    display:inline-block;
+    box-shadow:0 0 0 4px rgba(34,197,94,.18);
+  }
+
+  .hero-side-title{
+    font-size:12px;
+    font-weight:900;
+    text-transform:uppercase;
+    letter-spacing:.07em;
+    color:#64748b;
+  }
+
+  .hero-side-driver{
+    font-size:22px;
+    line-height:1.15;
+    font-weight:900;
+    color:#0f172a;
+  }
+
+  .hero-actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+
+  .btn-ui{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:38px;
+    padding:9px 14px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:900;
+    text-decoration:none;
+    border:1px solid transparent;
+    box-shadow:0 4px 12px rgba(15,23,42,.06);
+  }
+
+  .btn-ui-light{
+    background:#fff;
+    border-color:#e5e7eb;
+    color:#334155;
+  }
+
+  .btn-ui-primary{
+    background:linear-gradient(90deg,#f97316,#2563eb);
+    color:#fff;
+  }
+
+  .panel{
+    background:linear-gradient(180deg,#ffffff 0%, #fbfcfe 100%);
+    border:1px solid #e8eef5;
+    border-radius:22px;
+    padding:14px;
+    box-shadow:0 10px 24px rgba(15,23,42,.05);
+    margin-bottom:14px;
+  }
+
+  .filters-grid{
+    display:grid;
+    grid-template-columns:repeat(12,minmax(0,1fr));
+    gap:10px;
+    align-items:end;
+  }
+
+  .field{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+
+  .field label{
+    font-size:11px;
+    color:#64748b;
+    font-weight:900;
+  }
+
+  .field input,
+  .field select{
+    width:100%;
+    padding:10px 12px;
+    border:1px solid #e5e7eb;
+    border-radius:12px;
+    background:#fff;
+    font-size:13px;
+    color:#111827;
+  }
+
+  .filters-actions{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+
+  .kpi-grid{
+    display:grid;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:10px;
+    margin-bottom:14px;
+  }
+
+  .kpi{
+    background:linear-gradient(180deg,#ffffff 0%, #fbfcfe 100%);
+    border:1px solid #e8eef5;
+    border-radius:18px;
+    padding:12px 14px;
+    box-shadow:0 8px 20px rgba(15,23,42,.05);
+  }
+
+  .kpi-label{
+    font-size:11px;
+    color:#64748b;
+    font-weight:900;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+  }
+
+  .kpi-value{
+    margin-top:6px;
+    font-size:18px;
+    font-weight:950;
+    color:#111827;
+  }
+
+  .kpi-value.green{ color:#166534; }
+  .kpi-value.orange{ color:#9a3412; }
+
+  .mission-card{
+    background:#fff;
+    border:1px solid #e5e7eb;
+    border-radius:18px;
+    padding:12px;
+    margin-bottom:10px;
+    box-shadow:0 6px 16px rgba(15,23,42,.04);
+  }
+
+  .mission-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  .mission-code{
+    font-weight:900;
+    font-size:13px;
+    color:#111827;
+  }
+
+  .mission-date{
+    font-size:11px;
+    color:#94a3b8;
+    margin-top:2px;
+  }
+
+  .mission-head-right{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+
+  .pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    min-height:26px;
+    padding:4px 10px;
+    border-radius:999px;
+    font-size:11px;
+    font-weight:900;
+    border:1px solid transparent;
+    white-space:nowrap;
+  }
+
+  .pill.pending{
+    background:#fffbeb;
+    color:#92400e;
+    border-color:#fde68a;
+  }
+
+  .pill.progress{
+    background:#dbeafe;
+    color:#1d4ed8;
+    border-color:#bfdbfe;
+  }
+
+  .pill.done{
+    background:#ecfdf3;
+    color:#166534;
+    border-color:#bbf7d0;
+  }
+
+  .pill.default{
+    background:#f3f4f6;
+    color:#374151;
+    border-color:#e5e7eb;
+  }
+
+  .mission-stats{
+    margin-top:10px;
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:10px;
+  }
+
+  .stat-box{
+    border:1px solid #eef2f7;
+    border-radius:14px;
+    padding:10px 12px;
+    background:#fff;
+  }
+
+  .stat-label{
+    font-size:11px;
+    color:#64748b;
+  }
+
+  .stat-value{
+    margin-top:4px;
+    font-weight:950;
+    color:#111827;
+    font-size:15px;
+  }
+
+  .stat-value.green{ color:#166534; }
+  .stat-value.orange{ color:#9a3412; }
+
+  .legs-title{
+    margin-top:10px;
+    margin-bottom:6px;
+    font-size:12px;
+    font-weight:900;
+    color:#111827;
+  }
+
+  .legs-list{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+
+  .leg-card{
+    border:1px solid #eef2f7;
+    border-radius:12px;
+    padding:8px 10px;
+    background:#fff;
+  }
+
+  .leg-head{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  .leg-title{
+    font-weight:900;
+    font-size:12px;
+    color:#111827;
+  }
+
+  .leg-meta{
+    font-size:11px;
+    color:#64748b;
+    margin-top:2px;
+  }
+
+  .empty-state{
+    border:1px dashed #e5e7eb;
+    border-radius:16px;
+    padding:16px;
+    color:#94a3b8;
+    background:#fff;
+  }
+
+  .pagination-wrap{
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    margin-top:14px;
+    flex-wrap:wrap;
+  }
+
+  .page-chip{
+    padding:8px 12px;
+    border:1px solid #e5e7eb;
+    border-radius:999px;
+    background:#f9fafb;
+    font-weight:900;
+    font-size:12px;
+  }
+
+  @media (max-width:1100px){
+    .hero{
+      grid-template-columns:1fr;
+    }
+
+    .kpi-grid{
+      grid-template-columns:repeat(2,minmax(0,1fr));
+    }
+
+    .mission-stats{
+      grid-template-columns:repeat(2,minmax(0,1fr));
+    }
+  }
+
+  @media (max-width:760px){
+    .filters-grid{
+      grid-template-columns:1fr;
+    }
+
+    .kpi-grid,
+    .mission-stats{
+      grid-template-columns:1fr;
+    }
+
+    .filters-actions,
+    .hero-actions{
+      justify-content:stretch;
+    }
+
+    .filters-actions .btn-ui,
+    .hero-actions .btn-ui{
+      flex:1 1 160px;
+    }
+
+    .hero-title{
+      font-size:24px;
+    }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container" style="max-width:980px;margin:0 auto;padding:14px 10px 26px;">
+<div class="missions-page">
 
-  <!-- Header -->
-  <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
-    <div>
-      <h1 style="margin:0;font-size:20px;font-weight:900;letter-spacing:-0.2px;">📜 Mes missions</h1>
-      <p style="margin:6px 0 0;color:#64748b;font-size:13px;">
-        Historique (lecture seule) : potentiel vs payé, basé sur les legs et le wallet.
+  <section class="hero">
+    <div class="hero-main">
+      <div class="hero-eyebrow">FAGNI • Historique livreur</div>
+      <h1 class="hero-title">📜 Mes missions</h1>
+      <p class="hero-subtitle">
+        Historique lecture seule de tes missions, avec potentiel, payé, reste à gagner et détail des tronçons.
       </p>
-    </div>
 
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-      <a class="btn btn-light" href="{% url 'orders:driver_app' %}{% if selected_driver_id %}?driver_id={{ selected_driver_id }}{% endif %}">
-        ← Retour App livreur
-      </a>
-
-      <a class="btn btn-light" href="{% url 'orders:driver_wallet' %}">
-        💼 Wallet
-      </a>
-
-      {% if driver %}
-        <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:999px;background:#f9fafb;font-weight:900;font-size:12px;">
-          🚴‍♂️ {{ driver.name|default:"Livreur" }}
+      <div class="hero-badges">
+        <span class="hero-badge">
+          <span class="hero-dot"></span>
+          Vue synchronisée
         </span>
-      {% endif %}
+        {% if driver %}
+          <span class="hero-badge">🚴‍♂️ {{ driver.name|default:"Livreur" }}</span>
+        {% endif %}
+      </div>
     </div>
-  </div>
 
-  <!-- ✅ FILTRES V2.2 -->
-  <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:12px 12px;margin-bottom:12px;box-shadow:0 1px 4px rgba(15,23,42,0.05);">
-    <form method="get" style="display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:10px;align-items:end;">
+    <div class="hero-side">
+      <div>
+        <div class="hero-side-title">Livreur actif</div>
+        <div class="hero-side-driver">
+          {% if driver %}{{ driver.name|default:"Livreur" }}{% else %}Profil non défini{% endif %}
+        </div>
+      </div>
+
+      <div class="hero-actions">
+        <a class="btn-ui btn-ui-light" href="{% url 'orders:driver_app' %}{% if selected_driver_id %}?driver_id={{ selected_driver_id }}{% endif %}">
+          ← Retour App livreur
+        </a>
+
+        <a class="btn-ui btn-ui-light" href="{% url 'wallets:driver_wallet_dashboard' %}{% if selected_driver_id %}?driver_id={{ selected_driver_id }}{% endif %}">
+          💼 Wallet
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <div class="panel">
+    <form method="get" class="filters-grid">
       {% if selected_driver_id %}
         <input type="hidden" name="driver_id" value="{{ selected_driver_id }}">
       {% endif %}
 
-      <div style="grid-column:span 3;">
-        <label style="font-size:11px;color:#64748b;font-weight:900;">Statut</label>
-        <select name="status" class="form-control" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:12px;">
+      <div class="field" style="grid-column:span 3;">
+        <label>Statut</label>
+        <select name="status">
           <option value="all" {% if status_filter == "all" %}selected{% endif %}>Tous</option>
           <option value="pending" {% if status_filter == "pending" %}selected{% endif %}>En attente</option>
           <option value="in_progress" {% if status_filter == "in_progress" %}selected{% endif %}>En cours</option>
@@ -50,30 +493,29 @@
         </select>
       </div>
 
-      <div style="grid-column:span 5;">
-        <label style="font-size:11px;color:#64748b;font-weight:900;">Recherche</label>
+      <div class="field" style="grid-column:span 5;">
+        <label>Recherche</label>
         <input
           type="text"
           name="q"
           value="{{ q|default:'' }}"
           placeholder="Code, nom, téléphone, adresse…"
-          style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:12px;"
         >
       </div>
 
-      <div style="grid-column:span 2;">
-        <label style="font-size:11px;color:#64748b;font-weight:900;">Du</label>
-        <input type="date" name="from" value="{{ date_from|default:'' }}" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:12px;">
+      <div class="field" style="grid-column:span 2;">
+        <label>Du</label>
+        <input type="date" name="from" value="{{ date_from|default:'' }}">
       </div>
 
-      <div style="grid-column:span 2;">
-        <label style="font-size:11px;color:#64748b;font-weight:900;">Au</label>
-        <input type="date" name="to" value="{{ date_to|default:'' }}" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:12px;">
+      <div class="field" style="grid-column:span 2;">
+        <label>Au</label>
+        <input type="date" name="to" value="{{ date_to|default:'' }}">
       </div>
 
-      <div style="grid-column:span 4;">
-        <label style="font-size:11px;color:#64748b;font-weight:900;">Tri</label>
-        <select name="sort" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:12px;">
+      <div class="field" style="grid-column:span 4;">
+        <label>Tri</label>
+        <select name="sort">
           <option value="newest" {% if sort == "newest" %}selected{% endif %}>Plus récentes</option>
           <option value="oldest" {% if sort == "oldest" %}selected{% endif %}>Plus anciennes</option>
           <option value="remaining_desc" {% if sort == "remaining_desc" %}selected{% endif %}>Reste ↓</option>
@@ -84,144 +526,134 @@
       <div style="grid-column:span 4;display:flex;align-items:center;gap:10px;padding:10px 0;">
         <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:900;color:#111827;">
           <input type="checkbox" name="min_remaining" value="1" {% if min_remaining %}checked{% endif %}>
-          Reste > 0 uniquement
+          Reste &gt; 0 uniquement
         </label>
       </div>
 
-      <div style="grid-column:span 4;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-        <button class="btn btn-primary" type="submit">Filtrer</button>
+      <div class="filters-actions" style="grid-column:span 4;">
+        <button class="btn-ui btn-ui-primary" type="submit">Filtrer</button>
 
-        <a class="btn btn-light"
+        <a class="btn-ui btn-ui-light"
            href="{% url 'orders:driver_missions_history' %}{% if selected_driver_id %}?driver_id={{ selected_driver_id }}{% endif %}">
           Réinitialiser
         </a>
 
         {% if qs_params %}
-          <a class="btn btn-light" href="?{{ qs_params }}&export=csv">Export CSV</a>
-          <a class="btn btn-light" href="?{{ qs_params }}&export=xlsx">Export XLSX</a>
+          <a class="btn-ui btn-ui-light" href="?{{ qs_params }}&export=csv">Export CSV</a>
+          <a class="btn-ui btn-ui-light" href="?{{ qs_params }}&export=xlsx">Export XLSX</a>
         {% else %}
-          <a class="btn btn-light" href="?export=csv{% if selected_driver_id %}&driver_id={{ selected_driver_id }}{% endif %}">Export CSV</a>
-          <a class="btn btn-light" href="?export=xlsx{% if selected_driver_id %}&driver_id={{ selected_driver_id }}{% endif %}">Export XLSX</a>
+          <a class="btn-ui btn-ui-light" href="?export=csv{% if selected_driver_id %}&driver_id={{ selected_driver_id }}{% endif %}">Export CSV</a>
+          <a class="btn-ui btn-ui-light" href="?export=xlsx{% if selected_driver_id %}&driver_id={{ selected_driver_id }}{% endif %}">Export XLSX</a>
         {% endif %}
       </div>
     </form>
   </div>
 
-  <!-- ✅ KPI V2.5 (sur items filtrés) -->
-  <div style="margin-bottom:12px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;">
-    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:10px 12px;box-shadow:0 1px 4px rgba(15,23,42,0.05);">
-      <div style="font-size:11px;color:#64748b;font-weight:900;">Missions</div>
-      <div style="font-weight:950;color:#111827;font-size:16px;">{{ kpi_total|default:0 }}</div>
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">Missions</div>
+      <div class="kpi-value">{{ kpi_total|default:0 }}</div>
     </div>
-    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:10px 12px;box-shadow:0 1px 4px rgba(15,23,42,0.05);">
-      <div style="font-size:11px;color:#64748b;font-weight:900;">Potentiel</div>
-      <div style="font-weight:950;color:#111827;font-size:16px;">{{ kpi_potential|floatformat:0 }} FCFA</div>
+    <div class="kpi">
+      <div class="kpi-label">Potentiel</div>
+      <div class="kpi-value">{{ kpi_potential|floatformat:0 }} FCFA</div>
     </div>
-    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:10px 12px;box-shadow:0 1px 4px rgba(15,23,42,0.05);">
-      <div style="font-size:11px;color:#64748b;font-weight:900;">Payé</div>
-      <div style="font-weight:950;color:#166534;font-size:16px;">{{ kpi_paid|floatformat:0 }} FCFA</div>
+    <div class="kpi">
+      <div class="kpi-label">Payé</div>
+      <div class="kpi-value green">{{ kpi_paid|floatformat:0 }} FCFA</div>
     </div>
-    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:10px 12px;box-shadow:0 1px 4px rgba(15,23,42,0.05);">
-      <div style="font-size:11px;color:#64748b;font-weight:900;">Reste</div>
-      <div style="font-weight:950;color:#9a3412;font-size:16px;">{{ kpi_remaining|floatformat:0 }} FCFA</div>
+    <div class="kpi">
+      <div class="kpi-label">Reste</div>
+      <div class="kpi-value orange">{{ kpi_remaining|floatformat:0 }} FCFA</div>
     </div>
-    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:10px 12px;box-shadow:0 1px 4px rgba(15,23,42,0.05);">
-      <div style="font-size:11px;color:#64748b;font-weight:900;">Km</div>
-      <div style="font-weight:950;color:#111827;font-size:16px;">{{ kpi_km|floatformat:2 }} km</div>
+    <div class="kpi">
+      <div class="kpi-label">Km</div>
+      <div class="kpi-value">{{ kpi_km|floatformat:2 }} km</div>
     </div>
   </div>
 
   {% for it in page_obj.object_list %}
-    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:12px 12px;margin-bottom:10px;box-shadow:0 1px 4px rgba(15,23,42,0.05);">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+    <div class="mission-card">
+      <div class="mission-head">
         <div>
-          <div style="font-weight:900;font-size:13px;color:#111827;">Course {{ it.code }}</div>
-          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Créée le {{ it.created_at }}</div>
+          <div class="mission-code">Course {{ it.code }}</div>
+          <div class="mission-date">Créée le {{ it.created_at }}</div>
         </div>
 
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <div class="mission-head-right">
           {% if it.mission_status == "pending" %}
-            <span style="padding:4px 10px;border-radius:999px;font-size:11px;font-weight:900;background:#fffbeb;color:#92400e;border:1px solid #fde68a;">⏳ En attente</span>
+            <span class="pill pending">⏳ En attente</span>
           {% elif it.mission_status == "in_progress" %}
-            <span style="padding:4px 10px;border-radius:999px;font-size:11px;font-weight:900;background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe;">🚚 En cours</span>
+            <span class="pill progress">🚚 En cours</span>
           {% elif it.mission_status == "done" %}
-            <span style="padding:4px 10px;border-radius:999px;font-size:11px;font-weight:900;background:#ecfdf3;color:#166534;border:1px solid #bbf7d0;">✅ Terminée</span>
+            <span class="pill done">✅ Terminée</span>
           {% else %}
-            <span style="padding:4px 10px;border-radius:999px;font-size:11px;font-weight:900;background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;">{{ it.mission_status }}</span>
+            <span class="pill default">{{ it.mission_status }}</span>
           {% endif %}
 
-          <a class="btn btn-primary"
+          <a class="btn-ui btn-ui-primary"
              href="{% url 'orders:driver_order_detail' order_id=it.order.id %}{% if qs_params %}?{{ qs_params }}{% elif selected_driver_id %}?driver_id={{ selected_driver_id }}{% endif %}">
             Ouvrir →
           </a>
         </div>
       </div>
 
-      <div style="margin-top:10px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;">
-        <div style="border:1px solid #eef2f7;border-radius:14px;padding:10px 12px;">
-          <div style="font-size:11px;color:#64748b;">Potentiel (legs)</div>
-          <div style="font-weight:950;color:#111827;">{{ it.potential|floatformat:0 }} FCFA</div>
+      <div class="mission-stats">
+        <div class="stat-box">
+          <div class="stat-label">Potentiel (legs)</div>
+          <div class="stat-value">{{ it.potential|floatformat:0 }} FCFA</div>
         </div>
-        <div style="border:1px solid #eef2f7;border-radius:14px;padding:10px 12px;">
-          <div style="font-size:11px;color:#64748b;">Payé (wallet net)</div>
-          <div style="font-weight:950;color:#166534;">{{ it.paid|floatformat:0 }} FCFA</div>
+        <div class="stat-box">
+          <div class="stat-label">Payé (wallet net)</div>
+          <div class="stat-value green">{{ it.paid|floatformat:0 }} FCFA</div>
         </div>
-        <div style="border:1px solid #eef2f7;border-radius:14px;padding:10px 12px;">
-          <div style="font-size:11px;color:#64748b;">Reste à gagner</div>
-          <div style="font-weight:950;color:#9a3412;">{{ it.remaining|floatformat:0 }} FCFA</div>
+        <div class="stat-box">
+          <div class="stat-label">Reste à gagner</div>
+          <div class="stat-value orange">{{ it.remaining|floatformat:0 }} FCFA</div>
         </div>
-        <div style="border:1px solid #eef2f7;border-radius:14px;padding:10px 12px;">
-          <div style="font-size:11px;color:#64748b;">Km (total)</div>
-          <div style="font-weight:950;color:#111827;">{{ it.total_km|floatformat:2 }} km</div>
+        <div class="stat-box">
+          <div class="stat-label">Km (total)</div>
+          <div class="stat-value">{{ it.total_km|floatformat:2 }} km</div>
         </div>
       </div>
 
-      <div style="margin-top:10px;">
-        <div style="font-size:12px;font-weight:900;color:#111827;margin-bottom:6px;">Tronçons (legs)</div>
+      <div class="legs-title">Tronçons (legs)</div>
 
-        {% if it.legs %}
-          <div style="display:flex;flex-direction:column;gap:6px;">
-            {% for l in it.legs %}
-              <div style="border:1px solid #eef2f7;border-radius:12px;padding:8px 10px;background:#fff;">
-                <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-                  <div style="font-weight:900;font-size:12px;">
-                    {% if l.leg_type == "pickup" %}🟣 Pickup{% elif l.leg_type == "return" %}🟢 Return{% else %}🚚 {{ l.leg_type }}{% endif %}
-                    <span style="font-weight:700;color:#64748b;">#{{ l.id }}</span>
-                  </div>
-                  <div style="font-size:12px;font-weight:900;">
-                    {{ l.driver_amount|floatformat:0 }} FCFA • {{ l.distance_km|floatformat:2 }} km
-                  </div>
+      {% if it.legs %}
+        <div class="legs-list">
+          {% for l in it.legs %}
+            <div class="leg-card">
+              <div class="leg-head">
+                <div class="leg-title">
+                  {% if l.leg_type == "pickup" %}🟣 Pickup{% elif l.leg_type == "return" %}🟢 Return{% else %}🚚 {{ l.leg_type }}{% endif %}
+                  <span style="font-weight:700;color:#64748b;">#{{ l.id }}</span>
                 </div>
-                <div style="font-size:11px;color:#64748b;margin-top:2px;">
-                  Statut : <strong style="color:#111827;">{{ l.status }}</strong>
-                  {% if l.started_at %} • Début : {{ l.started_at }}{% endif %}
-                  {% if l.finished_at %} • Fin : {{ l.finished_at }}{% endif %}
-                </div>
+                <div class="leg-title">{{ l.driver_amount|floatformat:0 }} FCFA • {{ l.distance_km|floatformat:2 }} km</div>
               </div>
-            {% endfor %}
-          </div>
-        {% else %}
-          <div style="font-size:12px;color:#94a3b8;">Aucun tronçon trouvé pour cette commande.</div>
-        {% endif %}
-      </div>
-
+              <div class="leg-meta">
+                Statut : <strong style="color:#111827;">{{ l.status }}</strong>
+                {% if l.started_at %} • Début : {{ l.started_at }}{% endif %}
+                {% if l.finished_at %} • Fin : {{ l.finished_at }}{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state">Aucun tronçon trouvé pour cette commande.</div>
+      {% endif %}
     </div>
   {% empty %}
-    <div style="border:1px dashed #e5e7eb;border-radius:16px;padding:16px;color:#94a3b8;">
-      Aucune mission pour ce livreur.
-    </div>
+    <div class="empty-state">Aucune mission pour ce livreur.</div>
   {% endfor %}
 
   {% if page_obj.paginator.num_pages > 1 %}
-    <div style="display:flex;justify-content:center;gap:10px;margin-top:14px;flex-wrap:wrap;">
+    <div class="pagination-wrap">
       {% if page_obj.has_previous %}
-        <a class="btn btn-light" href="?{% if qs_params %}{{ qs_params }}&{% endif %}page={{ page_obj.previous_page_number }}">← Précédent</a>
+        <a class="btn-ui btn-ui-light" href="?{% if qs_params %}{{ qs_params }}&{% endif %}page={{ page_obj.previous_page_number }}">← Précédent</a>
       {% endif %}
-      <span style="padding:8px 12px;border:1px solid #e5e7eb;border-radius:999px;background:#f9fafb;font-weight:900;font-size:12px;">
-        Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
-      </span>
+      <span class="page-chip">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
       {% if page_obj.has_next %}
-        <a class="btn btn-light" href="?{% if qs_params %}{{ qs_params }}&{% endif %}page={{ page_obj.next_page_number }}">Suivant →</a>
+        <a class="btn-ui btn-ui-light" href="?{% if qs_params %}{{ qs_params }}&{% endif %}page={{ page_obj.next_page_number }}">Suivant →</a>
       {% endif %}
     </div>
   {% endif %}

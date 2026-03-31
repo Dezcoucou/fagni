@@ -702,6 +702,12 @@
         </div>
     </div>
 
+    {% if order.status == "done" %}
+        <div style="margin:0 0 14px;padding:12px 14px;border-radius:16px;background:#ecfdf5;border:1px solid #bbf7d0;color:#166534;font-weight:900;">
+            ✅ Cette course est déjà totalement terminée. Aucune action chauffeur n’est encore requise.
+        </div>
+    {% endif %}
+
     {# ✅ Bandeau UX : course non chiffrée #}
     {% with tc=total_client_ttc|default:0 di=driver_income|default:0 %}
         {% if tc <= 0 or di <= 0 %}
@@ -749,7 +755,7 @@
                     </div>
                     <div>
                         <div class="label">Adresse de collecte</div>
-                        <div class="value">{{ order.pickup_address|default:order.customer.address|default:"—" }}</div>
+                        <div class="value">{{ display_address }}</div>
                     </div>
                     <div>
                         <div class="label">Adresse de livraison</div>
@@ -1025,6 +1031,10 @@
                                             {% csrf_token %}
                                             <button type="submit" class="btn-xxs">❌ Annuler</button>
                                         </form>
+                                    {% elif st == "done" %}
+                                        <div class="callout">
+                                            ✅ Tronçon déjà terminé.
+                                        </div>
                                     {% endif %}
 
                                 {% endif %}
@@ -1605,6 +1615,21 @@
     }
 
     fetch(url, {credentials:"same-origin"})
+.then(async (res) => {
+    let data = {};
+    try {
+        data = await res.json();
+    } catch(e) {}
+
+    if (!res.ok || !data.ok) {
+        console.warn("⚠️ Action échouée", data);
+    }
+
+    window.location.reload();
+}).catch(err => {
+    console.error("❌ erreur fetch:", err);
+    window.location.reload();
+})
       .then(function(r){
         var ct = (r.headers.get("content-type") || "").toLowerCase();
         if(ct.indexOf("application/json") < 0) throw new Error("non-json");

@@ -1,0 +1,74 @@
+/* =========================
+   FAGNI DESIGN SYSTEM
+========================= */
+
+/* ===== Cards ===== */
+.fg-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  margin-bottom: 16px;
+}
+
+/* ===== Titles ===== */
+.fg-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+/* ===== Rows ===== */
+.fg-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.fg-label {
+  color: #777;
+}
+
+.fg-value {
+  font-weight: 500;
+}
+
+/* ===== Amount highlight ===== */
+.fg-amount {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* ===== Status ===== */
+.fg-badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fg-badge-ok {
+  background: #e6f7ee;
+  color: #1f9d55;
+}
+
+.fg-badge-warn {
+  background: #fff4e5;
+  color: #d97706;
+}
+
+/* ===== Buttons ===== */
+.fg-btn {
+  display: inline-block;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: black;
+  color: white;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.fg-btn-outline {
+  background: #f3f3f3;
+  color: black;
+}

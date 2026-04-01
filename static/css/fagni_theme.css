@@ -6,50 +6,54 @@
 /* --------- 1. VARIABLES GLOBALES --------- */
 
 :root {
-    /* Couleurs brand */
-    --fagni-orange: #FE6F00;     /* logo */
-    --fagni-blue: #0060FE;       /* logo */
-    --fagni-blue-dark: #0B121A;  /* noir profond / texte */
+    /* === COULEURS BRAND FAGNI === */
+    --fagni-orange: #E87722;
+    --fagni-orange-light: #FFF0E0;
+    --fagni-orange-dark: #C4611A;
 
-    /* Fond & surfaces */
-    --fagni-bg: #F5F6FA;
+    /* On supprime le bleu — orange dominant partout */
+    --fagni-blue: #E87722;
+    --fagni-blue-dark: #1A1A2E;
+
+    /* === FONDS === */
+    --fagni-bg: #FAFAFA;
     --fagni-surface: #FFFFFF;
-    --fagni-surface-alt: #F9FAFB;
+    --fagni-surface-alt: #FFF8F2;
 
-    /* Bordures & textes */
-    --fagni-border: #E5E7EB;
-    --fagni-border-soft: #EEF0F4;
-    --fagni-text: #111827;
+    /* === TEXTES === */
+    --fagni-text: #1A1A2E;
     --fagni-text-muted: #6B7280;
     --fagni-text-soft: #9CA3AF;
 
-    /* Statuts */
+    /* === BORDURES === */
+    --fagni-border: #F0E8E0;
+    --fagni-border-soft: #FAF0E8;
+
+    /* === STATUTS === */
     --fagni-success: #16A34A;
     --fagni-danger: #DC2626;
     --fagni-warning: #F59E0B;
     --fagni-info: #0EA5E9;
 
-    /* Badges commandes */
+    /* === BADGES STATUT COMMANDES === */
     --fagni-status-pending-bg: #FFF4CD;
     --fagni-status-pending-text: #8A6D00;
-
-    --fagni-status-inprogress-bg: #DDEBFF;
-    --fagni-status-inprogress-text: #0A4FC4;
-
+    --fagni-status-inprogress-bg: #FFF0E0;
+    --fagni-status-inprogress-text: #C4611A;
     --fagni-status-done-bg: #D8F7DF;
     --fagni-status-done-text: #0D7A2B;
-
     --fagni-status-canceled-bg: #FFE4E4;
     --fagni-status-canceled-text: #A30000;
 
-    /* Rayons & ombres */
-    --fagni-radius-lg: 14px;
+    /* === FORMES & OMBRES === */
+    --fagni-radius-lg: 16px;
     --fagni-radius-md: 10px;
     --fagni-radius-pill: 999px;
-    --fagni-shadow-soft: 0 4px 10px rgba(15, 23, 42, 0.06);
+    --fagni-shadow-soft: 0 4px 16px rgba(232, 119, 34, 0.08);
 
-    /* Header gradient */
-    --fagni-header-gradient: linear-gradient(90deg, #0060FE, #FE6F00);}
+    /* === HEADER — Orange pur, fini le gradient bleu === */
+    --fagni-header-gradient: linear-gradient(135deg, #E87722, #C4611A);
+}
 
 /* --------- 2. BASE LAYOUT GÉNÉRAL --------- */
 

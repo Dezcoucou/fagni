@@ -1,7 +1,7 @@
 :root{
-  --fagni-blue:#2563eb;
-  --fagni-blue-dark:#172554;
-  --fagni-blue-night:#0f172a;
+  --fagni-blue:#E87722;
+  --fagni-blue-dark:#C4611A;
+  --fagni-blue-night:#1A1A2E;
   --fagni-orange:#f97316;
   --fagni-orange-dark:#c2410c;
 
@@ -93,7 +93,7 @@ html, body{
 }
 
 .fagni-hero-main{
-  background:linear-gradient(135deg,var(--fagni-blue-night) 0%, var(--fagni-blue-dark) 46%, var(--fagni-blue) 100%);
+  background:linear-gradient(135deg,#1A1A2E 0%, #C4611A 60%, #E87722 100%);
   color:#fff;
   border:1px solid rgba(255,255,255,.08);
 }
@@ -325,7 +325,7 @@ html, body{
 .fagni-btn:active{ transform:translateY(1px); }
 
 .fagni-btn--primary{
-  background:linear-gradient(90deg,var(--fagni-orange),var(--fagni-blue));
+  background:linear-gradient(90deg,#E87722,#C4611A);
   color:#fff;
   border:none;
   box-shadow:0 10px 20px rgba(0,86,179,.18);

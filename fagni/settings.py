@@ -26,6 +26,7 @@ ALLOWED_HOSTS = [
     "100.115.92.198",  # ton IP actuelle (Chromebook)
     "dezcoucou80.pythonanywhere.com",
     "fagni-t1s8.onrender.com",
+    "fagni-1-32kx.onrender.com",
 ]
 
 # Ajoute automatiquement le host de SITE_BASE_URL (si défini)

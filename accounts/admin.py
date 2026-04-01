@@ -1,9 +1,10 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 from .models import UserRole, CustomerProfile, DriverProfile
 
 
 @admin.register(UserRole)
-class UserRoleAdmin(admin.ModelAdmin):
+class UserRoleAdmin(UnfoldModelAdmin):
     list_display = ("id", "user", "role", "is_primary", "created_at")
     search_fields = ("user__username", "user__email", "role")
     list_filter = ("role", "is_primary", "created_at")
@@ -11,7 +12,7 @@ class UserRoleAdmin(admin.ModelAdmin):
 
 
 @admin.register(CustomerProfile)
-class CustomerProfileAdmin(admin.ModelAdmin):
+class CustomerProfileAdmin(UnfoldModelAdmin):
     list_display = ("id", "user", "default_address", "preferred_contact_mode", "created_at")
     search_fields = ("user__username", "user__email", "user__first_name", "user__last_name")
     list_filter = ("preferred_contact_mode", "created_at")
@@ -19,7 +20,7 @@ class CustomerProfileAdmin(admin.ModelAdmin):
 
 
 @admin.register(DriverProfile)
-class DriverProfileAdmin(admin.ModelAdmin):
+class DriverProfileAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "user",

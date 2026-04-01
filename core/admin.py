@@ -1,9 +1,10 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 from .models import Address, MediaAsset
 
 
 @admin.register(Address)
-class AddressAdmin(admin.ModelAdmin):
+class AddressAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "label",
@@ -29,7 +30,7 @@ class AddressAdmin(admin.ModelAdmin):
 
 
 @admin.register(MediaAsset)
-class MediaAssetAdmin(admin.ModelAdmin):
+class MediaAssetAdmin(UnfoldModelAdmin):
     list_display = ("id", "asset_type", "uploaded_by", "created_at")
     search_fields = ("asset_type", "uploaded_by__username", "uploaded_by__email")
     list_filter = ("asset_type", "created_at")

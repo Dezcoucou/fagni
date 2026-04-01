@@ -1,9 +1,10 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 from .models import Payment, Payout
 
 
 @admin.register(Payment)
-class PaymentAdmin(admin.ModelAdmin):
+class PaymentAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "payment_reference",
@@ -28,7 +29,7 @@ class PaymentAdmin(admin.ModelAdmin):
 
 
 @admin.register(Payout)
-class PayoutAdmin(admin.ModelAdmin):
+class PayoutAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "order",

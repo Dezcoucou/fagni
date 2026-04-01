@@ -1,9 +1,10 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 from .models import PricingRule, PriceQuote
 
 
 @admin.register(PricingRule)
-class PricingRuleAdmin(admin.ModelAdmin):
+class PricingRuleAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "service",
@@ -24,7 +25,7 @@ class PricingRuleAdmin(admin.ModelAdmin):
 
 
 @admin.register(PriceQuote)
-class PriceQuoteAdmin(admin.ModelAdmin):
+class PriceQuoteAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "order",

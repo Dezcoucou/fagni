@@ -1,7 +1,5 @@
 {% extends "base.html" %}
-
 {% block title %}FAGNI – App livreur{% endblock %}
-
 {% block page_css %}
 <style>
   :root{
@@ -16,35 +14,29 @@
     --radius-xl:28px;
     --radius-lg:22px;
   }
-
   *{ box-sizing:border-box; }
-
   body{
     background:
       radial-gradient(circle at top right, rgba(37,99,235,.06), transparent 24%),
       radial-gradient(circle at top left, rgba(249,115,22,.06), transparent 24%),
       #f8fafc;
   }
-
   .page{
     max-width:780px;
     margin:0 auto 32px;
     padding:10px 8px 24px;
   }
-
   .dashboard-shell{
     display:grid;
     gap:16px;
     margin-bottom:18px;
   }
-
   .dashboard-hero{
     display:grid;
     grid-template-columns:1.05fr .95fr;
     gap:14px;
     align-items:stretch;
   }
-
   .dashboard-hero-main,
   .dashboard-primary-card{
     border-radius:var(--radius-xl);
@@ -52,12 +44,10 @@
     border:1px solid rgba(255,255,255,.08);
     box-shadow:0 16px 34px rgba(15,23,42,.14);
   }
-
   .dashboard-hero-main{
     background:linear-gradient(135deg,#0f172a 0%, #172554 48%, #1d4ed8 100%);
     color:#fff;
   }
-
   .dashboard-primary-card{
     background:linear-gradient(135deg,rgba(249,115,22,.96) 0%, rgba(239,68,68,.92) 100%);
     color:#fff;
@@ -65,7 +55,6 @@
     flex-direction:column;
     justify-content:space-between;
   }
-
   .dashboard-eyebrow{
     font-size:11px;
     font-weight:900;
@@ -74,7 +63,6 @@
     color:rgba(255,255,255,.74);
     margin-bottom:8px;
   }
-
   .dashboard-title{
     margin:0;
     font-size:28px;
@@ -82,21 +70,18 @@
     font-weight:900;
     color:#fff;
   }
-
   .dashboard-subtitle{
     margin:12px 0 0;
     font-size:14px;
     line-height:1.55;
     color:rgba(255,255,255,.84);
   }
-
   .dashboard-status-row{
     display:flex;
     flex-wrap:wrap;
     gap:10px;
     margin-top:18px;
   }
-
   .dashboard-status-pill,
   .dashboard-period-pill{
     display:inline-flex;
@@ -110,7 +95,6 @@
     background:rgba(255,255,255,.10);
     color:#fff;
   }
-
   .dashboard-status-dot{
     width:8px;
     height:8px;
@@ -119,7 +103,6 @@
     display:inline-block;
     box-shadow:0 0 0 4px rgba(34,197,94,.18);
   }
-
   .dashboard-primary-label{
     font-size:12px;
     font-weight:900;
@@ -127,7 +110,6 @@
     text-transform:uppercase;
     color:rgba(255,255,255,.84);
   }
-
   .dashboard-primary-number{
     font-size:18px;
     line-height:1.2;
@@ -135,14 +117,12 @@
     margin-top:10px;
     color:#fff;
   }
-
   .dashboard-primary-helper{
     margin-top:8px;
     font-size:13px;
     line-height:1.45;
     color:rgba(255,255,255,.88);
   }
-
   .dashboard-main-cta{
     margin-top:16px;
     min-height:48px;
@@ -152,13 +132,11 @@
     color:#0f172a !important;
     box-shadow:0 10px 24px rgba(15,23,42,.16);
   }
-
   .dashboard-kpis{
     display:grid;
     grid-template-columns:repeat(3,minmax(0,1fr));
     gap:12px;
   }
-
   .dashboard-kpi-card{
     background:linear-gradient(180deg,#ffffff 0%, #fbfcfe 100%);
     border:1px solid #e8eef5;
@@ -166,22 +144,18 @@
     padding:16px 14px;
     box-shadow:0 10px 24px rgba(15,23,42,.06);
   }
-
   .dashboard-kpi-card-income{
     border-color:rgba(34,197,94,.18);
     background:linear-gradient(180deg,#f7fff9 0%, #effdf4 100%);
   }
-
   .dashboard-kpi-card-warning{
     border-color:rgba(249,115,22,.22);
     background:linear-gradient(180deg,#fffaf5 0%, #fff7ed 100%);
   }
-
   .dashboard-kpi-card-update{
     border-color:rgba(59,130,246,.16);
     background:linear-gradient(180deg,#f8fbff 0%, #eef5ff 100%);
   }
-
   .dashboard-kpi-label{
     font-size:11px;
     font-weight:900;
@@ -190,51 +164,43 @@
     color:#64748b;
     margin-bottom:8px;
   }
-
   .dashboard-kpi-value{
     font-size:24px;
     line-height:1.1;
     font-weight:900;
     color:#0f172a;
   }
-
   .dashboard-kpi-small{
     font-size:16px;
     line-height:1.35;
   }
-
   .dashboard-kpi-meta{
     margin-top:7px;
     font-size:12px;
     color:#64748b;
     line-height:1.45;
   }
-
   .missions-block{
     margin-top:18px;
   }
-
   .missions-title{
     font-size:20px;
     font-weight:1000;
     color:#0f172a;
     margin:0 0 10px;
   }
-
   .missions-subtitle{
     font-size:12px;
     color:#64748b;
     margin:0 0 14px;
     line-height:1.45;
   }
-
   .filters-bar{
     display:flex;
     flex-wrap:wrap;
     gap:8px;
     margin:0 0 14px;
   }
-
   .filter-chip{
     appearance:none;
     border:1px solid #e5e7eb;
@@ -247,18 +213,15 @@
     font-weight:900;
     cursor:pointer;
   }
-
   .filter-chip.active{
     background:linear-gradient(90deg,var(--fagni-orange),var(--fagni-blue));
     color:#fff;
     border-color:transparent;
   }
-
   .card-stack{
     display:grid;
     gap:12px;
   }
-
   .card-course{
     border:1px solid #e6edf5;
     border-radius:22px;
@@ -267,7 +230,6 @@
     overflow:hidden;
     padding:14px;
   }
-
   .course-top{
     display:flex;
     justify-content:space-between;
@@ -275,11 +237,9 @@
     gap:10px;
     margin-bottom:8px;
   }
-
   .course-meta{
     min-width:0;
   }
-
   .course-code{
     font-size:11px;
     font-weight:900;
@@ -288,14 +248,12 @@
     color:#2563eb;
     line-height:1.25;
   }
-
   .course-date{
     margin-top:4px;
     font-size:11px;
     color:#94a3b8;
     line-height:1.35;
   }
-
   .course-client{
     font-size:16px;
     font-weight:900;
@@ -304,7 +262,6 @@
     margin-bottom:6px;
     word-break:break-word;
   }
-
   .course-address{
     font-size:13px;
     color:#334155;
@@ -312,7 +269,6 @@
     margin-bottom:10px;
     word-break:break-word;
   }
-
   .course-middle{
     display:flex;
     flex-wrap:wrap;
@@ -320,7 +276,6 @@
     align-items:center;
     margin-bottom:12px;
   }
-
   .status-pill,
   .income-pill,
   .price-pill{
@@ -335,7 +290,6 @@
     border:1px solid transparent;
     white-space:nowrap;
   }
-
   .status-pill .dot,
   .income-pill .dot,
   .price-pill .dot{
@@ -344,49 +298,42 @@
     border-radius:999px;
     display:inline-block;
   }
-
   .status-pending{
     background:#fff7ed;
     color:#9a3412;
     border-color:#fed7aa;
   }
   .status-pending .dot{ background:#f97316; }
-
   .status-assigned{
     background:#eff6ff;
     color:#1d4ed8;
     border-color:#bfdbfe;
   }
   .status-assigned .dot{ background:#2563eb; }
-
   .status-in_progress{
     background:#eef2ff;
     color:#4338ca;
     border-color:#c7d2fe;
   }
   .status-in_progress .dot{ background:#4f46e5; }
-
   .status-done{
     background:#ecfdf5;
     color:#166534;
     border-color:#bbf7d0;
   }
   .status-done .dot{ background:#22c55e; }
-
   .income-paid{
     background:#ecfdf5;
     color:#166534;
     border-color:#bbf7d0;
   }
   .income-paid .dot{ background:#22c55e; }
-
   .income-estimated{
     background:#eff6ff;
     color:#1d4ed8;
     border-color:#bfdbfe;
   }
   .income-estimated .dot{ background:#2563eb; }
-
   .income-missing,
   .price-missing{
     background:#fff7ed;
@@ -395,14 +342,17 @@
   }
   .income-missing .dot,
   .price-missing .dot{ background:#f97316; }
-
   .price-pill{
     background:#f8fafc;
     color:#334155;
     border-color:#e2e8f0;
   }
+  .income-missing{
+  color:#94a3b8 !important;
+    color:#94a3b8;
+    font-weight:700;
+  }
   .price-pill .dot{ background:#64748b; }
-
   .course-footer{
     display:flex;
     justify-content:flex-end;
@@ -410,7 +360,10 @@
     gap:12px;
     flex-wrap:wrap;
   }
-
+  .price-missing{
+    color:#94a3b8;
+    font-weight:700;
+  }
   .btn{
     display:inline-flex;
     align-items:center;
@@ -427,20 +380,17 @@
     transition:transform .12s ease, opacity .12s ease, background .12s ease, border-color .12s ease, box-shadow .12s ease;
     box-shadow:0 4px 12px rgba(15,23,42,.06);
   }
-
   .btn-primary{
     background:linear-gradient(90deg,var(--fagni-orange),var(--fagni-blue));
     color:#fff;
     border:none;
   }
-
   .empty{
     font-size:12px;
     color:#94a3b8;
     padding:10px 2px;
     text-align:center;
   }
-
   .pager{
     margin-top:14px;
     display:flex;
@@ -449,18 +399,15 @@
     gap:10px;
     flex-wrap:wrap;
   }
-
   .pager-info{
     font-size:12px;
     color:#64748b;
     font-weight:900;
   }
-
   .pager-actions{
     display:flex;
     gap:8px;
   }
-
   .pager-btn{
     min-width:100px;
     min-height:40px;
@@ -471,22 +418,18 @@
     font-weight:900;
     cursor:pointer;
   }
-
   .pager-btn[disabled]{
     opacity:.45;
     cursor:not-allowed;
   }
-
   @media (max-width:760px){
     .dashboard-hero{
       grid-template-columns:1fr;
     }
-
     .dashboard-kpis{
       grid-template-columns:1fr 1fr;
     }
   }
-
   @media (max-width:640px){
     .page{ padding:8px 4px 24px; }
     .dashboard-title{ font-size:24px; }
@@ -495,24 +438,20 @@
     .dashboard-primary-card,
     .dashboard-kpi-card,
     .card-course{ border-radius:18px; }
-
     .course-top,
     .course-footer{
       flex-direction:column;
       align-items:flex-start;
     }
-
     .course-footer .btn{
       width:100%;
     }
   }
 </style>
 {% endblock %}
-
 {% block content %}
 <div class="page">
   <div class="dashboard-shell">
-
     <section class="dashboard-hero">
       <div class="dashboard-hero-main">
         <div class="dashboard-eyebrow">FAGNI • App livreur</div>
@@ -522,7 +461,6 @@
         <p class="dashboard-subtitle">
           Listing terrain pour accéder vite à la bonne course, sans noyer l’écran.
         </p>
-
         <div class="dashboard-status-row">
           <span class="dashboard-status-pill">
             <span class="dashboard-status-dot"></span>
@@ -531,7 +469,6 @@
           <span class="dashboard-period-pill">Aujourd’hui</span>
         </div>
       </div>
-
       <div class="dashboard-primary-card">
         <div>
           <div class="dashboard-primary-label">Mission du moment</div>
@@ -540,70 +477,58 @@
             Lecture de la mission prioritaire.
           </div>
         </div>
-
         <a href="#mission-list" class="btn btn-primary dashboard-main-cta" id="hero-focus-cta">
           Voir missions
         </a>
       </div>
     </section>
-
     <section class="dashboard-kpis">
       <div class="dashboard-kpi-card">
         <div class="dashboard-kpi-label">À accepter</div>
         <div class="dashboard-kpi-value" id="kpi-accept">—</div>
         <div class="dashboard-kpi-meta">Courses non encore acceptées</div>
       </div>
-
       <div class="dashboard-kpi-card">
         <div class="dashboard-kpi-label">À démarrer</div>
         <div class="dashboard-kpi-value" id="kpi-start">—</div>
         <div class="dashboard-kpi-meta">Courses acceptées prêtes au départ</div>
       </div>
-
       <div class="dashboard-kpi-card">
         <div class="dashboard-kpi-label">En cours</div>
         <div class="dashboard-kpi-value" id="kpi-in-progress">—</div>
         <div class="dashboard-kpi-meta">Missions actives</div>
       </div>
-
       <div class="dashboard-kpi-card dashboard-kpi-card-income">
         <div class="dashboard-kpi-label">Gain visible</div>
         <div class="dashboard-kpi-value dashboard-kpi-small" id="kpi-driver-visible">—</div>
         <div class="dashboard-kpi-meta">Somme visible sur la liste</div>
       </div>
-
       <div class="dashboard-kpi-card dashboard-kpi-card-warning">
-        <div class="dashboard-kpi-label">À chiffrer</div>
+        <div class="dashboard-kpi-label" style="color:#94a3b8;">En attente</div>
         <div class="dashboard-kpi-value" id="kpi-unpriced">—</div>
         <div class="dashboard-kpi-meta">Client ou gain livreur manquant</div>
       </div>
-
       <div class="dashboard-kpi-card dashboard-kpi-card-update">
         <div class="dashboard-kpi-label">Mise à jour</div>
         <div class="dashboard-kpi-value dashboard-kpi-small" id="kpi-updated">Chargement…</div>
         <div class="dashboard-kpi-meta" id="kpi-source">Live</div>
       </div>
     </section>
-
   </div>
-
   <section class="missions-block">
     <h2 class="missions-title">🚚 Mes missions</h2>
     <p class="missions-subtitle">Page listing + accès. La mission du moment est traitée ailleurs, ici on trie et on ouvre vite.</p>
-
     <div class="filters-bar" id="filters-bar">
       <button class="filter-chip active" data-filter="all" type="button">Toutes</button>
       <button class="filter-chip" data-filter="accept" type="button">À accepter</button>
       <button class="filter-chip" data-filter="start" type="button">À démarrer</button>
       <button class="filter-chip" data-filter="doing" type="button">En cours</button>
       <button class="filter-chip" data-filter="done" type="button">Terminées</button>
-      <button class="filter-chip" data-filter="pricing" type="button">À chiffrer</button>
+      <button class="filter-chip" data-filter="pricing" type="button">En attente</button>
     </div>
-
     <div id="mission-list" class="card-stack">
       <p class="empty">Chargement…</p>
     </div>
-
     <div class="pager">
       <div id="pager-info" class="pager-info"></div>
       <div class="pager-actions">
@@ -614,18 +539,15 @@
   </section>
 </div>
 {% endblock %}
-
 {% block extra_js %}
 <script>
 (function(){
   const DATA_URL = "/orders/driver-app/data/" + (window.location.search || "");
   const PAGE_SIZE = 3;
-
   let currentPage = 1;
   let allOrders = [];
   let filteredOrders = [];
   let activeFilter = "all";
-
   const els = {
     kpiAccept: document.getElementById("kpi-accept"),
     kpiStart: document.getElementById("kpi-start"),
@@ -634,35 +556,29 @@
     kpiUnpriced: document.getElementById("kpi-unpriced"),
     kpiSource: document.getElementById("kpi-source"),
     kpiUpdated: document.getElementById("kpi-updated"),
-
     heroFocusTitle: document.getElementById("hero-focus-title"),
     heroFocusSub: document.getElementById("hero-focus-sub"),
     heroFocusCta: document.getElementById("hero-focus-cta"),
-
     missionList: document.getElementById("mission-list"),
     pagerInfo: document.getElementById("pager-info"),
     prevPage: document.getElementById("prev-page"),
     nextPage: document.getElementById("next-page"),
     filtersBar: document.getElementById("filters-bar"),
   };
-
   function firstValue() {
     for (const v of arguments) {
       if (v !== undefined && v !== null && v !== "") return v;
     }
     return null;
   }
-
   function asNumber(v){
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
   }
-
   function fmtMoney(v){
     const n = asNumber(v);
     return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
   }
-
   function getClientAmount(o){
     return firstValue(
       o.total_client_ttc,
@@ -673,7 +589,6 @@
       o.amount_client
     );
   }
-
   function getDriverAmount(o){
     return firstValue(
       o.driver_income,
@@ -683,7 +598,6 @@
       o.driver_logistic_cost
     );
   }
-
   function statusClass(status){
     const s = String(status || "").toLowerCase();
     if (s === "assigned") return "status-assigned";
@@ -691,7 +605,6 @@
     if (s === "done") return "status-done";
     return "status-pending";
   }
-
   function statusLabel(status){
     const s = String(status || "").toLowerCase();
     if (s === "assigned") return "À démarrer";
@@ -699,46 +612,38 @@
     if (s === "done") return "Terminée";
     return "À accepter";
   }
-
   function inferFilter(o){
     const s = String(o.status || "").toLowerCase();
     const clientAmount = asNumber(getClientAmount(o));
     const driverAmount = asNumber(getDriverAmount(o));
-
     if (clientAmount <= 0 || driverAmount <= 0) return "pricing";
     if (s === "in_progress") return "doing";
     if (s === "assigned") return "start";
     if (s === "done") return "done";
     return "accept";
   }
-
   function getOrders(payload){
     const buckets = [
       ...(payload.orders_in_progress || []),
       ...(payload.orders_pending || []),
       ...(payload.orders_done || [])
     ];
-
     const seen = new Set();
     const out = [];
-
     for (const o of buckets){
       const id = o && o.id;
       if (!id || seen.has(id)) continue;
       seen.add(id);
       out.push(o);
     }
-
     out.sort((a, b) => {
       const pa = orderPriority(a);
       const pb = orderPriority(b);
       if (pa !== pb) return pa - pb;
       return 0;
     });
-
     return out;
   }
-
   function orderPriority(o){
     const f = inferFilter(o);
     if (f === "doing") return 0;
@@ -748,35 +653,32 @@
     if (f === "done") return 4;
     return 9;
   }
-
   function incomePill(amount){
     const n = asNumber(amount);
     if (n <= 0){
       return {
         cls: "income-missing",
-        text: "Gain à chiffrer"
+        text: "Calcul en cours"
       };
     }
     return {
       cls: "income-estimated",
-      text: fmtMoney(n)
+      text: (n > 0 ? fmtMoney(n) : "— FCFA")
     };
   }
-
   function pricePill(amount){
     const n = asNumber(amount);
     if (n <= 0){
       return {
         cls: "price-missing",
-        text: "Client à chiffrer"
+        text: "En attente ⏳"
       };
     }
     return {
       cls: "price-pill",
-      text: "Client " + fmtMoney(n)
+      text: "Client " + (n > 0 ? fmtMoney(n) : "— FCFA")
     };
   }
-
   function renderMissionCard(o){
     const detail = o.detail_url || "#";
     const code = o.code || o.id || "—";
@@ -789,16 +691,13 @@
       o.customer && o.customer.address,
       "Adresse non disponible"
     );
-
     const clientAmount = getClientAmount(o);
     const driverAmount = getDriverAmount(o);
     const clientP = pricePill(clientAmount);
     const incomeP = incomePill(driverAmount);
-
     const createdAt = firstValue(o.created_at_label, o.created_at, "—");
     const sClass = statusClass(o.status);
     const sLabel = statusLabel(o.status);
-
     return `
       <article class="card-course">
         <div class="course-top">
@@ -810,10 +709,8 @@
             <span class="dot"></span>${sLabel}
           </span>
         </div>
-
         <div class="course-client">${customer}</div>
         <div class="course-address">${address}</div>
-
         <div class="course-middle">
           <span class="${clientP.cls === 'price-pill' ? 'price-pill' : 'price-pill price-missing'}">
             <span class="dot"></span>${clientP.text}
@@ -822,31 +719,26 @@
             <span class="dot"></span>${incomeP.text}
           </span>
         </div>
-
         <div class="course-footer">
           <a class="btn btn-primary" href="${detail}">Ouvrir</a>
         </div>
       </article>
     `;
   }
-
   function applyFilter(){
     filteredOrders = activeFilter === "all"
       ? [...allOrders]
       : allOrders.filter(o => inferFilter(o) === activeFilter);
-
     currentPage = 1;
     renderPage();
     syncFilterUi();
   }
-
   function syncFilterUi(){
     if (!els.filtersBar) return;
     els.filtersBar.querySelectorAll(".filter-chip").forEach(btn => {
       btn.classList.toggle("active", btn.dataset.filter === activeFilter);
     });
   }
-
   function renderPage(){
     if (!filteredOrders.length){
       els.missionList.innerHTML = '<p class="empty">Aucune mission à afficher dans cette catégorie.</p>';
@@ -855,33 +747,26 @@
       if (els.nextPage) els.nextPage.disabled = true;
       return;
     }
-
     const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
     if (currentPage > totalPages) currentPage = totalPages;
-
     const start = (currentPage - 1) * PAGE_SIZE;
     const end = start + PAGE_SIZE;
     const visible = filteredOrders.slice(start, end);
-
     els.missionList.innerHTML = visible.map(renderMissionCard).join("");
-
     if (els.pagerInfo) els.pagerInfo.textContent = "Page " + currentPage + " / " + totalPages;
     if (els.prevPage) els.prevPage.disabled = currentPage <= 1;
     if (els.nextPage) els.nextPage.disabled = currentPage >= totalPages;
   }
-
   function renderHeroFocus(){
     if (!allOrders.length){
       if (els.heroFocusTitle) els.heroFocusTitle.textContent = "Aucune mission";
       if (els.heroFocusSub) els.heroFocusSub.textContent = "Rien d’actionnable pour le moment.";
       return;
     }
-
     const focus = allOrders[0];
     const filter = inferFilter(focus);
     const customer = firstValue(focus.customer_name, focus.customer && focus.customer.name, "Client");
     const detail = focus.detail_url || "#";
-
     let title = customer;
     let sub = "Mission disponible.";
     if (filter === "doing") sub = "Mission déjà en cours. Ouvre-la pour continuer.";
@@ -889,40 +774,33 @@
     else if (filter === "accept") sub = "Mission en attente d’acceptation.";
     else if (filter === "pricing") sub = "Mission visible mais non complètement chiffrée.";
     else if (filter === "done") sub = "Dernière mission terminée visible.";
-
     if (els.heroFocusTitle) els.heroFocusTitle.textContent = title;
     if (els.heroFocusSub) els.heroFocusSub.textContent = sub;
     if (els.heroFocusCta) els.heroFocusCta.href = detail;
   }
-
   function renderKpis(){
     const accept = allOrders.filter(o => inferFilter(o) === "accept").length;
     const start = allOrders.filter(o => inferFilter(o) === "start").length;
     const doing = allOrders.filter(o => inferFilter(o) === "doing").length;
     const pricing = allOrders.filter(o => inferFilter(o) === "pricing").length;
-
     const visibleDriverSum = allOrders.reduce((acc, o) => {
       const n = asNumber(getDriverAmount(o));
       return acc + (n > 0 ? n : 0);
     }, 0);
-
     if (els.kpiAccept) els.kpiAccept.textContent = accept;
     if (els.kpiStart) els.kpiStart.textContent = start;
     if (els.kpiInProgress) els.kpiInProgress.textContent = doing;
     if (els.kpiUnpriced) els.kpiUnpriced.textContent = pricing;
     if (els.kpiDriverVisible) els.kpiDriverVisible.textContent = fmtMoney(visibleDriverSum);
   }
-
   function render(payload){
     if (els.kpiUpdated) els.kpiUpdated.textContent = new Date().toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"});
     if (els.kpiSource) els.kpiSource.textContent = "Live";
-
     allOrders = getOrders(payload || {});
     renderHeroFocus();
     renderKpis();
     applyFilter();
   }
-
   async function refresh(){
     try{
       const res = await fetch(DATA_URL, {
@@ -939,14 +817,12 @@
       if (els.kpiSource) els.kpiSource.textContent = "Erreur";
     }
   }
-
   if (els.prevPage){
     els.prevPage.addEventListener("click", function(){
       currentPage = Math.max(1, currentPage - 1);
       renderPage();
     });
   }
-
   if (els.nextPage){
     els.nextPage.addEventListener("click", function(){
       const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
@@ -954,7 +830,6 @@
       renderPage();
     });
   }
-
   if (els.filtersBar){
     els.filtersBar.addEventListener("click", function(e){
       const btn = e.target.closest(".filter-chip");
@@ -963,7 +838,6 @@
       applyFilter();
     });
   }
-
   refresh();
   setInterval(refresh, 8000);
 })();

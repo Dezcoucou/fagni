@@ -6,23 +6,16 @@
     <title>{% block title %}FAGNI – Laundry & Logistics{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#ff7a00">
-
     <link rel="stylesheet" href="{% static 'css/site.css' %}">
     <link rel="icon" type="image/png" href="{% static 'favicon.png' %}">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-
     <link rel="stylesheet" href="{% static 'css/fagni_theme.css' %}">
     <link rel="stylesheet" href="{% static 'css/fagni_unified_ui.css' %}">
     {% block page_css %}{% endblock %}
-
-
     <style>
         * { box-sizing: border-box; }
         img { max-width: 100%; display: block; }
-
 {% block topbar_css %}
-
-
         /* TOPBAR SUPER-APP FAGNI (ULTRA PREMIUM — SANS DÉGRADÉ) */
 .fagni-topbar::after{
             content:"";
@@ -49,7 +42,6 @@
             display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;
             border:1px solid rgba(148,163,184,0.5);
         }
-
 /* --- moved into topbar_css --- */
 .fagni-topbar{
             background:#020617; /* bleu nuit premium, sans dégradé */
@@ -59,46 +51,35 @@
             align-items:center;
             justify-content:space-between;
             gap:12px;
-
             position: relative;
             overflow: hidden;
-
-            
             box-shadow: 0 10px 26px rgba(2,6,23,0.35);
         }
-
 .fagni-topbar-left{ display:flex; align-items:center; gap:10px; }
-
 .fagni-topbar-tag{
             font-size:10px; padding:3px 8px; border-radius:999px;
             background:rgba(15,23,42,0.7); border:1px solid rgba(148,163,184,0.4);
             display:inline-flex; align-items:center; gap:4px;
         }
-
 .fagni-topbar-user{ display:flex; align-items:center; gap:6px; font-size:11px; }
-
 .fagni-topbar-status{
             font-size:9px; padding:2px 6px; border-radius:999px;
             background:rgba(34,197,94,0.12); color:#bbf7d0;
             border:1px solid rgba(34,197,94,0.4);
         }
-
 @media(min-width:1024px){
   .fagni-topbar{ padding:12px 32px; }
 }
 {% endblock %}
-
   /* Conteneur principal */
   .fagni-shell{
       max-width:1200px;
       margin:0 auto;
       padding:10px 10px 24px;
   }
-
   @media(min-width:1024px){
       .fagni-shell{ padding:18px 18px 30px; }
   }
-
   /* Flash messages */
   .flash-stack{
       display:flex;
@@ -120,7 +101,6 @@
   .flash-warning{ border-color: rgba(245,158,11,.45); }
   .flash-info{ border-color: rgba(59,130,246,.45); }
     </style>
-
     {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
@@ -133,7 +113,7 @@
             </span>
             <span class="fagni-logo-text">
                 <span class="fagni-logo-text-main">FAGNI</span>
-                <span class="fagni-logo-text-sub">Laundry • Logistics • Affiliation</span>
+                <span class="fagni-logo-text-sub">Mon espace livreur</span>
             </span>
         </a>
         <span class="fagni-topbar-tag">🚀 Super-App</span>
@@ -156,7 +136,6 @@
 </header>
 {% endblock %}
 <div class="fagni-shell">
-
     {% if messages %}
         <div class="flash-stack">
             {% for message in messages %}
@@ -166,16 +145,8 @@
             {% endfor %}
         </div>
     {% endif %}
-
-    <div id="SERVER_MARKER_FAGNI" style="position:fixed;right:10px;bottom:10px;z-index:2147483647;background:#111;color:#fff;padding:6px 10px;border-radius:10px;font:12px ui-monospace">SERVER_MARKER_FAGNI</div>
 {% block content %}{% endblock %}
 </div>
-
 {% block extra_js %}{% endblock %}
-
-<div id="RENDER_COMMIT" style="position:fixed;left:10px;bottom:10px;z-index:2147483647;background:#111;color:#fff;padding:6px 10px;border-radius:10px;font:12px ui-monospace">
-  commit: {{ request.META.RENDER_GIT_COMMIT|default:"n/a" }}
-</div>
-
 </body>
 </html>

@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block title %}Commande blanchisserie – FAGNI{% endblock %}
-
 {% block extra_head %}
 <style>
   .laundry-page{
@@ -10,7 +8,6 @@
     margin:0 auto;
     padding:16px;
   }
-
   .laundry-topbar{
     display:flex;
     justify-content:space-between;
@@ -19,7 +16,6 @@
     flex-wrap:wrap;
     margin-bottom:14px;
   }
-
   .laundry-title{
     margin:0;
     font-size:28px;
@@ -27,20 +23,17 @@
     font-weight:1000;
     color:#0f172a;
   }
-
   .laundry-sub{
     margin-top:6px;
     color:#64748b;
     font-size:14px;
     font-weight:700;
   }
-
   .laundry-actions{
     display:flex;
     gap:8px;
     flex-wrap:wrap;
   }
-
   .lang-select{
     width:100%;
     min-height:48px;
@@ -53,7 +46,6 @@
     color:#0f172a;
     margin-bottom:14px;
   }
-
   .hero-card,
   .section-card,
   .audio-card{
@@ -63,11 +55,9 @@
     padding:16px;
     box-shadow:0 8px 24px rgba(15,23,42,.04);
   }
-
   .hero-card{
     margin-bottom:14px;
   }
-
   .hero-head{
     display:flex;
     justify-content:space-between;
@@ -75,33 +65,28 @@
     flex-wrap:wrap;
     align-items:flex-start;
   }
-
   .hero-order{
     font-size:24px;
     font-weight:1000;
     color:#0f172a;
   }
-
   .hero-date{
     font-size:13px;
     color:#64748b;
     font-weight:800;
   }
-
   .status-grid{
     margin-top:14px;
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
     gap:12px;
   }
-
   .status-box{
     border:1px solid #e5e7eb;
     border-radius:16px;
     padding:14px;
     background:#f8fafc;
   }
-
   .status-k{
     font-size:12px;
     text-transform:uppercase;
@@ -109,7 +94,6 @@
     font-weight:900;
     color:#64748b;
   }
-
   .status-v{
     margin-top:6px;
     font-size:22px;
@@ -117,7 +101,6 @@
     color:#0f172a;
     line-height:1.1;
   }
-
   .items-list{
     margin:14px 0 0;
     padding:0;
@@ -125,7 +108,6 @@
     display:grid;
     gap:10px;
   }
-
   .item-row{
     display:flex;
     justify-content:space-between;
@@ -136,20 +118,17 @@
     border-radius:16px;
     background:#fff;
   }
-
   .item-name{
     font-size:22px;
     font-weight:900;
     color:#0f172a;
   }
-
   .item-meta{
     margin-top:4px;
     font-size:13px;
     color:#64748b;
     font-weight:700;
   }
-
   .item-qty{
     min-width:64px;
     text-align:center;
@@ -160,19 +139,16 @@
     font-size:16px;
     font-weight:1000;
   }
-
   .audio-card{
     margin-bottom:14px;
     border-color:#bfdbfe;
     background:linear-gradient(180deg,#eff6ff,#ffffff);
   }
-
   .audio-title{
     font-size:22px;
     font-weight:1000;
     color:#0f172a;
   }
-
   .audio-sub{
     margin-top:6px;
     color:#475569;
@@ -180,21 +156,18 @@
     line-height:1.5;
     font-weight:700;
   }
-
   .audio-actions{
     margin-top:12px;
     display:grid;
     grid-template-columns:1fr 1fr;
     gap:10px;
   }
-
   .visual-steps{
     margin-top:14px;
     display:grid;
     grid-template-columns:repeat(3,minmax(0,1fr));
     gap:10px;
   }
-
   .visual-step{
     border:1px solid #dbeafe;
     border-radius:16px;
@@ -202,30 +175,25 @@
     background:#fff;
     text-align:center;
   }
-
   .visual-step-ico{
     font-size:28px;
     line-height:1;
   }
-
   .visual-step-label{
     margin-top:8px;
     font-size:14px;
     font-weight:1000;
     color:#0f172a;
   }
-
   .actions-grid{
     display:grid;
     grid-template-columns:repeat(3,minmax(0,1fr));
     gap:12px;
     margin-top:14px;
   }
-
   .action-form{
     margin:0;
   }
-
   .action-btn{
     width:100%;
     min-height:110px;
@@ -242,42 +210,34 @@
     transition:.16s ease;
     box-shadow:0 10px 20px rgba(15,23,42,.08);
   }
-
   .action-btn:hover{
     transform:translateY(-1px);
   }
-
   .action-btn[disabled]{
     opacity:.5;
     cursor:not-allowed;
     transform:none;
     box-shadow:none;
   }
-
   .action-btn--start{
     background:#2563eb;
     color:#fff;
   }
-
   .action-btn--ready{
     background:#16a34a;
     color:#fff;
   }
-
   .action-btn--done{
     background:#0f172a;
     color:#fff;
   }
-
   .action-btn__icon{
     font-size:26px;
     line-height:1;
   }
-
   .action-btn__label{
     line-height:1.1;
   }
-
   .helper-note{
     margin-top:12px;
     padding:12px 14px;
@@ -288,7 +248,6 @@
     font-size:14px;
     font-weight:800;
   }
-
   .voice-feedback{
     margin-top:12px;
     text-align:center;
@@ -297,7 +256,6 @@
     font-weight:900;
     min-height:22px;
   }
-
   .empty-box{
     margin-top:14px;
     padding:14px;
@@ -307,77 +265,145 @@
     color:#64748b;
     font-weight:800;
   }
-
   @media (max-width:760px){
     .laundry-title{
       font-size:24px;
     }
-
     .status-grid,
     .audio-actions,
     .visual-steps,
     .actions-grid{
       grid-template-columns:1fr;
     }
-
     .item-row{
       flex-direction:column;
       align-items:flex-start;
     }
-
     .item-qty{
       min-width:0;
     }
-
     .laundry-actions{
       width:100%;
     }
-
     .laundry-actions .btn{
       width:100%;
     }
   }
+
+  .terrain-advanced-panel{
+    display:none;
+    position:fixed;
+    right:16px;
+    top:72px;
+    width:min(92vw, 360px);
+    max-height:70vh;
+    overflow:auto;
+    z-index:9999;
+    background:#ffffff;
+    border:1px solid #dbe3ea;
+    border-radius:16px;
+    box-shadow:0 16px 50px rgba(15,23,42,.20);
+    padding:14px;
+  }
+
+  .terrain-advanced-panel.is-open{
+    display:block;
+  }
+
+  .terrain-advanced-title{
+    font-weight:800;
+    font-size:14px;
+    margin-bottom:10px;
+    color:#0f172a;
+  }
+
+  .terrain-advanced-help{
+    font-size:12px;
+    color:#64748b;
+    margin-bottom:12px;
+  }
+
+  .terrain-advanced-list{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+
+  .terrain-hidden-origin{
+    display:none !important;
+  }
+
+  .terrain-mode-active [data-terrain-role="primary-start"]{
+    background:#2563eb !important;
+    color:#fff !important;
+  }
+
+  .terrain-mode-active [data-terrain-role="primary-ready"]{
+    background:#16a34a !important;
+    color:#fff !important;
+  }
+
+  .terrain-mode-active [data-terrain-role="primary-done"]{
+    background:#334155 !important;
+    color:#fff !important;
+  }
+
+  .terrain-mode-active .lang-select,
+  .terrain-mode-active #btn-ultra-mode,
+  .terrain-mode-active .laundry-actions,
+  .terrain-mode-active .audio-card.terrain-advanced-source,
+  .terrain-mode-active .terrain-advanced-source{
+    display:none !important;
+  }
+
+  .terrain-mode-active .section-card .audio-sub{
+    display:none !important;
+  }
+
+  .terrain-mode-active .actions-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:12px;
+    margin-top:10px;
+  }
+
+  .terrain-mode-active .hero-card{
+    margin-bottom:16px;
+  }
+
+  .terrain-mode-active .items-list{
+    margin-top:10px;
+  }
+
+  .terrain-advanced-item > *{
+    width:100%;
+  }
+
 </style>
 {% endblock %}
-
 {% block content %}
 <div class="laundry-page">
-  <select id="language-select" class="lang-select">
-    <option value="fr">Français</option>
-    <option value="dioula">Dioula</option>
-  </select>
-
-  
-<div style="margin-bottom:12px;">
-  <button id="btn-ultra-mode" style="
-    width:100%;
-    height:60px;
-    border:none;
-    border-radius:16px;
-    font-size:18px;
-    font-weight:1000;
-    background:#0f172a;
-    color:#fff;
-  ">
-    ⚡ Mode simple (recommandé)
-  </button>
-</div>
-<div class="laundry-topbar">
-    <div>
-      <h1 class="laundry-title">🧺 Détail commande</h1>
-      <div class="laundry-sub">⚠️ Aucune information client affichée.</div>
-    </div>
-
-    <div class="laundry-actions">
-      <a class="btn btn-light btn-sm" href="{% url 'orders:laundry_app' %}{% if laundry_id %}?laundry_id={{ laundry_id }}{% endif %}">← Retour</a>
-      <a class="btn btn-light btn-sm" href="/accounts/logout/">🚪 Déconnexion</a>
+  <div class="laundry-topbar">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <a href="javascript:void(0)" id="terrain-logo-trigger" data-fagni-logo style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:inherit;">
+        <img src="{% static 'images/logo-fagni.png' %}" alt="FAGNI" style="height:42px;width:auto;" onerror="this.style.display='none'">
+        <div>
+          <h1 class="laundry-title" style="margin:0;">FAGNI</h1>
+          <div class="laundry-sub" style="margin-top:2px;">Mode terrain</div>
+        </div>
+      </a>
     </div>
   </div>
 
+  <div id="terrain-advanced-panel" class="terrain-advanced-panel" aria-hidden="true">
+    <div class="terrain-advanced-title">Paramètres avancés</div>
+    <div class="terrain-advanced-help">
+      Appui long de 3 secondes sur le logo FAGNI pour afficher ou masquer ce panneau.
+    </div>
+    <div id="terrain-advanced-list" class="terrain-advanced-list"></div>
+  </div>
   {% if error %}
     <div class="alert alert-warning" style="margin-top:12px;">{{ error }}</div>
   {% endif %}
-
   {% if not order %}
     <div class="empty-box">Commande non disponible.</div>
   {% else %}
@@ -388,7 +414,6 @@
         <div class="hero-order">Commande #{{ order.id }}</div>
         <div class="hero-date">{{ order.created_at|date:"d/m/Y H:i" }}</div>
       </div>
-
       <div id="status-hero" style="
         margin-top:12px;
         padding:16px;
@@ -409,7 +434,6 @@ En cours
 À traiter
 {% endif %}
       </div>
-
       <div class="status-grid">
         <div class="status-box">
           <div class="status-k">Statut</div>
@@ -428,7 +452,6 @@ En cours
           <div class="status-v" id="ready-text">{% if order.wash_complete_time %}Oui{% else %}Non{% endif %}</div>
         </div>
       </div>
-
       <ul class="items-list">
         {% if items %}
           {% for it in items %}
@@ -445,18 +468,15 @@ En cours
         {% endif %}
       </ul>
     </section>
-
-    <section class="audio-card">
+    <section class="audio-card terrain-advanced-source">
       <div class="audio-title">🔊 Aide vocale</div>
       <div class="audio-sub">
         Utilise l’écoute vocale pour entendre la commande et les étapes.
       </div>
-
       <div class="audio-actions">
         <button type="button" class="btn btn-primary" id="play-guide-btn" style="width:100%;height:60px;font-size:18px;">▶️ Écouter</button>
         <button type="button" class="btn btn-light" id="stop-guide-btn">⏹️ Arrêter</button>
       </div>
-
       <div class="visual-steps">
         <div class="visual-step">
           <div class="visual-step-ico">🧺</div>
@@ -471,22 +491,17 @@ En cours
           <div class="visual-step-label">Terminé</div>
         </div>
       </div>
-
       <div class="voice-feedback" id="voice-feedback"></div>
-
       <div style="margin-top:14px;padding:14px;border-radius:16px;border:1px solid #dbeafe;background:#ffffff;">
         <div style="font-size:16px;font-weight:1000;color:#0f172a;">🎙️ Commande vocale</div>
         <div style="margin-top:6px;font-size:14px;line-height:1.5;color:#475569;font-weight:700;">
           Dis : <b>en cours</b>, <b>prêt</b> ou <b>terminé</b>.
         </div>
-
         <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <button type="button" class="btn btn-dark" id="voice-start-btn" onclick="startVoiceRecognition()">🎤 Écouter ma voix</button>
           <button type="button" class="btn btn-light" id="voice-stop-btn" onclick="stopVoiceRecognition()">⏹️ Stop écoute</button>
         </div>
-
         <div id="voice-command-result" style="margin-top:12px;font-size:14px;font-weight:900;color:#1d4ed8;min-height:22px;">Module vocal en chargement…</div>
-
         <form method="post" id="voice-command-form" style="display:none;margin-top:12px;">
           {% csrf_token %}
           <input type="hidden" name="action" id="voice-command-action">
@@ -496,26 +511,11 @@ En cours
         </form>
       </div>
     </section>
-
     <section class="section-card">
       <div class="audio-title">Actions</div>
       <div class="audio-sub">
         Appuie sur un grand bouton pour faire avancer la commande.
       </div>
-
-      
-<div style="margin-bottom:20px;">
-  <button id="one-button" style="
-    width:100%;
-    height:90px;
-    border:none;
-    border-radius:20px;
-    font-size:22px;
-    font-weight:1000;
-  ">
-    Chargement...
-  </button>
-</div>
 
 <div class="actions-grid">
         <form method="post" class="action-form">
@@ -527,10 +527,9 @@ En cours
             {% if is_start_disabled %}disabled{% endif %}
             onclick="speakAction('start')">
             <span class="action-btn__icon">🧺</span>
-            <span class="action-btn__label">En cours</span>
+            <span class="action-btn__label">DÉMARRER</span>
           </button>
         </form>
-
         <form method="post" class="action-form">
           {% csrf_token %}
           <input type="hidden" name="action" value="ready">
@@ -540,10 +539,9 @@ En cours
             {% if is_ready_disabled %}disabled{% endif %}
             onclick="speakAction('ready')">
             <span class="action-btn__icon">✅</span>
-            <span class="action-btn__label">Prêt</span>
+            <span class="action-btn__label">PRÊT</span>
           </button>
         </form>
-
         <form method="post" class="action-form">
           {% csrf_token %}
           <input type="hidden" name="action" value="done">
@@ -553,19 +551,16 @@ En cours
             {% if is_done_disabled %}disabled{% endif %}
             onclick="speakAction('done')">
             <span class="action-btn__icon">🏁</span>
-            <span class="action-btn__label">Terminé</span>
+            <span class="action-btn__label">TERMINÉ</span>
           </button>
         </form>
       </div>
-
       {% if is_done_disabled and not order.wash_complete_time %}
-        <div class="helper-note">ℹ️ Il faut d’abord appuyer sur “Prêt” avant “Terminé”.</div>
+        <div class="helper-note">ℹ️ Il faut d’abord appuyer sur “PRÊT” avant “TERMINÉ”.</div>
       {% endif %}
-
       <div class="helper-note" style="margin-top:10px;background:#f8fafc;border-color:#e2e8f0;color:#475569;">
         ⚠️ Confidentialité : aucune information client n’est affichée.
       </div>
-
       <div style="margin-top:20px;padding:14px;border:1px solid #e2e8f0;border-radius:16px;">
         <div style="font-weight:900;">📊 Performance du jour</div>
         <div style="margin-top:8px;">
@@ -576,7 +571,6 @@ En cours
         </div>
       </div>
     </section>
-  
 <div id="ultra-mode" style="
   display:none;
   position:fixed;
@@ -588,19 +582,16 @@ En cours
   align-items:center;
   gap:20px;
 ">
-
   <button onclick="closeUltra()" style="
     position:absolute;
     top:10px;
     right:10px;
     font-size:18px;
   ">✖</button>
-
   <div id="ultra-label" style="
     font-size:22px;
     font-weight:1000;
   "></div>
-
   <form method="post" id="ultra-form">
     {% csrf_token %}
     <input type="hidden" name="action" id="ultra-action">
@@ -613,18 +604,15 @@ En cours
       font-weight:1000;
     "></button>
   </form>
-
 </div>
 {% endif %}
 </div>
-
 <script>
 (function(){
   function getLang(){
     var el = document.getElementById("language-select");
     return el ? el.value : "fr";
   }
-
   function speak(text){
     try{
       if(!("speechSynthesis" in window)) return;
@@ -634,12 +622,10 @@ En cours
       window.speechSynthesis.speak(u);
     }catch(e){}
   }
-
   function setFeedback(text){
     var box = document.getElementById("voice-feedback");
     if(box) box.textContent = text;
   }
-
   function buildGuideText(){
     var lang = getLang();
     if(lang === "dioula"){
@@ -647,11 +633,9 @@ En cours
     }
     return "Bienvenue. Vérifie les articles. Appuie sur En cours pour démarrer. Appuie sur Prêt quand le linge est prêt. Appuie sur Terminé à la fin.";
   }
-
   window.speakAction = function(type){
     var lang = getLang();
     var text = "";
-
     if(lang === "dioula"){
       if(type === "start") text = "Baara daminɛra.";
       if(type === "ready") text = "A labɛlen don.";
@@ -661,24 +645,20 @@ En cours
       if(type === "ready") text = "Commande prête.";
       if(type === "done") text = "Commande terminée.";
     }
-
     if(text){
       speak(text);
       setFeedback(text);
     }
   };
-
   document.addEventListener("DOMContentLoaded", function(){
     var playBtn = document.getElementById("play-guide-btn");
     var stopBtn = document.getElementById("stop-guide-btn");
-
     if(playBtn){
       playBtn.addEventListener("click", function(){
         speak(buildGuideText());
         setFeedback("Lecture vocale activée.");
       });
     }
-
     if(stopBtn){
       stopBtn.addEventListener("click", function(){
         try{
@@ -688,18 +668,13 @@ En cours
       });
     }
   });
-
 // ULTRA MODE
-
 // 🎯 GUIDAGE INTELLIGENT
-
 function autoGuide(){
   const status = getStatus();
   const ready = isReady();
   const lang = getLang();
-
   let text = "";
-
   if(lang === "dioula"){
     if(!status || status.includes("pending")){
       text = "I bɛ se ka baara daminɛ. Bɔ En cours.";
@@ -717,13 +692,11 @@ function autoGuide(){
       text = "Appuie sur TERMINÉ pour finaliser.";
     }
   }
-
   if(text){
     speak(text);
     setFeedback(text);
   }
 }
-
 function openUltra(){
   var modal = document.getElementById("ultra-mode");
   if(modal){
@@ -732,33 +705,26 @@ function openUltra(){
   updateUltra();
   setTimeout(autoGuide, 500);
 }
-
 function closeUltra(){
   var modal = document.getElementById("ultra-mode");
   if(modal){
     modal.style.display = "none";
   }
 }
-
 function getStatus(){
   var el = document.getElementById("ultra-status-raw");
   return el ? String(el.value || "").toLowerCase().trim() : "";
 }
-
 function isReady(){
   var el = document.getElementById("ultra-ready-raw");
   return el ? String(el.value || "").trim() === "1" : false;
 }
-
 function updateUltra(){
   var status = getStatus();
-
   var btn = document.getElementById("ultra-btn");
   var action = document.getElementById("ultra-action");
   var label = document.getElementById("ultra-label");
-
   if(!btn || !action || !label) return;
-
   if(status === "done"){
     label.innerText = "✅ Commande déjà terminée";
     btn.innerText = "🏁 TERMINÉ";
@@ -767,7 +733,6 @@ function updateUltra(){
     action.value = "done";
     return;
   }
-
   if(status === "ready"){
     label.innerText = "👉 Terminer la commande";
     btn.innerText = "🏁 TERMINÉ";
@@ -776,7 +741,6 @@ function updateUltra(){
     action.value = "done";
     return;
   }
-
   if(status === "in_progress"){
     label.innerText = "👉 Marquer prêt";
     btn.innerText = "✅ PRÊT";
@@ -785,14 +749,12 @@ function updateUltra(){
     action.value = "ready";
     return;
   }
-
   label.innerText = "👉 Démarrer";
   btn.innerText = "🧺 EN COURS";
   btn.style.background = "#2563eb";
   btn.style.color = "#fff";
   action.value = "start";
 }
-
 document.addEventListener("DOMContentLoaded", function(){
   var btn = document.getElementById("btn-ultra-mode");
   if(btn){
@@ -801,19 +763,15 @@ document.addEventListener("DOMContentLoaded", function(){
     };
   }
 });
-
 })();
 </script>
-
 <script>
 (function(){
   let FAGNI_VOICE_RECO = null;
-
   function voiceResult(msg){
     const el = document.getElementById("voice-command-result");
     if(el) el.textContent = msg;
   }
-
   function normalizeVoiceText(value){
     return String(value || "")
       .toLowerCase()
@@ -821,10 +779,8 @@ document.addEventListener("DOMContentLoaded", function(){
       .replace(/[\u0300-\u036f]/g, "")
       .trim();
   }
-
   function mapVoiceCommand(text){
     const t = normalizeVoiceText(text);
-
     if (t.includes("termine") || t.includes("terminer") || t.includes("fini") || t.includes("finir")) {
       return {action: "done", label: "🏁 TERMINÉ"};
     }
@@ -836,14 +792,11 @@ document.addEventListener("DOMContentLoaded", function(){
     }
     return null;
   }
-
   function getCurrentLaundryStage(){
     const rawStatusEl = document.getElementById("ultra-status-raw");
     const readyEl = document.getElementById("ultra-ready-raw");
-
     const rawStatus = rawStatusEl ? String(rawStatusEl.value || "").toLowerCase().trim() : "";
     const ready = readyEl ? String(readyEl.value || "").trim() === "1" : false;
-
     if(rawStatus === "done"){
       return "done";
     }
@@ -855,7 +808,6 @@ document.addEventListener("DOMContentLoaded", function(){
     }
     return "pending";
   }
-
   function getAllowedVoiceAction(){
     const stage = getCurrentLaundryStage();
     if(stage === "pending") return "start";
@@ -863,14 +815,12 @@ document.addEventListener("DOMContentLoaded", function(){
     if(stage === "ready") return "done";
     return null;
   }
-
   function getAllowedVoiceLabel(action){
     if(action === "start") return "🧺 EN COURS";
     if(action === "ready") return "✅ PRÊT";
     if(action === "done") return "🏁 TERMINÉ";
     return "";
   }
-
   function getVoiceGuidanceText(){
     const allowed = getAllowedVoiceAction();
     if(allowed === "start") return "Dis seulement : en cours.";
@@ -878,49 +828,39 @@ document.addEventListener("DOMContentLoaded", function(){
     if(allowed === "done") return "Dis seulement : terminé.";
     return "Aucune action vocale disponible. La commande est déjà terminée.";
   }
-
   function setVoiceCommand(command, heardText){
     const result = document.getElementById("voice-command-result");
     const form = document.getElementById("voice-command-form");
     const action = document.getElementById("voice-command-action");
     const submit = document.getElementById("voice-command-submit");
-
     if(!result || !form || !action || !submit) return;
-
     const allowed = getAllowedVoiceAction();
-
     if(!allowed){
       form.style.display = "none";
       result.textContent = "Commande déjà terminée. Aucune action vocale disponible.";
       return;
     }
-
     if(!command){
       form.style.display = "none";
       result.textContent = "Commande non reconnue. " + getVoiceGuidanceText();
       return;
     }
-
     if(command.action !== allowed){
       form.style.display = "none";
       result.textContent = "Action non autorisée maintenant. " + getVoiceGuidanceText();
       return;
     }
-
     action.value = command.action;
     submit.textContent = "✅ Confirmer : " + command.label;
     form.style.display = "";
     result.textContent = "Commande reconnue : " + command.label + (heardText ? " — " + heardText : "");
   }
-
   window.startVoiceRecognition = function(){
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
     if(!SpeechRecognition){
       voiceResult("Reconnaissance vocale non disponible sur ce navigateur.");
       return;
     }
-
     if(!FAGNI_VOICE_RECO){
       try{
         FAGNI_VOICE_RECO = new SpeechRecognition();
@@ -928,11 +868,9 @@ document.addEventListener("DOMContentLoaded", function(){
         FAGNI_VOICE_RECO.interimResults = false;
         FAGNI_VOICE_RECO.maxAlternatives = 3;
         FAGNI_VOICE_RECO.continuous = false;
-
         FAGNI_VOICE_RECO.onstart = function(){
           voiceResult("🎤 J’écoute… " + getVoiceGuidanceText());
         };
-
         FAGNI_VOICE_RECO.onresult = function(event){
           let heard = "";
           try{
@@ -941,19 +879,16 @@ document.addEventListener("DOMContentLoaded", function(){
           const command = mapVoiceCommand(heard);
           setVoiceCommand(command, heard);
         };
-
         FAGNI_VOICE_RECO.onerror = function(event){
           const code = event && event.error ? event.error : "unknown";
           voiceResult("Erreur vocale : " + code);
         };
-
         FAGNI_VOICE_RECO.onend = function(){};
       }catch(e){
         voiceResult("Impossible d’initialiser la commande vocale.");
         return;
       }
     }
-
     try{
       setVoiceCommand(null, "");
       FAGNI_VOICE_RECO.start();
@@ -961,7 +896,6 @@ document.addEventListener("DOMContentLoaded", function(){
       voiceResult("Impossible de démarrer l’écoute.");
     }
   };
-
   window.stopVoiceRecognition = function(){
     if(FAGNI_VOICE_RECO){
       try{
@@ -974,7 +908,6 @@ document.addEventListener("DOMContentLoaded", function(){
       voiceResult("Aucune écoute en cours.");
     }
   };
-
   document.addEventListener("DOMContentLoaded", function(){
     const startBtn = document.getElementById("voice-start-btn");
     const stopBtn = document.getElementById("voice-stop-btn");
@@ -984,7 +917,6 @@ document.addEventListener("DOMContentLoaded", function(){
     if(stopBtn && !stopBtn.onclick){
       stopBtn.onclick = window.stopVoiceRecognition;
     }
-
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if(SpeechRecognition){
       voiceResult("Commande vocale prête. " + getVoiceGuidanceText());
@@ -994,80 +926,63 @@ document.addEventListener("DOMContentLoaded", function(){
   });
 })();
 </script>
-
-
 <script>
 (function(){
   function byId(id){
     return document.getElementById(id);
   }
-
   function getRawStatus(){
     var el = byId("ultra-status-raw");
     return el ? String(el.value || "").toLowerCase().trim() : "";
   }
-
   function getReadyFlag(){
     var el = byId("ultra-ready-raw");
     return el ? String(el.value || "").trim() === "1" : false;
   }
-
   function getStage(){
     var status = getRawStatus();
     var ready = getReadyFlag();
-
     if(status === "done") return "done";
     if(ready) return "ready";
     if(status === "in_progress" || status.indexOf("progress") >= 0) return "in_progress";
     return "pending";
   }
-
   window.updateOneButton = function(){
     var btn = byId("one-button");
     if(!btn) return;
-
     var stage = getStage();
-
     btn.disabled = false;
     btn.style.color = "#fff";
-
     if(stage === "pending"){
       btn.innerText = "🧺 DÉMARRER";
       btn.dataset.action = "start";
       btn.style.background = "#2563eb";
       return;
     }
-
     if(stage === "in_progress"){
       btn.innerText = "✅ MARQUER PRÊT";
       btn.dataset.action = "ready";
       btn.style.background = "#16a34a";
       return;
     }
-
     if(stage === "ready"){
       btn.innerText = "🏁 TERMINER";
       btn.dataset.action = "done";
       btn.style.background = "#0f172a";
       return;
     }
-
     btn.innerText = "✔ TERMINÉ";
     btn.dataset.action = "";
     btn.disabled = true;
     btn.style.background = "#94a3b8";
   };
-
   window.submitOneButtonAction = function(){
     var btn = byId("one-button");
     if(!btn) return false;
-
     var action = btn.dataset.action;
     if(!action) return false;
-
     var form = document.createElement("form");
     form.method = "POST";
-
     var csrf = document.querySelector('[name=csrfmiddlewaretoken]');
     if(csrf){
       var token = document.createElement("input");
@@ -1076,18 +991,15 @@ document.addEventListener("DOMContentLoaded", function(){
       token.value = csrf.value;
       form.appendChild(token);
     }
-
     var a = document.createElement("input");
     a.type = "hidden";
     a.name = "action";
     a.value = action;
     form.appendChild(a);
-
     document.body.appendChild(form);
     form.submit();
     return false;
   };
-
   document.addEventListener("DOMContentLoaded", function(){
     var btn = byId("one-button");
     if(btn){
@@ -1097,5 +1009,4 @@ document.addEventListener("DOMContentLoaded", function(){
   });
 })();
 </script>
-
 {% endblock %}

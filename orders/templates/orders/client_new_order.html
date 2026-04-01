@@ -1,8 +1,6 @@
 {% extends "orders/client_base.html" %}
 {% load static %}
-
 {% block title %}Nouvelle commande – Client FAGNI{% endblock %}
-
 {% block extra_head %}
 {{ block.super }}
 <style>
@@ -11,7 +9,6 @@
     margin:0 auto;
     padding:10px 8px 110px;
   }
-
   .client-create-top{
     display:flex;
     align-items:flex-start;
@@ -20,7 +17,6 @@
     margin-bottom:14px;
     flex-wrap:wrap;
   }
-
   .client-create-title{
     margin:0;
     font-size:26px;
@@ -29,7 +25,6 @@
     letter-spacing:-.03em;
     color:#0f172a;
   }
-
   .client-create-sub{
     margin-top:8px;
     color:#64748b;
@@ -38,14 +33,12 @@
     font-weight:700;
     max-width:760px;
   }
-
   .client-steps{
     display:flex;
     gap:8px;
     flex-wrap:wrap;
     margin-top:12px;
   }
-
   .client-step{
     min-height:34px;
     padding:0 12px;
@@ -60,21 +53,18 @@
     font-weight:900;
     white-space:nowrap;
   }
-
   .client-step.active{
     color:#fff;
     background:linear-gradient(135deg,#ff7a00,#dd6400);
     border-color:transparent;
     box-shadow:0 8px 18px rgba(255,122,0,.18);
   }
-
   .client-create-hero{
     display:grid;
     grid-template-columns:minmax(0,1.35fr) minmax(320px,.95fr);
     gap:14px;
     margin-bottom:14px;
   }
-
   .client-create-hero-main{
     border-radius:24px;
     padding:18px;
@@ -83,30 +73,25 @@
     border:1px solid rgba(255,255,255,.08);
     box-shadow:0 16px 34px rgba(15,23,42,.14);
   }
-
   .client-create-hero-main .fagni-eyebrow,
   .client-create-hero-main .fagni-subtitle{
     color:rgba(255,255,255,.82);
   }
-
   .client-create-hero-main .fagni-title{
     color:#fff;
   }
-
   .client-create-badges{
     display:flex;
     gap:8px;
     flex-wrap:wrap;
     margin-top:14px;
   }
-
   .client-create-mini{
     display:grid;
     grid-template-columns:repeat(3,minmax(0,1fr));
     gap:10px;
     margin-top:16px;
   }
-
   .client-create-mini-card{
     border:1px solid rgba(255,255,255,.14);
     background:rgba(255,255,255,.08);
@@ -114,7 +99,6 @@
     padding:12px;
     min-width:0;
   }
-
   .client-create-mini-card .k{
     margin:0;
     font-size:11px;
@@ -123,7 +107,6 @@
     color:rgba(255,255,255,.72);
     font-weight:900;
   }
-
   .client-create-mini-card .v{
     margin:6px 0 0;
     font-size:14px;
@@ -131,7 +114,6 @@
     color:#fff;
     font-weight:1000;
   }
-
   .client-create-hero-side{
     border-radius:24px;
     padding:16px;
@@ -139,13 +121,11 @@
     border:1px solid #e2e8f0;
     box-shadow:0 12px 28px rgba(15,23,42,.06);
   }
-
   .client-create-info-list{
     display:grid;
     gap:10px;
     margin-top:14px;
   }
-
   .client-create-info-item{
     display:flex;
     gap:10px;
@@ -155,7 +135,6 @@
     border:1px solid #e2e8f0;
     background:#fff;
   }
-
   .client-create-info-icon{
     width:38px;
     height:38px;
@@ -168,14 +147,12 @@
     flex:0 0 auto;
     font-size:16px;
   }
-
   .client-create-info-title{
     font-size:13px;
     font-weight:1000;
     color:#0f172a;
     line-height:1.25;
   }
-
   .client-create-info-desc{
     margin-top:4px;
     color:#64748b;
@@ -183,7 +160,6 @@
     line-height:1.5;
     font-weight:700;
   }
-
   .client-form-panel{
     border-radius:24px;
     border:1px solid #e2e8f0;
@@ -191,7 +167,6 @@
     box-shadow:0 14px 30px rgba(15,23,42,.07);
     padding:18px;
   }
-
   .client-form-head{
     display:flex;
     align-items:flex-start;
@@ -200,7 +175,6 @@
     flex-wrap:wrap;
     margin-bottom:16px;
   }
-
   .client-form-title{
     margin:0;
     font-size:20px;
@@ -209,7 +183,6 @@
     color:#0f172a;
     letter-spacing:-.02em;
   }
-
   .client-form-sub{
     margin-top:6px;
     color:#64748b;
@@ -218,7 +191,6 @@
     font-weight:700;
     max-width:760px;
   }
-
   .client-alert{
     margin-bottom:14px;
     padding:12px 14px;
@@ -230,21 +202,17 @@
     line-height:1.5;
     font-weight:800;
   }
-
   .client-form-grid{
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
     gap:14px;
   }
-
   .client-field{
     min-width:0;
   }
-
   .client-field--full{
     grid-column:1 / -1;
   }
-
   .client-label{
     display:block;
     margin-bottom:8px;
@@ -253,7 +221,6 @@
     font-weight:1000;
     letter-spacing:.01em;
   }
-
   .client-input,
   .client-textarea{
     width:100%;
@@ -268,18 +235,15 @@
     outline:none;
     transition:border-color .15s ease, box-shadow .15s ease, transform .15s ease;
   }
-
   .client-input:focus,
   .client-textarea:focus{
     border-color:#93c5fd;
     box-shadow:0 0 0 4px rgba(37,99,235,.10);
   }
-
   .client-input--disabled{
     background:#f8fafc;
     color:#475569;
   }
-
   .client-help{
     display:block;
     margin-top:8px;
@@ -288,20 +252,17 @@
     line-height:1.5;
     font-weight:700;
   }
-
   .co-geo-grid{
     display:grid;
     grid-template-columns:1fr;
     gap:12px;
   }
-
   .co-address-actions{
     display:flex;
     flex-wrap:wrap;
     gap:10px;
     margin-top:2px;
   }
-
   .co-geo-note{
     margin-top:0;
     padding:12px 14px;
@@ -313,7 +274,6 @@
     line-height:1.5;
     font-weight:700;
   }
-
   .co-geo-status{
     display:none;
     margin-top:0;
@@ -323,28 +283,24 @@
     line-height:1.5;
     font-weight:800;
   }
-
   .co-geo-status.is-ok{
     display:block;
     background:#ecfdf3;
     border:1px solid #bbf7d0;
     color:#166534;
   }
-
   .co-geo-status.is-warn{
     display:block;
     background:#fff7ed;
     border:1px solid #fed7aa;
     color:#9a3412;
   }
-
   .co-geo-status.is-err{
     display:block;
     background:#fef2f2;
     border:1px solid #fecaca;
     color:#991b1b;
   }
-
   .co-map-preview{
     display:none;
     margin-top:0;
@@ -353,21 +309,18 @@
     border:1px solid #e2e8f0;
     background:#fff;
   }
-
   .co-map-preview iframe{
     width:100%;
     height:240px;
     border:0;
     display:block;
   }
-
   .co-coords{
     margin-top:0;
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
     gap:10px;
   }
-
   .co-coords .client-help{
     margin-top:0;
     padding:10px 12px;
@@ -375,7 +328,6 @@
     background:#fff;
     border:1px solid #e2e8f0;
   }
-
   .client-cta{
     margin-top:18px;
     display:flex;
@@ -384,14 +336,12 @@
     gap:12px;
     flex-wrap:wrap;
   }
-
   .client-cta-meta{
     color:#64748b;
     font-size:12px;
     line-height:1.45;
     font-weight:700;
   }
-
   .client-note{
     margin-top:14px;
     padding:12px 14px;
@@ -403,7 +353,6 @@
     line-height:1.55;
     font-weight:700;
   }
-
   @media (max-width:1100px){
     .client-create-hero,
     .client-create-mini,
@@ -411,7 +360,6 @@
       grid-template-columns:1fr;
     }
   }
-
   @media (max-width:760px){
     .client-create-top,
     .client-form-head,
@@ -420,41 +368,33 @@
       align-items:flex-start;
     }
   }
-
   @media (max-width:640px){
     .client-order-create{
       padding:10px 8px 104px;
     }
-
     .co-address-actions{
       flex-direction:column;
     }
-
     .co-address-actions .fagni-btn{
       width:100%;
     }
-
     .co-coords{
       grid-template-columns:1fr;
     }
-
     .client-create-title{
       font-size:24px;
     }
   }
 </style>
 {% endblock %}
-
 {% block content %}
 <div class="page client-order-create">
-
   <div class="client-create-top">
     <div>
       <h1 class="client-create-title">Nouvelle commande</h1>
       <p class="client-create-sub">
         Étape 1/4 — Tes informations. Ensuite tu choisis la catégorie, le mode logistique, les articles et tu valides le récapitulatif.
       </p>
-
       <div class="client-steps" aria-label="progression">
         <span class="client-step active">1 • Infos</span>
         <span class="client-step">2 • Catégorie & livraison</span>
@@ -462,12 +402,10 @@
         <span class="client-step">4 • Récap</span>
       </div>
     </div>
-
     <div>
       <a class="fagni-btn fagni-btn--light" href="{% url 'orders:client_home' %}">← Retour</a>
     </div>
   </div>
-
   <section class="client-create-hero">
     <div class="client-create-hero-main">
       <div class="fagni-eyebrow">FAGNI • Création de commande</div>
@@ -475,13 +413,11 @@
       <p class="fagni-subtitle">
         Tu décris le besoin, nous organisons la collecte, le traitement puis la livraison. Cette première étape sert à sécuriser tes informations avant le reste du parcours.
       </p>
-
       <div class="client-create-badges" aria-label="atouts">
         <span class="fagni-badge fagni-badge--glass">Collecte & livraison</span>
         <span class="fagni-badge fagni-badge--glass">Suivi par statut</span>
         <span class="fagni-badge fagni-badge--glass">Paiement après validation</span>
       </div>
-
       <div class="client-create-mini" aria-label="infos rapides">
         <div class="client-create-mini-card">
           <p class="k">Ensuite</p>
@@ -497,14 +433,12 @@
         </div>
       </div>
     </div>
-
     <div class="client-create-hero-side">
       <div class="fagni-eyebrow" style="color:#64748b;">Ce qu’il faut savoir</div>
       <h3 class="fagni-title" style="font-size:20px;color:#0f172a;">Avant de continuer</h3>
       <p class="fagni-subtitle" style="margin-top:8px;color:#64748b;">
         Quelques rappels utiles pour une commande plus fluide.
       </p>
-
       <div class="client-create-info-list">
         <div class="client-create-info-item">
           <div class="client-create-info-icon">📍</div>
@@ -513,7 +447,6 @@
             <div class="client-create-info-desc">Tu peux saisir l’adresse manuellement ou utiliser ta position pour fiabiliser la collecte.</div>
           </div>
         </div>
-
         <div class="client-create-info-item">
           <div class="client-create-info-icon">🧾</div>
           <div>
@@ -521,7 +454,6 @@
             <div class="client-create-info-desc">Le prix dépendra des articles et quantités choisis aux étapes suivantes.</div>
           </div>
         </div>
-
         <div class="client-create-info-item">
           <div class="client-create-info-icon">⏱️</div>
           <div>
@@ -532,7 +464,6 @@
       </div>
     </div>
   </section>
-
   <section class="client-form-panel">
     <div class="client-form-head">
       <div>
@@ -542,27 +473,22 @@
         </div>
       </div>
     </div>
-
     {% if error %}
       <div class="client-alert">{{ error }}</div>
     {% endif %}
-
     <form method="post" id="clientNewOrderForm">
       {% csrf_token %}
-
       <input type="hidden" name="pickup_lat" id="pickupLat" value="">
       <input type="hidden" name="pickup_lng" id="pickupLng" value="">
       <input type="hidden" name="pickup_place_id" id="pickupPlaceId" value="">
       <input type="hidden" name="pickup_geo_source" id="pickupGeoSource" value="">
       <input type="hidden" name="pickup_geo_label" id="pickupGeoLabel" value="">
-
       <div class="client-form-grid">
         <div class="client-field">
           <label class="client-label">Téléphone</label>
           <input value="{{ phone }}" disabled class="client-input client-input--disabled" />
           <small class="client-help">Ce numéro sert à retrouver tes commandes.</small>
         </div>
-
         <div class="client-field">
           <label class="client-label">Nom</label>
           <input
@@ -575,14 +501,13 @@
           />
           <small class="client-help">Ex : Désiré Tongbé</small>
         </div>
-
         <div class="client-field client-field--full">
           <label class="client-label">Adresse de collecte / livraison</label>
-
           <div class="co-geo-grid">
             <input
               id="addressInput"
               name="address"
+              placeholder="Ex: Cocody Riviera 3, près du carrefour Shell"
               value="{{ address_init }}"
               placeholder="Ex : Cocody Angré 8ème tranche…"
               class="client-input"
@@ -590,26 +515,33 @@
               required
             />
 
+            <div class="client-geo-tools" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <button type="button" id="btn-use-location" class="btn btn-light" style="min-height:44px;font-weight:900;">
+                📍 Utiliser ma position
+              </button>
+              <div id="geo-feedback" style="font-size:12px;font-weight:800;color:#64748b;"></div>
+            </div>
+
+
+            <input type="hidden" name="pickup_lat" id="id_pickup_lat" value="{{ request.POST.pickup_lat|default:'' }}">
+            <input type="hidden" name="pickup_lng" id="id_pickup_lng" value="{{ request.POST.pickup_lng|default:'' }}">
+            <input type="hidden" name="pickup_geo_label" id="id_pickup_geo_label" value="{{ request.POST.pickup_geo_label|default:'' }}">
+
             <div class="co-address-actions">
               <button type="button" class="fagni-btn fagni-btn--light" id="btnLocateMe">📍 Utiliser ma position</button>
               <button type="button" class="fagni-btn fagni-btn--light" id="btnClearGeo">✕ Effacer la géolocalisation</button>
             </div>
-
             <div class="co-geo-note">
               Tu peux saisir ton adresse manuellement, utiliser l’autocomplétion, ou autoriser ta position pour préremplir une adresse plus fiable.
             </div>
-
             <div id="geoStatus" class="co-geo-status"></div>
-
             <div class="co-coords">
               <small class="client-help" id="latPreview">Latitude : —</small>
               <small class="client-help" id="lngPreview">Longitude : —</small>
             </div>
-
             <div id="mapPreview" class="co-map-preview"></div>
           </div>
         </div>
-
         <div class="client-field client-field--full">
           <label class="client-label">Détails / Notes (optionnel)</label>
           <textarea
@@ -621,53 +553,42 @@
           <small class="client-help">Plus c’est précis, plus c’est simple pour l’équipe.</small>
         </div>
       </div>
-
       <div class="client-cta">
         <button type="submit" class="fagni-btn fagni-btn--primary">Continuer → Étape 2</button>
         <span class="client-cta-meta">Temps estimé : <strong>30 secondes</strong></span>
       </div>
-
       <div class="client-note">
         <strong>Info :</strong> le montant dépend des <strong>articles</strong> et des <strong>quantités</strong> que tu choisiras à l’étape suivante.
       </div>
     </form>
   </section>
-
 </div>
-
 {% if google_maps_api_key %}
 <script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places&loading=async"></script>
 {% endif %}
-
 <script>
 (function(){
-
   const addressInput = document.getElementById("addressInput");
   const latInput = document.getElementById("pickupLat");
   const lngInput = document.getElementById("pickupLng");
   const placeIdInput = document.getElementById("pickupPlaceId");
   const geoSourceInput = document.getElementById("pickupGeoSource");
   const geoLabelInput = document.getElementById("pickupGeoLabel");
-
   const btnLocateMe = document.getElementById("btnLocateMe");
   const btnClearGeo = document.getElementById("btnClearGeo");
-
   const geoStatus = document.getElementById("geoStatus");
   const latPreview = document.getElementById("latPreview");
   const lngPreview = document.getElementById("lngPreview");
-
   function showStatus(msg, type){
     if(!geoStatus) return;
     geoStatus.className = "co-geo-status";
     if(type){ geoStatus.classList.add(type); }
     geoStatus.textContent = msg || "";
   }
-
   function updatePreview(lat, lng){
     if(latPreview) latPreview.textContent = "Latitude : " + (lat || "—");
     if(lngPreview) lngPreview.textContent = "Longitude : " + (lng || "—");
   }
-
   function setGeo(lat, lng, opts){
     const options = opts || {};
     latInput.value = lat || "";
@@ -675,56 +596,42 @@
     placeIdInput.value = options.placeId || "";
     geoSourceInput.value = options.source || "";
     geoLabelInput.value = options.label || "";
-
     updatePreview(latInput.value, lngInput.value);
   }
-
   async function reverseGeocode(lat, lng){
     try{
       const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`;
-
       const res = await fetch(url);
-
       if(!res.ok){
         return { address: "", placeId: "" };
       }
-
       const data = await res.json();
-
       return {
         address: data.display_name || "",
         placeId: ""
       };
-
     }catch(e){
       return { address: "", placeId: "" };
     }
   }
-
   async function locateMe(){
     if(!navigator.geolocation){
       showStatus("Géolocalisation non disponible.", "is-err");
       return;
     }
-
     showStatus("Localisation en cours…", "is-warn");
-
     navigator.geolocation.getCurrentPosition(
       async function(pos){
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
-
         setGeo(lat, lng, {
           source: "browser_geolocation",
           label: "Position actuelle"
         });
-
         const geo = await reverseGeocode(lat, lng);
-
         if(geo.address && addressInput){
           addressInput.value = geo.address;
         }
-
         showStatus("Position récupérée avec succès.", "is-ok");
       },
       function(){
@@ -732,11 +639,9 @@
       }
     );
   }
-
   if(btnLocateMe){
     btnLocateMe.addEventListener("click", locateMe);
   }
-
 })();
 </script>
 {% endblock %}

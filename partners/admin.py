@@ -1,10 +1,11 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 
 from .models import LaundryPartner, DeliveryPartner, RelayPointPartner
 
 
 @admin.register(LaundryPartner)
-class LaundryPartnerAdmin(admin.ModelAdmin):
+class LaundryPartnerAdmin(UnfoldModelAdmin):
     """
     Blanchisseries partenaires FAGNI.
     """
@@ -14,7 +15,7 @@ class LaundryPartnerAdmin(admin.ModelAdmin):
 
 
 @admin.register(DeliveryPartner)
-class DeliveryPartnerAdmin(admin.ModelAdmin):
+class DeliveryPartnerAdmin(UnfoldModelAdmin):
     """
     Livreurs partenaires FAGNI.
     """
@@ -24,7 +25,7 @@ class DeliveryPartnerAdmin(admin.ModelAdmin):
 
 
 @admin.register(RelayPointPartner)
-class RelayPointPartnerAdmin(admin.ModelAdmin):
+class RelayPointPartnerAdmin(UnfoldModelAdmin):
     """
     Points relais partenaires FAGNI.
     """

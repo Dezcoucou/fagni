@@ -1,9 +1,10 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 from .models import Mission, MissionActionLog
 
 
 @admin.register(Mission)
-class MissionAdmin(admin.ModelAdmin):
+class MissionAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "code",
@@ -37,7 +38,7 @@ class MissionAdmin(admin.ModelAdmin):
 
 
 @admin.register(MissionActionLog)
-class MissionActionLogAdmin(admin.ModelAdmin):
+class MissionActionLogAdmin(UnfoldModelAdmin):
     list_display = ("id", "mission", "action_type", "performed_at", "created_at")
     search_fields = ("mission__code", "action_type", "notes")
     list_filter = ("action_type", "performed_at", "created_at")

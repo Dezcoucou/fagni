@@ -1,4 +1,6 @@
-from django.contrib import admin, messages
+from django.contrib import admin
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
+from django.contrib import messages
 from django.db import transaction
 from django.utils import timezone
 
@@ -9,7 +11,7 @@ from .models import Wallet, WalletTransaction, WithdrawalRequest
 #  WALLET
 # =========================
 @admin.register(Wallet)
-class WalletAdmin(admin.ModelAdmin):
+class WalletAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "owner_type",
@@ -34,7 +36,7 @@ class WalletAdmin(admin.ModelAdmin):
 #  WALLET TRANSACTIONS
 # =========================
 @admin.register(WalletTransaction)
-class WalletTransactionAdmin(admin.ModelAdmin):
+class WalletTransactionAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "wallet",
@@ -60,7 +62,7 @@ class WalletTransactionAdmin(admin.ModelAdmin):
 #  WITHDRAWAL REQUESTS
 # =========================
 @admin.register(WithdrawalRequest)
-class WithdrawalRequestAdmin(admin.ModelAdmin):
+class WithdrawalRequestAdmin(UnfoldModelAdmin):
     """
     Demandes de retrait.
     Objectif: payer / rejeter proprement + tracer processed_by + anti-doublon.

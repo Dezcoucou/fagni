@@ -1,9 +1,10 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 from .models import TrackingEvent, Proof, Incident
 
 
 @admin.register(TrackingEvent)
-class TrackingEventAdmin(admin.ModelAdmin):
+class TrackingEventAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "order",
@@ -28,7 +29,7 @@ class TrackingEventAdmin(admin.ModelAdmin):
 
 
 @admin.register(Proof)
-class ProofAdmin(admin.ModelAdmin):
+class ProofAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "order",
@@ -50,7 +51,7 @@ class ProofAdmin(admin.ModelAdmin):
 
 
 @admin.register(Incident)
-class IncidentAdmin(admin.ModelAdmin):
+class IncidentAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "order",

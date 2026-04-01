@@ -2,7 +2,9 @@
 from decimal import Decimal
 
 from django import forms
-from django.contrib import admin, messages
+from django.contrib import admin
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
+from django.contrib import messages
 from django.contrib.admin.helpers import ActionForm
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -46,7 +48,7 @@ except ModuleNotFoundError:
 
 
 @admin.register(LogisticsConfig)
-class LogisticsConfigAdmin(admin.ModelAdmin):
+class LogisticsConfigAdmin(UnfoldModelAdmin):
     list_display = ("id",)
 
 
@@ -216,7 +218,7 @@ class CycleOrderLinkedFilter(admin.SimpleListFilter):
 
 
 @admin.register(Customer)
-class CustomerAdmin(admin.ModelAdmin):
+class CustomerAdmin(UnfoldModelAdmin):
     list_display = ("name", "phone", "address", "nb_commandes", "montant_total")
     search_fields = ("name", "phone", "address")
     list_per_page = 50
@@ -277,7 +279,7 @@ class SubscriptionCycleInline(admin.TabularInline):
 
 
 @admin.register(Subscription)
-class SubscriptionAdmin(admin.ModelAdmin):
+class SubscriptionAdmin(UnfoldModelAdmin):
     action_form = SubscriptionActionForm
 
     list_display = (
@@ -340,7 +342,7 @@ class SubscriptionAdmin(admin.ModelAdmin):
 
 
 @admin.register(SubscriptionCycle)
-class SubscriptionCycleAdmin(admin.ModelAdmin):
+class SubscriptionCycleAdmin(UnfoldModelAdmin):
     list_display = ("id", "customer", "pickup_date", "delivery_date", "status", "related_order_link", "created_at")
     list_filter = (CycleOrderLinkedFilter, "status", "pickup_date", "delivery_date")
     search_fields = ("customer__name", "customer__phone")
@@ -443,7 +445,7 @@ class SubscriptionCycleAdmin(admin.ModelAdmin):
 # ============================================================
 
 @admin.register(DeliveryLeg)
-class DeliveryLegAdmin(admin.ModelAdmin):
+class DeliveryLegAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "order_link",
@@ -488,7 +490,7 @@ class DeliveryLegAdmin(admin.ModelAdmin):
 
 
 @admin.register(Order)
-class OrderAdmin(admin.ModelAdmin):
+class OrderAdmin(UnfoldModelAdmin):
     list_display = (
         "code",
         "customer",
@@ -1057,22 +1059,22 @@ class OrderAdmin(admin.ModelAdmin):
 
 
 @admin.register(GlobalPricingSettings)
-class GlobalPricingSettingsAdmin(admin.ModelAdmin):
+class GlobalPricingSettingsAdmin(UnfoldModelAdmin):
     list_display = ("id",)
 
 
 @admin.register(WorkflowSettings)
-class WorkflowSettingsAdmin(admin.ModelAdmin):
+class WorkflowSettingsAdmin(UnfoldModelAdmin):
     list_display = ("id",)
 
 
 @admin.register(AssignmentSettings)
-class AssignmentSettingsAdmin(admin.ModelAdmin):
+class AssignmentSettingsAdmin(UnfoldModelAdmin):
     list_display = ("id",)
 
 
 @admin.register(InvoiceSettings)
-class InvoiceSettingsAdmin(admin.ModelAdmin):
+class InvoiceSettingsAdmin(UnfoldModelAdmin):
     list_display = ("id",)
 
 
@@ -1081,13 +1083,13 @@ from django.contrib import admin
 from .models import ServiceCategory, ServiceItem
 
 @admin.register(ServiceCategory)
-class ServiceCategoryAdmin(admin.ModelAdmin):
+class ServiceCategoryAdmin(UnfoldModelAdmin):
     list_display = ("name", "slug")
     search_fields = ("name", "slug")
     prepopulated_fields = {"slug": ("name",)}
 
 @admin.register(ServiceItem)
-class ServiceItemAdmin(admin.ModelAdmin):
+class ServiceItemAdmin(UnfoldModelAdmin):
     list_display = ("name", "category", "default_price", "is_active")
     list_filter = ("category", "is_active")
     search_fields = ("name", "code", "category__name")

@@ -1,9 +1,10 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 from .models import ServiceCategory, Service, ServiceOption
 
 
 @admin.register(ServiceCategory)
-class ServiceCategoryAdmin(admin.ModelAdmin):
+class ServiceCategoryAdmin(UnfoldModelAdmin):
     list_display = ("id", "code", "name", "is_active", "created_at")
     search_fields = ("code", "name", "description")
     list_filter = ("is_active", "created_at")
@@ -12,7 +13,7 @@ class ServiceCategoryAdmin(admin.ModelAdmin):
 
 
 @admin.register(Service)
-class ServiceAdmin(admin.ModelAdmin):
+class ServiceAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "code",
@@ -41,7 +42,7 @@ class ServiceAdmin(admin.ModelAdmin):
 
 
 @admin.register(ServiceOption)
-class ServiceOptionAdmin(admin.ModelAdmin):
+class ServiceOptionAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "service",

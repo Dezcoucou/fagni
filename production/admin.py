@@ -1,9 +1,10 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 from .models import PartnerJob, WeighingRecord
 
 
 @admin.register(PartnerJob)
-class PartnerJobAdmin(admin.ModelAdmin):
+class PartnerJobAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "code",
@@ -23,7 +24,7 @@ class PartnerJobAdmin(admin.ModelAdmin):
 
 
 @admin.register(WeighingRecord)
-class WeighingRecordAdmin(admin.ModelAdmin):
+class WeighingRecordAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "order",

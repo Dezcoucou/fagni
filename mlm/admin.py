@@ -1,4 +1,5 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 
 from .models import (
     ReferralLink,
@@ -10,7 +11,7 @@ from .models import (
 
 
 @admin.register(ReferralLink)
-class ReferralLinkAdmin(admin.ModelAdmin):
+class ReferralLinkAdmin(UnfoldModelAdmin):
     list_display = (
         "referral_code",
         "customer",
@@ -28,7 +29,7 @@ class ReferralLinkAdmin(admin.ModelAdmin):
 
 
 @admin.register(ReferralCommission)
-class ReferralCommissionAdmin(admin.ModelAdmin):
+class ReferralCommissionAdmin(UnfoldModelAdmin):
     list_display = (
         "beneficiary_profile",
         "level",
@@ -48,7 +49,7 @@ class ReferralCommissionAdmin(admin.ModelAdmin):
 
 
 @admin.register(WalletTransaction)
-class WalletTransactionAdmin(admin.ModelAdmin):
+class WalletTransactionAdmin(UnfoldModelAdmin):
     list_display = (
         "profile",
         "type",
@@ -66,7 +67,7 @@ class WalletTransactionAdmin(admin.ModelAdmin):
 
 
 @admin.register(WithdrawalRequest)
-class WithdrawalRequestAdmin(admin.ModelAdmin):
+class WithdrawalRequestAdmin(UnfoldModelAdmin):
     list_display = (
         "profile",
         "amount",
@@ -85,7 +86,7 @@ class WithdrawalRequestAdmin(admin.ModelAdmin):
 
 
 @admin.register(MLMSettings)
-class MLMSettingsAdmin(admin.ModelAdmin):
+class MLMSettingsAdmin(UnfoldModelAdmin):
     list_display = (
         "name",
         "is_active",

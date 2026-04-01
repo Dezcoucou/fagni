@@ -1,4 +1,5 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 from .models import Article, ItemPhoto
 
 
@@ -8,13 +9,13 @@ class ItemPhotoInline(admin.TabularInline):
 
 
 @admin.register(Article)
-class ArticleAdmin(admin.ModelAdmin):
+class ArticleAdmin(UnfoldModelAdmin):
     list_display = ("title", "price", "created_at")
     search_fields = ("title",)
     inlines = [ItemPhotoInline]
 
 
 @admin.register(ItemPhoto)
-class ItemPhotoAdmin(admin.ModelAdmin):
+class ItemPhotoAdmin(UnfoldModelAdmin):
     list_display = ("article", "caption", "uploaded_at")
     search_fields = ("article__title", "caption")

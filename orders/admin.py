@@ -18,6 +18,7 @@ from .models import (
     LogisticsConfig,
     Order,
     OrderItem,
+    Payment,
     OrderItemPhoto,
     ServiceCategory,
     ServiceItem,
@@ -1094,3 +1095,12 @@ class ServiceItemAdmin(UnfoldModelAdmin):
     list_filter = ("category", "is_active")
     search_fields = ("name", "code", "category__name")
     ordering = ("category__name", "name")
+
+
+@admin.register(Payment)
+class PaymentAdmin(UnfoldModelAdmin):
+    list_display = ["order", "amount", "channel", "source", "created_at"]
+    list_filter = ["channel", "source"]
+    search_fields = ["order__code", "reference"]
+    ordering = ["-created_at"]
+    readonly_fields = ["order", "amount", "channel", "reference", "source", "created_at"]

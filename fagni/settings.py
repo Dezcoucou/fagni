@@ -64,6 +64,9 @@ FAGNI_QR_BASE_URL = SITE_BASE_URL
 INSTALLED_APPS = [
     'dashboard',
 
+    'unfold',
+    'unfold.contrib.filters',
+    'unfold.contrib.forms',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -381,3 +384,102 @@ try:
 except Exception:
     pass
 
+
+# ========================
+#  UNFOLD ADMIN
+# ========================
+UNFOLD = {
+    "SITE_TITLE": "FAGNI Admin",
+    "SITE_HEADER": "FAGNI",
+    "SITE_SUBHEADER": "Pressing • Collecte • Livraison",
+    "SITE_URL": "/",
+    "SITE_SYMBOL": "local_laundry_service",
+    "SHOW_HISTORY": True,
+    "SHOW_VIEW_ON_SITE": True,
+    "COLORS": {
+        "primary": {
+            "50": "255 248 240",
+            "100": "255 237 213",
+            "200": "254 215 170",
+            "300": "253 186 116",
+            "400": "251 146 60",
+            "500": "232 119 34",
+            "600": "194 65 12",
+            "700": "154 52 18",
+            "800": "124 45 18",
+            "900": "101 35 13",
+            "950": "67 20 7",
+        },
+    },
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": True,
+        "navigation": [
+            {
+                "title": "Commandes",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "Toutes les commandes",
+                        "icon": "receipt_long",
+                        "link": "/admin/orders/order/",
+                        "badge": "orders.admin.order_count",
+                    },
+                    {
+                        "title": "Clients",
+                        "icon": "person",
+                        "link": "/admin/orders/customer/",
+                    },
+                    {
+                        "title": "Paiements",
+                        "icon": "payments",
+                        "link": "/admin/orders/payment/",
+                    },
+                ],
+            },
+            {
+                "title": "Partenaires",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "Blanchisseries",
+                        "icon": "local_laundry_service",
+                        "link": "/admin/partners/laundrypartner/",
+                    },
+                    {
+                        "title": "Livreurs",
+                        "icon": "delivery_dining",
+                        "link": "/admin/partners/deliverypartner/",
+                    },
+                ],
+            },
+            {
+                "title": "Finance",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "Wallets",
+                        "icon": "account_balance_wallet",
+                        "link": "/admin/wallets/wallet/",
+                    },
+                    {
+                        "title": "Retraits",
+                        "icon": "currency_exchange",
+                        "link": "/admin/wallets/withdrawalrequest/",
+                    },
+                ],
+            },
+            {
+                "title": "MLM",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "Affiliés",
+                        "icon": "group_add",
+                        "link": "/admin/mlm/",
+                    },
+                ],
+            },
+        ],
+    },
+}

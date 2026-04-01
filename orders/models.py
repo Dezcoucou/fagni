@@ -3,6 +3,7 @@ import uuid
 import math
 from orders.utils.distances import haversine_distance_km
 from django.db import models
+from django.db.models import Max
 from django.db import transaction
 from django.db.models import Sum, F, DecimalField
 from django.conf import settings
@@ -789,6 +790,12 @@ class LogisticsConfig(models.Model):
 #  COMMANDE
 # =====================
 class Order(models.Model):
+    order_number = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        unique=True,
+    )
+
 
     # ======================
     #  FACTURATION (Lot 4.11.1)
@@ -2653,6 +2660,12 @@ class Order(models.Model):
         return "ODR" + "".join(secrets.choice(alphabet) for _ in range(11))
 
     def save(self, *args, **kwargs):
+        if not self.order_number:
+            max_number = Order.objects.aggregate(
+                max_number=Max("order_number")
+            )["max_number"] or 1000
+            self.order_number = max_number + 1
+
         from decimal import Decimal
         from django.utils import timezone
         from django.apps import apps

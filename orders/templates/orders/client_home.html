@@ -1,1142 +1,314 @@
 {% extends "orders/client_base.html" %}
-{% load humanize money_filters %}
+{% load static %}
 
-{% block title %}Accueil – Client FAGNI{% endblock %}
+{% block title %}Mon espace — FAGNI{% endblock %}
 
 {% block extra_head %}
-{{ block.super }}
 <style>
-  .client-home{
-    max-width:1180px;
-    margin:0 auto;
-    padding:10px 8px 108px;
+  :root{
+    --navy:#1E3A5F;
+    --navy-2:#27476f;
+    --orange:#E87722;
+    --orange-dark:#C4611A;
+    --cream:#FFF8F2;
+    --text:#1E3A5F;
+    --muted:#6B7280;
+    --border:#E8EDF5;
+    --bg:#F4F7FB;
+    --shadow:0 10px 30px rgba(30,58,95,.10);
+    --shadow-orange:0 10px 24px rgba(232,119,34,.18);
+    --radius:20px;
+  }
+  *{ box-sizing:border-box; }
+  body{ background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,sans-serif; -webkit-font-smoothing:antialiased; }
+  a{ text-decoration:none; color:inherit; }
+  img{ display:block; max-width:100%; }
+  .shell{ width:min(1100px, calc(100% - 24px)); margin:0 auto; }
+
+  .client-topbar{ background:linear-gradient(90deg,var(--navy),var(--navy-2)); box-shadow:0 4px 20px rgba(0,0,0,.10); position:sticky; top:0; z-index:40; }
+  .client-topbar-inner{ display:flex; align-items:center; justify-content:space-between; min-height:68px; gap:16px; }
+  .topbar-brand img{ height:32px; filter:brightness(0) invert(1); }
+  .topbar-right{ display:flex; align-items:center; gap:12px; }
+  .topbar-btn{ min-height:40px; padding:0 18px; border-radius:999px; background:var(--orange); color:#fff; font-size:13px; font-weight:800; display:inline-flex; align-items:center; gap:8px; box-shadow:var(--shadow-orange); transition:background .2s; }
+  .topbar-btn:hover{ background:var(--orange-dark); }
+  .topbar-ghost{ min-height:38px; padding:0 14px; border-radius:999px; border:1px solid rgba(255,255,255,.22); color:#fff; font-size:13px; font-weight:700; display:inline-flex; align-items:center; }
+  .topbar-avatar{ width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,#f7c7a2,#ffe4d0); border:2px solid rgba(255,255,255,.40); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; color:var(--navy); }
+
+  .welcome-hero{ background:linear-gradient(90deg,var(--navy),var(--navy-2)); color:#fff; padding:32px 0 80px; margin-bottom:-56px; }
+  .welcome-inner{ display:grid; grid-template-columns:1fr 220px; gap:24px; align-items:center; }
+  .welcome-title{ font-size:clamp(22px,4vw,34px); font-weight:900; letter-spacing:-0.03em; margin-bottom:6px; }
+  .welcome-sub{ color:rgba(255,255,255,.75); font-size:15px; }
+  .welcome-visual{ height:130px; border-radius:18px; background:linear-gradient(135deg,#d4e0ee,#c8d7ea); border:1px solid rgba(255,255,255,.12); }
+
+  .stats-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; position:relative; z-index:2; }
+  .stat-card{ background:#fff; border:1px solid var(--border); border-radius:18px; padding:18px 16px; box-shadow:var(--shadow); display:flex; align-items:center; gap:14px; transition:transform .2s; }
+  .stat-card:hover{ transform:translateY(-3px); }
+  .stat-icon{ width:48px; height:48px; border-radius:14px; background:#EEF3FB; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
+  .stat-icon.orange{ background:#FFF0E4; }
+  .stat-value{ font-size:26px; font-weight:900; color:var(--navy); line-height:1; margin-bottom:4px; }
+  .stat-label{ font-size:13px; color:var(--muted); font-weight:600; }
+
+  .section{ margin-top:28px; }
+  .section-head{ display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:16px; }
+  .section-title{ font-size:20px; font-weight:900; color:var(--navy); letter-spacing:-0.02em; }
+  .section-link{ font-size:13px; font-weight:700; color:var(--orange); }
+
+  .priority-card{ background:#fff; border:1px solid var(--border); border-radius:20px; padding:20px; box-shadow:var(--shadow); }
+  .priority-inner{ display:grid; grid-template-columns:68px 1fr auto; gap:16px; align-items:center; }
+  .order-thumb{ width:68px; height:68px; border-radius:14px; background:linear-gradient(135deg,#f6e7d8,#fff8f2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0; }
+  .order-ref{ font-size:12px; color:var(--muted); font-weight:600; margin-bottom:4px; }
+  .order-name{ font-size:17px; font-weight:900; color:var(--navy); margin-bottom:4px; }
+  .order-meta{ font-size:13px; color:var(--muted); }
+  .amount-value{ font-size:22px; font-weight:900; color:var(--navy); }
+  .amount-fcfa{ font-size:13px; color:var(--muted); font-weight:700; }
+  .pay-btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:0 18px; border-radius:14px; background:var(--orange); color:#fff; font-size:14px; font-weight:800; margin-top:8px; box-shadow:var(--shadow-orange); transition:background .2s; white-space:nowrap; }
+  .pay-btn:hover{ background:var(--orange-dark); }
+
+  .badge{ display:inline-flex; align-items:center; min-height:26px; padding:0 10px; border-radius:999px; font-size:11px; font-weight:800; }
+  .badge-unpaid,.badge-pending{ background:#FFF4CD; color:#8A6D00; }
+  .badge-paid,.badge-done{ background:#D8F7DF; color:#0D7A2B; }
+  .badge-in_progress{ background:#DDEEFF; color:#1E3A5F; }
+  .badge-canceled{ background:#FFE4E4; color:#A30000; }
+  .badge-partial{ background:#FFE8CC; color:#C4611A; }
+
+  .quick-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+  .quick-card{ background:#fff; border:1px solid var(--border); border-radius:18px; padding:18px 14px; text-align:center; box-shadow:var(--shadow); transition:transform .2s; cursor:pointer; }
+  .quick-card:hover{ transform:translateY(-3px); }
+  .quick-icon{ font-size:28px; margin-bottom:10px; }
+  .quick-label{ font-size:13px; font-weight:800; color:var(--navy); }
+  .quick-sub{ font-size:11px; color:var(--muted); margin-top:3px; }
+
+  .filters{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .filter-pill{ min-height:36px; padding:0 16px; border-radius:999px; border:1px solid var(--border); background:#fff; color:var(--navy); font-size:13px; font-weight:700; cursor:pointer; transition:all .2s; }
+  .filter-pill.active{ background:var(--navy); color:#fff; border-color:var(--navy); }
+
+  .orders-list{ display:flex; flex-direction:column; gap:12px; }
+  .order-row{ background:#fff; border:1px solid var(--border); border-radius:18px; padding:16px 18px; box-shadow:var(--shadow); display:grid; grid-template-columns:48px 1fr auto auto auto; gap:14px; align-items:center; transition:transform .2s; }
+  .order-row:hover{ transform:translateY(-2px); }
+  .order-row-thumb{ width:48px; height:48px; border-radius:12px; background:linear-gradient(135deg,#EEF3FB,#F4F7FB); display:flex; align-items:center; justify-content:center; font-size:20px; }
+  .order-row-name{ font-size:15px; font-weight:800; color:var(--navy); margin-bottom:3px; }
+  .order-row-meta{ font-size:12px; color:var(--muted); }
+  .order-row-amount{ font-size:15px; font-weight:900; color:var(--navy); text-align:right; white-space:nowrap; }
+  .order-row-arrow{ color:var(--muted); font-size:18px; }
+
+  .faq-list{ display:flex; flex-direction:column; gap:10px; }
+  .faq-item{ background:#fff; border:1px solid var(--border); border-radius:16px; padding:16px 18px; box-shadow:var(--shadow); }
+  .faq-q{ font-size:14px; font-weight:700; color:var(--navy); display:flex; justify-content:space-between; }
+
+  .bottom-nav{ display:none; position:fixed; bottom:0; left:0; right:0; background:var(--navy); border-top:1px solid rgba(255,255,255,.08); z-index:50; padding:8px 0 12px; }
+  .bottom-nav-inner{ display:grid; grid-template-columns:repeat(4,1fr); }
+  .bottom-tab{ display:flex; flex-direction:column; align-items:center; gap:4px; padding:6px 4px; color:rgba(255,255,255,.70); font-size:11px; font-weight:700; border-radius:14px; margin:0 4px; }
+  .tab-icon{ font-size:20px; line-height:1; }
+  .bottom-tab.active{ background:var(--orange); color:#fff; }
+
+  @media (max-width:900px){
+    .welcome-visual{ display:none; }
+    .welcome-inner{ grid-template-columns:1fr; }
+    .quick-grid{ grid-template-columns:repeat(2,1fr); }
+    .priority-inner{ grid-template-columns:52px 1fr; }
+    .order-row{ grid-template-columns:48px 1fr auto; }
+    .order-row-arrow{ display:none; }
+    .bottom-nav{ display:block; }
+    .page-body{ padding-bottom:80px; }
+  }
+  @media (max-width:600px){
+    .stats-grid{ grid-template-columns:1fr 1fr; }
+    .topbar-ghost{ display:none; }
   }
-
-  .client-topbar{
-    position:sticky;
-    top:10px;
-    z-index:35;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
-    padding:10px 12px;
-    margin-bottom:14px;
-    border-radius:999px;
-    background:rgba(255,255,255,.90);
-    backdrop-filter:blur(14px);
-    border:1px solid rgba(226,232,240,.95);
-    box-shadow:0 10px 24px rgba(15,23,42,.08);
-    flex-wrap:wrap;
-  }
-
-  .client-topbar-left{
-    min-width:0;
-    display:flex;
-    align-items:center;
-    gap:12px;
-  }
-
-  .client-brand-mark{
-    width:36px;
-    height:36px;
-    border-radius:12px;
-    border:1px solid #e2e8f0;
-    background:linear-gradient(180deg,#fff,#f8fafc);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-weight:1000;
-    color:#0f172a;
-    flex:0 0 auto;
-  }
-
-  .client-brand-copy{ min-width:0; }
-
-  .client-brand-title{
-    font-size:14px;
-    font-weight:1000;
-    line-height:1.1;
-    color:#0f172a;
-  }
-
-  .client-brand-sub{
-    margin-top:2px;
-    color:#64748b;
-    font-size:11px;
-    line-height:1.25;
-    font-weight:700;
-  }
-
-  .client-topbar-actions{
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
-    justify-content:flex-end;
-    align-items:center;
-  }
-
-  .client-hero-main--dark{
-    background:linear-gradient(135deg,#0f172a 0%, #172554 42%, #2563eb 100%);
-    color:#fff;
-    border:1px solid rgba(255,255,255,.08);
-  }
-
-  .client-hero-main--dark .fagni-eyebrow,
-  .client-hero-main--dark .fagni-subtitle{
-    color:rgba(255,255,255,.82);
-  }
-
-  .client-hero-main--dark .fagni-title{
-    color:#fff;
-  }
-
-  .client-hero-kpis{
-    display:grid;
-    grid-template-columns:repeat(3,minmax(0,1fr));
-    gap:10px;
-    margin-top:16px;
-  }
-
-  .client-hero-kpi{
-    border:1px solid rgba(255,255,255,.14);
-    background:rgba(255,255,255,.08);
-    border-radius:18px;
-    padding:12px;
-    min-width:0;
-  }
-
-  .client-hero-kpi-label{
-    font-size:11px;
-    text-transform:uppercase;
-    letter-spacing:.06em;
-    color:rgba(255,255,255,.70);
-    font-weight:900;
-  }
-
-  .client-hero-kpi-value{
-    margin-top:6px;
-    font-size:18px;
-    line-height:1.2;
-    font-weight:1000;
-    color:#fff;
-    word-break:break-word;
-  }
-
-  .client-hero-kpi-sub{
-    margin-top:5px;
-    font-size:11px;
-    line-height:1.45;
-    color:rgba(255,255,255,.76);
-    font-weight:700;
-  }
-
-  .client-shortcuts{
-    display:grid;
-    grid-template-columns:repeat(2,minmax(0,1fr));
-    gap:14px;
-  }
-
-  .client-shortcut{
-    display:flex;
-    gap:12px;
-    align-items:flex-start;
-    padding:16px;
-    min-height:102px;
-    border:1px solid #e2e8f0;
-    border-radius:20px;
-    background:linear-gradient(180deg,#fff,#fbfdff);
-    text-decoration:none;
-    color:inherit;
-    transition:.16s ease;
-  }
-
-  .client-shortcut:hover{
-    transform:translateY(-1px);
-    box-shadow:0 8px 20px rgba(15,23,42,.06);
-  }
-
-  .client-shortcut--disabled{
-    opacity:.62;
-    cursor:not-allowed;
-  }
-
-  .client-shortcut-ico{
-    width:42px;
-    height:42px;
-    border-radius:14px;
-    background:#f8fafc;
-    border:1px solid #e2e8f0;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size:18px;
-    flex:0 0 auto;
-  }
-
-  .client-shortcut-title{
-    font-size:14px;
-    font-weight:1000;
-    color:#0f172a;
-    line-height:1.2;
-  }
-
-  .client-shortcut-desc{
-    margin-top:4px;
-    color:#64748b;
-    font-size:11px;
-    line-height:1.45;
-    font-weight:700;
-  }
-
-  .client-live-grid{
-    display:grid;
-    grid-template-columns:220px minmax(280px,1.2fr) 180px 220px;
-    gap:12px;
-    align-items:stretch;
-  }
-
-  .client-live-box{
-    border:1px solid #e2e8f0;
-    border-radius:18px;
-    background:#fff;
-    padding:14px;
-    min-width:0;
-  }
-
-  .client-live-box--action{
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    background:linear-gradient(180deg,#fff,#fbfdff);
-  }
-
-  .client-live-k{
-    color:#64748b;
-    font-size:11px;
-    text-transform:uppercase;
-    letter-spacing:.05em;
-    font-weight:900;
-  }
-
-  .client-live-v{
-    margin-top:6px;
-    color:#0f172a;
-    font-size:15px;
-    line-height:1.45;
-    font-weight:1000;
-    word-break:break-word;
-  }
-
-  .client-est-pill{
-    min-height:30px;
-    padding:0 12px;
-    border-radius:999px;
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-    background:#fff7ed;
-    border:1px solid #fed7aa;
-    color:#9a3412;
-    font-size:11px;
-    font-weight:1000;
-  }
-
-  .client-est-pill .spark{
-    width:8px;
-    height:8px;
-    border-radius:999px;
-    background:#f59e0b;
-    display:inline-block;
-    box-shadow:0 0 0 4px rgba(245,158,11,.14);
-  }
-
-  .client-orders-head{
-    display:flex;
-    align-items:flex-start;
-    justify-content:space-between;
-    gap:12px;
-    margin-bottom:14px;
-    flex-wrap:wrap;
-  }
-
-  .client-orders-title{
-    margin:0;
-    font-size:18px;
-    line-height:1.1;
-    font-weight:1000;
-    letter-spacing:-.02em;
-    color:#0f172a;
-  }
-
-  .client-orders-sub{
-    margin:4px 0 0;
-    color:#64748b;
-    font-size:13px;
-    line-height:1.45;
-    font-weight:700;
-  }
-
-  .client-filters{
-    margin-top:10px;
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
-  }
-
-  .client-chip{
-    min-height:34px;
-    padding:0 14px;
-    border-radius:999px;
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    text-decoration:none;
-    background:#fff;
-    border:1px solid #e2e8f0;
-    color:#334155;
-    font-size:11px;
-    font-weight:900;
-    transition:.16s ease;
-  }
-
-  .client-chip.active{
-    color:#fff;
-    background:linear-gradient(135deg,#ff7a00,#dd6400);
-    border-color:transparent;
-    box-shadow:0 8px 18px rgba(255,122,0,.18);
-  }
-
-  .client-page-pill{
-    min-height:34px;
-    padding:0 12px;
-    border-radius:999px;
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    border:1px solid #e2e8f0;
-    color:#64748b;
-    font-size:11px;
-    font-weight:900;
-    white-space:nowrap;
-  }
-
-  
-.client-priority-card{
-  padding:18px;
-  border-radius:22px;
-  border:1px solid #e2e8f0;
-  background:linear-gradient(135deg,#ffffff,#f8fafc);
-  box-shadow:0 16px 36px rgba(15,23,42,.08);
-  margin-bottom:18px;
-}
-
-.client-priority-title{
-  font-size:18px;
-  font-weight:1000;
-  color:#0f172a;
-}
-
-.client-priority-sub{
-  margin-top:6px;
-  font-size:13px;
-  color:#64748b;
-  font-weight:700;
-}
-
-.client-priority-meta{
-  margin-top:12px;
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-}
-
-.client-mini-pill{
-  padding:6px 10px;
-  border-radius:999px;
-  font-size:11px;
-  font-weight:900;
-  border:1px solid #e2e8f0;
-  background:#fff;
-}
-
-.client-priority-cta{
-  margin-top:14px;
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-}
-
-.client-orders-compact{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-
-.client-order-compact{
-  padding:12px;
-  border-radius:16px;
-  border:1px solid #e2e8f0;
-  background:#fff;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:10px;
-}
-
-.client-order-compact-left{
-  font-size:13px;
-  font-weight:800;
-  color:#0f172a;
-}
-
-.client-order-compact-sub{
-  font-size:11px;
-  color:#64748b;
-  font-weight:700;
-}
-.client-orders-grid{
-    display:grid;
-    grid-template-columns:repeat(2,minmax(0,1fr));
-    gap:14px;
-  }
-
-  .client-order-card{
-    display:block;
-    text-decoration:none;
-    color:inherit;
-    border:1px solid #e2e8f0;
-    border-radius:20px;
-    background:linear-gradient(180deg,#fff,#fbfdff);
-    padding:16px;
-    transition:.16s ease;
-    min-height:220px;
-  }
-
-  .client-order-card:hover{
-    transform:translateY(-1px);
-    box-shadow:0 8px 18px rgba(15,23,42,.06);
-  }
-
-  .client-order-card.highlight-unpaid{
-    border:2px solid #fecaca;
-    background:linear-gradient(180deg,#fff7f7,#fff1f2);
-  }
-
-  .client-order-card.highlight-unpaid:hover{
-    box-shadow:0 10px 25px rgba(220,38,38,.15);
-  }
-
-  .payment-alert-bar{
-    margin-bottom:12px;
-    padding:10px 12px;
-    border-radius:12px;
-    border:1px solid #fecaca;
-    background:#fff1f2;
-    color:#b91c1c;
-    font-size:12px;
-    line-height:1.45;
-    font-weight:900;
-  }
-
-  .client-order-row{
-    display:flex;
-    align-items:flex-start;
-    justify-content:space-between;
-    gap:12px;
-  }
-
-  .client-order-main{
-    min-width:0;
-    flex:1 1 auto;
-  }
-
-  .client-order-code{
-    font-size:15px;
-    line-height:1.15;
-    font-weight:1000;
-    color:#0f172a;
-    letter-spacing:-.02em;
-  }
-
-  .client-order-date{
-    margin-top:4px;
-    color:#64748b;
-    font-size:11px;
-    line-height:1.45;
-    font-weight:700;
-  }
-
-  .client-order-right{
-    display:flex;
-    flex-direction:column;
-    align-items:flex-end;
-    gap:8px;
-    flex:0 0 auto;
-  }
-
-  .client-badge{
-    min-height:32px;
-    padding:0 12px;
-    border-radius:999px;
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    border:1px solid transparent;
-    font-size:11px;
-    font-weight:1000;
-    white-space:nowrap;
-  }
-
-  .client-badge--pending{
-    color:#9a3412;
-    background:#fff7ed;
-    border-color:#fed7aa;
-  }
-
-  .client-badge--in_progress{
-    color:#1d4ed8;
-    background:#eff6ff;
-    border-color:#bfdbfe;
-  }
-
-  .client-badge--done{
-    color:#166534;
-    background:#ecfdf3;
-    border-color:#bbf7d0;
-  }
-
-  .client-badge--canceled{
-    color:#991b1b;
-    background:#fef2f2;
-    border-color:#fecaca;
-  }
-
-  .client-badge--pay-pending{
-    color:#9a3412;
-    background:#fff7ed;
-    border-color:#fed7aa;
-  }
-
-  .client-badge--pay-unknown{
-    color:#475569;
-    background:#f8fafc;
-    border-color:#cbd5e1;
-  }
-
-  .client-badge--paid{
-    background:#dcfce7;
-    color:#166534;
-    border:1px solid #86efac;
-    font-weight:1000;
-  }
-
-  .client-order-total-box{
-    margin-top:12px;
-    padding:12px 14px;
-    border-radius:16px;
-    background:linear-gradient(180deg,#fff7ed,#ffffff);
-    border:1px solid #fed7aa;
-  }
-
-  .client-order-total-k{
-    font-size:11px;
-    text-transform:uppercase;
-    letter-spacing:.08em;
-    color:#9a3412;
-    font-weight:1000;
-  }
-
-  .client-order-total-v{
-    margin-top:6px;
-    font-size:24px;
-    line-height:1;
-    color:#0f172a;
-    font-weight:1000;
-  }
-
-  .client-order-hint{
-    margin-top:8px;
-    color:#64748b;
-    font-size:11px;
-    line-height:1.45;
-    font-weight:700;
-  }
-
-  .client-order-footer{
-    margin-top:12px;
-  }
-
-  .pay-cta-inline{
-    display:block;
-    width:100%;
-    padding:10px 12px;
-    border-radius:12px;
-    text-align:center;
-    font-weight:900;
-    font-size:13px;
-    color:#fff;
-    background:linear-gradient(135deg,#ef4444,#dc2626);
-    text-decoration:none;
-    transition:.2s ease;
-  }
-
-  .pay-cta-inline:hover{
-    transform:translateY(-1px);
-    box-shadow:0 10px 20px rgba(220,38,38,.25);
-  }
-
-  .client-order-addr{
-    margin-top:10px;
-    color:#475569;
-    font-size:12px;
-    line-height:1.5;
-    font-weight:700;
-  }
-
-  .client-order-empty-address{
-    color:#94a3b8;
-    font-style:italic;
-  }
-
-  .client-faq{
-    display:grid;
-    gap:12px;
-  }
-
-  .client-faq details{
-    border:1px solid #e2e8f0;
-    border-radius:18px;
-    background:#fff;
-    padding:14px 16px;
-  }
-
-  .client-faq summary{
-    cursor:pointer;
-    font-weight:900;
-    color:#0f172a;
-  }
-
-  .client-faq .ans{
-    margin-top:10px;
-    color:#64748b;
-    font-size:13px;
-    line-height:1.6;
-    font-weight:700;
-  }
-
-  .client-empty{
-    color:#0f172a;
-    font-size:15px;
-    font-weight:900;
-  }
-
-  .client-order-service-hint{
-    color:#64748b;
-    font-size:12px;
-    line-height:1.5;
-    font-weight:700;
-  }
-
-  @media (max-width: 1024px){
-    .client-live-grid{
-      grid-template-columns:repeat(2,minmax(0,1fr));
-    }
-  }
-
-  @media (max-width: 860px){
-    .client-shortcuts,
-    .client-orders-grid,
-    .client-live-grid,
-    .client-hero-kpis{
-      grid-template-columns:1fr;
-    }
-
-    .client-topbar{
-      border-radius:22px;
-      padding:12px;
-    }
-
-    .client-topbar-actions{
-      width:100%;
-    }
-
-    .client-topbar-actions .fagni-btn{
-      width:100%;
-    }
-
-    .client-order-row{
-      flex-direction:column;
-    }
-
-    .client-order-right{
-      align-items:flex-start;
-      width:100%;
-    }
-  }
-
-/* =========================
-   LOT 27 — PREMIUM CARDS
-========================= */
-
-.client-order-card{
-  border-radius:22px !important;
-  padding:16px !important;
-  min-height:0 !important;
-  position:relative;
-  overflow:hidden;
-  transition:.18s ease;
-}
-
-.client-order-card:hover{
-  transform:translateY(-2px);
-  box-shadow:0 14px 30px rgba(15,23,42,.08) !important;
-}
-
-.client-order-card.highlight-unpaid{
-  border:1px solid #fecaca !important;
-  background:linear-gradient(180deg,#fffafa,#fff4f5) !important;
-}
-
-.client-order-card.highlight-unpaid::before{
-  content:"";
-  position:absolute;
-  left:0;
-  top:0;
-  bottom:0;
-  width:4px;
-  background:linear-gradient(180deg,#ef4444,#f97316);
-}
-
-.client-order-row{
-  display:grid !important;
-  grid-template-columns:1fr auto !important;
-  gap:14px !important;
-  align-items:start !important;
-}
-
-.client-order-code{
-  font-size:18px !important;
-  font-weight:1000 !important;
-}
-
-.client-order-right{
-  min-width:110px;
-}
-
-.client-order-total-box{
-  border-radius:16px !important;
-}
-
-.client-order-total-v{
-  font-size:22px !important;
-  font-weight:1000 !important;
-}
-
-.client-order-footer{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-}
-
-.pay-cta-inline{
-  display:flex !important;
-  align-items:center;
-  justify-content:center;
-  min-height:42px;
-  width:100%;
-  border-radius:14px;
-  font-weight:1000;
-  background:linear-gradient(135deg,#ef4444,#dc2626) !important;
-  box-shadow:0 10px 20px rgba(220,38,38,.18);
-}
-
-.pay-cta-inline:hover{
-  transform:translateY(-1px);
-  box-shadow:0 14px 24px rgba(220,38,38,.25);
-}
-
-.client-order-service-hint{
-  font-size:11px;
-  color:#64748b;
-  font-weight:800;
-  margin-top:8px;
-}
-
-/* MOBILE */
-@media (max-width:640px){
-  .client-orders-grid{
-    grid-template-columns:1fr !important;
-  }
-
-  .client-order-row{
-    grid-template-columns:1fr !important;
-  }
-
-  .client-order-right{
-    width:100%;
-    flex-direction:row;
-    flex-wrap:wrap;
-    align-items:flex-start;
-  }
-
-  .client-order-card{
-    padding:14px !important;
-  }
-}
-
-
-.pay-trust{
-  font-size:11px;
-  color:#64748b;
-  margin-top:6px;
-  text-align:center;
-  font-weight:700;
-}
-
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="page client-home">
+<div class="page-body">
 
-  <section class="client-topbar">
-    <div class="client-topbar-left">
-      <div class="client-brand-mark">FA</div>
-      <div class="client-brand-copy">
-        <div class="client-brand-title">FAGNI Client</div>
-        <div class="client-brand-sub">{{ phone|default:"—" }}</div>
+  <header class="client-topbar">
+    <div class="shell client-topbar-inner">
+      <div class="topbar-brand">
+        <img src="{% load static %}{% static 'img/logo_fagni.svg' %}" alt="FAGNI">
+      </div>
+      <div class="topbar-right">
+        <a href="{% url 'orders:client_new_order' %}" class="topbar-btn">+ Nouvelle commande</a>
+        <a href="{% url 'orders:client_wallet' %}" class="topbar-ghost">👛 Wallet</a>
+        <div class="topbar-avatar">{{ customer.name|first|upper|default:"C" }}</div>
       </div>
     </div>
+  </header>
 
-    <div class="client-topbar-actions">
-      <a class="fagni-btn fagni-btn--primary" href="{% url 'orders:client_new_order' %}">➕ Nouvelle commande</a>
-    <div class="pay-trust">Paiement sécurisé via Wave</div>
-      {% if customer %}
-        <a class="fagni-btn fagni-btn--light" href="{% url 'orders:client_wallet' %}">💼 Wallet</a>
-        <form method="post" action="{% url 'orders:client_logout' %}" style="display:inline;">
-          {% csrf_token %}
-          <button type="submit" class="fagni-btn fagni-btn--light">Déconnexion</button>
-        </form>
-      {% else %}
-        <a class="fagni-btn fagni-btn--light" href="{% url 'orders:client_login' %}">Connexion</a>
-      {% endif %}
+  <div class="welcome-hero">
+    <div class="shell welcome-inner">
+      <div>
+        <div class="welcome-title">Bonjour, {{ customer.name|default:"Client" }} 👋</div>
+        <div class="welcome-sub">Suis tes commandes, consulte ton wallet et active ton parrainage depuis un seul espace.</div>
+      </div>
+      <div class="welcome-visual"></div>
     </div>
-  </section>
+  </div>
 
-  <section class="fagni-panel client-hero-main--dark">
-    <div class="fagni-eyebrow">Espace client</div>
-    <h1 class="fagni-title">Bienvenue sur FAGNI</h1>
-    <p class="fagni-subtitle">
-      Suis tes commandes, consulte ton wallet et active ton parrainage depuis un seul espace.
-    </p>
+  <div class="shell">
 
-    <div class="client-hero-kpis">
-      <div class="client-hero-kpi">
-        <div class="client-hero-kpi-label">Commandes</div>
-        <div class="client-hero-kpi-value">{{ kpi_orders_count|default:0 }}</div>
-        <div class="client-hero-kpi-sub">Historique global</div>
-      </div>
-      <div class="client-hero-kpi">
-        <div class="client-hero-kpi-label">Actives</div>
-        <div class="client-hero-kpi-value">{{ active_orders_count|default:0 }}</div>
-        <div class="client-hero-kpi-sub">En attente ou en cours</div>
-      </div>
-      <div class="client-hero-kpi">
-        <div class="client-hero-kpi-label">À payer</div>
-        <div class="client-hero-kpi-value">{{ unpaid_orders_count|default:0 }}</div>
-        <div class="client-hero-kpi-sub">Paiements en attente</div>
-      </div>
-    </div>
-  </section>
-
-  {% if orders %}
-    {% with o=orders|first %}
-      <section class="fagni-panel">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
-          <div>
-            <div class="fagni-eyebrow" style="color:#64748b;">Commande récente</div>
-            <h2 class="fagni-title" style="font-size:20px;color:#0f172a;">Commande prioritaire à suivre</h2>
-          </div>
-
-          {% if o.status == "pending" %}
-            <span class="fagni-pill fagni-pill--pending"><span class="dot"></span>En attente</span>
-          {% elif o.status == "in_progress" %}
-            <span class="fagni-pill fagni-pill--progress"><span class="dot"></span>En cours</span>
-          {% elif o.status == "done" %}
-            <span class="fagni-pill fagni-pill--done"><span class="dot"></span>Terminée</span>
-          {% elif o.status == "canceled" %}
-            <span class="fagni-pill fagni-pill--danger"><span class="dot"></span>Annulée</span>
-          {% else %}
-            <span class="fagni-pill fagni-pill--neutral"><span class="dot"></span>{{ o.status|default:"—" }}</span>
-          {% endif %}
+    <div class="stats-grid section">
+      <a href="{% url 'orders:client_home' %}" class="stat-card">
+        <div class="stat-icon">📦</div>
+        <div>
+          <div class="stat-value">{{ orders_count_all|default:"0" }}</div>
+          <div class="stat-label">Commandes</div>
         </div>
+      </a>
+      <a href="{% url 'orders:client_home' %}?status=in_progress" class="stat-card">
+        <div class="stat-icon">🔄</div>
+        <div>
+          <div class="stat-value">{{ active_orders_count|default:"0" }}</div>
+          <div class="stat-label">En cours</div>
+        </div>
+      </a>
+      <a href="{% url 'orders:client_home' %}?status=pending" class="stat-card">
+        <div class="stat-icon orange">⚠️</div>
+        <div>
+          <div class="stat-value">{{ unpaid_orders_count|default:"0" }}</div>
+          <div class="stat-label">À payer</div>
+        </div>
+      </a>
+    </div>
 
-        <div class="client-live-grid">
-          <div class="client-live-box">
-            <div class="client-live-k">Référence</div>
-            <div class="client-live-v">#{{ o.code|default:o.id }}</div>
-          </div>
-
-          <div class="client-live-box">
-            <div class="client-live-k">Adresse</div>
-            <div class="client-live-v">
-              📍 {% if o.pickup_address_short and o.pickup_address_short != "—" %}
-                {{ o.pickup_address_short }}
-              {% else %}
-                <span class="client-order-empty-address">Adresse à confirmer</span>
-              {% endif %}
+    {% with priority_order=orders|first %}
+    {% if priority_order %}
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Commande prioritaire à suivre</div>
+        <span class="badge badge-{{ priority_order.payment_status }}">
+          {{ priority_order.get_payment_status_display }}
+        </span>
+      </div>
+      <div class="priority-card">
+        <div class="priority-inner">
+          <div class="order-thumb">🧺</div>
+          <div>
+            <div class="order-ref">CMD-{{ priority_order.order_number|default:priority_order.id }}</div>
+            <div class="order-name">{{ priority_order.items.first.service_item.name|default:"Commande FAGNI" }}</div>
+            <div class="order-meta">
+              {% if priority_order.pickup_address_short %}📍 {{ priority_order.pickup_address_short }}{% else %}📅 {{ priority_order.created_at|date:"d M Y" }}{% endif %}
             </div>
           </div>
-
-          <div class="client-live-box">
-            <div class="client-live-k">Total TTC</div>
-            {% with tot=o.total_client_display|default:0 %}
-              {% with tot0=tot|floatformat:0 %}
-                {% if tot0 == "0" %}
-                  <div class="client-live-v">
-                    <span class="client-est-pill"><span class="spark"></span>Estimation en cours</span>
-                    <div class="client-order-service-hint" style="margin-top:8px;">
-                      Le total est confirmé après collecte et validation.
-                    </div>
-                  </div>
-                {% else %}
-                  <div class="client-live-v">{{ tot|fcfa }}</div>
-                {% endif %}
-              {% endwith %}
-            {% endwith %}
-          </div>
-
-          <div class="client-live-box client-live-box--action">
-            {% if o.payment_status != "paid" %}
-              <a class="fagni-btn fagni-btn--primary client-follow-btn" href="{% url 'orders:client_order_pay_wave_page' o.id %}">
-                💳 Payer maintenant
-              </a>
-            {% else %}
-              <a class="fagni-btn fagni-btn--primary client-follow-btn" href="{% url 'orders:client_order_detail' o.id %}">
-                Suivre ma commande
-              </a>
+          <div style="text-align:right;">
+            <div class="amount-value">{{ priority_order.total_client_display|floatformat:0|default:priority_order.total_client_ttc|floatformat:0 }}</div>
+            <div class="amount-fcfa">FCFA</div>
+            {% if priority_order.payment_status in "unpaid,partial" %}
+            <a href="{% url 'orders:client_order_pay_wave_page' priority_order.id %}" class="pay-btn">💳 Payer maintenant</a>
             {% endif %}
           </div>
         </div>
-      </section>
+        <div style="margin-top:14px;text-align:right;">
+          <a href="{% url 'orders:client_order_detail' priority_order.id %}" style="font-size:13px;font-weight:700;color:var(--navy);">Voir le détail →</a>
+        </div>
+      </div>
+    </div>
+    {% endif %}
     {% endwith %}
-  {% else %}
-    <section class="fagni-panel">
-      <div>
-        <div class="fagni-eyebrow" style="color:#64748b;">Démarrage</div>
-        <h2 class="fagni-title" style="font-size:20px;color:#0f172a;">Aucune commande pour le moment</h2>
-        <p class="fagni-subtitle" style="margin-top:8px;color:#64748b;">
-          Crée ta première commande pour commencer.
-        </p>
+
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Les actions essentielles</div>
       </div>
-
-      <div class="fagni-btn-group" style="margin-top:14px;">
-        <a class="fagni-btn fagni-btn--primary" href="{% url 'orders:client_new_order' %}">➕ Créer une commande</a>
-      </div>
-    </section>
-  {% endif %}
-
-  <section class="fagni-panel">
-    <div style="margin-bottom:14px;">
-      <div class="fagni-eyebrow" style="color:#64748b;">Accès rapide</div>
-      <h2 class="fagni-title" style="font-size:20px;color:#0f172a;">Les actions essentielles</h2>
-    </div>
-
-    <div class="client-shortcuts">
-      <a class="client-shortcut" href="#mes-commandes">
-        <div class="client-shortcut-ico">📦</div>
-        <div>
-          <div class="client-shortcut-title">Mes commandes</div>
-          <div class="client-shortcut-desc">Historique, statuts et suivi détaillé</div>
-        </div>
-      </a>
-
-      <a class="client-shortcut" href="{% url 'orders:client_referrals' %}">
-        <div class="client-shortcut-ico">🎁</div>
-        <div>
-          <div class="client-shortcut-title">Parrainage</div>
-          <div class="client-shortcut-desc">Inviter des proches et suivre tes gains</div>
-        </div>
-      </a>
-
-      {% if customer %}
-        <a class="client-shortcut" href="{% url 'orders:client_wallet' %}">
-          <div class="client-shortcut-ico">💼</div>
-          <div>
-            <div class="client-shortcut-title">Wallet</div>
-            <div class="client-shortcut-desc">Consulter ton solde et tes mouvements</div>
-          </div>
+      <div class="quick-grid">
+        <a href="{% url 'orders:client_home' %}" class="quick-card">
+          <div class="quick-icon">📋</div>
+          <div class="quick-label">Mes commandes</div>
+          <div class="quick-sub">Historique et suivi</div>
         </a>
-      {% else %}
-        <div class="client-shortcut client-shortcut--disabled" aria-disabled="true">
-          <div class="client-shortcut-ico">💼</div>
-          <div>
-            <div class="client-shortcut-title">Wallet</div>
-            <div class="client-shortcut-desc">Disponible après la première commande</div>
-          </div>
-        </div>
-      {% endif %}
-
-      <a class="client-shortcut" href="#faq">
-        <div class="client-shortcut-ico">❓</div>
-        <div>
-          <div class="client-shortcut-title">Aide</div>
-          <div class="client-shortcut-desc">FAQ rapide et informations utiles</div>
-        </div>
-      </a>
-    </div>
-  </section>
-
-  <section class="fagni-panel" id="mes-commandes">
-    <div class="client-orders-head">
-      <div>
-        <h2 class="client-orders-title">Mes commandes</h2>
-        <p class="client-orders-sub">Retrouve toutes tes commandes, leur statut et leur paiement en un coup d’œil.</p>
-
-        <div class="client-filters" role="tablist" aria-label="Filtre commandes">
-          <a class="client-chip {% if current_status == 'all' %}active{% endif %}" href="?page=1#mes-commandes">Toutes</a>
-          <a class="client-chip {% if current_status == 'pending' %}active{% endif %}" href="?status=pending&page=1#mes-commandes">En attente</a>
-          <a class="client-chip {% if current_status == 'in_progress' %}active{% endif %}" href="?status=in_progress&page=1#mes-commandes">En cours</a>
-          <a class="client-chip {% if current_status == 'done' %}active{% endif %}" href="?status=done&page=1#mes-commandes">Terminées</a>
-          <a class="client-chip {% if current_status == 'canceled' %}active{% endif %}" href="?status=canceled&page=1#mes-commandes">Annulées</a>
-        </div>
-      </div>
-
-      {% if page_obj %}
-        <span class="client-page-pill">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-      {% endif %}
-    </div>
-
-    {% if orders %}
-      <div class="client-orders-grid">
-        
-{% if orders %}
-  {% with o=orders.0 %}
-    <div class="client-priority-card">
-      <div class="client-priority-title">
-        Commande #{{ o.code|default:o.id }}
-      </div>
-
-      <div class="client-priority-sub">
-        {{ o.get_status_display }} • {{ o.get_payment_status_display }}
-      </div>
-
-      <div class="client-priority-meta">
-        <span class="client-mini-pill">{{ o.get_status_display }}</span>
-        <span class="client-mini-pill">{{ o.get_payment_status_display }}</span>
-      </div>
-
-      <div class="client-priority-cta">
-        <a class="btn btn-light" href="{% url 'orders:client_order_detail' o.id %}">
-          Voir
+        <a href="{% url 'orders:client_referrals' %}" class="quick-card">
+          <div class="quick-icon">🎁</div>
+          <div class="quick-label">Parrainage</div>
+          <div class="quick-sub">Inviter et gagner</div>
         </a>
+        <a href="{% url 'orders:client_wallet' %}" class="quick-card">
+          <div class="quick-icon">👛</div>
+          <div class="quick-label">Wallet</div>
+          <div class="quick-sub">Solde et mouvements</div>
+        </a>
+        <a href="#aide" class="quick-card">
+          <div class="quick-icon">❓</div>
+          <div class="quick-label">Aide</div>
+          <div class="quick-sub">FAQ et support</div>
+        </a>
+      </div>
+    </div>
 
-        {% if o.can_pay %}
-          <a class="btn btn-primary" href="{% url 'orders:client_order_pay_wave_page' o.id %}">
-            💳 Payer
-          </a>
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Mes commandes</div>
+        <a href="{% url 'orders:client_home' %}" class="section-link">Voir tout →</a>
+      </div>
+      <div class="filters">
+        <a href="{% url 'orders:client_home' %}" class="filter-pill {% if current_status == 'all' %}active{% endif %}">Toutes</a>
+        <a href="{% url 'orders:client_home' %}?status=pending" class="filter-pill {% if current_status == 'pending' %}active{% endif %}">En attente</a>
+        <a href="{% url 'orders:client_home' %}?status=in_progress" class="filter-pill {% if current_status == 'in_progress' %}active{% endif %}">En cours</a>
+        <a href="{% url 'orders:client_home' %}?status=done" class="filter-pill {% if current_status == 'done' %}active{% endif %}">Terminées</a>
+        <a href="{% url 'orders:client_home' %}?status=canceled" class="filter-pill {% if current_status == 'canceled' %}active{% endif %}">Annulées</a>
+      </div>
+      <div class="orders-list">
+        {% for order in orders %}
+        <a href="{% url 'orders:client_order_detail' order.id %}" class="order-row">
+          <div class="order-row-thumb">🧺</div>
+          <div>
+            <div class="order-row-name">CMD-{{ order.order_number|default:order.id }}</div>
+            <div class="order-row-meta">{{ order.get_status_display }} • {{ order.created_at|date:"d/m/Y" }}</div>
+          </div>
+          <div><span class="badge badge-{{ order.payment_status }}">{{ order.get_payment_status_display }}</span></div>
+          <div class="order-row-amount">{{ order.total_client_display|floatformat:0|default:order.total_client_ttc|floatformat:0 }} FCFA</div>
+          <div class="order-row-arrow">›</div>
+        </a>
+        {% empty %}
+        <div style="text-align:center;padding:48px;color:var(--muted);">
+          <div style="font-size:40px;margin-bottom:12px;">📦</div>
+          <div style="font-weight:700;color:var(--navy);margin-bottom:8px;">Aucune commande pour l'instant</div>
+          <div style="font-size:13px;margin-bottom:20px;">Commande ton premier pressing FAGNI en quelques secondes.</div>
+          <a href="{% url 'orders:client_new_order' %}" style="display:inline-flex;align-items:center;min-height:46px;padding:0 24px;border-radius:999px;background:var(--orange);color:#fff;font-weight:800;">+ Créer ma première commande</a>
+        </div>
+        {% endfor %}
+      </div>
+      {% if is_paginated %}
+      <div style="display:flex;justify-content:center;gap:8px;margin-top:24px;flex-wrap:wrap;">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="filter-pill">‹ Préc.</a>
+        {% endif %}
+        <span class="filter-pill active">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="filter-pill">Suiv. ›</a>
         {% endif %}
       </div>
-    </div>
-  {% endwith %}
-
-  <div class="client-orders-compact">
-    {% for o in orders|slice:"1:" %}
-      <a href="{% url 'orders:client_order_detail' o.id %}" class="client-order-compact">
-        <div>
-          <div class="client-order-compact-left">
-            #{{ o.code|default:o.id }}
-          </div>
-          <div class="client-order-compact-sub">
-            {{ o.get_status_display }} • {{ o.get_payment_status_display }}
-          </div>
-        </div>
-        <div>→</div>
-      </a>
-    {% endfor %}
-  </div>
-
-{% else %}
-  <div class="empty-box">
-    Aucune commande pour le moment.
-  </div>
-{% endif %}
-
-      </div>
-
-      {% if is_paginated %}
-        <div style="margin-top:16px;">
-          {% if current_status != "all" %}
-            {% with qs="status="|add:current_status|add:"&" %}
-              {% include "orders/_pager.html" %}
-            {% endwith %}
-          {% else %}
-            {% with qs="" %}
-              {% include "orders/_pager.html" %}
-            {% endwith %}
-          {% endif %}
-        </div>
       {% endif %}
-    {% else %}
-      <p class="client-empty">Aucune commande pour le moment.</p>
-      <p class="client-order-service-hint">Commence par créer ta première commande.</p>
-    {% endif %}
-  </section>
-
-  <section class="fagni-panel" id="faq">
-    <div style="margin-bottom:14px;">
-      <div class="fagni-eyebrow" style="color:#64748b;">Aide</div>
-      <h2 class="fagni-title" style="font-size:20px;color:#0f172a;">Réponses rapides aux questions courantes</h2>
     </div>
 
-    <div class="client-faq">
-      <details>
-        <summary>Comment est calculé le prix ?</summary>
-        <div class="ans">
-          Le prix dépend de la formule ou des articles choisis, ainsi que des éventuels frais logistiques. Le total affiché dans la commande correspond au Total TTC client.
-        </div>
-      </details>
-
-      <details>
-        <summary>Comment je paie ?</summary>
-        <div class="ans">
-          Tu peux payer via Wave depuis ton parcours client. Le statut de paiement est ensuite visible directement dans la commande.
-        </div>
-      </details>
-
-      <details>
-        <summary>Comment fonctionne le parrainage ?</summary>
-        <div class="ans">
-          Tu peux inviter des proches, suivre tes recommandations et consulter tes gains dans l’espace Parrainage.
-        </div>
-      </details>
-
-      <details>
-        <summary>Que faire en cas d’incident ?</summary>
-        <div class="ans">
-          Contacte le support pilote. L’équipe FAGNI pourra suivre le dossier avec le partenaire pour la collecte, le traitement ou la livraison.
-        </div>
-      </details>
+    <div class="section" id="aide" style="margin-bottom:40px;">
+      <div class="section-head">
+        <div class="section-title">Réponses rapides aux questions courantes</div>
+      </div>
+      <div class="faq-list">
+        <div class="faq-item"><div class="faq-q">Comment est calculé le prix ? <span>›</span></div></div>
+        <div class="faq-item"><div class="faq-q">Comment je paie ? <span>›</span></div></div>
+        <div class="faq-item"><div class="faq-q">Comment fonctionne le parrainage ? <span>›</span></div></div>
+        <div class="faq-item"><div class="faq-q">Que faire en cas d'incident ? <span>›</span></div></div>
+      </div>
     </div>
-  </section>
+
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="shell bottom-nav-inner">
+      <a href="{% url 'orders:client_home' %}" class="bottom-tab {% if current_status == 'all' %}active{% endif %}">
+        <span class="tab-icon">🏠</span>Accueil
+      </a>
+      <a href="{% url 'orders:client_new_order' %}" class="bottom-tab">
+        <span class="tab-icon">＋</span>Créer
+      </a>
+      <a href="{% url 'orders:client_home' %}" class="bottom-tab">
+        <span class="tab-icon">📋</span>Commandes
+      </a>
+      <a href="#aide" class="bottom-tab">
+        <span class="tab-icon">❓</span>Aide
+      </a>
+    </div>
+  </nav>
 
 </div>
-
-<nav class="bottom-nav" aria-label="Navigation">
-  <div class="wrap">
-    <a class="nav-item active" href="{% url 'orders:client_home' %}">
-      <div class="ico">🏠</div><div>Accueil</div>
-    </a>
-    <a class="nav-item" href="{% url 'orders:client_new_order' %}">
-      <div class="ico">➕</div><div>Créer</div>
-    </a>
-    <a class="nav-item" href="#mes-commandes">
-      <div class="ico">📦</div><div>Commandes</div>
-    </a>
-    <a class="nav-item" href="#faq">
-      <div class="ico">❓</div><div>Aide</div>
-    </a>
-  </div>
-</nav>
 {% endblock %}

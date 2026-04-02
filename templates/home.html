@@ -1,2288 +1,817 @@
 {% extends "base.html" %}
 {% load static %}
-{% block body_class %}fagni-home-premium{% endblock %}
-{% block title %}FAGNI – Pressing digital premium{% endblock %}
+
+{% block body_class %}fagni-home{% endblock %}
+{% block title %}FAGNI — Pressing digital Abidjan{% endblock %}
 {% block topbar %}{% endblock %}
+
 {% block extra_head %}
 <style>
   :root{
-    --fagni-orange:#ff7a00;
-    --fagni-orange-2:#ffa247;
-    --fagni-blue:#0b1e3a;
-    --fagni-blue-2:#102746;
-    --fagni-ink:#0f172a;
-    --fagni-muted:#64748b;
-    --fagni-bg:#f5f7fb;
-    --fagni-card:#ffffff;
-    --fagni-line:rgba(15,23,42,.10);
-    --fagni-shadow:0 24px 60px rgba(11,30,58,.12);
-    --fagni-shadow-soft:0 12px 30px rgba(11,30,58,.08);
+    --blue:#1E3A5F;
+    --blue-2:#173a73;
+    --orange:#E87722;
+    --orange-dark:#C4611A;
+    --cream:#FFF8F2;
+    --card:#ffffff;
+    --text:#1E3A5F;
+    --muted:#6B7280;
+    --border:#E8EDF5;
+    --shadow-blue:0 14px 35px rgba(30,58,95,.10);
+    --shadow-orange:0 10px 24px rgba(232,119,34,.18);
+    --radius:20px;
   }
-  body.fagni-home-premium{
-    background:
-      radial-gradient(1200px 520px at 0% 0%, rgba(255,122,0,.11), transparent 48%),
-      radial-gradient(1000px 500px at 100% 0%, rgba(11,30,58,.09), transparent 44%),
-      var(--fagni-bg) !important;
-    color:var(--fagni-ink) !important;
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+
+  body.fagni-home{
+    background:#F4F7FB;
+    color:var(--text);
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;
   }
-  .fagni-shell{
-    max-width:1280px;
-    padding-top:14px;
-  }
-  .home-wrap{
-    max-width:1160px;
+
+  .fagni-home a{ text-decoration:none; color:inherit; }
+  .fagni-home img{ display:block; max-width:100%; }
+
+  .shell{
+    width:min(1180px, calc(100% - 24px));
     margin:0 auto;
-    padding:0 0 34px;
   }
-  .home-topbar{
+
+  /* ===== NAVBAR ===== */
+  .navbar{
     position:sticky;
-    top:10px;
+    top:0;
     z-index:50;
+    background:rgba(30,58,95,.98);
+    backdrop-filter:blur(12px);
+    box-shadow:0 4px 20px rgba(0,0,0,.10);
+  }
+
+  .navbar-inner{
     display:flex;
     align-items:center;
     justify-content:space-between;
-    gap:12px;
-    flex-wrap:wrap;
-    padding:12px 14px;
-    border:1px solid var(--fagni-line);
-    border-radius:22px;
-    background:rgba(255,255,255,.88);
-    backdrop-filter:blur(14px);
-    box-shadow:var(--fagni-shadow-soft);
+    min-height:68px;
+    gap:16px;
   }
-  .brand{
+
+  .navbar-brand{
     display:flex;
     align-items:center;
-    gap:12px;
-    min-width:0;
+    gap:10px;
   }
-  .brand-logo{
-    width:46px;
-    height:46px;
-    border-radius:14px;
-    background:linear-gradient(135deg,var(--fagni-orange),var(--fagni-orange-2));
+
+  .navbar-brand img{
+    height:34px;
+    width:auto;
+    filter:brightness(0) invert(1);
+  }
+
+  .navbar-pills{
     display:flex;
     align-items:center;
-    justify-content:center;
-    box-shadow:0 12px 24px rgba(255,122,0,.18);
-    overflow:hidden;
-    flex:0 0 auto;
-  }
-  .brand-logo img{
-    width:28px;
-    height:28px;
-    object-fit:contain;
-    display:block;
-  }
-  .brand-main{
-    font-size:12px;
-    font-weight:1000;
-    letter-spacing:.08em;
-    text-transform:uppercase;
-    color:var(--fagni-blue);
-    line-height:1.05;
-  }
-  .brand-sub{
-    margin-top:4px;
-    font-size:11px;
-    color:var(--fagni-muted);
-    font-weight:800;
-    line-height:1.1;
-  }
-  .top-actions{
-    display:flex;
     gap:8px;
     flex-wrap:wrap;
+  }
+
+  .navbar-pill{
+    min-height:34px;
+    padding:0 14px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.20);
+    background:rgba(255,255,255,.08);
+    color:#fff;
+    font-size:12px;
+    font-weight:700;
+    display:inline-flex;
     align-items:center;
   }
+
+  .navbar-cta{
+    min-height:38px;
+    padding:0 18px;
+    border-radius:999px;
+    background:var(--orange);
+    color:#fff;
+    font-size:13px;
+    font-weight:800;
+    display:inline-flex;
+    align-items:center;
+    box-shadow:var(--shadow-orange);
+    transition:background .2s;
+  }
+
+  .navbar-cta:hover{ background:var(--orange-dark); }
+
+  /* ===== BOUTONS ===== */
   .btn{
     display:inline-flex;
     align-items:center;
     justify-content:center;
     gap:8px;
-    min-height:46px;
-    padding:0 16px;
+    min-height:50px;
+    padding:0 24px;
     border-radius:999px;
-    text-decoration:none;
-    font-size:13px;
-    font-weight:900;
-    border:1px solid transparent;
-    white-space:nowrap;
-    cursor:pointer;
-    transition:transform .12s ease, box-shadow .12s ease, background .12s ease, border-color .12s ease, opacity .12s ease;
-  }
-  .btn:hover{ transform:translateY(-1px); }
-  .btn-primary{
-    background:linear-gradient(90deg,var(--fagni-orange),var(--fagni-orange-2));
-    color:#111827;
-    box-shadow:0 16px 34px rgba(255,122,0,.24);
-  }
-  .btn-light{
-    background:#fff;
-    color:var(--fagni-blue);
-    border-color:var(--fagni-line);
-  }
-  .btn-dark{
-    background:var(--fagni-blue);
-    color:#fff;
-    border-color:var(--fagni-blue);
-    box-shadow:0 14px 30px rgba(11,30,58,.16);
-  }
-  .hero{
-    margin-top:16px;
-    position:relative;
-    overflow:hidden;
-    min-height:620px;
-    border-radius:32px;
-    box-shadow:var(--fagni-shadow);
-    border:1px solid rgba(255,255,255,.08);
-    background:
-      radial-gradient(700px 320px at 18% 18%, rgba(255,122,0,.22), rgba(255,122,0,0) 62%),
-      radial-gradient(620px 300px at 88% 18%, rgba(255,255,255,.10), rgba(255,255,255,0) 56%),
-      linear-gradient(135deg, #081428 0%, #0b1e3a 52%, #102746 100%);
-  }
-  .hero::before{
-    content:"";
-    position:absolute;
-    inset:0;
-    background:
-      linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0)),
-      repeating-linear-gradient(
-        90deg,
-        rgba(255,255,255,.02) 0,
-        rgba(255,255,255,.02) 1px,
-        transparent 1px,
-        transparent 120px
-      );
-    pointer-events:none;
-  }
-  .hero::after{
-    content:"";
-    position:absolute;
-    right:-100px;
-    bottom:-120px;
-    width:420px;
-    height:420px;
-    background:radial-gradient(circle, rgba(255,122,0,.24), rgba(255,122,0,0));
-    pointer-events:none;
-    filter:blur(14px);
-  }
-  .hero-inner{
-    position:relative;
-    z-index:2;
-    display:grid;
-    grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);
-    gap:22px;
-    padding:30px;
-    color:#fff;
-    min-height:620px;
-  }
-  .hero-copy{
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-  }
-  .hero-top{
-    display:flex;
-    align-items:flex-start;
-    justify-content:space-between;
-    gap:14px;
-    flex-wrap:wrap;
-  }
-  .hero-brand-wrap{
-    display:flex;
-    gap:12px;
-    align-items:flex-start;
-  }
-  .hero-logo{
-    width:58px;
-    height:58px;
-    border-radius:18px;
-    background:linear-gradient(135deg,var(--fagni-orange),var(--fagni-orange-2));
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    box-shadow:0 14px 28px rgba(255,122,0,.24);
-    overflow:hidden;
-    flex:0 0 auto;
-  }
-  .hero-logo img{
-    width:34px;
-    height:34px;
-    object-fit:contain;
-    display:block;
-  }
-  .hero-kicker{
-    font-size:12px;
-    font-weight:1000;
-    letter-spacing:.12em;
-    text-transform:uppercase;
-    color:#fff;
-    opacity:.96;
-  }
-  .hero-mini{
-    margin-top:5px;
-    color:rgba(255,255,255,.78);
-    font-size:13px;
-    font-weight:800;
-  }
-  .hero-chip-row{
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
-  }
-  .hero-chip{
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
-    min-height:34px;
-    padding:0 12px;
-    border-radius:999px;
-    border:1px solid rgba(255,255,255,.14);
-    background:rgba(255,255,255,.08);
-    backdrop-filter:blur(8px);
-    color:#fff;
-    font-size:12px;
-    font-weight:850;
-  }
-  .hero-title{
-    margin:22px 0 12px;
-    font-size:48px;
-    line-height:1.02;
-    letter-spacing:-.04em;
-    color:#fff;
-    max-width:680px;
-  }
-  .hero-desc{
-    margin:0;
-    max-width:620px;
-    color:rgba(255,255,255,.84);
-    font-size:15px;
-    line-height:1.6;
-    font-weight:750;
-  }
-  .hero-actions{
-    margin-top:20px;
-    display:flex;
-    gap:10px;
-    flex-wrap:wrap;
-  }
-  .hero-actions .btn-light{
-    background:rgba(255,255,255,.10);
-    border-color:rgba(255,255,255,.18);
-    color:#fff;
-    backdrop-filter:blur(8px);
-  }
-  .hero-trust{
-    margin-top:18px;
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
-  }
-  .trust-pill{
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
-    min-height:36px;
-    padding:0 12px;
-    border-radius:999px;
-    border:1px solid rgba(255,255,255,.14);
-    background:rgba(255,255,255,.08);
-    color:#fff;
-    font-size:12px;
-    font-weight:900;
-    backdrop-filter:blur(8px);
-  }
-  .hero-side{
-    display:flex;
-    align-items:flex-end;
-    justify-content:flex-end;
-  }
-  .hero-panel{
-    width:100%;
-    max-width:360px;
-    border:1px solid rgba(255,255,255,.14);
-    background:rgba(255,255,255,.08);
-    backdrop-filter:blur(12px);
-    border-radius:24px;
-    padding:16px;
-    color:#fff;
-    box-shadow:0 20px 40px rgba(0,0,0,.18);
-  }
-  .hero-panel-k{
-    font-size:12px;
-    font-weight:900;
-    color:rgba(255,255,255,.70);
-    text-transform:uppercase;
-    letter-spacing:.06em;
-  }
-  .hero-panel-v{
-    margin-top:8px;
-    font-size:20px;
-    font-weight:1000;
-    line-height:1.2;
-  }
-  .hero-panel-sub{
-    margin-top:8px;
-    font-size:12px;
-    line-height:1.45;
-    color:rgba(255,255,255,.82);
-    font-weight:700;
-  }
-  .section{
-    margin-top:16px;
-  }
-  .grid{
-    display:grid;
-    grid-template-columns:repeat(12,minmax(0,1fr));
-    gap:14px;
-  }
-  .card{
-    grid-column:span 12;
-    border:1px solid var(--fagni-line);
-    border-radius:24px;
-    background:rgba(255,255,255,.96);
-    box-shadow:var(--fagni-shadow-soft);
-    padding:18px;
-  }
-  @media(min-width:900px){
-    .col4{ grid-column:span 4; }
-    .col6{ grid-column:span 6; }
-  }
-  .card-title{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
-    margin:0;
-    font-size:16px;
-    font-weight:1000;
-    color:var(--fagni-ink);
-  }
-  .card-sub{
-    margin-top:8px;
-    color:var(--fagni-muted);
-    font-size:13px;
-    line-height:1.5;
-    font-weight:750;
-  }
-  .card-actions{
-    margin-top:14px;
-    display:flex;
-    gap:10px;
-    flex-wrap:wrap;
-  }
-  .card-actions .btn{
-    width:100%;
-  }
-  .space-visual,
-  .offer-visual{
-    margin-top:14px;
-    position:relative;
-    overflow:hidden;
-    border-radius:22px;
-    border:1px solid var(--fagni-line);
-    background:
-      radial-gradient(280px 160px at 18% 18%, rgba(255,122,0,.16), rgba(255,122,0,0) 70%),
-      radial-gradient(240px 140px at 85% 22%, rgba(11,30,58,.13), rgba(11,30,58,0) 70%),
-      linear-gradient(135deg, #ffffff 0%, #f7f9fc 100%);
-  }
-  .space-visual{
-    height:190px;
-  }
-  .offer-visual{
-    height:220px;
-  }
-  .space-visual--client{
-    background:url("{% static 'img/home/home_client.jpg' %}") center/cover no-repeat;
-  }
-  .space-visual--laundry{
-    background:url("{% static 'img/home/home_laundry.jpg' %}") center/cover no-repeat;
-  }
-  .space-visual--driver{
-    background:url("{% static 'img/home/home_driver.jpg' %}") center/cover no-repeat;
-  }
-  .offer-visual--laundry{
-    background:url("{% static 'img/home/home_offer_laundry.jpg' %}") center/cover no-repeat;
-  }
-  .offer-visual--pressing{
-    background:url("{% static 'img/home/home_offer_pressing.jpg' %}") center/cover no-repeat;
-  }
-  .space-visual::before,
-  .offer-visual::before{
-    content:"";
-    position:absolute;
-    inset:0;
-    border-radius:22px;
-    background:linear-gradient(180deg, rgba(11,30,58,.06), rgba(11,30,58,.28));
-    pointer-events:none;
-  }
-  .visual-chip-row{
-    position:absolute;
-    left:18px;
-    top:18px;
-    z-index:2;
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
-  }
-  .visual-chip{
-    display:inline-flex;
-    align-items:center;
-    min-height:28px;
-    padding:0 10px;
-    border-radius:999px;
-    background:#fff;
-    border:1px solid var(--fagni-line);
-    color:var(--fagni-blue);
-    font-size:11px;
-    font-weight:900;
-    box-shadow:0 8px 20px rgba(11,30,58,.06);
-  }
-  .visual-lines{
-    position:absolute;
-    left:24px;
-    right:24px;
-    top:62px;
-    display:grid;
-    gap:10px;
-    z-index:1;
-  }
-  .visual-line{
-    height:12px;
-    border-radius:999px;
-    background:rgba(11,30,58,.08);
-  }
-  .visual-line.short{ width:48%; }
-  .visual-line.mid{ width:72%; }
-  .visual-line.long{ width:88%; }
-  .visual-footer{
-    position:absolute;
-    left:20px;
-    right:20px;
-    bottom:18px;
-    z-index:2;
-  }
-  .visual-footer strong{
-    display:block;
-    font-size:15px;
-    font-weight:1000;
-    color:var(--fagni-blue);
-  }
-  .visual-footer span{
-    display:block;
-    margin-top:5px;
-    font-size:12px;
-    line-height:1.42;
-    color:var(--fagni-muted);
-    font-weight:800;
-  }
-  .price{
-    font-size:13px;
-    font-weight:1000;
-    color:var(--fagni-ink);
-    white-space:nowrap;
-  }
-  .list{
-    margin:12px 0 0;
-    padding-left:18px;
-  }
-  .list li{
-    margin:7px 0;
-    color:var(--fagni-ink);
-    font-size:13px;
-    line-height:1.42;
-  }
-  .steps{
-    margin-top:12px;
-    display:grid;
-    grid-template-columns:repeat(12,minmax(0,1fr));
-    gap:12px;
-  }
-  .step{
-    grid-column:span 12;
-    border:1px solid rgba(15,23,42,.08);
-    border-radius:20px;
-    background:rgba(11,30,58,.02);
-    padding:16px;
-  }
-  @media(min-width:900px){
-    .step{ grid-column:span 4; }
-  }
-  .step-n{
-    width:32px;
-    height:32px;
-    border-radius:11px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    background:#fff;
-    border:1px solid var(--fagni-line);
-    color:var(--fagni-ink);
-    font-weight:1000;
-    font-size:13px;
-  }
-  .step-title{
-    margin-top:10px;
     font-size:14px;
-    font-weight:1000;
-    color:var(--fagni-ink);
+    font-weight:800;
+    transition:transform .2s, box-shadow .2s, background .2s;
+    cursor:pointer;
+    border:1.5px solid transparent;
+    white-space:nowrap;
   }
-  .step-desc{
-    margin-top:6px;
-    color:var(--fagni-muted);
-    font-size:13px;
-    line-height:1.5;
-    font-weight:750;
+
+  .btn:hover{ transform:translateY(-2px); }
+
+  .btn-primary{
+    background:var(--orange);
+    color:#fff;
+    box-shadow:var(--shadow-orange);
+    border-color:var(--orange);
   }
-  .mini-card{
-    display:flex;
-    flex-direction:column;
-    justify-content:space-between;
-    min-height:168px;
+
+  .btn-primary:hover{ background:var(--orange-dark); }
+
+  .btn-secondary{
+    background:#fff;
+    color:var(--blue);
+    border-color:#fff;
+    box-shadow:0 4px 14px rgba(255,255,255,.15);
   }
-  .footer-note{
-    margin-top:16px;
-    padding:14px 16px;
-    border-radius:18px;
-    border:1px solid var(--fagni-line);
-    background:rgba(255,255,255,.88);
-    color:var(--fagni-muted);
-    font-size:12px;
-    font-weight:750;
-    text-align:center;
+
+  .btn-secondary:hover{ background:#F0F5FF; }
+
+  .btn-outline{
+    background:#fff;
+    color:var(--orange);
+    border-color:#F4C9A8;
   }
-  @media(max-width:1100px){
-    .hero{
-      min-height:unset;
-    }
-    .hero-inner{
-      grid-template-columns:1fr;
-      min-height:unset;
-    }
-    .hero-side{
-      justify-content:flex-start;
-    }
-  }
-  @media(max-width:720px){
-    .home-topbar{ padding:10px; }
-    .top-actions, .hero-actions{ width:100%; }
-    .top-actions .btn, .hero-actions .btn{ width:100%; }
-    .hero-inner{ padding:20px 18px 18px; }
-    .hero-title{ font-size:34px; }
-  }
-  /* ===== PATCH VISUELS PREMIUM FAGNI ===== */
-  .space-visual,
-  .offer-visual{
-    position:relative;
-    overflow:hidden;
-    transition:transform .25s ease, box-shadow .25s ease;
-  }
-  .space-visual:hover,
-  .offer-visual:hover{
-    transform:scale(1.03);
-    box-shadow:0 14px 34px rgba(0,0,0,.15);
-  }
-  .space-visual::after,
-  .offer-visual::after{
-    content:"";
-    position:absolute;
-    inset:0;
-    background:linear-gradient(
-      to bottom,
-      rgba(0,0,0,0.05),
-      rgba(0,0,0,0.35)
-    );
-    pointer-events:none;
-  }
-  /* ===== FINAL HOME CLEANUP FAGNI ===== */
-  .space-visual,
-  .offer-visual{
-    position:relative;
-    overflow:hidden;
-    transition:transform .22s ease, box-shadow .22s ease;
-  }
-  .space-visual:hover,
-  .offer-visual:hover{
-    transform:translateY(-2px);
-    box-shadow:0 14px 28px rgba(11,30,58,.14);
-  }
-  /* On retire les surcouches textuelles dans les visuels */
-  .space-visual > *,
-  .offer-visual > *{
-    display:none !important;
-  }
-  /* Overlay plus léger et plus premium */
-  .space-visual::after,
-  .offer-visual::after{
-    content:"";
-    position:absolute;
-    inset:0;
-    background:linear-gradient(
-      180deg,
-      rgba(11,30,58,.04) 0%,
-      rgba(11,30,58,.18) 100%
-    );
-    pointer-events:none;
-  }
-  /* Un peu plus de respiration visuelle */
-  .card-sub{
-    line-height:1.55;
-  }
-  .card-actions .btn{
-    min-height:44px;
-  }
-  /* Hero plus net sans casser la structure */
+
+  .btn-outline:hover{ background:var(--cream); }
+
+  .btn-full{ width:100%; }
+
+  /* ===== HERO ===== */
   .hero{
-    box-shadow:0 26px 56px rgba(11,30,58,.18);
+    padding:28px 0 0;
   }
-  .hero-desc{
-    max-width:560px;
-  }
-  /* ===== HERO PREMIUM FINAL FAGNI ===== */
-  .hero{
+
+  .hero-panel{
     position:relative;
     overflow:hidden;
-    min-height:720px;
-    border-radius:34px;
+    border-radius:28px;
+    min-height:580px;
     background:
-      linear-gradient(90deg, rgba(8,18,38,.88) 0%, rgba(8,18,38,.74) 34%, rgba(8,18,38,.40) 62%, rgba(8,18,38,.18) 100%),
-      radial-gradient(circle at 18% 22%, rgba(255,122,0,.18), rgba(255,122,0,0) 34%),
-      url("{% static 'img/home/home_client.jpg' %}") center right / cover no-repeat !important;
-    box-shadow:0 26px 64px rgba(11,30,58,.20);
-    border:1px solid rgba(255,255,255,.08);
+      linear-gradient(90deg, rgba(30,58,95,.96) 0%, rgba(30,58,95,.88) 50%, rgba(30,58,95,.45) 100%),
+      url("{% static 'img/home/hero_fagni.jpg' %}") center center / cover no-repeat;
+    box-shadow:0 20px 50px rgba(30,58,95,.18);
+    display:grid;
+    grid-template-columns:1.2fr .85fr;
+    gap:24px;
+    align-items:end;
+    padding:56px;
   }
-  .hero::before{
-    content:"";
-    position:absolute;
-    inset:0;
-    background:
-      linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0)),
-      linear-gradient(0deg, rgba(8,18,38,.10), rgba(8,18,38,.10));
-    pointer-events:none;
-  }
-  .hero-inner{
-    position:relative;
-    z-index:2;
-    width:min(700px, 100%);
-    padding:34px 30px 34px;
-  }
-  .hero-title{
-    max-width:620px;
-    font-size:56px;
-    line-height:1.02;
-    letter-spacing:-.045em;
-    text-shadow:0 8px 28px rgba(0,0,0,.18);
-  }
-  .hero-desc{
-    max-width:560px;
-    font-size:15px;
-    line-height:1.65;
-    color:rgba(255,255,255,.88);
-    text-shadow:0 4px 18px rgba(0,0,0,.14);
-  }
-  .hero-trust{
-    margin-top:18px;
-    gap:10px;
-  }
-  .trust-pill{
+
+  .hero-copy{ max-width:620px; }
+
+  .hero-eyebrow{
+    display:inline-flex;
+    align-items:center;
+    min-height:32px;
+    padding:0 14px;
+    border-radius:999px;
     background:rgba(255,255,255,.10);
     border:1px solid rgba(255,255,255,.16);
-    backdrop-filter:blur(10px);
     color:#fff;
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    margin-bottom:18px;
   }
-  .hero-float{
-    right:26px;
-    bottom:26px;
-    width:min(360px, calc(100% - 52px));
-    background:rgba(255,255,255,.12);
-    border:1px solid rgba(255,255,255,.18);
-    backdrop-filter:blur(14px);
-    box-shadow:0 22px 44px rgba(0,0,0,.20);
-  }
-  .hero-float-v{
-    font-size:20px;
-    line-height:1.18;
-  }
-  .hero-float-sub{
-    font-size:12px;
-    line-height:1.55;
-  }
-  .hero-actions .btn-primary{
-    box-shadow:0 18px 34px rgba(255,122,0,.30);
-  }
-  .hero-actions .btn-light{
-    background:rgba(255,255,255,.12);
-    border-color:rgba(255,255,255,.18);
+
+  .hero-title{
+    font-size:clamp(36px,5.5vw,62px);
+    line-height:.98;
+    font-weight:900;
+    letter-spacing:-0.04em;
     color:#fff;
+    margin-bottom:16px;
   }
-  @media(max-width:1100px){
-    .hero{
-      min-height:680px;
-      background:
-        linear-gradient(180deg, rgba(8,18,38,.84) 0%, rgba(8,18,38,.58) 48%, rgba(8,18,38,.42) 100%),
-        radial-gradient(circle at 18% 22%, rgba(255,122,0,.16), rgba(255,122,0,0) 36%),
-        url("{% static 'img/home/home_client.jpg' %}") center center / cover no-repeat !important;
-    }
-    .hero-float{
-      margin:18px 18px 18px auto;
-    }
-  }
-  @media(max-width:720px){
-    .hero{
-      min-height:unset;
-      border-radius:28px;
-    }
-    .hero-inner{
-      padding:22px 18px 20px;
-    }
-    .hero-title{
-      font-size:40px;
-      max-width:100%;
-    }
-    .hero-desc{
-      max-width:100%;
-      font-size:14px;
-    }
-    .hero-float{
-      position:relative;
-      right:auto;
-      bottom:auto;
-      width:calc(100% - 36px);
-      margin:14px 18px 18px;
-    }
-  }
-  /* ===== FAGNI FINAL POLISH ===== */
-  .home-wrap{
-    padding-top:0 !important;
-  }
-  .home-topbar{
-    margin-top:0 !important;
-  }
-  .hero{
-    min-height:620px !important;
-    border-radius:30px !important;
-    box-shadow:0 24px 54px rgba(11,30,58,.18) !important;
-  }
-  .hero-inner{
-    width:min(620px,100%) !important;
-    padding:28px 24px 28px !important;
-  }
-  .hero-title{
-    font-size:48px !important;
-    line-height:1.02 !important;
-    max-width:520px !important;
-  }
+
   .hero-desc{
-    max-width:500px !important;
-    font-size:14px !important;
-    line-height:1.6 !important;
+    color:rgba(255,255,255,.85);
+    font-size:16px;
+    line-height:1.72;
+    margin-bottom:28px;
+    max-width:560px;
   }
-  .hero-actions{
-    margin-top:16px !important;
-  }
-  .hero-trust{
-    margin-top:14px !important;
-    gap:8px !important;
-  }
-  .trust-pill,
-  .hero-chip{
-    font-size:11px !important;
-  }
-  .hero-float{
-    width:300px !important;
-    right:20px !important;
-    bottom:20px !important;
-    padding:14px !important;
-    border-radius:18px !important;
-    background:rgba(255,255,255,.10) !important;
-    border:1px solid rgba(255,255,255,.16) !important;
-    backdrop-filter:blur(12px) !important;
-  }
-  .hero-float-v{
-    font-size:18px !important;
-  }
-  .hero-float-sub{
-    font-size:11px !important;
-    line-height:1.5 !important;
-  }
-  .section{
-    margin-top:14px !important;
-  }
-  .grid{
-    gap:12px !important;
-  }
-  .card{
-    border-radius:22px !important;
-    padding:16px !important;
-    box-shadow:0 10px 24px rgba(11,30,58,.08) !important;
-  }
-  .card-title{
-    font-size:15px !important;
-  }
-  .card-sub{
-    font-size:12px !important;
-    line-height:1.5 !important;
-  }
-  .space-visual{
-    height:165px !important;
-    border-radius:18px !important;
-  }
-  .offer-visual{
-    height:175px !important;
-    border-radius:18px !important;
-  }
-  .steps{
-    gap:10px !important;
-  }
-  .step{
-    padding:14px !important;
-    border-radius:18px !important;
-  }
-  .step-title{
-    font-size:13px !important;
-  }
-  .step-desc{
-    font-size:12px !important;
-  }
-  .footer-note{
-    margin-top:14px !important;
-    padding:12px 14px !important;
-  }
-  @media (max-width: 900px){
-    .hero{
-      min-height:560px !important;
-    }
-    .hero-title{
-      font-size:40px !important;
-      max-width:100% !important;
-    }
-    .hero-desc{
-      max-width:100% !important;
-    }
-    .hero-float{
-      width:calc(100% - 32px) !important;
-      right:16px !important;
-      bottom:16px !important;
-    }
-  }
-  @media (max-width: 720px){
-    .hero{
-      min-height:auto !important;
-    }
-    .hero-inner{
-      padding:22px 18px 20px !important;
-    }
-    .hero-title{
-      font-size:34px !important;
-    }
-    .hero-float{
-      position:relative !important;
-      width:100% !important;
-      right:auto !important;
-      bottom:auto !important;
-      margin-top:14px !important;
-    }
-    .space-visual{
-      height:150px !important;
-    }
-    .offer-visual{
-      height:160px !important;
-    }
-  }
-  /* ===== FAGNI AUTO PATCH FINAL ===== */
-  .home-wrap{
-    padding-top:0 !important;
-  }
-  .home-topbar{
-    margin-top:0 !important;
-  }
-  .hero{
-    min-height:600px !important;
-    background-position:65% center !important;
-    box-shadow:0 24px 56px rgba(11,30,58,.18) !important;
-  }
-  .hero-inner{
-    width:min(600px,100%) !important;
-    padding:26px 22px 26px !important;
-  }
-  .hero-title{
-    font-size:46px !important;
-    line-height:1.03 !important;
-    max-width:500px !important;
-  }
-  .hero-desc{
-    max-width:480px !important;
-    font-size:14px !important;
-    line-height:1.58 !important;
-  }
-  .hero-actions{
-    margin-top:14px !important;
-  }
-  .hero-trust{
-    margin-top:12px !important;
-    gap:8px !important;
-  }
-  .hero-chip,
-  .trust-pill{
-    font-size:11px !important;
-  }
-  .hero-float{
-    width:280px !important;
-    padding:12px !important;
-    right:18px !important;
-    bottom:18px !important;
-    border-radius:18px !important;
-    background:rgba(255,255,255,.08) !important;
-    border:1px solid rgba(255,255,255,.14) !important;
-    box-shadow:0 18px 34px rgba(0,0,0,.18) !important;
-  }
-  .hero-float-v{
-    font-size:17px !important;
-    line-height:1.18 !important;
-  }
-  .hero-float-sub{
-    font-size:11px !important;
-    line-height:1.45 !important;
-  }
-  .card{
-    transition:transform .20s ease, box-shadow .20s ease !important;
-  }
-  .card:hover{
-    transform:translateY(-4px) !important;
-    box-shadow:0 18px 40px rgba(11,30,58,.12) !important;
-  }
-  .space-visual,
-  .offer-visual{
-    border-radius:18px !important;
-  }
-  .card-sub{
-    line-height:1.52 !important;
-  }
-  @media (max-width: 900px){
-    .hero{
-      min-height:540px !important;
-      background-position:60% center !important;
-    }
-    .hero-title{
-      font-size:40px !important;
-      max-width:100% !important;
-    }
-    .hero-desc{
-      max-width:100% !important;
-    }
-    .hero-float{
-      width:260px !important;
-      right:16px !important;
-      bottom:16px !important;
-    }
-  }
-  @media (max-width: 720px){
-    .hero{
-      min-height:auto !important;
-      background-position:center center !important;
-    }
-    .hero-inner{
-      padding:20px 16px 18px !important;
-    }
-    .hero-title{
-      font-size:34px !important;
-    }
-    .hero-float{
-      position:relative !important;
-      width:100% !important;
-      right:auto !important;
-      bottom:auto !important;
-      margin-top:14px !important;
-    }
-  }
-/* ===== FINAL FAGNI UI PATCH ===== */
-.hero{
-background-position:72% center !important;
-}
-.hero-float{
-width:260px !important;
-background:rgba(255,255,255,.06) !important;
-}
-.space-visual,
-.offer-visual{
-transition:transform .25s ease;
-}
-.space-visual:hover,
-.offer-visual:hover{
-transform:scale(1.04);
-}
-  /* ===== FAGNI HOMEPAGE UPGRADE ===== */
-  .hero{
-    min-height:560px !important;
-    background-position:72% center !important;
-    box-shadow:0 24px 56px rgba(11,30,58,.18) !important;
-  }
-  .hero::before{
-    content:"";
-    position:absolute;
-    inset:0;
-    background:linear-gradient(
-      90deg,
-      rgba(10,20,40,.72) 0%,
-      rgba(10,20,40,.58) 34%,
-      rgba(10,20,40,.26) 58%,
-      rgba(10,20,40,.06) 100%
-    );
-    pointer-events:none;
-  }
-  .hero-inner{
-    position:relative;
-    z-index:2;
-    width:min(560px,100%) !important;
-    padding:24px 20px 24px !important;
-  }
-  .hero-title{
-    font-size:52px !important;
-    line-height:1.02 !important;
-    letter-spacing:-.04em !important;
-    max-width:500px !important;
-    margin:18px 0 12px !important;
-  }
-  .hero-desc{
-    max-width:470px !important;
-    font-size:15px !important;
-    line-height:1.6 !important;
-    color:rgba(255,255,255,.90) !important;
-  }
-  .hero-actions{
-    margin-top:18px !important;
-    gap:10px !important;
-  }
-  .hero-actions .btn{
-    min-height:48px !important;
-    padding:0 18px !important;
-    font-size:14px !important;
-  }
-  .hero-trust{
-    margin-top:14px !important;
-    gap:8px !important;
-  }
-  .trust-pill{
-    background:rgba(255,255,255,.10) !important;
-    border:1px solid rgba(255,255,255,.16) !important;
-    color:#fff !important;
-    font-size:12px !important;
-  }
-  .hero-chip{
-    font-size:11px !important;
-  }
-  .flow-strip{
+
+  .hero-cta-row{
     display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:10px;
+    gap:12px;
     flex-wrap:wrap;
-    padding:14px 16px;
-    border:1px solid rgba(15,23,42,.08);
-    background:rgba(255,255,255,.92);
-    border-radius:20px;
-    box-shadow:0 10px 24px rgba(11,30,58,.06);
+    margin-bottom:24px;
   }
-  .flow-step{
-    display:inline-flex;
-    align-items:center;
+
+  .hero-trust{
+    display:flex;
     gap:8px;
-    padding:10px 14px;
-    border-radius:999px;
-    background:#fff;
-    border:1px solid rgba(15,23,42,.08);
-    font-weight:900;
-    color:#0f172a;
-    font-size:13px;
-  }
-  .flow-n{
-    width:24px;
-    height:24px;
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    border-radius:999px;
-    background:linear-gradient(90deg,#ff7a00,#ffab4d);
-    color:#111827;
-    font-size:12px;
-    font-weight:1000;
-  }
-  .flow-arrow{
-    color:#94a3b8;
-    font-weight:1000;
-    font-size:18px;
-  }
-  .grid{
-    gap:14px !important;
-  }
-  .card{
-    border-radius:22px !important;
-    padding:16px !important;
-    box-shadow:0 10px 24px rgba(11,30,58,.08) !important;
-    transition:transform .18s ease, box-shadow .18s ease !important;
-  }
-  .card:hover{
-    transform:translateY(-3px) !important;
-    box-shadow:0 18px 36px rgba(11,30,58,.12) !important;
-  }
-  .card-title{
-    font-size:16px !important;
-  }
-  .card-sub{
-    font-size:13px !important;
-    line-height:1.55 !important;
-  }
-  .space-visual{
-    height:170px !important;
-    border-radius:18px !important;
-  }
-  .offer-visual{
-    height:185px !important;
-    border-radius:18px !important;
-  }
-  .card-actions .btn{
-    min-height:44px !important;
-  }
-  .steps{
-    gap:12px !important;
-  }
-  .step{
-    border-radius:18px !important;
-    padding:16px !important;
-  }
-  .step-title{
-    font-size:14px !important;
-  }
-  .step-desc{
-    font-size:13px !important;
-    line-height:1.55 !important;
-  }
-  .footer-note{
-    font-size:12px !important;
-  }
-  @media(max-width:900px){
-    .hero{
-      min-height:520px !important;
-      background-position:70% center !important;
-    }
-    .hero-title{
-      font-size:42px !important;
-      max-width:100% !important;
-    }
-    .hero-desc{
-      max-width:100% !important;
-      font-size:14px !important;
-    }
-    .space-visual{
-      height:160px !important;
-    }
-    .offer-visual{
-      height:170px !important;
-    }
-  }
-  @media(max-width:720px){
-    .hero{
-      min-height:auto !important;
-      background-position:center center !important;
-    }
-    .hero-inner{
-      width:100% !important;
-      padding:20px 16px 20px !important;
-    }
-    .hero-title{
-      font-size:34px !important;
-      line-height:1.04 !important;
-    }
-    .hero-actions{
-      flex-direction:column;
-      align-items:stretch;
-    }
-    .hero-actions .btn{
-      width:100%;
-    }
-    .flow-strip{
-      justify-content:flex-start;
-    }
-    .flow-arrow{
-      display:none;
-    }
-  }
-  /* ===== FAGNI REAL HERO FINAL ===== */
-  .hero{
-    position:relative !important;
-    overflow:hidden !important;
-    min-height:580px !important;
-    border-radius:30px !important;
-    background:
-      linear-gradient(90deg,
-        rgba(10,20,40,.76) 0%,
-        rgba(10,20,40,.60) 34%,
-        rgba(10,20,40,.28) 60%,
-        rgba(10,20,40,.06) 100%
-      ),
-      url("{% static 'img/home/hero_fagni.jpg' %}") 70% center / cover no-repeat !important;
-    box-shadow:0 24px 56px rgba(11,30,58,.18) !important;
-    border:1px solid rgba(255,255,255,.08) !important;
-  }
-  .hero::before{
-    content:"";
-    position:absolute;
-    inset:0;
-    background:
-      radial-gradient(circle at 18% 22%, rgba(255,122,0,.10), rgba(255,122,0,0) 28%),
-      linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
-    pointer-events:none;
-  }
-  .hero-inner{
-    position:relative !important;
-    z-index:2 !important;
-    width:min(560px,100%) !important;
-    padding:28px 22px 28px !important;
-  }
-  .hero-title{
-    font-size:54px !important;
-    line-height:1.02 !important;
-    letter-spacing:-.045em !important;
-    max-width:520px !important;
-    margin:18px 0 12px !important;
-    color:#fff !important;
-    text-shadow:0 8px 24px rgba(0,0,0,.16) !important;
-    white-space:pre-line !important;
-  }
-  .hero-desc{
-    max-width:500px !important;
-    font-size:15px !important;
-    line-height:1.62 !important;
-    color:rgba(255,255,255,.90) !important;
-    text-shadow:0 4px 16px rgba(0,0,0,.12) !important;
-  }
-  .hero-actions{
-    margin-top:18px !important;
-    gap:10px !important;
-  }
-  .hero-actions .btn{
-    min-height:48px !important;
-    padding:0 18px !important;
-    font-size:14px !important;
-  }
-  .hero-actions .btn-primary{
-    box-shadow:0 16px 34px rgba(255,122,0,.28) !important;
-  }
-  .hero-actions .btn-light{
-    background:rgba(255,255,255,.12) !important;
-    border-color:rgba(255,255,255,.18) !important;
-    color:#fff !important;
-    backdrop-filter:blur(8px) !important;
-  }
-  .hero-trust{
-    margin-top:14px !important;
-    gap:8px !important;
-  }
-  .trust-pill{
-    background:rgba(255,255,255,.10) !important;
-    border:1px solid rgba(255,255,255,.16) !important;
-    color:#fff !important;
-    font-size:12px !important;
-    backdrop-filter:blur(8px) !important;
-  }
-  .hero-chip{
-    font-size:11px !important;
-    background:rgba(255,255,255,.10) !important;
-    border-color:rgba(255,255,255,.14) !important;
-    color:#fff !important;
-  }
-  @media(max-width:900px){
-    .hero{
-      min-height:520px !important;
-      background:
-        linear-gradient(90deg,
-          rgba(10,20,40,.78) 0%,
-          rgba(10,20,40,.62) 38%,
-          rgba(10,20,40,.26) 62%,
-          rgba(10,20,40,.08) 100%
-        ),
-        url("{% static 'img/home/hero_fagni.jpg' %}") 74% center / cover no-repeat !important;
-    }
-    .hero-title{
-      font-size:42px !important;
-      max-width:100% !important;
-    }
-    .hero-desc{
-      max-width:100% !important;
-      font-size:14px !important;
-    }
-  }
-  @media(max-width:720px){
-    .hero{
-      min-height:500px !important;
-      background:
-        linear-gradient(180deg,
-          rgba(10,20,40,.72) 0%,
-          rgba(10,20,40,.52) 46%,
-          rgba(10,20,40,.24) 100%
-        ),
-        url("{% static 'img/home/hero_fagni.jpg' %}") 68% center / cover no-repeat !important;
-    }
-    .hero-inner{
-      width:100% !important;
-      padding:20px 16px 20px !important;
-    }
-    .hero-title{
-      font-size:36px !important;
-      line-height:1.04 !important;
-    }
-    .hero-desc{
-      font-size:14px !important;
-    }
-    .hero-actions{
-      flex-direction:column !important;
-      align-items:stretch !important;
-    }
-    .hero-actions .btn{
-      width:100% !important;
-    }
-  }
-  /* ===== FAGNI HERO VISIBILITY PATCH ===== */
-  .hero{
-    position:relative !important;
-    overflow:hidden !important;
-    min-height:580px !important;
-    border-radius:30px !important;
-    background:
-      linear-gradient(
-        90deg,
-        rgba(10,20,40,.55) 0%,
-        rgba(10,20,40,.35) 40%,
-        rgba(10,20,40,.12) 65%,
-        rgba(10,20,40,0) 100%
-      ),
-      url("{% static 'img/home/hero_fagni.jpg' %}") 70% center / cover no-repeat !important;
-    box-shadow:0 24px 56px rgba(11,30,58,.18) !important;
-    border:1px solid rgba(255,255,255,.08) !important;
-  }
-  .hero::before{
-    content:"";
-    position:absolute;
-    inset:0;
-    background:
-      radial-gradient(circle at 18% 22%, rgba(255,122,0,.08), rgba(255,122,0,0) 30%),
-      linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
-    pointer-events:none;
-  }
-  .hero-inner{
-    position:relative !important;
-    z-index:2 !important;
-    width:min(560px,100%) !important;
-    padding:26px 22px 26px !important;
-  }
-  .hero-title{
-    font-size:52px !important;
-    line-height:1.02 !important;
-    letter-spacing:-.04em !important;
-    max-width:520px !important;
-    margin:18px 0 12px !important;
-    color:#fff !important;
-    text-shadow:0 8px 24px rgba(0,0,0,.14) !important;
-  }
-  .hero-desc{
-    max-width:500px !important;
-    font-size:15px !important;
-    line-height:1.6 !important;
-    color:rgba(255,255,255,.92) !important;
-    text-shadow:0 4px 16px rgba(0,0,0,.10) !important;
-  }
-  .hero-actions{
-    margin-top:18px !important;
-    gap:10px !important;
-  }
-  .hero-actions .btn{
-    min-height:48px !important;
-    padding:0 18px !important;
-    font-size:14px !important;
-  }
-  .hero-actions .btn-primary{
-    box-shadow:0 16px 34px rgba(255,122,0,.24) !important;
-  }
-  .hero-actions .btn-light{
-    background:rgba(255,255,255,.12) !important;
-    border-color:rgba(255,255,255,.18) !important;
-    color:#fff !important;
-    backdrop-filter:blur(8px) !important;
-  }
-  .hero-trust{
-    margin-top:14px !important;
-    gap:8px !important;
-  }
-  .trust-pill,
-  .hero-chip{
-    background:rgba(255,255,255,.10) !important;
-    border:1px solid rgba(255,255,255,.16) !important;
-    color:#fff !important;
-    backdrop-filter:blur(8px) !important;
-  }
-  .trust-pill{
-    font-size:12px !important;
-  }
-  .hero-chip{
-    font-size:11px !important;
-  }
-  .hero-float{
-    width:250px !important;
-    padding:12px !important;
-    right:18px !important;
-    bottom:18px !important;
-    border-radius:18px !important;
-    background:rgba(255,255,255,.06) !important;
-    border:1px solid rgba(255,255,255,.12) !important;
-    box-shadow:0 14px 28px rgba(0,0,0,.14) !important;
-    backdrop-filter:blur(10px) !important;
-  }
-  .hero-float-k{
-    font-size:11px !important;
-  }
-  .hero-float-v{
-    font-size:16px !important;
-    line-height:1.18 !important;
-  }
-  .hero-float-sub{
-    font-size:11px !important;
-    line-height:1.45 !important;
-  }
-  @media(max-width:900px){
-    .hero{
-      min-height:520px !important;
-      background:
-        linear-gradient(
-          90deg,
-          rgba(10,20,40,.58) 0%,
-          rgba(10,20,40,.38) 42%,
-          rgba(10,20,40,.14) 66%,
-          rgba(10,20,40,0) 100%
-        ),
-        url("{% static 'img/home/hero_fagni.jpg' %}") 72% center / cover no-repeat !important;
-    }
-    .hero-title{
-      font-size:42px !important;
-      max-width:100% !important;
-    }
-    .hero-desc{
-      max-width:100% !important;
-      font-size:14px !important;
-    }
-  }
-  @media(max-width:720px){
-    .hero{
-      min-height:500px !important;
-      background:
-        linear-gradient(
-          180deg,
-          rgba(10,20,40,.66) 0%,
-          rgba(10,20,40,.42) 48%,
-          rgba(10,20,40,.16) 100%
-        ),
-        url("{% static 'img/home/hero_fagni.jpg' %}") 68% center / cover no-repeat !important;
-    }
-    .hero-inner{
-      width:100% !important;
-      padding:20px 16px 20px !important;
-    }
-    .hero-title{
-      font-size:36px !important;
-      line-height:1.04 !important;
-    }
-    .hero-desc{
-      font-size:14px !important;
-    }
-    .hero-actions{
-      flex-direction:column !important;
-      align-items:stretch !important;
-    }
-    .hero-actions .btn{
-      width:100% !important;
-    }
-    .hero-float{
-      width:100% !important;
-      right:auto !important;
-      bottom:auto !important;
-      margin-top:14px !important;
-    }
-  }
-  /* ===== FAGNI FINAL POLISH V2 ===== */
-  .hero{
-    min-height:520px !important;
-    border-radius:28px !important;
-    background:
-      linear-gradient(
-        90deg,
-        rgba(10,20,40,.60) 0%,
-        rgba(10,20,40,.38) 36%,
-        rgba(10,20,40,.14) 60%,
-        rgba(10,20,40,.04) 100%
-      ),
-      url("{% static 'img/home/hero_fagni.jpg' %}") 72% center / cover no-repeat !important;
-  }
-  .hero-inner{
-    width:min(540px,100%) !important;
-    padding:24px 20px 22px !important;
-  }
-  .hero-top{
-    margin-bottom:10px !important;
-  }
-  .hero-title{
-    font-size:48px !important;
-    max-width:500px !important;
-    margin:16px 0 10px !important;
-  }
-  .hero-desc{
-    max-width:470px !important;
-    font-size:14px !important;
-    line-height:1.58 !important;
-  }
-  .hero-actions{
-    margin-top:16px !important;
-  }
-  .hero-trust{
-    margin-top:12px !important;
-  }
-  .trust-pill{
-    font-size:11px !important;
-    padding:0 10px !important;
-    min-height:34px !important;
-  }
-  .flow-strip{
-    margin-top:2px !important;
-  }
-  .card{
-    background:rgba(255,255,255,.96) !important;
-    border:1px solid rgba(15,23,42,.08) !important;
-    border-radius:20px !important;
-    box-shadow:0 10px 22px rgba(11,30,58,.07) !important;
-  }
-  .card-title{
-    font-size:15px !important;
-  }
-  .card-sub{
-    font-size:12px !important;
-    line-height:1.5 !important;
-  }
-  .space-visual{
-    height:150px !important;
-    border-radius:16px !important;
-  }
-  .offer-visual{
-    height:165px !important;
-    border-radius:16px !important;
-  }
-  .card-actions .btn{
-    min-height:42px !important;
-    font-size:13px !important;
-  }
-  .step{
-    background:#fff !important;
-    border:1px solid rgba(15,23,42,.08) !important;
-    border-radius:18px !important;
-  }
-  .step-title{
-    font-size:13px !important;
-  }
-  .step-desc{
-    font-size:12px !important;
-  }
-  .mini-card{
-    min-height:150px !important;
-  }
-  .footer-note{
-    border-radius:16px !important;
-    background:#fff !important;
-  }
-  @media(max-width:900px){
-    .hero{
-      min-height:500px !important;
-      background:
-        linear-gradient(
-          90deg,
-          rgba(10,20,40,.62) 0%,
-          rgba(10,20,40,.40) 40%,
-          rgba(10,20,40,.16) 64%,
-          rgba(10,20,40,.04) 100%
-        ),
-        url("{% static 'img/home/hero_fagni.jpg' %}") 74% center / cover no-repeat !important;
-    }
-    .hero-title{
-      font-size:42px !important;
-    }
-  }
-  @media(max-width:720px){
-    .hero{
-      min-height:460px !important;
-      border-radius:24px !important;
-      background:
-        linear-gradient(
-          180deg,
-          rgba(10,20,40,.66) 0%,
-          rgba(10,20,40,.44) 48%,
-          rgba(10,20,40,.16) 100%
-        ),
-        url("{% static 'img/home/hero_fagni.jpg' %}") 68% center / cover no-repeat !important;
-    }
-    .hero-inner{
-      padding:18px 16px 18px !important;
-    }
-    .hero-title{
-      font-size:34px !important;
-      line-height:1.04 !important;
-    }
-    .hero-desc{
-      font-size:13px !important;
-    }
-    .space-visual{
-      height:140px !important;
-    }
-    .offer-visual{
-      height:150px !important;
-    }
-  }
-  /* ===== FAGNI REMOVE HERO FLOAT FINAL ===== */
-  .hero{
-    min-height:470px !important;
-    border-radius:26px !important;
-    background:
-      linear-gradient(
-        90deg,
-        rgba(10,20,40,.60) 0%,
-        rgba(10,20,40,.38) 36%,
-        rgba(10,20,40,.14) 60%,
-        rgba(10,20,40,.04) 100%
-      ),
-      url("{% static 'img/home/hero_fagni.jpg' %}") 72% center / cover no-repeat !important;
-  }
-  .hero-inner{
-    width:min(520px,100%) !important;
-    padding:22px 18px 20px !important;
-  }
-  .hero-title{
-    font-size:44px !important;
-    line-height:1.03 !important;
-    margin:14px 0 10px !important;
-    max-width:480px !important;
-  }
-  .hero-desc{
-    max-width:460px !important;
-    font-size:14px !important;
-    line-height:1.55 !important;
-  }
-  .hero-actions{
-    margin-top:14px !important;
-  }
-  .hero-actions .btn{
-    min-height:44px !important;
-    font-size:13px !important;
-  }
-  .hero-trust{
-    margin-top:10px !important;
-    gap:8px !important;
-  }
-  .trust-pill{
-    min-height:32px !important;
-    font-size:11px !important;
-    padding:0 10px !important;
-  }
-  .hero-chip{
-    min-height:30px !important;
-    font-size:10px !important;
-    padding:0 10px !important;
-  }
-  @media(max-width:900px){
-    .hero{
-      min-height:440px !important;
-      background:
-        linear-gradient(
-          90deg,
-          rgba(10,20,40,.62) 0%,
-          rgba(10,20,40,.40) 40%,
-          rgba(10,20,40,.16) 64%,
-          rgba(10,20,40,.05) 100%
-        ),
-        url("{% static 'img/home/hero_fagni.jpg' %}") 74% center / cover no-repeat !important;
-    }
-    .hero-title{
-      font-size:38px !important;
-    }
-  }
-  @media(max-width:720px){
-    .hero{
-      min-height:420px !important;
-      border-radius:22px !important;
-      background:
-        linear-gradient(
-          180deg,
-          rgba(10,20,40,.66) 0%,
-          rgba(10,20,40,.44) 48%,
-          rgba(10,20,40,.16) 100%
-        ),
-        url("{% static 'img/home/hero_fagni.jpg' %}") 68% center / cover no-repeat !important;
-    }
-    .hero-inner{
-      padding:18px 14px 18px !important;
-    }
-    .hero-title{
-      font-size:32px !important;
-      line-height:1.05 !important;
-    }
-    .hero-desc{
-      font-size:13px !important;
-    }
-  }
-  /* ===== FAGNI HARD REMOVE EXPERIENCE FIX ===== */
-  .hero{
-    min-height:430px !important;
-    background:
-      linear-gradient(
-        90deg,
-        rgba(10,20,40,.58) 0%,
-        rgba(10,20,40,.34) 36%,
-        rgba(10,20,40,.12) 60%,
-        rgba(10,20,40,.04) 100%
-      ),
-      url("{% static 'img/home/hero_fagni.jpg' %}") 72% center / cover no-repeat !important;
-  }
-  .hero-inner{
-    width:min(500px,100%) !important;
-    padding:18px 18px 18px !important;
-  }
-  .hero-title{
-    font-size:40px !important;
-    margin:12px 0 8px !important;
-    max-width:440px !important;
-  }
-  .hero-desc{
-    font-size:13px !important;
-    line-height:1.5 !important;
-    max-width:430px !important;
-  }
-  .hero-actions .btn{
-    min-height:42px !important;
-    font-size:13px !important;
-  }
-  .hero-trust{
-    margin-top:10px !important;
-  }
-  @media(max-width:720px){
-    .hero{
-      min-height:390px !important;
-    }
-    .hero-title{
-      font-size:30px !important;
-    }
-    .hero-desc{
-      font-size:12px !important;
-    }
-  }
-  /* ===== FAGNI FORCE HIDE EXPERIENCE BLOCK ===== */
-  .hero .hero-trust + div{
-    display:none !important;
-  }
-  .hero-float{
-    display:none !important;
-    visibility:hidden !important;
-    opacity:0 !important;
-    pointer-events:none !important;
-  }
-  .hero{
-    min-height:420px !important;
-  }
-  .hero-inner{
-    padding-bottom:18px !important;
-  }
-  /* ===== FAGNI REMOVE HERO MOCK FINAL ===== */
-  .hero-mock,
-  .hero-mockup,
-  .hero-mock-card,
-  .hero-mock-panel{
-    display:none !important;
-    visibility:hidden !important;
-    opacity:0 !important;
-    pointer-events:none !important;
-  }
-  .hero{
-    min-height:410px !important;
-  }
-  .hero-inner{
-    width:min(500px,100%) !important;
-    padding:18px 18px 18px !important;
-  }
-  .hero-title{
-    font-size:40px !important;
-    margin:12px 0 8px !important;
-    max-width:440px !important;
-  }
-  .hero-desc{
-    font-size:13px !important;
-    line-height:1.5 !important;
-    max-width:430px !important;
-  }
-  .hero-actions .btn{
-    min-height:42px !important;
-    font-size:13px !important;
-  }
-  @media(max-width:720px){
-    .hero{
-      min-height:390px !important;
-    }
-    .hero-title{
-      font-size:30px !important;
-    }
-    .hero-desc{
-      font-size:12px !important;
-    }
-  }
-  /* ===== FAGNI DYNAMIC PRICES STRIP ===== */
-  .hero-price-strip{
-    margin-top:14px;
-    display:flex;
-    gap:10px;
     flex-wrap:wrap;
   }
-  .hero-price-pill{
+
+  .hero-trust-pill{
+    min-height:34px;
+    padding:0 12px;
     display:inline-flex;
     align-items:center;
-    min-height:38px;
-    padding:0 12px;
+    gap:6px;
     border-radius:999px;
-    background:rgba(255,255,255,.10);
-    border:1px solid rgba(255,255,255,.18);
-    color:#fff;
+    background:rgba(255,255,255,.09);
+    border:1px solid rgba(255,255,255,.14);
+    color:rgba(255,255,255,.90);
     font-size:12px;
-    font-weight:900;
+    font-weight:700;
     backdrop-filter:blur(8px);
   }
-  @media(max-width:720px){
-    .hero-price-strip{
-      flex-direction:column;
-      align-items:stretch;
-    }
-    .hero-price-pill{
-      width:100%;
-      justify-content:center;
-    }
+
+  .hero-side-card{
+    width:100%;
+    max-width:320px;
+    padding:24px;
+    border-radius:24px;
+    background:rgba(255,255,255,.12);
+    border:1px solid rgba(255,255,255,.16);
+    color:#fff;
+    backdrop-filter:blur(16px);
+    box-shadow:0 16px 40px rgba(0,0,0,.14);
   }
-  /* ===== FAGNI HERO TEXT UPGRADE ===== */
-  .hero-inner{
-    width:min(620px,100%) !important;
-    padding:26px 24px 24px !important;
+
+  .hero-side-label{
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:rgba(255,255,255,.70);
+    margin-bottom:10px;
   }
-  .hero-title{
-    font-size:52px !important;
-    line-height:1.15 !important;
-    font-weight:900 !important;
-    letter-spacing:-.03em !important;
-    max-width:520px !important;
-    margin:14px 0 10px !important;
-  }
-  .hero-desc{
-    font-size:16px !important;
-    line-height:1.6 !important;
-    max-width:520px !important;
-    opacity:.96 !important;
-    margin-top:14px !important;
-  }
-  .hero-actions{
-    margin-top:24px !important;
-    display:flex !important;
-    gap:12px !important;
-    flex-wrap:wrap !important;
-  }
-  .hero-actions .btn{
-    min-height:46px !important;
-    padding:0 18px !important;
-    font-size:14px !important;
-  }
-  .hero-benefits{
-    margin-top:18px !important;
-    display:flex !important;
-    gap:14px !important;
-    flex-wrap:wrap !important;
-    align-items:center !important;
-    font-size:13px !important;
-    font-weight:700 !important;
-    color:rgba(255,255,255,.88) !important;
-  }
-  .hero-benefits span{
-    display:inline-flex !important;
-    align-items:center !important;
-    gap:6px !important;
-  }
-  .hero{
-    background:
-      linear-gradient(
-        90deg,
-        rgba(15,23,42,.75) 0%,
-        rgba(15,23,42,.55) 40%,
-        rgba(15,23,42,.10) 70%,
-        rgba(15,23,42,0) 100%
-      ),
-      url("{% static 'img/home/hero_fagni.jpg' %}") 72% center / cover no-repeat !important;
-  }
-  @media(max-width:900px){
-    .hero-inner{
-      width:min(560px,100%) !important;
-      padding:22px 20px 22px !important;
-    }
-    .hero-title{
-      font-size:44px !important;
-      max-width:500px !important;
-    }
-    .hero-desc{
-      font-size:15px !important;
-      max-width:500px !important;
-    }
-  }
-  @media(max-width:720px){
-    .hero-inner{
-      width:100% !important;
-      padding:18px 16px 18px !important;
-    }
-    .hero-title{
-      font-size:34px !important;
-      line-height:1.1 !important;
-      max-width:100% !important;
-    }
-    .hero-desc{
-      font-size:14px !important;
-      max-width:100% !important;
-    }
-    .hero-actions{
-      gap:10px !important;
-    }
-    .hero-benefits{
-      gap:8px !important;
-      font-size:12px !important;
-      flex-direction:column !important;
-      align-items:flex-start !important;
-    }
-  }
-  /* ===== FAGNI TRANSPORT UNIFIED ===== */
-  .offers-transport-strip{
-    padding:14px 16px;
-    border-radius:18px;
-    border:1px solid rgba(15,23,42,.08);
-    background:rgba(255,255,255,.96);
-    box-shadow:0 10px 22px rgba(11,30,58,.06);
-    color:#0f172a;
-    font-size:13px;
-    line-height:1.6;
-    font-weight:700;
-  }
-  .offers-transport-strip strong{
+
+  .hero-side-main{
+    font-size:26px;
     font-weight:900;
+    line-height:1.08;
+    letter-spacing:-0.03em;
+    margin-bottom:12px;
   }
-  .hero{
-    min-height:400px !important;
+
+  .hero-side-sub{
+    font-size:14px;
+    line-height:1.65;
+    color:rgba(255,255,255,.80);
   }
-  @media(max-width:720px){
-    .offers-transport-strip{
-      font-size:12px;
-      padding:12px 14px;
+
+  /* ===== SECTIONS ===== */
+  .section{
+    padding:56px 0;
+  }
+
+  .section-head{
+    margin-bottom:28px;
+  }
+
+  .section-title{
+    font-size:clamp(26px,3.5vw,38px);
+    font-weight:900;
+    letter-spacing:-0.03em;
+    color:var(--blue);
+    margin-bottom:10px;
+  }
+
+  .section-sub{
+    font-size:16px;
+    line-height:1.7;
+    color:var(--muted);
+    max-width:680px;
+  }
+
+  /* ===== CARDS ===== */
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow-blue);
+    transition:transform .2s, box-shadow .2s;
+  }
+
+  .card:hover{
+    transform:translateY(-4px);
+    box-shadow:0 16px 36px rgba(30,58,95,.12);
+  }
+
+  /* ===== ESPACES ===== */
+  .spaces-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:18px;
+  }
+
+  .space-card{
+    padding:22px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+
+  .space-emoji{
+    font-size:28px;
+    line-height:1;
+  }
+
+  .space-title{
+    font-size:20px;
+    font-weight:900;
+    letter-spacing:-0.02em;
+    color:var(--blue);
+  }
+
+  .space-desc{
+    font-size:14px;
+    line-height:1.65;
+    color:var(--muted);
+    flex:1;
+  }
+
+  .space-visual{
+    border-radius:14px;
+    overflow:hidden;
+    border:1px solid var(--border);
+    aspect-ratio:16/10;
+    background:#EEF2F8;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:3rem;
+  }
+
+  .space-visual img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
+
+  /* ===== TARIFS ===== */
+  .tariffs-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:18px;
+  }
+
+  .tariff-card{
+    padding:26px;
+    background:var(--cream);
+    border:1px solid #F0D8C0;
+    box-shadow:var(--shadow-orange);
+  }
+
+  .tariff-header{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:18px;
+  }
+
+  .tariff-title{
+    font-size:22px;
+    font-weight:900;
+    letter-spacing:-0.02em;
+    color:var(--blue);
+  }
+
+  .tariff-badge{
+    min-height:32px;
+    padding:0 12px;
+    border-radius:999px;
+    background:#fff;
+    border:1px solid #F0C9AB;
+    color:var(--orange-dark);
+    font-size:12px;
+    font-weight:800;
+    display:inline-flex;
+    align-items:center;
+    white-space:nowrap;
+  }
+
+  .tariff-table{
+    width:100%;
+    border-collapse:collapse;
+    margin-bottom:12px;
+  }
+
+  .tariff-table th{
+    background:var(--blue);
+    color:#fff;
+    padding:10px 14px;
+    text-align:left;
+    font-size:12px;
+    font-weight:800;
+    letter-spacing:.04em;
+  }
+
+  .tariff-table th:first-child{ border-radius:10px 0 0 0; }
+  .tariff-table th:last-child{ border-radius:0 10px 0 0; }
+
+  .tariff-table td{
+    padding:10px 14px;
+    font-size:14px;
+    border-bottom:1px solid #EEF2F8;
+    color:var(--text);
+  }
+
+  .tariff-table td:last-child{
+    font-weight:800;
+    color:var(--orange-dark);
+    text-align:right;
+  }
+
+  .tariff-note{
+    font-size:13px;
+    color:var(--muted);
+    line-height:1.6;
+    margin-bottom:18px;
+  }
+
+  /* ===== ÉTAPES ===== */
+  .steps-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:18px;
+    margin-top:26px;
+  }
+
+  .step-card{
+    padding:26px;
+  }
+
+  .step-number{
+    width:44px;
+    height:44px;
+    border-radius:999px;
+    background:var(--orange);
+    color:#fff;
+    font-size:18px;
+    font-weight:900;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow:var(--shadow-orange);
+    margin-bottom:16px;
+  }
+
+  .step-title{
+    font-size:20px;
+    font-weight:900;
+    color:var(--blue);
+    margin-bottom:10px;
+    letter-spacing:-0.02em;
+  }
+
+  .step-desc{
+    font-size:14px;
+    line-height:1.7;
+    color:var(--muted);
+  }
+
+  .step-icon{
+    margin-top:16px;
+    height:100px;
+    border-radius:14px;
+    background:linear-gradient(135deg,#FFF0E0,#FFF8F2);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:2.5rem;
+  }
+
+  /* ===== INFO GRID ===== */
+  .info-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:18px;
+  }
+
+  .info-card{
+    padding:26px;
+  }
+
+  .info-title{
+    font-size:22px;
+    font-weight:900;
+    color:var(--blue);
+    margin-bottom:12px;
+    letter-spacing:-0.02em;
+  }
+
+  .info-desc{
+    font-size:15px;
+    line-height:1.7;
+    color:var(--muted);
+    margin-bottom:18px;
+  }
+
+  .mini-map{
+    height:120px;
+    border-radius:14px;
+    background:
+      radial-gradient(circle at 25% 35%, var(--orange) 0 7px, transparent 8px),
+      radial-gradient(circle at 55% 50%, var(--blue) 0 7px, transparent 8px),
+      radial-gradient(circle at 78% 65%, #FFB703 0 7px, transparent 8px),
+      linear-gradient(90deg, transparent 0 20%, rgba(30,58,95,.08) 20% 22%, transparent 22%),
+      #EEF2F8;
+  }
+
+  /* ===== FOOTER ===== */
+  .site-footer{
+    background:var(--blue);
+    color:#fff;
+    margin-top:20px;
+  }
+
+  .site-footer-inner{
+    padding:28px 0;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+
+  .footer-brand{
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+
+  .footer-brand img{
+    height:28px;
+    filter:brightness(0) invert(1);
+  }
+
+  .footer-text{
+    font-size:14px;
+    color:rgba(255,255,255,.80);
+  }
+
+  .footer-meta{
+    font-size:12px;
+    color:rgba(255,255,255,.55);
+  }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width:900px){
+    .hero-panel{
+      grid-template-columns:1fr;
+      min-height:auto;
+      padding:32px 24px 24px;
     }
-    .hero{
-      min-height:380px !important;
+
+    .hero-side-card{ max-width:100%; }
+
+    .spaces-grid,
+    .tariffs-grid,
+    .steps-grid,
+    .info-grid{
+      grid-template-columns:1fr;
     }
+  }
+
+  @media (max-width:600px){
+    .navbar-inner{ flex-wrap:wrap; min-height:auto; padding:12px 0; }
+    .hero-cta-row{ flex-direction:column; }
+    .btn{ width:100%; }
+    .section{ padding:40px 0; }
   }
 </style>
 {% endblock %}
+
 {% block content %}
+<div class="fagni-home">
+
+  <!-- NAVBAR -->
+  <header class="navbar">
+    <div class="shell navbar-inner">
+      <div class="navbar-brand">
+        <img src="{% static 'img/logo_fagni.svg' %}" alt="FAGNI">
+      </div>
+      <div class="navbar-pills">
+        <span class="navbar-pill">📍 Abidjan</span>
+        <span class="navbar-pill">🚚 Collecte à domicile</span>
+        <span class="navbar-pill">💳 Paiement Wave</span>
+        <a href="/orders/client/" class="navbar-cta">Commander →</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="shell">
+
+    <!-- HERO -->
     <section class="hero">
-    <div class="hero-inner">
-      <div class="hero-copy">
-        <div class="hero-top">
-          <div class="hero-brand-wrap">
-            <div class="hero-logo">
-              <img src="{% static 'img/logo_fagni.png' %}" alt="FAGNI">
-            </div>
-            <div>
-              <div class="hero-kicker">FAGNI</div>
-              <div class="hero-mini">Pressing • Collecte • Livraison</div>
-            </div>
+      <div class="hero-panel">
+        <div class="hero-copy">
+          <div class="hero-eyebrow">Pressing digital · Abidjan</div>
+          <h1 class="hero-title">Votre quotidien,<br>simplifié en un clic.</h1>
+          <p class="hero-desc">
+            FAGNI collecte, traite et livre vos articles à domicile.
+            Pressing, blanchisserie, retouche, cordonnerie — avec suivi
+            en temps réel et paiement Wave.
+          </p>
+          <div class="hero-cta-row">
+            <a href="/orders/client/" class="btn btn-primary">✅ Commander maintenant</a>
+            <a href="/orders/client/" class="btn btn-secondary">📦 Suivre ma commande</a>
           </div>
-          <div class="hero-chip-row">
-            <span class="hero-chip">Abidjan</span>
-            <span class="hero-chip">Collecte à domicile</span>
-            <span class="hero-chip">Paiement Wave</span>
-          </div>
-        </div>
-        <h1 class="hero-title">Le pressing digital simple,
-traçable et premium.</h1>
-        <p class="hero-desc">
-          FAGNI permet de commander une collecte, suivre le traitement du linge,
-          payer simplement et recevoir ses articles à domicile avec un parcours
-          plus clair, plus moderne et mieux organisé.
-        </p>
-        <div class="hero-actions">
-          <a class="btn btn-primary" href="/orders/client/">✅ Commander maintenant</a>
-          <a class="btn btn-light" href="/orders/client/">📦 Suivre ma commande</a>
-          {% if request.user.is_authenticated and request.user.is_staff %}
-            <a class="btn btn-dark" href="/?public=1">🌍 Version publique</a>
-          {% endif %}
-        </div>
-        <div class="hero-trust">
-          <span class="trust-pill">✔ Collecte & livraison</span>
-          <span class="trust-pill">✔ Suivi des étapes</span>
-          <span class="trust-pill">✔ Preuves & traçabilité</span>
-        </div>
-      </div>
-      <div class="hero-side">
-        <div class="hero-panel">
-          <div class="hero-panel-k">Expérience FAGNI</div>
-          <div class="hero-panel-v"></div>
-          <div class="hero-panel-sub">
-            Une chaîne de service plus lisible, plus moderne et mieux organisée
-            pour le client, le blanchisseur et le livreur.
-          </div>
-</div>
+          <div class="hero-trust">
+            <span class="hero-trust-pill">✔ Collecte & livraison</span>
+            <span class="hero-trust-pill">✔ Suivi des étapes</span>
+            <span class="hero-trust-pill">✔ Preuves & traçabilité</span>
           </div>
         </div>
-      </div>
-    </div>
-  </section>
-  <section class="section">
-    <div class="offers-transport-strip">
-      <strong>🚚 Transport :</strong>
-      calculé séparément selon la distance aller-retour —
-      Minimum : <strong>{{ pricing_cfg.delivery_min_fee }}</strong> FCFA •
-      Prix/km : <strong>{{ pricing_cfg.delivery_price_per_km }}</strong> FCFA
-      {% if pricing_cfg.delivery_fixed_fee and pricing_cfg.delivery_fixed_fee > 0 %}
-        • Frais fixes : <strong>{{ pricing_cfg.delivery_fixed_fee }}</strong> FCFA
-      {% endif %}
-    </div>
-  </section>
-  <section class="section">
-    <div class="grid">
-      <div class="card col4">
-        <h2 class="card-title"><span>👤 Espace client</span></h2>
-        <div class="card-sub">
-          Crée ta commande, ajoute tes articles, confirme ton panier et suis ton parcours FAGNI.
-        </div>
-        <div class="space-visual space-visual--client">
-          <div class="visual-chip-row">
-            <span class="visual-chip">Commande</span>
-            <span class="visual-chip">Suivi</span>
-          </div>
-          <div class="visual-lines">
-            <div class="visual-line long"></div>
-            <div class="visual-line mid"></div>
-            <div class="visual-line short"></div>
-          </div>
-          <div class="visual-footer">
-            <strong>Parcours client simplifié</strong>
-            <span>Commande, validation, suivi et paiement dans une même logique produit.</span>
-          </div>
-        </div>
-        <div class="card-actions">
-          <a class="btn btn-primary" href="/orders/client/">Accéder à l’espace client</a>
-        </div>
-      </div>
-      <div class="card col4">
-        <h2 class="card-title"><span>🧺 Espace blanchisseur</span></h2>
-        <div class="card-sub">
-          Consulte les commandes attribuées, traite le linge et fais avancer le flux atelier.
-        </div>
-        <div class="space-visual space-visual--laundry">
-          <div class="visual-chip-row">
-            <span class="visual-chip">Atelier</span>
-            <span class="visual-chip">Statuts</span>
-          </div>
-          <div class="visual-lines">
-            <div class="visual-line mid"></div>
-            <div class="visual-line long"></div>
-            <div class="visual-line short"></div>
-          </div>
-          <div class="visual-footer">
-            <strong>Traitement atelier cadré</strong>
-            <span>Pesée, démarrage, prêt et visibilité métier dans une interface dédiée.</span>
-          </div>
-        </div>
-        <div class="card-actions">
-          <a class="btn btn-light" href="/orders/laundry/app/">Ouvrir l’espace blanchisseur</a>
-        </div>
-      </div>
-      <div class="card col4">
-        <h2 class="card-title"><span>🚚 Espace livreur</span></h2>
-        <div class="card-sub">
-          Visualise les missions de collecte et de retour puis exécute les étapes terrain.
-        </div>
-        <div class="space-visual space-visual--driver">
-          <div class="visual-chip-row">
-            <span class="visual-chip">Pickup</span>
-            <span class="visual-chip">Return</span>
-          </div>
-          <div class="visual-lines">
-            <div class="visual-line short"></div>
-            <div class="visual-line long"></div>
-            <div class="visual-line mid"></div>
-          </div>
-          <div class="visual-footer">
-            <strong>Flux logistique maîtrisé</strong>
-            <span>Collecte, dépôt, retour et preuves dans un parcours livreur plus pro.</span>
-          </div>
-        </div>
-        <div class="card-actions">
-          <a class="btn btn-light" href="/orders/driver/hub/">Ouvrir l’espace livreur</a>
-        </div>
-      </div>
-    </div>
-  </section>
-  <section class="section">
-    <div class="grid">
-      <div class="card col6">
-        <h2 class="card-title">
-          <span>🧺 Blanchisserie — Formules</span>
-          <span class="price">
-            {% if laundry_offers %}
-              Dès {{ laundry_offers.0.default_price|floatformat:0 }} FCFA
-            {% else %}
-              —
-            {% endif %}
-          </span>
-        </h2>
-        {% if laundry_offers %}
-          <ul class="list">
-            {% for s in laundry_offers %}
-              <li><strong>{{ s.name }}</strong> — {{ s.default_price|floatformat:0 }} FCFA</li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <div class="card-sub">Aucune formule active pour le moment.</div>
-        {% endif %}
-        <div class="offer-visual offer-visual--laundry">
-          <div class="visual-chip-row">
-            <span class="visual-chip">Formules</span>
-            <span class="visual-chip">Standard</span>
-          </div>
-          <div class="visual-lines">
-            <div class="visual-line long"></div>
-            <div class="visual-line mid"></div>
-            <div class="visual-line short"></div>
-          </div>
-          <div class="visual-footer">
-            <strong>Linge courant & volumes simples</strong>
-            <span>Sacs, lots et formules de blanchisserie pour un parcours rapide et lisible.</span>
-          </div>
-        </div>
-        <div class="card-sub">
-          <strong>Transport</strong> calculé automatiquement selon la distance aller-retour.
-          <br>
-          Minimum : <strong>{{ pricing_cfg.delivery_min_fee }}</strong> FCFA •
-          Prix/km : <strong>{{ pricing_cfg.delivery_price_per_km }}</strong> FCFA
-          {% if pricing_cfg.delivery_fixed_fee and pricing_cfg.delivery_fixed_fee > 0 %}
-            • Frais fixes : <strong>{{ pricing_cfg.delivery_fixed_fee }}</strong> FCFA
-          {% endif %}
-        </div>
-        <div class="card-actions">
-          <a class="btn btn-primary" href="/orders/client/">Commander une formule</a>
-        </div>
-      </div>
-      <div class="card col6">
-        <h2 class="card-title">
-          <span>👔 Pressing — Par article</span>
-          <span class="price">
-            {% if pressing_offers %}
-              Dès {{ pressing_offers.0.default_price|floatformat:0 }} FCFA
-            {% else %}
-              —
-            {% endif %}
-          </span>
-        </h2>
-        {% if pressing_offers %}
-          <ul class="list">
-            {% for s in pressing_offers %}
-              <li><strong>{{ s.name }}</strong> — {{ s.default_price|floatformat:0 }} FCFA</li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <div class="card-sub">Aucun article pressing actif pour le moment.</div>
-        {% endif %}
-        <div class="offer-visual offer-visual--pressing">
-          <div class="visual-chip-row">
-            <span class="visual-chip">Article</span>
-            <span class="visual-chip">Premium</span>
-          </div>
-          <div class="visual-lines">
-            <div class="visual-line mid"></div>
-            <div class="visual-line long"></div>
-            <div class="visual-line short"></div>
-          </div>
-          <div class="visual-footer">
-            <strong>Pièces unitaires & traitement soigné</strong>
-            <span>Chemises, pantalons et articles à l’unité dans un cadre plus premium.</span>
-          </div>
-        </div>
-        <div class="card-actions">
-<a class="btn btn-light" href="/orders/client/">Voir les tarifs</a>
-        </div>
-      </div>
-    </div>
-  </section>
-  <section class="section">
-    <div class="flow-strip">
-      <div class="flow-step"><span class="flow-n">1</span><span>Commande</span></div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-step"><span class="flow-n">2</span><span>Collecte</span></div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-step"><span class="flow-n">3</span><span>Atelier</span></div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-step"><span class="flow-n">4</span><span>Livraison</span></div>
-    </div>
-    <!-- FAGNI FLOW STRIP -->
-  </section>
-<section class="section card">
-    <h2 class="card-title"><span>🚀 Comment ça marche ?</span></h2>
-    <div class="steps">
-      <div class="step">
-        <div class="step-n">1</div>
-        <div class="step-title">Commande en ligne</div>
-        <div class="step-desc">
-          Le client choisit ses articles ou sa formule puis valide sa demande depuis son espace.
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-n">2</div>
-        <div class="step-title">Collecte & traitement</div>
-        <div class="step-desc">
-          Le livreur collecte, la blanchisserie traite la commande et le suivi évolue étape par étape.
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-n">3</div>
-        <div class="step-title">Retour & livraison</div>
-        <div class="step-desc">
-          Le linge prêt repart en mission retour jusqu’à la livraison finale chez le client.
-        </div>
-      </div>
-    </div>
-  </section>
-  <section class="section">
-    <div class="grid">
-      <div class="card col6 mini-card">
         <div>
-          <h2 class="card-title"><span>📍 Zone pilote</span></h2>
-          <div class="card-sub">
-            Riviera 1 • Riviera 2 • Riviera 3 • Deux-Plateaux • secteurs proches selon disponibilité logistique.
+          <div class="hero-side-card">
+            <div class="hero-side-label">Expérience FAGNI</div>
+            <div class="hero-side-main">Collecte. Atelier. Livraison.</div>
+            <p class="hero-side-sub">
+              Une chaîne de service plus lisible, plus moderne et mieux
+              organisée pour le client, le blanchisseur et le livreur.
+            </p>
           </div>
         </div>
       </div>
-      <div class="card col6 mini-card">
-        <div>
-          <h2 class="card-title"><span>💳 Paiement</span></h2>
-          <div class="card-sub">
-            Paiement Wave, suivi commande, transparence du parcours et expérience simplifiée pour le pilote FAGNI.
-          </div>
-        </div>
+    </section>
+
+    <!-- ESPACES -->
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">Choisissez votre espace</h2>
+        <p class="section-sub">Chaque acteur dispose d'un accès clair, pensé mobile et adapté à son rôle.</p>
       </div>
+      <div class="spaces-grid">
+        <article class="card space-card">
+          <div class="space-emoji">👤</div>
+          <div class="space-title">Espace client</div>
+          <p class="space-desc">Crée ta commande, ajoute tes articles, confirme ton panier et suis ton parcours FAGNI.</p>
+          <div class="space-visual">
+            <img src="{% static 'img/home/home_client.jpg' %}" alt="Espace client" onerror="this.style.display='none'">
+            {% if not 'img/home/home_client.jpg' %}👤{% endif %}
+          </div>
+          <a href="/orders/client/" class="btn btn-primary btn-full">Accéder à l'espace client</a>
+        </article>
+
+        <article class="card space-card">
+          <div class="space-emoji">🧺</div>
+          <div class="space-title">Espace blanchisseur</div>
+          <p class="space-desc">Consulte les commandes attribuées, traite le linge et fais avancer le flux atelier.</p>
+          <div class="space-visual">
+            <img src="{% static 'img/home/home_laundry.jpg' %}" alt="Espace blanchisseur" onerror="this.style.display='none'">
+          </div>
+          <a href="/orders/laundry/" class="btn btn-primary btn-full">Ouvrir l'espace blanchisseur</a>
+        </article>
+
+        <article class="card space-card">
+          <div class="space-emoji">🛵</div>
+          <div class="space-title">Espace livreur</div>
+          <p class="space-desc">Visualise les missions de collecte et de retour puis exécute les étapes terrain.</p>
+          <div class="space-visual">
+            <img src="{% static 'img/home/home_driver.jpg' %}" alt="Espace livreur" onerror="this.style.display='none'">
+          </div>
+          <a href="/orders/driver/" class="btn btn-primary btn-full">Ouvrir l'espace livreur</a>
+        </article>
+      </div>
+    </section>
+
+    <!-- TARIFS -->
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">Tarifs clairs et simples</h2>
+        <p class="section-sub">Deux approches selon votre besoin — formule ou article.</p>
+      </div>
+      <div class="tariffs-grid">
+        <article class="card tariff-card">
+          <div class="tariff-header">
+            <div class="tariff-title">🧺 Blanchisserie — Formules</div>
+            <span class="tariff-badge">Dès 3 000 FCFA</span>
+          </div>
+          <table class="tariff-table">
+            <thead>
+              <tr><th>Formule</th><th>Prix</th></tr>
+            </thead>
+            <tbody>
+              {% if laundry_offers %}
+                {% for offer in laundry_offers|slice:":5" %}
+                <tr>
+                  <td>{{ offer.label|default:offer.name }}</td>
+                  <td>{{ offer.price|default:"—" }} FCFA</td>
+                </tr>
+                {% endfor %}
+              {% else %}
+                <tr><td>Sac 15 vêtements</td><td>3 000 FCFA</td></tr>
+                <tr><td>Formule standard</td><td>Tarif simple</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+          <p class="tariff-note">
+            Transport : min {{ pricing_cfg.delivery_min_fee|default:"1 700" }} FCFA •
+            {{ pricing_cfg.delivery_price_per_km|default:"150" }} FCFA/km
+          </p>
+          <a href="/orders/client/" class="btn btn-primary btn-full">Commander une formule</a>
+        </article>
+
+        <article class="card tariff-card">
+          <div class="tariff-header">
+            <div class="tariff-title">👔 Pressing — Par article</div>
+            <span class="tariff-badge">Dès 400 FCFA</span>
+          </div>
+          <table class="tariff-table">
+            <thead>
+              <tr><th>Article</th><th>Prix</th></tr>
+            </thead>
+            <tbody>
+              {% if pressing_items %}
+                {% for item in pressing_items|slice:":5" %}
+                <tr>
+                  <td>{{ item.label|default:item.name }}</td>
+                  <td>{{ item.price|default:"—" }} FCFA</td>
+                </tr>
+                {% endfor %}
+              {% else %}
+                <tr><td>T-shirt</td><td>400 FCFA</td></tr>
+                <tr><td>Chemise</td><td>500 FCFA</td></tr>
+                <tr><td>Pantalon</td><td>700 FCFA</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+          <p class="tariff-note">Idéal pour une commande au détail avec traitement précis.</p>
+          <a href="/orders/client/" class="btn btn-outline btn-full">Voir tous les tarifs</a>
+        </article>
+      </div>
+    </section>
+
+    <!-- COMMENT ÇA MARCHE -->
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">Comment ça marche ?</h2>
+        <p class="section-sub">Un parcours simple en trois temps, du début à la livraison.</p>
+      </div>
+      <div class="steps-grid">
+        <article class="card step-card">
+          <div class="step-number">1</div>
+          <div class="step-title">Je passe commande</div>
+          <p class="step-desc">Le client choisit ses articles ou sa formule puis valide depuis son espace.</p>
+          <div class="step-icon">📱</div>
+        </article>
+        <article class="card step-card">
+          <div class="step-number">2</div>
+          <div class="step-title">On collecte & traite</div>
+          <p class="step-desc">Le livreur collecte, la blanchisserie traite et le suivi évolue étape par étape.</p>
+          <div class="step-icon">🚚</div>
+        </article>
+        <article class="card step-card">
+          <div class="step-number">3</div>
+          <div class="step-title">Je reçois à domicile</div>
+          <p class="step-desc">Le linge prêt repart en mission retour jusqu'à la livraison finale chez le client.</p>
+          <div class="step-icon">🏠</div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ZONE PILOTE + PAIEMENT -->
+    <section class="section">
+      <div class="info-grid">
+        <article class="card info-card">
+          <div class="info-title">📍 Zone pilote</div>
+          <p class="info-desc">Riviera 1 • Riviera 2 • Riviera 3 • Deux-Plateaux • secteurs proches selon disponibilité.</p>
+          <div class="mini-map"></div>
+        </article>
+        <article class="card info-card">
+          <div class="info-title">💳 Paiement Wave</div>
+          <p class="info-desc">Paiement simple et sécurisé via Wave. Suivi commande transparent. Expérience simplifiée pour le pilote FAGNI.</p>
+          <a href="/orders/client/" class="btn btn-primary">Commander maintenant</a>
+        </article>
+      </div>
+    </section>
+
+  </div><!-- /shell -->
+
+  <!-- FOOTER -->
+  <footer class="site-footer">
+    <div class="shell site-footer-inner">
+      <div class="footer-brand">
+        <img src="{% static 'img/logo_fagni.svg' %}" alt="FAGNI">
+        <span class="footer-text">FAGNI — pressing digital, collecte et livraison à domicile</span>
+      </div>
+      <div class="footer-meta">Super-app multiservice pilote • Abidjan • Wave</div>
     </div>
-  </section>
-  <div class="footer-note">
-    FAGNI — pressing digital, collecte et livraison à domicile. Version pilote.
-  </div>
+  </footer>
+
 </div>
 {% endblock %}

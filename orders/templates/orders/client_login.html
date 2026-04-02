@@ -1,65 +1,104 @@
 {% extends "orders/client_base.html" %}
+{% load static %}
 
-{% block title %}Espace client – FAGNI{% endblock %}
+{% block title %}Connexion — FAGNI{% endblock %}
+{% block topbar %}{% endblock %}
+
 {% block extra_head %}
-{{ block.super }}
 <style>
   :root{
-    --fagni-orange:#ff7a00;
-    --fagni-blue:#0056b3;
-    --text:#0f172a;
-    --muted:#64748b;
-    --line:#e5e7eb;
-    --shadow: 0 1px 4px rgba(15,23,42,0.06);
+    --navy:#1E3A5F;
+    --orange:#E87722;
+    --orange-dark:#C4611A;
+    --cream:#FFF8F2;
+    --text:#1E3A5F;
+    --muted:#6B7280;
+    --border:#E8EDF5;
+    --shadow:0 16px 42px rgba(30,58,95,.10);
+    --shadow-orange:0 10px 24px rgba(232,119,34,.18);
   }
-  .page{ max-width:520px; margin:0 auto; padding:16px 10px 24px; }
-  .cardx{ background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:18px; }
-  .title{ font-size:20px;font-weight:950;color:var(--text);margin:0;letter-spacing:-0.2px; }
-  .sub{ margin:6px 0 0; font-size:13px; color:var(--muted); line-height:1.35; }
-  .label{ display:block;font-weight:900;margin:14px 0 6px;color:#111827;font-size:13px; }
-  .input{
-    width:100%;padding:12px 12px;border-radius:14px;border:1px solid var(--line);
-    outline:none; font-weight:700;
+  *{box-sizing:border-box}
+  body{
+    margin:0;min-height:100vh;
+    background:radial-gradient(circle at top left,rgba(232,119,34,.08),transparent 28%),linear-gradient(180deg,#fff 0%,#FFF8F2 100%);
+    color:var(--text);font-family:system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased;display:flex;flex-direction:column;background:#fff !important;
   }
-  .input:focus{ border-color:rgba(0,86,179,0.35); box-shadow:0 0 0 4px rgba(0,86,179,0.10); }
-  .btn{
-    width:100%;margin-top:14px;padding:12px 14px;border-radius:999px;border:none;
-    background:linear-gradient(90deg,var(--fagni-orange),var(--fagni-blue));
-    color:#fff;font-weight:950;cursor:pointer;
-    transition: transform .12s ease, opacity .12s ease;
-  }
-  .btn:active{ transform: translateY(1px); }
-  .hint{ margin-top:10px;color:var(--muted);font-size:12px; }
+  a{text-decoration:none;color:inherit}
+  .login-nav{padding:16px 24px;display:flex;align-items:center}
+  .login-nav img{height:30px;width:auto}
+  .login-shell{flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px 48px}
+  .login-card{width:100%;max-width:420px;background:#fff;border:1px solid var(--border);border-radius:28px;padding:36px 32px;box-shadow:var(--shadow)}
+  .login-logo-mark{width:68px;height:68px;border-radius:22px;background:linear-gradient(135deg,var(--navy),#2f5482);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;box-shadow:0 14px 28px rgba(30,58,95,.18)}
+  .login-logo-mark img{height:36px;filter:brightness(0) invert(1)}
+  .ref-badge{display:flex;align-items:flex-start;gap:8px;background:rgba(232,119,34,.10);border:1px solid rgba(232,119,34,.18);color:var(--orange);border-radius:14px;padding:10px 14px;font-size:13px;font-weight:700;margin-bottom:20px;line-height:1.4}
+  .login-title{font-size:22px;font-weight:900;color:var(--navy);text-align:center;letter-spacing:-0.02em;margin:0 0 8px}
+  .login-subtitle{font-size:14px;color:var(--muted);text-align:center;line-height:1.5;margin:0 0 24px}
+  .field-label{display:block;font-size:14px;font-weight:800;color:var(--navy);margin-bottom:8px}
+  .phone-input{width:100%;height:52px;border:1.5px solid var(--border);border-radius:14px;padding:0 16px;font-size:16px;font-weight:600;color:var(--navy);background:#fff;outline:none;transition:border-color .2s,box-shadow .2s;font-family:inherit}
+  .phone-input:focus{border-color:var(--orange);box-shadow:0 0 0 4px rgba(232,119,34,.10)}
+  .phone-input::placeholder{color:#B0BAC9;font-weight:500}
+  .error-msg{background:#FEF2F2;border:1px solid #FECACA;color:#B91C1C;border-radius:12px;padding:10px 14px;font-size:13px;font-weight:700;margin-bottom:16px}
+  .login-btn{width:100%;height:52px;border:none;border-radius:999px;background:var(--orange);color:#fff;font-size:15px;font-weight:900;cursor:pointer;margin-top:16px;box-shadow:var(--shadow-orange);transition:background .2s,transform .2s;font-family:inherit}
+  .login-btn:hover{background:var(--orange-dark);transform:translateY(-1px)}
+  .login-help{font-size:12px;color:var(--muted);text-align:center;line-height:1.5;margin-top:16px}
+  .login-ghost{display:block;text-align:center;font-size:13px;font-weight:800;color:var(--navy);margin-top:14px;opacity:.70;transition:opacity .2s}
+  .login-ghost:hover{opacity:1}
+  @media(max-width:480px){.login-card{border-radius:20px;padding:28px 20px}}
 </style>
 {% endblock %}
-{% block content %}
-<div class="page">
-  <div class="cardx">
-    <h1 class="title">FAGNI — Espace client</h1>
-    <p class="sub">Connecte-toi avec ton numéro pour suivre tes commandes.</p>
 
-    {% if error %}
-      <div class="alert alert-danger" style="margin-top:12px;">{{ error }}</div>
-    {% endif %}
+{% block content %}
+<nav class="login-nav">
+  <img src="{% static 'img/logo_fagni.svg' %}" alt="FAGNI">
+</nav>
+
+<div class="login-shell">
+  <div class="login-card">
+    <div class="login-logo-mark">
+      <img src="{% static 'img/logo_fagni.svg' %}" alt="FAGNI">
+    </div>
 
     {% if incoming_ref %}
-      <div style="margin-top:12px;padding:12px 14px;border-radius:14px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;font-size:13px;line-height:1.5;font-weight:800;">
-        🎁 Code de parrainage détecté : <strong>{{ incoming_ref }}</strong><br>
+    <div class="ref-badge">
+      <span>🎁</span>
+      <div>
+        <strong>Code parrainage détecté : {{ incoming_ref }}</strong><br>
         En te connectant, ce code sera pris en compte sur ton espace client.
       </div>
+    </div>
     {% endif %}
 
-    <form method="post" style="margin-top:10px;">
+    <h1 class="login-title">Espace client FAGNI</h1>
+    <p class="login-subtitle">Connecte-toi avec ton numéro pour suivre tes commandes.</p>
+
+    {% if error %}
+    <div class="error-msg">⚠️ Numéro invalide. Merci de vérifier et réessayer.</div>
+    {% endif %}
+
+    <form method="post" action="{% url 'orders:client_login' %}">
       {% csrf_token %}
-      <input type="hidden" name="incoming_ref" value="{{ incoming_ref|default:'' }}">
+      {% if incoming_ref %}
+      <input type="hidden" name="incoming_ref" value="{{ incoming_ref }}">
+      {% endif %}
 
-      <label class="label">Téléphone</label>
-      <input class="input" name="phone" value="{{ phone }}" placeholder="Ex : 0700000000" inputmode="tel" autocomplete="tel" />
+      <label class="field-label" for="phone">Téléphone</label>
+      <input
+        class="phone-input"
+        type="tel"
+        id="phone"
+        name="phone"
+        placeholder="Ex : 0700000000"
+        autocomplete="tel"
+        inputmode="numeric"
+        required
+      >
 
-      <button class="btn" type="submit">Continuer →</button>
+      <button type="submit" class="login-btn">Continuer →</button>
     </form>
 
-    <p class="hint">Astuce : ton téléphone sert d’identifiant pour retrouver tes commandes.</p>
+    <p class="login-help">Astuce : ton téléphone sert d'identifiant pour retrouver tes commandes.</p>
+    <a href="{% url 'orders:client_new_order' %}" class="login-ghost">Commander sans compte →</a>
   </div>
 </div>
 {% endblock %}

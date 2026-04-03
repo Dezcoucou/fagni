@@ -5564,9 +5564,6 @@ def client_order_detail(request, order_id: int):
 
     amounts = _client_order_amounts(order)
     snapshot = build_order_canonical_snapshot(order)
-    display_summary = build_order_display_summary(order)
-    finance_summary = build_order_finance_summary(order)
-
     legs = []
     try:
         legs = list(

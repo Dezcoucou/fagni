@@ -665,7 +665,7 @@
         </div>
     {% endif %}
     {# ✅ Bandeau UX : course non chiffrée #}
-    {% with tc=total_client_ttc|default:0 di=driver_income|default:0 %}
+    {% with tc=finance_summary.total_client_ttc|default:0 di=driver_income|default:0 %}
         {% if tc <= 0 or di <= 0 %}
             <div class="pricing-alert" role="alert" aria-live="polite">
                 <div>
@@ -675,10 +675,10 @@
                         (prestations + frais + montant livreur).
                     </p>
                     <div class="mini">
-                        {% if order.items.count == 0 %}
+                        {% if order.items.count == 0 and not display_summary.is_bag %}
                             • Aucune prestation n’est enregistrée sur cette commande.<br>
                         {% endif %}
-                        • Total client : <strong>{{ total_client_ttc|default:0|money }}</strong> FCFA —
+                        • Total client : <strong>{{ finance_summary.total_client_ttc|default:0|money }}</strong> FCFA —
                         • Ton gain : <strong>{{ driver_income|default:0|money }}</strong> FCFA
                     </div>
                 </div>
@@ -1461,79 +1461,98 @@
   // PAYLIVE_DRIVER_UI
   function updatePayUI(o){
     if(!o) return;
+
     var pill = document.getElementById("jsPayPill");
     var details = document.getElementById("jsPayDetails");
+    var totalEl = document.getElementById("jsPayTotal");
     if(!pill || !details) return;
+
     var total = Number(o.total_ttc || 0);
     var paid  = Number(o.amount_paid || 0);
-    var rest  = (o.amount_remaining != null) ? Number(o.amount_remaining) : Math.max(Number(o.total_ttc||0) - Number(o.amount_paid||0), 0);
-    if(!isFinite(rest)) rest = Math.max(0, total - paid);
+    var rest  = Number(o.amount_remaining || 0);
+
+    if(!isFinite(total)) total = 0;
+    if(!isFinite(paid)) paid = 0;
+    if(!isFinite(rest)) rest = 0;
+    if(rest < 0) rest = 0;
+
     var label = "En attente";
     var cls   = "pill-unpaid";
     var ps = String(o.payment_status || "").toLowerCase();
+
     if(ps === "paid" || ps.indexOf("paid") >= 0){
-      label = "Payé"; cls = "pill-paid";
+      label = "Payé";
+      cls = "pill-paid";
     } else if(ps === "partial" || ps.indexOf("partial") >= 0){
-      label = "Acompte"; cls = "pill-partial";
+      label = "Acompte";
+      cls = "pill-partial";
     }
-    pill.classList.remove("pill-paid","pill-partial","pill-unpaid");
+
+    pill.classList.remove("pill-paid", "pill-partial", "pill-unpaid");
     pill.classList.add(cls);
     pill.textContent = label;
+
+    if(totalEl){
+      totalEl.textContent = Math.round(total).toLocaleString();
+    }
+
     details.textContent =
       "Payé : " + Math.round(paid).toLocaleString() +
       " / " + Math.round(total).toLocaleString() +
       " — Reste : " + Math.round(rest).toLocaleString();
   }
+
   function pollPayLive(){
     var page = document.querySelector(".page");
     if(!page || !page.dataset.liveUrl) return;
+
     var url = page.dataset.liveUrl;
     var did = null;
-    try{ did = new URLSearchParams(window.location.search).get("driver_id"); }catch(e){}
+
+    try {
+      did = new URLSearchParams(window.location.search).get("driver_id");
+    } catch(e) {}
+
     if(did && url.indexOf("driver_id=") < 0){
       url += (url.indexOf("?") >= 0 ? "&" : "?") + "driver_id=" + encodeURIComponent(did);
     }
-    fetch(url, {credentials:"same-origin"})
-.then(async (res) => {
-    let data = {};
-    try {
-        data = await res.json();
-    } catch(e) {}
-    if (!res.ok || !data.ok) {
-        console.warn("⚠️ Action échouée", data);
-    }
-    window.location.reload();
-}).catch(err => {
-    console.error("❌ erreur fetch:", err);
-    window.location.reload();
-})
+
+    fetch(url, { credentials: "same-origin" })
       .then(function(r){
         var ct = (r.headers.get("content-type") || "").toLowerCase();
+        if(!r.ok) throw new Error("http_" + r.status);
         if(ct.indexOf("application/json") < 0) throw new Error("non-json");
         return r.json();
       })
       .then(function(d){
-        if(d && d.order) updatePayUI(d.order);
-      })["catch"](function(){});
+        if(d && d.order){
+          updatePayUI(d.order);
+        }
+      })
+      .catch(function(err){
+        console.warn("PAYLIVE poll ignored:", err);
+      });
   }
+
   function __initPayLive(){
-    // init serveur (reste calculé sans attribut modèle)
     updatePayUI({
-      payment_status: "{{ order.payment_status|default:'' }}",
-      total_ttc: {{ total_client_ttc|default:0|unlocalize }},
-      amount_paid: {{ order.amount_paid|default:0|unlocalize }},
-      amount_remaining: ({{ total_client_ttc|default:0|unlocalize }} - {{ order.amount_paid|default:0|unlocalize }})
+      payment_status: "{{ order.payment_status|default:''|escapejs }}",
+      total_ttc: {{ finance_summary.total_client_ttc|default:0|unlocalize }},
+      amount_paid: {{ finance_summary.amount_paid|default:0|unlocalize }},
+      amount_remaining: {{ finance_summary.amount_remaining|default:0|unlocalize }}
     });
+
     pollPayLive();
     setTimeout(pollPayLive, 800);
     setInterval(pollPayLive, 6000);
   }
+
   try{
     if(document.readyState === "loading"){
       document.addEventListener("DOMContentLoaded", __initPayLive);
-    }else{
+    } else {
       __initPayLive();
     }
-  }catch(e){}
+  } catch(e){}
 </script>
 {% endblock %}

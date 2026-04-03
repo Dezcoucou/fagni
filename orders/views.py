@@ -45,6 +45,7 @@ from django.utils.encoding import smart_str
 from orders.utils.pricing import compute_order_amounts
 from orders.utils import build_order_canonical_snapshot
 from orders.presenters import build_order_display_summary, build_order_finance_summary
+from orders.pricing_engine import compute_order_pricing
 from orders.utils.address_rules import clean_address_or_empty, is_probably_valid_address
 
 from orders.utils.settings_loader import get_pricing_settings
@@ -2908,161 +2909,22 @@ def _dec_or_zero(val):
 
 def _compute_order_pricing(order):
     """
-    Calcule tous les montants importants pour une commande FAGNI
-    sans casser ce qui existe déjà en base.
-
-    Retourne un dict avec :
-      - items_total
-      - service_fee
-      - delivery_fee
-      - total_client
-      - driver_income
-      - vat_fagni
-      - fagni_revenue_ht
-      - fagni_revenue_ttc
-      - laundry_amount
-      - logistic_margin
+    Bridge legacy -> pricing engine canonique.
     """
-    # 1) Sous-total prestations (à partir des items, sinon fallback sur prestation_total)
-    items_total = DEC_ZERO
-    try:
-        items_qs = order.items.all()
-    except Exception:
-        items_qs = []
-
-    for it in items_qs:
-        line_total = _dec_or_zero(getattr(it, "total", None))
-        if line_total > 0:
-            items_total += line_total
-            continue
-
-        q = _dec_or_zero(getattr(it, "quantity", 0))
-        unit = _dec_or_zero(getattr(it, "unit_price", 0))
-        items_total += q * unit
-
-    if items_total <= 0:
-        items_total = _dec_or_zero(getattr(order, "prestation_total", 0))
-
-    base_items_total = items_total  # vérité comptable prestations
-
-    service_fee = _dec_or_zero(getattr(order, "service_fee", 0))
-    delivery_fee = _dec_or_zero(getattr(order, "delivery_fee", 0))
-    vat_fagni = _dec_or_zero(getattr(order, "vat_fagni", 0))
-    express_extra_fee = _dec_or_zero(getattr(order, "express_extra_fee", 0))
-
-    # total calculé canonique
-    computed_total = items_total + service_fee + delivery_fee + vat_fagni + express_extra_fee
-
-    # total stocké DB (peut être faux)
-    stored_total = _dec_or_zero(getattr(order, "total_client_ttc", 0))
-
-    # ✅ Réconciliation breakdown (legacy) :
-    # Si la DB a un total TTC > computed_total et que service_fee est à 0,
-    # on tente d'expliquer l'écart comme "service FAGNI manquant".
-    # Cas typique: vat_fagni=90 => service≈500 (TVA 18%).
-    if stored_total > 0 and computed_total > 0:
-        delta = stored_total - computed_total  # ce qui manque dans le breakdown
-        if delta > Decimal("1") and service_fee <= 0:
-            # 1) Essai: déduire service_fee depuis la TVA (18%)
-            try:
-                VAT_RATE = Decimal("0.18")
-                inferred = (vat_fagni / VAT_RATE) if vat_fagni > 0 else Decimal("0")
-                # Arrondi FCFA (entier)
-                inferred = inferred.quantize(Decimal("1"))
-            except Exception:
-                inferred = Decimal("0")
-
-            # si inferred colle au delta (±1), on prend inferred
-            if inferred > 0 and abs(inferred - delta) <= Decimal("1"):
-                service_fee = inferred
-            else:
-                # 2) Sinon: si delta reste "raisonnable", on l'affecte au service_fee
-                cap = max(Decimal("5000"), (items_total + delivery_fee) * Decimal("0.5"))
-                if delta <= cap:
-                    service_fee = delta
-
-            # Recalcule le total canonique avec service_fee réconcilié
-            computed_total = items_total + service_fee + delivery_fee + vat_fagni + express_extra_fee
-
-
-    # ✅ Réconciliation LEGACY (service caché) :
-    # Cas: service_fee=0 mais vat_fagni>0, ET stored_total ≈ computed_total.
-    # => On reconstruit un service_fee (depuis TVA 18%) en le "splitant"
-    #    depuis delivery_fee (priorité), sinon depuis items_total (UI),
-    #    sans changer le total TTC.
-    if stored_total > 0 and vat_fagni > 0 and service_fee <= 0 and abs(stored_total - computed_total) <= Decimal("1"):
-        try:
-            VAT_RATE = Decimal("0.18")
-            inferred_service = (vat_fagni / VAT_RATE).quantize(Decimal("1"))  # FCFA entier
-        except Exception:
-            inferred_service = Decimal("0")
-    
-        if inferred_service > 0:
-            if delivery_fee >= inferred_service:
-                service_fee = inferred_service
-                delivery_fee = delivery_fee - inferred_service
-            elif items_total >= inferred_service:
-                service_fee = inferred_service
-                items_total = items_total - inferred_service
-    
-            computed_total = items_total + service_fee + delivery_fee + vat_fagni + express_extra_fee
-    
-    # ✅ Fallback legacy:
-    # - si computed_total est 0 mais que la DB a un total > 0, on garde le total DB
-    # - sinon, on garde la DB uniquement si cohérente (±1 FCFA)
-    if stored_total > 0 and (
-        computed_total <= Decimal("0") or abs(stored_total - computed_total) <= Decimal("1")
-    ):
-        total_client = stored_total
-    else:
-        total_client = computed_total
-
-    # Bonus UX: si on est en legacy (breakdown vide), on tente de reconstruire un "delivery_fee"
-    # pour que la somme des lignes affiche le total (même si c'est une estimation).
-    if stored_total > 0 and computed_total <= Decimal("0"):
-        # tout ce qui n'est pas prestations/service/vat/express est mis en livraison (fallback)
-        guessed_delivery = stored_total - (items_total + service_fee + vat_fagni + express_extra_fee)
-        if guessed_delivery < 0:
-            guessed_delivery = Decimal("0")
-        if delivery_fee <= 0:
-            delivery_fee = guessed_delivery
-
-    # 4) Revenu livreur
-    driver_income = _dec_or_zero(getattr(order, "amount_driver_partner", None))
-    if driver_income <= 0:
-        driver_income = _dec_or_zero(getattr(order, "driver_logistic_cost", None))
-
-    # 5) Marge logistique & revenus FAGNI
-    logistic_margin = _dec_or_zero(getattr(order, "logistic_margin", None))
-    fagni_revenue_ht = service_fee + logistic_margin
-
-    # Si un champ fagni_revenue_ht existe et est déjà renseigné, on le respecte
-    if hasattr(order, "fagni_revenue_ht"):
-        db_fagni_ht = _dec_or_zero(getattr(order, "fagni_revenue_ht", 0))
-        if db_fagni_ht > 0:
-            fagni_revenue_ht = db_fagni_ht
-
-    fagni_revenue_ttc = fagni_revenue_ht + vat_fagni
-
-    # 6) Revenu blanchisserie (fallback simple)
-    laundry_amount = _dec_or_zero(getattr(order, "amount_laundry_partner", None))
-    if laundry_amount <= 0 and items_total > 0:
-        # par défaut, on considère que la blanchisserie touche le montant prestations
-        laundry_amount = base_items_total
+    result = compute_order_pricing(order)
     return {
-        "items_total": items_total,
-        "service_fee": service_fee,
-        "delivery_fee": delivery_fee,
-        "total_client": total_client,
-        "driver_income": driver_income,
-        "vat_fagni": vat_fagni,
-        "express_extra_fee": express_extra_fee,
-        "fagni_revenue_ht": fagni_revenue_ht,
-        "fagni_revenue_ttc": fagni_revenue_ttc,
-        "laundry_amount": laundry_amount,
-        "logistic_margin": logistic_margin,
+        "items_total": result.prestation_total,
+        "service_fee": result.service_fee_ht,
+        "delivery_fee": result.delivery_fee_client,
+        "total_client": result.total_client_ttc,
+        "driver_income": result.amount_driver,
+        "vat_fagni": result.vat_fagni,
+        "express_extra_fee": result.express_extra_fee_client,
+        "fagni_revenue_ht": result.fagni_revenue_ht,
+        "fagni_revenue_ttc": result.fagni_revenue_ht + result.vat_fagni,
+        "laundry_amount": result.amount_laundry,
+        "logistic_margin": result.margin_delivery,
     }
-
 
 def _guess_delivery_fee(order, total_client=None, items_total=None, service_fee=None):
     """
@@ -4727,8 +4589,8 @@ def build_order_finance_context(order):
 
         # Montants client
         "prestation_total": prestation_total,
-        "service_fee_ht": service_fee_ht,
-        "delivery_fee_client": delivery_fee_client,
+        "service_fee_ht": finance_summary.get("service_fee_ht", service_fee_ht),
+        "delivery_fee_client": finance_summary.get("delivery_fee_client", delivery_fee_client),
         "express_surcharge": express_surcharge,
         "vat_fagni": vat_fagni,
         "total_ttc_client": total_ttc_client,
@@ -5487,46 +5349,20 @@ def _to_dec(v) -> Decimal:
 
 def _client_order_amounts(order: Order) -> dict:
     """
-    Montants côté client = proxy vers le moteur canonique (_compute_order_pricing).
-
-    Règle UX FAGNI :
-    - le client voit uniquement des montants TTC cohérents
-    - pas de TVA séparée
-    - pas de service fee séparé
-    - Prestations affichées + Livraison = Total TTC
+    Bridge client legacy -> pricing engine canonique.
     """
-    pricing = _compute_order_pricing(order)
-
-    total_ttc = pricing.get("total_client", Decimal("0")) or Decimal("0")
-    delivery_fee = pricing.get("delivery_fee", Decimal("0")) or Decimal("0")
-
-    try:
-        total_ttc = Decimal(str(total_ttc))
-    except Exception:
-        total_ttc = Decimal("0")
-
-    try:
-        delivery_fee = Decimal(str(delivery_fee))
-    except Exception:
-        delivery_fee = Decimal("0")
-
-    display_prestation_total = total_ttc - delivery_fee
-    if display_prestation_total < Decimal("0"):
-        display_prestation_total = Decimal("0")
-
+    finance = build_order_finance_summary(order)
     return {
-        # affichage client
-        "prestation_total": display_prestation_total,
-        "delivery_fee": delivery_fee,
-        "total_ttc": total_ttc,
-
-        # valeurs internes conservées si besoin ailleurs
-        "_items_total_internal": pricing.get("items_total", Decimal("0")),
-        "_service_fee_internal": pricing.get("service_fee", Decimal("0")),
-        "_express_extra_fee_internal": pricing.get("express_extra_fee", Decimal("0")),
-        "_vat_fagni_internal": pricing.get("vat_fagni", Decimal("0")),
+        "prestation_total": finance.get("prestation_total", Decimal("0")),
+        "delivery_fee": finance.get("delivery_fee_client", Decimal("0")),
+        "delivery_fee_client": finance.get("delivery_fee_client", Decimal("0")),
+        "service_fee_ht": finance.get("service_fee_ht", Decimal("0")),
+        "vat_fagni": finance.get("vat_fagni", Decimal("0")),
+        "total_ttc": finance.get("total_client_ttc", Decimal("0")),
+        "total_client_ttc": finance.get("total_client_ttc", Decimal("0")),
+        "amount_paid": finance.get("amount_paid", Decimal("0")),
+        "amount_remaining": finance.get("amount_remaining", Decimal("0")),
     }
-
 
 # --- LOT_2_32_PAYMENT_UI_JSON_VIEW_OK ---
 @client_login_required
@@ -8070,6 +7906,9 @@ def driver_order_detail(request, order_id):
         pk=order_id,
     )
 
+    display_summary = build_order_display_summary(order)
+    finance_summary = build_order_finance_summary(order)
+
     # ------------------------------------------------------------
     # Driver à utiliser pour la vue "détail course"
     # Règle :
@@ -8411,8 +8250,8 @@ def driver_order_detail(request, order_id):
         "driver_wallet_url": driver_wallet_url,
 
         "amounts": amounts,
-        "total_client_ttc": total_client_ttc,
-        "delivery_fee_client": delivery_fee_client,
+        "total_client_ttc": finance_summary.get("total_client_ttc", total_client_ttc),
+        "delivery_fee_client": finance_summary.get("delivery_fee_client", delivery_fee_client),
         "driver_income": driver_income,
         "driver_income_remaining": driver_income_remaining,
         "driver_income_progress_pct": driver_income_progress_pct,
@@ -8427,7 +8266,7 @@ def driver_order_detail(request, order_id):
         "provider_lat": provider_lat,
         "provider_lng": provider_lng,
 
-        "service_fee_ht": service_fee_ht,
+        "service_fee_ht": finance_summary.get("service_fee_ht", service_fee_ht),
         "vat_fagni": vat_fagni,
         "express_surcharge": express_surcharge,
 

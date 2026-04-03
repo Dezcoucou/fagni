@@ -51,7 +51,7 @@
                             {% endif %}
                         </td>
                         <td class="num">
-                            {{ order.total_client_ttc|default:0|money }} FCFA
+                            {{ order.total_client_display|default:order.total_client_ttc|default:0|money }} FCFA
                         </td>
                         <td class="num">
                             <div class="row-actions">

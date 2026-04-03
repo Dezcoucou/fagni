@@ -648,7 +648,9 @@
               <div>
                 <div class="meta-k">Montant client</div>
                 <div class="meta-v">
-                  {% if order.total_client_ttc %}
+                  {% if order.total_client_display %}
+                    {{ order.total_client_display|fcfa }}
+                  {% elif order.total_client_ttc %}
                     {{ order.total_client_ttc|fcfa }}
                   {% elif order.total %}
                     {{ order.total|fcfa }}

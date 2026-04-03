@@ -5713,6 +5713,16 @@ def client_order_detail(request, order_id: int):
     except Exception:
         paid = DECIMAL_ZERO
 
+    try:
+        display_summary
+    except NameError:
+        display_summary = build_order_display_summary(order)
+
+    try:
+        finance_summary
+    except NameError:
+        finance_summary = build_order_finance_summary(order)
+
     ctx = {
         "phone": phone,
         "customer": customer,

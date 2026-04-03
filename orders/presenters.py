@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import Any, Dict
 
-from orders.finance import compute_order_financials
+from orders.pricing_engine import compute_order_pricing
 
 
 DECIMAL_ZERO = Decimal("0")
@@ -56,27 +56,26 @@ def build_order_display_summary(order: Any) -> Dict[str, Any]:
 
 
 def build_order_finance_summary(order: Any) -> Dict[str, Any]:
-    data = compute_order_financials(order)
-
-    prestation_total = _to_decimal(data.get("prestation_total", 0))
-    delivery_fee_client = _to_decimal(data.get("delivery_fee_client", 0))
-    service_fee_ht = _to_decimal(data.get("service_fee_ht", 0))
-    vat_fagni = _to_decimal(data.get("vat_fagni", 0))
-    total_client_ttc = _to_decimal(data.get("total_client_ttc", 0))
-    amount_paid = _to_decimal(getattr(order, "amount_paid", 0))
-
-    service_fee_client_ttc = service_fee_ht + vat_fagni
-    amount_remaining = total_client_ttc - amount_paid
-    if amount_remaining < DECIMAL_ZERO:
-        amount_remaining = DECIMAL_ZERO
+    result = compute_order_pricing(order)
 
     return {
-        "prestation_total": prestation_total,
-        "delivery_fee_client": delivery_fee_client,
-        "service_fee_ht": service_fee_ht,
-        "vat_fagni": vat_fagni,
-        "service_fee_client_ttc": service_fee_client_ttc,
-        "total_client_ttc": total_client_ttc,
-        "amount_paid": amount_paid,
-        "amount_remaining": amount_remaining,
+        "prestation_total": _to_decimal(result.prestation_total),
+        "delivery_fee_client": _to_decimal(result.delivery_fee_client),
+        "delivery_cost_driver": _to_decimal(result.delivery_cost_driver),
+        "service_fee_ht": _to_decimal(result.service_fee_ht),
+        "vat_fagni": _to_decimal(result.vat_fagni),
+        "service_fee_client_ttc": _to_decimal(result.service_fee_client_ttc),
+        "express_surcharge": _to_decimal(result.express_surcharge),
+        "express_for_client": _to_decimal(result.express_for_client),
+        "express_extra_fee_client": _to_decimal(result.express_extra_fee_client),
+        "commission_laundry_ht": _to_decimal(result.commission_laundry_ht),
+        "commission_delivery_ht": _to_decimal(result.commission_delivery_ht),
+        "amount_laundry": _to_decimal(result.amount_laundry),
+        "amount_driver": _to_decimal(result.amount_driver),
+        "margin_delivery": _to_decimal(result.margin_delivery),
+        "fagni_revenue_ht": _to_decimal(result.fagni_revenue_ht),
+        "upsell_total": _to_decimal(result.upsell_total),
+        "total_client_ttc": _to_decimal(result.total_client_ttc),
+        "amount_paid": _to_decimal(result.amount_paid),
+        "amount_remaining": _to_decimal(result.amount_remaining),
     }

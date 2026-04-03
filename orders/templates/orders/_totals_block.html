@@ -28,7 +28,7 @@
     <div class="flex justify-between mt-2">
       <span class="font-semibold text-orange-600">Total TTC client :</span>
       <span id="total_global_display" class="font-semibold text-orange-600">
-        {{ finance.total_ttc_client|default:0|floatformat:0 }} FCFA
+        {{ finance.total_client_ttc|default:0|floatformat:0 }} FCFA
       </span>
     </div>
     {% if finance.express_surcharge and finance.express_surcharge > 0 %}
@@ -59,7 +59,7 @@
     <div class="flex justify-between mt-2">
       <span class="font-semibold text-orange-600">Total TTC client :</span>
       <span id="total_global_display" class="font-semibold text-orange-600">
-        {{ order.total_client_ttc|default:0|floatformat:0 }} FCFA
+        {{ order.total_client_display|default:order.total_client_ttc|default:0|floatformat:0 }} FCFA
       </span>
     </div>
   {% endif %}

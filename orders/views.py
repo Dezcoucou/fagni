@@ -12685,11 +12685,13 @@ def client_new_order_step4(request, order_id: int):
         return redirect("orders:client_order_detail", order_id=order.id)
 
     return render(request, "orders/client_new_order_step4.html", {
+        "display_summary": display_summary,
+        "finance_summary": finance_summary,
         "order": order,
         "pricing_mode": pricing_mode,
         "is_bag_mode": is_bag_mode,
         "bag_size": bag_size,
-        "bag_label": bag_label_map.get(bag_size, "Sac moyen"),
+        "bag_label": display_summary.get("bag_label", "Sac moyen"),
         "bag_base_price": bag_price_map.get(bag_size, 10000),
         "amounts": amounts,
         "finance_breakdown": finance_breakdown,

@@ -1,9 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load money_filters %}
-
 {% block title %}Mon wallet chauffeur – FAGNI{% endblock %}
-
 {% block page_css %}
 <style>
   .wallet-page{
@@ -11,29 +9,24 @@
     margin:0 auto;
     padding:10px 6px 24px;
   }
-
   .wallet-layout{
     display:grid;
     grid-template-columns:minmax(0, .95fr) minmax(0, 1.05fr);
     gap:14px;
     align-items:start;
   }
-
   .wallet-stack{
     display:grid;
     gap:14px;
   }
-
   .wallet-balance{
     background:linear-gradient(135deg,#0f172a 0%, #172554 46%, #2563eb 100%);
     color:#fff;
     border:1px solid rgba(255,255,255,.08);
   }
-
   .wallet-balance .fagni-eyebrow{
     color:rgba(255,255,255,.74);
   }
-
   .wallet-balance-value{
     font-size:42px;
     line-height:1;
@@ -42,28 +35,24 @@
     margin-top:10px;
     color:#fff;
   }
-
   .wallet-balance-sub{
     margin-top:10px;
     font-size:13px;
     line-height:1.5;
     color:rgba(255,255,255,.84);
   }
-
   .wallet-mini-grid{
     display:grid;
     grid-template-columns:1fr 1fr;
     gap:10px;
     margin-top:14px;
   }
-
   .wallet-mini-card{
     background:rgba(255,255,255,.10);
     border:1px solid rgba(255,255,255,.12);
     border-radius:16px;
     padding:12px;
   }
-
   .wallet-mini-label{
     font-size:11px;
     text-transform:uppercase;
@@ -71,32 +60,27 @@
     color:rgba(255,255,255,.68);
     font-weight:900;
   }
-
   .wallet-mini-value{
     margin-top:6px;
     font-size:18px;
     font-weight:900;
     color:#fff;
   }
-
   .wallet-note{
     font-size:12px;
     line-height:1.5;
     color:#64748b;
   }
-
   .wallet-withdraw-box{
     display:grid;
     gap:12px;
   }
-
   .wallet-withdraw-form{
     display:grid;
     grid-template-columns:minmax(0,1fr) auto;
     gap:10px;
     align-items:end;
   }
-
   .wallet-history-table-wrap{
     overflow:auto;
     border-radius:18px;
@@ -104,14 +88,12 @@
     background:#fff;
     box-shadow:0 6px 16px rgba(15,23,42,.05);
   }
-
   .wallet-history-table{
     width:100%;
     min-width:760px;
     border-collapse:separate;
     border-spacing:0;
   }
-
   .wallet-history-table thead th{
     text-align:left;
     font-size:11px;
@@ -122,7 +104,6 @@
     padding:12px 14px;
     border-bottom:1px solid #e5e7eb;
   }
-
   .wallet-history-table tbody td{
     padding:12px 14px;
     border-bottom:1px solid #f1f5f9;
@@ -130,47 +111,38 @@
     color:#0f172a;
     vertical-align:top;
   }
-
   .wallet-history-table tbody tr:last-child td{
     border-bottom:none;
   }
-
   .wallet-amount{
     text-align:right;
     white-space:nowrap;
     font-weight:900;
   }
-
   .wallet-amount.in{
     color:#166534;
   }
-
   .wallet-amount.out{
     color:#b91c1c;
   }
-
   .wallet-date{
     white-space:nowrap;
     color:#64748b;
     font-size:12px;
   }
-
   .wallet-order-link{
     color:#2563eb;
     text-decoration:none;
     font-weight:800;
   }
-
   .wallet-order-link:hover{
     text-decoration:underline;
   }
-
   .wallet-chip-group{
     display:flex;
     gap:8px;
     flex-wrap:wrap;
   }
-
   .wallet-filter-btn{
     appearance:none;
     border:1px solid #e5e7eb;
@@ -183,26 +155,22 @@
     font-weight:900;
     cursor:pointer;
   }
-
   .wallet-filter-btn.is-active{
     background:#eff6ff;
     border-color:#bfdbfe;
     color:#1d4ed8;
   }
-
   .wallet-summary-grid{
     display:grid;
     grid-template-columns:1fr 1fr;
     gap:10px;
   }
-
   .wallet-summary-item{
     border:1px solid #eef2f7;
     border-radius:16px;
     padding:12px;
     background:#fff;
   }
-
   .wallet-summary-label{
     font-size:11px;
     color:#64748b;
@@ -210,22 +178,18 @@
     letter-spacing:.06em;
     font-weight:900;
   }
-
   .wallet-summary-value{
     margin-top:6px;
     font-size:18px;
     font-weight:950;
     color:#111827;
   }
-
   .wallet-summary-value.success{
     color:#166534;
   }
-
   .wallet-summary-value.warning{
     color:#9a3412;
   }
-
   .wallet-empty{
     border:1px dashed #e5e7eb;
     border-radius:16px;
@@ -234,33 +198,27 @@
     color:#94a3b8;
     font-size:13px;
   }
-
   @media (max-width:980px){
     .wallet-layout{
       grid-template-columns:1fr;
     }
   }
-
   @media (max-width:760px){
     .wallet-mini-grid,
     .wallet-summary-grid{
       grid-template-columns:1fr;
     }
-
     .wallet-withdraw-form{
       grid-template-columns:1fr;
     }
-
     .wallet-balance-value{
       font-size:34px;
     }
   }
 </style>
 {% endblock %}
-
 {% block content %}
 <div class="wallet-page">
-
   <section class="fagni-hero">
     <div class="fagni-hero-main wallet-balance">
       <div class="fagni-eyebrow">FAGNI • Wallet livreur</div>
@@ -268,15 +226,12 @@
       <p class="fagni-subtitle">
         Vos gains FAGNI sur les courses livrées. Le solde disponible correspond au montant que vous pouvez demander en retrait.
       </p>
-
       <div class="wallet-balance-value">
         {% if wallet %}{{ wallet.balance|default:0|money }} FCFA{% else %}0 FCFA{% endif %}
       </div>
-
       <div class="wallet-balance-sub">
         Solde disponible à l’instant T, après prise en compte des crédits et des retraits enregistrés.
       </div>
-
       <div class="wallet-mini-grid">
         <div class="wallet-mini-card">
           <div class="wallet-mini-label">Total gains crédités</div>
@@ -291,7 +246,6 @@
           </div>
         </div>
       </div>
-
       <div class="fagni-badges">
         <span class="fagni-badge fagni-badge--glass">
           <span class="fagni-dot fagni-dot--success"></span>
@@ -302,7 +256,6 @@
         {% endif %}
       </div>
     </div>
-
     <div class="fagni-hero-side">
       <div>
         <div class="fagni-eyebrow">Navigation rapide</div>
@@ -313,7 +266,6 @@
           Revenus, retraits et historique des mouvements liés à votre activité terrain.
         </p>
       </div>
-
       <div class="fagni-btn-group">
         <a href="{% url 'orders:driver_app' %}{% if driver %}?driver_id={{ driver.id }}{% endif %}" class="fagni-btn fagni-btn--light">
           ← Retour App livreur
@@ -324,10 +276,8 @@
       </div>
     </div>
   </section>
-
   {% if wallet %}
     <div class="wallet-layout">
-
       <div class="wallet-stack">
         <section class="fagni-panel">
           <div class="fagni-eyebrow" style="color:#64748b;">Synthèse</div>
@@ -350,7 +300,6 @@
             </div>
           </div>
         </section>
-
         <section class="fagni-panel wallet-withdraw-box">
           <div>
             <div class="fagni-eyebrow" style="color:#64748b;">Retrait</div>
@@ -359,7 +308,6 @@
               Soumettez une demande de retrait sur votre solde disponible. Le traitement est effectué selon les règles opérationnelles FAGNI.
             </p>
           </div>
-
           {% if can_request_withdrawal %}
             <form method="post" action="{% url 'wallets:driver_wallet_dashboard' %}?driver_id={{ driver.id }}" class="wallet-withdraw-form">
               {% csrf_token %}
@@ -384,27 +332,23 @@
               Aucun retrait possible pour le moment. Votre solde doit être supérieur à zéro et conforme aux règles de retrait.
             </div>
           {% endif %}
-
           <div class="wallet-note">
             Les montants sont exprimés en FCFA. En cas d’écart ou d’anomalie, contactez l’équipe FAGNI.
           </div>
         </section>
       </div>
-
       <section class="fagni-panel">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
           <div>
             <div class="fagni-eyebrow" style="color:#64748b;">Historique</div>
             <h2 class="fagni-title" style="font-size:20px;color:#0f172a;">Mouvements du wallet</h2>
           </div>
-
           <div class="wallet-chip-group">
             <button type="button" class="wallet-filter-btn is-active" data-filter="all">Tous</button>
             <button type="button" class="wallet-filter-btn" data-filter="in">Entrées</button>
             <button type="button" class="wallet-filter-btn" data-filter="out">Sorties</button>
           </div>
         </div>
-
         {% if transactions %}
           <div class="wallet-history-table-wrap">
             <table class="wallet-history-table" id="wallet-history-table">
@@ -465,7 +409,6 @@
           </div>
         {% endif %}
       </section>
-
     </div>
   {% else %}
     <div class="fagni-panel">
@@ -481,25 +424,19 @@
       </div>
     </div>
   {% endif %}
-
 </div>
 {% endblock %}
-
 {% block extra_js %}
 <script>
 (function(){
   const buttons = document.querySelectorAll(".wallet-filter-btn");
   const rows = document.querySelectorAll("#wallet-history-table tbody tr");
-
   if(!buttons.length || !rows.length) return;
-
   buttons.forEach(btn => {
     btn.addEventListener("click", function(){
       const filter = btn.getAttribute("data-filter") || "all";
-
       buttons.forEach(b => b.classList.remove("is-active"));
       btn.classList.add("is-active");
-
       rows.forEach(row => {
         const dir = row.getAttribute("data-direction") || "";
         row.style.display = (filter === "all" || filter === dir) ? "" : "none";

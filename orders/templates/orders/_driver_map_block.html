@@ -1,9 +1,7 @@
 {% load static %}
-
 <link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
 <link rel="stylesheet" href="{% static 'vendor/leaflet-markercluster/MarkerCluster.css' %}">
 <link rel="stylesheet" href="{% static 'vendor/leaflet-markercluster/MarkerCluster.Default.css' %}">
-
 <style>
   #map-wrapper{
     position: relative;
@@ -16,7 +14,6 @@
     height: 360px;
     width: 100%;
   }
-
   #leaflet-status-pill{
     position: absolute;
     top: 12px;
@@ -45,7 +42,6 @@
     background: #ef4444;
     box-shadow: 0 0 0 4px rgba(239,68,68,.16);
   }
-
   .map-toolbar{
     display: flex;
     align-items: center;
@@ -79,7 +75,6 @@
     box-shadow: 0 6px 16px rgba(15, 23, 42, 0.07);
   }
   .map-btn:hover{ background:#f3f4f6; }
-
   .map-toggle{
     display: inline-flex;
     align-items: center;
@@ -90,7 +85,6 @@
     background: #fff;
   }
   .map-toggle input{ transform: translateY(1px); }
-
   /* PIN custom */
   .fagni-pin{
     width: 12px;
@@ -102,77 +96,61 @@
   .fagni-pin.active{ background:#22c55e; }
   .fagni-pin.idle{ background:#f59e0b; }
   .fagni-pin.offline{ background:#9ca3af; }
-
   .marker-cluster-small,
   .marker-cluster-medium,
   .marker-cluster-large{
     border-radius: 999px !important;
   }
 </style>
-
 <div class="card">
   <h2 class="card-title">
     <span class="emoji">🗺️</span>
     Carte des livreurs actifs
   </h2>
-
   <div class="map-toolbar">
     <div class="map-toolbar-left">
       <label class="map-toggle">
         <input type="checkbox" id="toggle-active-only" checked>
         Afficher actifs seulement
       </label>
-
       <span>
         Actifs: <strong id="active-counter">0</strong>
       </span>
     </div>
-
     <div class="map-toolbar-right">
       <button type="button" class="map-btn" id="btn-map-recenter">🎯 Recentrer</button>
     </div>
   </div>
-
   <div id="map-wrapper">
     <div id="driver-map"></div>
-
     <div id="leaflet-status-pill">
       <span class="dot"></span>
       <span class="txt">Live</span>
     </div>
   </div>
-
   <p style="font-size:12px;color:#6b7280;margin-top:8px;">
     Position live des livreurs (mise à jour automatique).
   </p>
 </div>
-
 <script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
 <script src="{% static 'vendor/leaflet-markercluster/leaflet.markercluster.js' %}"></script>
-
 <script id="drivers-json" type="application/json">
 {{ drivers_json|safe }}
 </script>
-
 <script>
 (function(){
   "use strict";
-
   const MAP_EL = document.getElementById("driver-map");
   if (!MAP_EL) return;
-
   const STATUS_PILL = document.getElementById("leaflet-status-pill");
   const STATUS_TXT = STATUS_PILL ? STATUS_PILL.querySelector(".txt") : null;
   const TOGGLE_ACTIVE_ONLY = document.getElementById("toggle-active-only");
   const ACTIVE_COUNTER = document.getElementById("active-counter");
   const BTN_RECENTER = document.getElementById("btn-map-recenter");
-
   const LIVE_URL = "/orders/ops-dashboard/drivers-live/";
   const POLL_MS = 10000;
-
   const ACTIVE_MS = 10 * 60 * 1000; // 10 min
   const IDLE_MS   = 30 * 60 * 1000; // 30 min (après => offline)
-
   function parseISO(s){
     const t = Date.parse(s);
     return Number.isFinite(t) ? t : null;
@@ -181,7 +159,6 @@
     const t = payload && payload.server_time ? parseISO(payload.server_time) : null;
     return t || Date.now();
   }
-
   function driverStatus(d, serverNowMs){
     const t = parseISO(d.updated_at);
     if (!t) return "offline";
@@ -190,45 +167,36 @@
     if (age <= IDLE_MS) return "idle";
     return "offline";
   }
-
   function esc(s){
     return String(s || "").replace(/[&<>"']/g, m => ({
       "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
     }[m]));
   }
-
   function fmtMoney(n){
     const v = Number(n || 0);
     try { return v.toLocaleString("fr-FR"); } catch(e){ return String(v); }
   }
-
   let initialPayload = { ok:true, count:0, drivers:[], server_time:null };
   try {
     initialPayload = JSON.parse(document.getElementById("drivers-json").textContent || "{}");
   } catch(e){}
-
   const fallbackCenter = [5.3599517, -4.0082563]; // Abidjan
   const initDrivers = (initialPayload && initialPayload.drivers) ? initialPayload.drivers : [];
   const startCenter = initDrivers.length ? [initDrivers[0].latitude, initDrivers[0].longitude] : fallbackCenter;
-
   const map = L.map("driver-map", { zoomControl: true }).setView(startCenter, 12);
-
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: "&copy; OpenStreetMap"
   }).addTo(map);
-
   const cluster = L.markerClusterGroup({
     chunkedLoading: true,
     showCoverageOnHover: false,
     maxClusterRadius: 50
   });
   map.addLayer(cluster);
-
   const markersById = new Map();
   let lastBounds = null;
   let lastPayload = initialPayload;
-
   function makeIcon(status){
     return L.divIcon({
       className: "",
@@ -237,14 +205,11 @@
       iconAnchor: [6, 6]
     });
   }
-
   function popupHTML(d, status, serverNowMs){
     const upd = d.updated_at ? new Date(parseISO(d.updated_at)).toLocaleString("fr-FR") : "—";
     const ageSec = d.updated_at ? Math.max(0, Math.round((serverNowMs - parseISO(d.updated_at)) / 1000)) : null;
     const badge = status === "active" ? "🟢 Actif" : (status === "idle" ? "🟠 Idle" : "⚪ Offline");
-
     const opsUrl = `/orders/ops-dashboard/?driver_id=${encodeURIComponent(d.id)}&focus=driver`;
-
     return `
       <div style="min-width:230px">
         <div style="font-weight:800;margin-bottom:6px;">${esc(d.name)}</div>
@@ -255,7 +220,6 @@
           💰 ${fmtMoney(d.week_earnings)} FCFA (semaine)<br>
           🕒 Maj: ${esc(upd)}${ageSec !== null ? ` (${ageSec}s)` : ""}
         </div>
-
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
           <a href="${opsUrl}" style="
             display:inline-flex;align-items:center;justify-content:center;
@@ -267,7 +231,6 @@
       </div>
     `;
   }
-
   function setPillOnline(isOnline){
     if (!STATUS_PILL) return;
     STATUS_PILL.style.display = "flex";
@@ -279,28 +242,23 @@
       if (STATUS_TXT) STATUS_TXT.textContent = "Offline";
     }
   }
-
   function gotoDriverFilter(driverId){
     try{
       const url = new URL(window.location.href);
       url.pathname = "/orders/ops-dashboard/";
       url.searchParams.set("focus", "driver");
       url.searchParams.set("driver_id", String(driverId));
-
       // Nettoyage: pagination/selection commande
       ["pending_page","progress_page","done_page","highlight"].forEach(k => url.searchParams.delete(k));
-
       window.location.href = url.toString();
     } catch(e){
       window.location.href = "/orders/ops-dashboard/?focus=driver&driver_id=" + encodeURIComponent(driverId);
     }
   }
-
   function rebuild(payload){
     lastPayload = payload || lastPayload;
     const serverNowMs = getServerNow(payload);
     const drivers = payload && payload.drivers ? payload.drivers : [];
-
     // compteur actifs
     let activeCount = 0;
     drivers.forEach(d => {
@@ -308,34 +266,25 @@
       if (st === "active" || st === "idle") activeCount++;
     });
     if (ACTIVE_COUNTER) ACTIVE_COUNTER.textContent = String(activeCount);
-
     // filtre
     const activeOnly = !!(TOGGLE_ACTIVE_ONLY && TOGGLE_ACTIVE_ONLY.checked);
-
     // bounds
     const bounds = L.latLngBounds([]);
-
     // upsert markers
     const keepIds = new Set();
-
     drivers.forEach(d => {
       if (typeof d.latitude !== "number" || typeof d.longitude !== "number") return;
-
       const st = driverStatus(d, serverNowMs);
       const isShown = !activeOnly || (st === "active" || st === "idle");
-
       keepIds.add(d.id);
-
       let marker = markersById.get(d.id);
       if (!marker){
         marker = L.marker([d.latitude, d.longitude], { icon: makeIcon(st) });
         marker.bindPopup(popupHTML(d, st, serverNowMs));
-
         // ✅ clic marker => filtre driver + focus + URL propre
         marker.on("click", function(){
           gotoDriverFilter(d.id);
         });
-
         markersById.set(d.id, marker);
         cluster.addLayer(marker);
       } else {
@@ -343,15 +292,12 @@
         marker.setIcon(makeIcon(st));
         marker.setPopupContent(popupHTML(d, st, serverNowMs));
       }
-
       // show/hide by adding/removing from cluster
       const isInCluster = cluster.hasLayer(marker);
       if (isShown && !isInCluster) cluster.addLayer(marker);
       if (!isShown && isInCluster) cluster.removeLayer(marker);
-
       if (isShown) bounds.extend([d.latitude, d.longitude]);
     });
-
     // remove stale markers
     for (const [id, marker] of markersById.entries()){
       if (!keepIds.has(id)){
@@ -359,14 +305,12 @@
         markersById.delete(id);
       }
     }
-
     // fit bounds on first build (or if we have none)
     if (!lastBounds && bounds.isValid()){
       map.fitBounds(bounds, { padding: [30, 30] });
       lastBounds = bounds;
     }
   }
-
   async function poll(){
     try{
       const res = await fetch(LIVE_URL, { headers: { "Accept": "application/json" } });
@@ -374,7 +318,6 @@
       const payload = await res.json();
       setPillOnline(true);
       rebuild(payload);
-
       // si on a une demande de focus en attente, on tente après refresh
       const pending = window.__OPS_FOCUS_DRIVER_ID__;
       if (pending) focusDriverById(Number(pending));
@@ -382,12 +325,10 @@
       setPillOnline(false);
     }
   }
-
   if (BTN_RECENTER){
     BTN_RECENTER.addEventListener("click", function(){
       const bounds = L.latLngBounds([]);
       let added = 0;
-
       for (const marker of markersById.values()){
         if (cluster.hasLayer(marker)){
           bounds.extend(marker.getLatLng());
@@ -399,37 +340,29 @@
       }
     });
   }
-
   if (TOGGLE_ACTIVE_ONLY){
     TOGGLE_ACTIVE_ONLY.addEventListener("change", function(){
       rebuild(lastPayload);
       poll();
     });
   }
-
   function focusDriverById(id){
     const marker = markersById.get(id);
-
     // Si pas encore présent, on tente un rebuild depuis lastPayload + poll
     if (!marker){
       setTimeout(() => poll(), 0);
       return false;
     }
-
     // S'assurer que le marker est visible même si "active only" est ON
     if (!cluster.hasLayer(marker)) cluster.addLayer(marker);
-
     const ll = marker.getLatLng();
     map.setView(ll, Math.max(map.getZoom(), 15), { animate: true });
     setTimeout(() => {
       try { marker.openPopup(); } catch(e){}
     }, 250);
-
     return true;
   }
-
   window.__OPS_FOCUS_DRIVER__ = focusDriverById;
-
   window.addEventListener("ops:focus-driver", function(){
     const id = window.__OPS_FOCUS_DRIVER_ID__;
     if (!id) return;
@@ -437,14 +370,11 @@
       setTimeout(() => focusDriverById(Number(id)), 1200);
     }
   });
-
   // init
   setPillOnline(true);
   rebuild(initialPayload);
-
   // start polling
   poll();
   setInterval(poll, POLL_MS);
-
 })();
 </script>

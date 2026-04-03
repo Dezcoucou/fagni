@@ -5,7 +5,6 @@
   <meta charset="utf-8">
   <title>Ticket {{ order.code|default:order.id }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
   <style>
     html, body { margin:0; padding:0; background:#f3f4f6; }
     .ticket {
@@ -51,7 +50,6 @@
 <body>
   <div class="ticket">
     <div class="pad">
-
       <div class="brand">
         <div>
           <div class="name">FAGNI</div>
@@ -60,7 +58,6 @@
             <div class="sub">{{ invoice_settings.company_city }}</div>
           {% endif %}
         </div>
-
         <div class="qr">
           {% if qr_b64 %}
             <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR" style="width:100%;height:100%;object-fit:contain;">
@@ -71,16 +68,13 @@
           {% endif %}
         </div>
       </div>
-
       <div class="row"><div class="label">Commande</div><div class="value">{{ order.code|default:order.id }}</div></div>
       <div class="row"><div class="label">Date</div><div class="value">{{ order.created_at|date:"d/m/Y H:i" }}</div></div>
       <div class="row"><div class="label">Client</div><div class="value">{% if order.customer %}{{ order.customer.name|default:"—" }}{% else %}—{% endif %}</div></div>
       {% if order.customer and order.customer.phone %}
         <div class="row"><div class="label">Tel</div><div class="value">{{ order.customer.phone }}</div></div>
       {% endif %}
-
       <div class="line"></div>
-
       <div class="items">
         {% for item in items %}
           <div class="item-row">
@@ -104,30 +98,22 @@
           <div class="small">Aucune ligne de commande.</div>
         {% endfor %}
       </div>
-
       <div class="line"></div>
-
       <div class="totals">
         <div class="row"><div class="label">Prestations</div><div class="value">{{ prestations_amount|default:0|money }} FCFA</div></div>
-
         <div class="row"><div class="label">Prestations</div><div class="value">{{ display_prestations_amount|default:0|money }} FCFA</div></div>
-
         <div class="row"><div class="label">Livraison</div><div class="value">{{ display_delivery_amount|default:0|money }} FCFA</div></div>
-
         {% if display_express_amount and display_express_amount|floatformat:"0" != "0" %}
           <div class="row">
             <div class="label">Express</div>
             <div class="value"><span class="express">+ {{ display_express_amount|default:0|money }} FCFA</span></div>
           </div>
         {% endif %}
-
         <div class="line"></div>
-
         <div class="row">
           <div class="label grand">TOTAL TTC</div>
           <div class="value grand">{{ display_total_ttc|default:0|money }} FCFA</div>
         </div>
-
         <div style="margin-top:10px;">
           {% if order.payment_status == "paid" %}
             <span class="badge b-success">Payée</span>
@@ -137,29 +123,23 @@
             <span class="badge b-secondary">{{ order.get_payment_status_display|default:order.payment_status }}</span>
           {% endif %}
         </div>
-
         {% if order.fne_invoice_number %}
           <div class="line"></div>
           <div class="small">FNE : <strong>{{ order.fne_invoice_number }}</strong></div>
         {% endif %}
-
         {% if order.invoice_number %}
           <div class="small">Facture : <strong>{{ order.invoice_number }}</strong></div>
         {% endif %}
       </div>
-
       <div class="line"></div>
-
       <div class="small" style="text-align:center;">
         Merci pour votre confiance 🙏
       </div>
-
       {% if qr_data %}
         <div class="small" style="margin-top:8px; word-break:break-word;">
           <span class="label">QR data :</span> {{ qr_data }}
         </div>
       {% endif %}
-
     </div>
   </div>
 </body>

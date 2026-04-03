@@ -1,13 +1,9 @@
 {# Fragment INCLUDE : pas de extends / block ici #}
 <!-- ORDER_ACTIONS_OK -->
-
 <a href="{% url 'orders:list' %}" class="btn btn-secondary">← Retour aux commandes</a>
-
 {% if order.id %}
-
   {% if order.payment_status != "paid" %}
       <a href="{% url 'orders:update' order.id %}" class="btn btn-primary">✏️ Modifier la commande</a>
-
       {% if request.user.is_staff %}
       <form method="post" action="{% url 'orders:order_mark_paid' order.id %}" style="display:inline-flex; gap:6px; align-items:center;">
           {% csrf_token %}
@@ -21,14 +17,11 @@
           </button>
       </form>
       {% endif %}
-
   {% else %}
       <span class="chip">🔒 Commande verrouillée (payée)</span>
   {% endif %}
-
   <a href="{% url 'orders:order_ticket_pdf' order.id %}" class="btn btn-primary" target="_blank">🧾 Ticket client (A4)</a>
   <a href="{% url 'orders:order_ticket_thermal_pdf' order.id %}" class="btn btn-primary" target="_blank">🧾 Ticket thermique (80mm)</a>
-
   {% if order.payment_status == "paid" %}
       <a href="{% url 'orders:order_invoice_pdf' order.id %}" class="btn btn-primary" target="_blank">
           ✅ Facture fiscale (A4)
@@ -37,5 +30,4 @@
           {% endif %}
       </a>
   {% endif %}
-
 {% endif %}

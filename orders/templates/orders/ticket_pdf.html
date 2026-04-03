@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% load money_filters %}
-
 {% block title %}Ticket commande {{ order.code|default:order.id }}{% endblock %}
-
 {% block content %}
 <style>
   .ticket-wrap{max-width:920px;margin:0 auto;padding:16px}
@@ -36,16 +34,13 @@
     .card{break-inside:avoid}
   }
 </style>
-
 <div class="ticket-wrap">
-
   <div class="ticket-top">
     <div class="brand">
       <div class="brand-title">FAGNI</div>
       <div class="brand-sub">
         Ticket / Facture – Commande {{ order.code|default:order.id }}
       </div>
-
       <div class="muted">
         {% if invoice_settings %}
           {{ invoice_settings.company_name|default:"—" }}
@@ -56,7 +51,6 @@
         {% endif %}
       </div>
     </div>
-
     <div class="qr-box">
       {% if qr_b64 %}
         <img class="qr-img" src="data:image/png;base64,{{ qr_b64 }}" alt="QR code">
@@ -68,7 +62,6 @@
       </div>
     </div>
   </div>
-
   <div class="meta">
     <div class="card">
       <div class="row">
@@ -90,7 +83,6 @@
         </div>
       </div>
     </div>
-
     <div class="card">
       <div class="muted">Partenaires</div>
       <div class="row" style="margin-top:6px;">
@@ -107,7 +99,6 @@
           </div>
         </div>
       </div>
-
       <div style="margin-top:10px;">
         {% if order.payment_status == "paid" %}
           <span class="badge b-success">Payée</span>
@@ -119,13 +110,11 @@
       </div>
     </div>
   </div>
-
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">
       <div><strong>Détails</strong></div>
       <div class="muted">Articles : {{ items|length }}</div>
     </div>
-
     <table>
       <thead>
         <tr>
@@ -166,36 +155,30 @@
       </tbody>
     </table>
   </div>
-
   <div class="card">
     <div><strong>Totaux</strong></div>
-
     <table class="total-box">
       <tbody>
         <tr>
           <td class="muted">Prestations</td>
           <td class="num">{{ display_prestations_amount|default:0|money }} FCFA</td>
         </tr>
-
         <tr>
           <td class="muted">Frais de livraison</td>
           <td class="num">{{ display_delivery_amount|default:0|money }} FCFA</td>
         </tr>
-
         {% if display_express_amount and display_express_amount|floatformat:"0" != "0" %}
         <tr class="highlight-express">
           <td class="muted">⚡ Express</td>
           <td class="num">{{ display_express_amount|default:0|money }} FCFA</td>
         </tr>
         {% endif %}
-
         <tr>
           <td style="font-weight:900;">Total TTC</td>
           <td class="num" style="font-weight:900;">{{ display_total_ttc|default:0|money }} FCFA</td>
         </tr>
       </tbody>
     </table>
-
     {% if order.fne_invoice_number %}
       <div class="line"></div>
       <div class="muted small">
@@ -203,7 +186,6 @@
       </div>
     {% endif %}
   </div>
-
   <div class="footer">
     <div>
       {% if invoice_settings and invoice_settings.company_address %}
@@ -218,6 +200,5 @@
       {% endif %}
     </div>
   </div>
-
 </div>
 {% endblock %}

@@ -1,33 +1,27 @@
 {% extends "base.html" %}
 {% load static %}
 {% load money_filters %}
-
 {% block title %}Mon wallet blanchisserie – FAGNI{% endblock %}
-
 {% block extra_head %}
 <style>
   .page { max-width: 900px; margin: 0 auto 32px; padding: 12px 10px 24px; }
-
   .page-header{
     display:flex; justify-content:space-between; align-items:flex-start;
     gap:12px; margin-bottom:18px;
   }
   .page-title{ font-size:20px; font-weight:700; color:#0f172a; margin:0; }
   .page-subtitle{ font-size:13px; color:#64748b; margin:4px 0 0; }
-
   .tag-driver{
     font-size:12px; background:#eff6ff; border-radius:999px;
     padding:4px 10px; color:#1d4ed8; border:1px solid #bfdbfe;
     display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
   }
-
   .layout{
     display:grid;
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.6fr);
     gap:14px;
     align-items:flex-start;
   }
-
   .card{
     background:#ffffff; border-radius:16px; padding:12px 14px;
     border:1px solid #e5e7eb; box-shadow:0 2px 6px rgba(15,23,42,0.06);
@@ -37,27 +31,23 @@
     display:flex; align-items:center; gap:6px;
   }
   .card-title .emoji{ font-size:18px; }
-
   .balance-value{ font-size:26px; font-weight:700; color:#0f172a; }
   .balance-label{
     font-size:12px; text-transform:uppercase; letter-spacing:.06em;
     color:#6b7280; margin-bottom:2px;
   }
-
   .pill-info{
     display:inline-flex; align-items:center; gap:6px; padding:3px 9px;
     border-radius:999px; background:#f3f4f6; color:#4b5563;
     font-size:11px; margin-top:6px;
   }
   .pill-info span.dot{ width:8px; height:8px; border-radius:999px; background:#22c55e; }
-
   .meta-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px; }
   .meta-block-label{
     font-size:11px; text-transform:uppercase; letter-spacing:.06em;
     color:#9ca3af; margin-bottom:2px;
   }
   .meta-block-value{ font-size:13px; font-weight:500; color:#111827; }
-
   .btn{
     display:inline-flex; align-items:center; justify-content:center;
     padding:7px 12px; border-radius:999px; font-size:13px;
@@ -69,7 +59,6 @@
   .btn-light{ background:#fff; border-color:#e5e7eb; color:#374151; }
   .btn-light:hover{ background:#f3f4f6; }
   .btn-sm{ padding:5px 10px; font-size:12px; }
-
   .history-header{
     display:flex; justify-content:space-between; align-items:center;
     gap:8px; margin-bottom:6px;
@@ -82,7 +71,6 @@
   .chip-filter.is-active{
     background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; font-weight:500;
   }
-
   table.history-table{ width:100%; border-collapse:collapse; font-size:12px; margin-top:4px; }
   table.history-table th, table.history-table td{ padding:6px 4px; border-bottom:1px solid #e5e7eb; }
   table.history-table th{
@@ -91,7 +79,6 @@
   }
   table.history-table td.amount{ text-align:right; white-space:nowrap; font-weight:500; }
   table.history-table td.date{ white-space:nowrap; }
-
   .badge-direction-in{
     display:inline-flex; padding:2px 7px; border-radius:999px; font-size:10px;
     background:#ecfdf3; color:#166534;
@@ -100,12 +87,9 @@
     display:inline-flex; padding:2px 7px; border-radius:999px; font-size:10px;
     background:#fef2f2; color:#b91c1c;
   }
-
   .history-empty{ font-size:12px; color:#9ca3af; padding:6px 2px; }
-
   .order-link{ font-size:11px; color:#2563eb; text-decoration:none; }
   .order-link:hover{ text-decoration:underline; }
-
   @media (max-width: 880px){ .layout{ grid-template-columns: 1fr; } }
   @media (max-width: 640px){
     .page{ padding:10px 8px 22px; }
@@ -114,10 +98,8 @@
   }
 </style>
 {% endblock %}
-
 {% block content %}
 <div class="page">
-
   <div class="page-header">
     <div>
       <h1 class="page-title">Mon wallet blanchisserie</h1>
@@ -133,30 +115,24 @@
       {% endif %}
     </div>
   </div>
-
   {% if error_message %}
     <section class="card">
       <h2 class="card-title"><span class="emoji">⚠️</span> Accès</h2>
       <p style="margin:6px 0 0; color:#374151; font-size:13px;">{{ error_message }}</p>
     </section>
-
   {% elif wallet %}
     <div class="layout">
-
       <!-- COLONNE GAUCHE -->
       <section class="card">
         <h2 class="card-title"><span class="emoji">💰</span> Solde et synthèse</h2>
-
         <div>
           <div class="balance-label">Solde disponible</div>
           <div class="balance-value">{{ wallet.balance|default:0|money }} FCFA</div>
-
           <div class="pill-info">
             <span class="dot"></span>
             <span>Montant prêt à être retiré (commandes déjà comptabilisées).</span>
           </div>
         </div>
-
         <div class="meta-grid">
           <div>
             <div class="meta-block-label">Total gains crédités</div>
@@ -171,7 +147,6 @@
             </div>
           </div>
         </div>
-
         <div style="margin-top:14px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
           <button type="button" class="btn btn-primary" id="btn-withdraw-open">
             ⬇️ Demander un retrait
@@ -180,7 +155,6 @@
             ← Retour à mes commandes
           </a>
         </div>
-
         <!-- PANEL RETRAIT -->
         <div id="withdraw-panel"
              style="display:none; margin-top:10px; padding:12px; border-radius:14px; border:1px solid rgba(0,0,0,.10); background:rgba(0,0,0,.03);">
@@ -204,7 +178,6 @@
                 Solde dispo : <strong>{{ wallet.balance|default:0|money }}</strong> FCFA
               </div>
             </div>
-
             <button type="submit" class="btn btn-primary" id="btn-withdraw-submit">
               ✅ Envoyer la demande
             </button>
@@ -213,12 +186,10 @@
             </button>
           </form>
         </div>
-
         <p style="font-size:11px; color:#9ca3af; margin-top:10px;">
           Les montants sont exprimés en FCFA. Les demandes de retrait sont traitées par l’équipe FAGNI selon les conditions du contrat blanchisserie.
         </p>
       </section>
-
       <!-- COLONNE DROITE -->
       <section class="card">
         <div class="history-header">
@@ -229,7 +200,6 @@
             <button type="button" class="chip-filter" data-filter="out">Sorties</button>
           </div>
         </div>
-
         {% if transactions %}
           <table class="history-table" id="wallet-history-table">
             <thead>
@@ -286,9 +256,7 @@
           </p>
         {% endif %}
       </section>
-
     </div>
-
   {% else %}
     <section class="card">
       <h2 class="card-title"><span class="emoji">💳</span> Wallet non trouvé</h2>
@@ -300,29 +268,23 @@
       </a>
     </section>
   {% endif %}
-
 </div>
 {% endblock %}
-
 {% block extra_js %}
 <script>
 (function(){
   function byId(id){ return document.getElementById(id); }
-
   document.addEventListener("DOMContentLoaded", function(){
     // 1) Filtres historique
     var filters = document.querySelectorAll(".chip-filter");
     var table = document.getElementById("wallet-history-table");
     var rows = table ? table.querySelectorAll("tbody tr") : [];
-
     if(filters && filters.length && rows && rows.length){
       filters.forEach(function(btn){
         btn.addEventListener("click", function(){
           var f = this.getAttribute("data-filter") || "all";
-
           filters.forEach(function(b){ b.classList.remove("is-active"); });
           this.classList.add("is-active");
-
           rows.forEach(function(row){
             var dir = row.getAttribute("data-direction");
             row.style.display = (f === "all" || dir === f) ? "" : "none";
@@ -330,13 +292,11 @@
         });
       });
     }
-
     // 2) Toggle retrait
     var openBtn = byId("btn-withdraw-open");
     var cancelBtn = byId("btn-withdraw-cancel");
     var panel = byId("withdraw-panel");
     var inp = byId("withdraw-amount");
-
     if(openBtn && panel){
       openBtn.addEventListener("click", function(){
         var show = (panel.style.display === "none" || !panel.style.display);
@@ -344,13 +304,11 @@
         if(show && inp) inp.focus();
       });
     }
-
     if(cancelBtn && panel){
       cancelBtn.addEventListener("click", function(){
         panel.style.display = "none";
       });
     }
-
     if(inp){
       inp.addEventListener("input", function(){
         this.value = this.value.replace(/[^0-9]/g, "");
@@ -385,27 +343,21 @@
     setTimeout(function(){ t.style.opacity = "0"; t.style.transition = "opacity .25s"; }, 1600);
     setTimeout(function(){ if(t && t.parentNode) t.parentNode.removeChild(t); }, 2000);
   }
-
   document.addEventListener("DOMContentLoaded", function(){
     var form = document.getElementById("withdraw-form");
     var panel = document.getElementById("withdraw-panel");
     var inp = document.getElementById("withdraw-amount");
     var submitBtn = document.getElementById("btn-withdraw-submit");
-
     if(!form) return;
-
     form.addEventListener("submit", async function(e){
       e.preventDefault();
-
       var amount = (inp && inp.value || "").trim();
       if(!amount){
         showToast("Montant requis.", "error");
         return;
       }
-
       // Désactive bouton pendant l’envoi
       if(submitBtn){ submitBtn.disabled = true; submitBtn.style.opacity = "0.75"; }
-
       try{
         var fd = new FormData(form);
         // Important: la view renvoie 302 -> on suit, puis on affiche toast
@@ -415,7 +367,6 @@
           credentials: "same-origin",
           headers: { "X-Requested-With": "XMLHttpRequest" }
         });
-
         // Même si 302 suivi, fetch renvoie 200 sur la page finale. On considère OK si pas 403/500.
         if(res.ok){
           showToast("Demande envoyée ✅", "success");

@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block title %}Fiche client – {{ customer.name|default:"Client FAGNI" }}{% endblock %}
-
 {% block content %}
 <style>
 /* ========= LAYOUT GLOBAL ========= */
@@ -12,7 +10,6 @@
     padding: 16px 16px 32px;
     font-size: 14px;
 }
-
 /* ========= HEADER CLIENT ========= */
 .customer-header {
     display: flex;
@@ -62,7 +59,6 @@
     gap: 4px;
     margin-right: 10px;
 }
-
 /* ========= BOUTONS ========= */
 .customer-header-actions {
     display: flex;
@@ -109,7 +105,6 @@
     background: linear-gradient(90deg, #ea580c, #c2410c);
     box-shadow: 0 10px 25px rgba(248, 113, 22, 0.45);
 }
-
 /* ========= CARDS / KPI ========= */
 .card {
     background: #ffffff;
@@ -150,7 +145,6 @@
     color: #4b5563;
     margin-top: 3px;
 }
-
 /* ========= TABLE COMMANDES ========= */
 .customer-orders-card {
     margin-top: 10px;
@@ -202,7 +196,6 @@
 .customer-table tr:last-child td {
     border-bottom: none;
 }
-
 /* ========= CONTENU TABLE ========= */
 .cell-main {
     display: flex;
@@ -228,7 +221,6 @@
 .cell-status {
     font-size: 0.8rem;
 }
-
 /* ========= BADGES STATUT ========= */
 .badge-status {
     display: inline-flex;
@@ -272,7 +264,6 @@
 .badge-status--canceled .badge-status-dot {
     background: #ef4444;
 }
-
 /* ========= LIENS ========= */
 .cell-actions {
     text-align: right;
@@ -285,7 +276,6 @@
 .cell-actions a:hover {
     text-decoration: underline;
 }
-
 /* ========= EMPTY STATE ========= */
 .customer-empty {
     text-align: center;
@@ -293,7 +283,6 @@
     font-size: 0.9rem;
     color: #6b7280;
 }
-
 /* ========= RESPONSIVE ========= */
 @media (max-width: 900px) {
     .customer-kpi-grid {
@@ -313,9 +302,7 @@
     }
 }
 </style>
-
 <div class="customer-page">
-
     <!-- HEADER CLIENT -->
     <div class="customer-header">
         <div class="customer-header-main">
@@ -345,7 +332,6 @@
                 </div>
             </div>
         </div>
-
         <div class="customer-header-actions">
             <a href="{% url 'orders:customers_list' %}" class="fg-btn fg-btn-outline">
                 ← Retour à la liste clients
@@ -358,7 +344,6 @@
             </a>
         </div>
     </div>
-
     <!-- KPIs CLIENT (simple, basés sur orders) -->
     <div class="customer-kpi-grid">
         <div class="kpi-card kpi-card--accent">
@@ -397,7 +382,6 @@
             </div>
         </div>
     </div>
-
     <!-- TABLEAU DES COMMANDES DU CLIENT -->
     <div class="card customer-orders-card">
         <div class="customer-orders-header">
@@ -409,7 +393,6 @@
                 </p>
             </div>
         </div>
-
         {% if orders %}
             <div class="table-wrapper">
                 <table class="customer-table">
@@ -452,7 +435,6 @@
                                         {% endif %}
                                     </div>
                                 </td>
-
                                 <!-- Dates & statut -->
                                 <td>
                                     <div class="cell-main">
@@ -471,7 +453,6 @@
                                         </div>
                                     </div>
                                 </td>
-
                                 <!-- Distance -->
                                 <td>
                                     {% if o.distance_km %}
@@ -487,7 +468,6 @@
                                         <span class="cell-sub">—</span>
                                     {% endif %}
                                 </td>
-
                                 <!-- Montants -->
                                 <td>
                                     <div class="cell-main">
@@ -502,7 +482,6 @@
                                         </div>
                                     </div>
                                 </td>
-
                                 <!-- Actions -->
                                 <td class="cell-actions">
                                     <a href="{% url 'orders:detail' o.id %}">
@@ -521,5 +500,4 @@
         {% endif %}
     </div>
 </div>
-
 {% endblock %}

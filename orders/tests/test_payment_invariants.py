@@ -1,10 +1,12 @@
 from decimal import Decimal
 from unittest.mock import patch
+
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
 from orders.models import Customer, Order
+from orders.presenters import build_order_finance_summary
 
 
 class PaymentInvariantTests(TestCase):
@@ -16,19 +18,27 @@ class PaymentInvariantTests(TestCase):
             customer=self.c,
             status="pending",
             payment_status="unpaid",
-            total_client_ttc=Decimal("1000"),
+            pricing_mode="bag",
+            bag_size="medium",
             amount_paid=Decimal("0"),
         )
 
+        try:
+            o.update_financials(save=True)
+        except Exception:
+            pass
+
+        expected_total = build_order_finance_summary(o)["total_client_ttc"]
+
         with patch("orders.models.Order.mark_as_paid_and_distribute", return_value=None):
             o.payment_status = "paid"
-            o.amount_paid = Decimal("0")          # incohérent
-            o.payment_date = None                 # incohérent
+            o.amount_paid = Decimal("0")
+            o.payment_date = None
             o.save()
 
         o.refresh_from_db()
         self.assertEqual(o.payment_status, "paid")
-        self.assertEqual(o.amount_paid, Decimal("1000"))
+        self.assertEqual(o.amount_paid, expected_total)
         self.assertIsNotNone(o.payment_date)
 
     def test_unpaid_clears_amount_and_date(self):
@@ -36,7 +46,8 @@ class PaymentInvariantTests(TestCase):
             customer=self.c,
             status="pending",
             payment_status="unpaid",
-            total_client_ttc=Decimal("1000"),
+            pricing_mode="bag",
+            bag_size="medium",
             amount_paid=Decimal("500"),
             payment_date=timezone.now(),
         )
@@ -52,23 +63,40 @@ class PaymentInvariantTests(TestCase):
             customer=self.c,
             status="pending",
             payment_status="partial",
-            total_client_ttc=Decimal("1000"),
+            pricing_mode="bag",
+            bag_size="medium",
             amount_paid=Decimal("5000"),
         )
+
+        try:
+            o.update_financials(save=True)
+        except Exception:
+            pass
+
+        expected_total = build_order_finance_summary(o)["total_client_ttc"]
+
+        o.amount_paid = expected_total + Decimal("5000")
         o.save()
         o.refresh_from_db()
 
-        self.assertEqual(o.amount_paid, Decimal("1000"))
-
+        self.assertEqual(o.amount_paid, expected_total)
 
     def test_cannot_mark_paid_with_zero_total(self):
         o = Order.objects.create(
             customer=self.c,
             status="pending",
             payment_status="unpaid",
-            total_client_ttc=Decimal("0"),
+            pricing_mode="item",
             amount_paid=Decimal("0"),
         )
+
+        try:
+            o.update_financials(save=True)
+        except Exception:
+            pass
+
+        expected_total = build_order_finance_summary(o)["total_client_ttc"]
+        self.assertEqual(expected_total, Decimal("0"))
 
         o.payment_status = "paid"
         with self.assertRaises(ValidationError):

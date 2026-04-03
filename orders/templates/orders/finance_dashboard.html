@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% load money_filters %}
-
 {% block title %}Dashboard financier FAGNI{% endblock %}
-
 {% block content %}
 <div class="page-header">
     <div class="page-header__left">
@@ -20,9 +18,7 @@
         </a>
     </div>
 </div>
-
 <div class="container">
-
     <!-- Filtres -->
     <div class="card mb-3">
         <div class="card-body">
@@ -39,7 +35,6 @@
                class="btn btn-sm {% if payment_filter == 'unpaid' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
                 Non payées
             </a>
-
             {% if vat_rate %}
                 <span class="badge bg-secondary" style="margin-left:10px;">
                     TVA FAGNI : {{ vat_rate }}%
@@ -47,7 +42,6 @@
             {% endif %}
         </div>
     </div>
-
     <!-- Cartes KPI -->
     <div class="row g-3 mb-4">
         <!-- CA client -->
@@ -65,7 +59,6 @@
                 </div>
             </div>
         </div>
-
         <!-- Partenaires -->
         <div class="col-12 col-md-4">
             <div class="card h-100">
@@ -83,7 +76,6 @@
                 </div>
             </div>
         </div>
-
         <!-- FAGNI -->
         <div class="col-12 col-md-4">
             <div class="card h-100">
@@ -105,12 +97,10 @@
             </div>
         </div>
     </div>
-
     <!-- Tableau des commandes -->
     <div class="card">
         <div class="card-body">
             <h2 class="h5 mb-3">Commandes (aperçu)</h2>
-
             {% if orders %}
                 <div class="table-responsive">
                     <table class="table table-sm align-middle">
@@ -159,7 +149,6 @@
                                         —
                                     {% endif %}
                                 </td>
-
                                 <td class="text-end">{{ o.fin_total_client|money }} FCFA</td>
                                 <td class="text-end">{{ o.fin_amount_laundry|money }} FCFA</td>
                                 <td class="text-end">{{ o.fin_amount_driver|money }} FCFA</td>
@@ -167,7 +156,6 @@
                                 <td class="text-end">{{ o.fin_service_fee|money }} FCFA</td>
                                 <td class="text-end">{{ o.fin_fagni_ttc|money }} FCFA</td>
                                 <td class="text-end">{{ o.fin_logistic_margin|money }} FCFA</td>
-
                                 <td>
                                     {% if o.payment_status == "paid" %}
                                         <span class="badge bg-success">Payée</span>

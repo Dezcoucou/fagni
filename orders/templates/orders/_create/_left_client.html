@@ -1,7 +1,6 @@
 <h2 class="card-title">
     <span class="emoji">👤</span> Client & coordonnées
 </h2>
-
 <div class="form-grid">
     <div>
         <label for="client_phone">Téléphone</label>
@@ -15,7 +14,6 @@
         >
         <span id="client_status" class="client-status"></span>
     </div>
-
     <div>
         <label for="client_name">Nom et prénoms</label>
         <input
@@ -26,7 +24,6 @@
             placeholder="Nom du client"
         >
     </div>
-
     <!-- MLM: code parrain -->
     <div>
         <label for="referral_code">Code parrain (optionnel)</label>
@@ -38,7 +35,6 @@
             placeholder="Ex : PARRAIN123"
         >
     </div>
-
     <div style="grid-column:1/-1;">
         <label for="client_address">Adresse de collecte (client)</label>
         <div class="address-row">
@@ -55,7 +51,6 @@
             Adresse où le livreur vient récupérer le linge (chez le client).
             Astuce : clique sur la carte pour placer le point, ou déplace le marqueur.
         </span>
-
         <label for="delivery_address" style="margin-top:6px;">Adresse de livraison (si différente)</label>
         <input
             type="text"
@@ -69,11 +64,9 @@
         </span>
     </div>
 </div>
-
 <!-- Coordonnées collecte -->
 <input type="hidden" id="client_lat" name="client_lat" value="{{ client_lat|default:'' }}">
 <input type="hidden" id="client_lng" name="client_lng" value="{{ client_lng|default:'' }}">
-
 <!-- Coordonnées livraison -->
 <input type="hidden" id="delivery_lat" name="delivery_lat" value="{{ delivery_lat|default:'' }}">
 <input type="hidden" id="delivery_lng" name="delivery_lng" value="{{ delivery_lng|default:'' }}">

@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block title %}Détail commande {{ order.code|default:order.id }} – FAGNI{% endblock %}
-
 {% block extra_head %}
 <style>
     :root {
@@ -14,13 +12,11 @@
         --text-main: #111827;
         --text-muted: #6b7280;
     }
-
     .page {
         max-width: 1100px;
         margin: 0 auto 32px;
         padding: 12px 10px 24px;
     }
-
     .page-header {
         display:flex;
         justify-content:space-between;
@@ -28,27 +24,23 @@
         gap:12px;
         margin-bottom:18px;
     }
-
     .page-title {
         font-size:20px;
         font-weight:700;
         color:#0f172a;
         margin:0;
     }
-
     .page-subtitle {
         font-size:13px;
         color:#64748b;
         margin:4px 0 0;
     }
-
     .page-header__right {
         display:flex;
         flex-wrap:wrap;
         gap:8px;
         justify-content:flex-end;
     }
-
     .badge-status {
         display:inline-flex;
         align-items:center;
@@ -58,12 +50,10 @@
         font-size:11px;
         font-weight:500;
     }
-
     .badge-status.pending { background:#fef3c7; color:#92400e; }
     .badge-status.in_progress { background:#dbeafe; color:#1d4ed8; }
     .badge-status.done { background:#dcfce7; color:#166534; }
     .badge-status.canceled { background:#fee2e2; color:#b91c1c; }
-
     .chip {
         display:inline-flex;
         align-items:center;
@@ -77,7 +67,6 @@
         margin-right:4px;
         margin-bottom:4px;
     }
-
     .card {
         background:#ffffff;
         border-radius:16px;
@@ -86,7 +75,6 @@
         border:1px solid #e5e7eb;
         box-shadow:0 2px 6px rgba(15,23,42,0.06);
     }
-
     .card-title {
         font-size:15px;
         font-weight:600;
@@ -96,21 +84,17 @@
         align-items:center;
         gap:6px;
     }
-
     .card-title .emoji { font-size:18px; }
-
     .card-subtitle {
         font-size:12px;
         color:#6b7280;
         margin:0 0 8px;
     }
-
     .two-cols {
         display:grid;
         grid-template-columns:1.1fr 0.9fr;
         gap:14px;
     }
-
     .label {
         font-size:11px;
         text-transform:uppercase;
@@ -118,22 +102,17 @@
         color:#9ca3af;
         margin-bottom:2px;
     }
-
     .value { font-size:13px; color:#111827; }
-
     .muted { color:#6b7280; }
-
     .grid {
         display:grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
         gap:10px 14px;
     }
-
     .divider {
         margin:10px 0;
         border-top:1px dashed #e5e7eb;
     }
-
     .btn {
         display:inline-flex;
         align-items:center;
@@ -146,28 +125,24 @@
         text-decoration:none;
         white-space:nowrap;
     }
-
     .btn-primary {
         background:#0f172a;
         border-color:#0f172a;
         color:#fff;
     }
     .btn-primary:hover { opacity:0.95; }
-
     .btn-secondary {
         background:#ffffff;
         border-color:#e5e7eb;
         color:#374151;
     }
     .btn-secondary:hover { background:#f9fafb; }
-
     .btn-light {
         background:#fff;
         border-color:#e5e7eb;
         color:#374151;
     }
     .btn-light:hover { background:#f9fafb; }
-
     .btn-soft {
         border-radius:999px;
         border:1px solid #e5e7eb;
@@ -186,7 +161,6 @@
         background:#eef2ff;
         border-color:#c7d2fe;
     }
-
     .timeline { position:relative; margin-top:8px; }
     .timeline::before {
         content:"";
@@ -197,13 +171,11 @@
         height:calc(100% - 4px);
         background:#e5e7eb;
     }
-
     .timeline-item {
         position:relative;
         padding-left:26px;
         margin-bottom:8px;
     }
-
     .timeline-bullet {
         position:absolute;
         left:2px;
@@ -214,20 +186,17 @@
         background:#fff;
         border:2px solid #0f172a;
     }
-
     .timeline-title {
         font-size:13px;
         font-weight:500;
         color:#111827;
         margin:0;
     }
-
     .timeline-meta {
         font-size:11px;
         color:#6b7280;
         margin:2px 0 0;
     }
-
     .articles-table-wrapper {
         width:100%;
         overflow-x:auto;
@@ -235,47 +204,38 @@
         border-radius:12px;
         margin-top:4px;
     }
-
     table {
         width:100%;
         border-collapse:collapse;
         font-size:13px;
         min-width:680px;
     }
-
     th, td {
         padding:7px 8px;
         border-bottom:1px solid #e5e7eb;
         text-align:left;
         vertical-align:top;
     }
-
     thead th {
         background:#f9fafb;
         font-weight:600;
         color:#6b7280;
         font-size:12px;
     }
-
     tbody tr:nth-child(even) { background:#fcfcfd; }
-
     .num { text-align:right; white-space:nowrap; }
-
     .line-designation { font-weight:500; }
-
     .line-meta {
         font-size:10px;
         color:#6b7280;
         margin-top:2px;
     }
-
     .photo-thumbs {
         display:flex;
         flex-wrap:wrap;
         gap:4px;
         margin-top:2px;
     }
-
     .photo-thumbs img {
         width:34px;
         height:34px;
@@ -283,9 +243,7 @@
         border-radius:6px;
         border:1px solid #e5e7eb;
     }
-
     .photo-thumbs a { text-decoration:none; }
-
     .totals-box {
         margin-top:12px;
         padding:12px;
@@ -294,38 +252,31 @@
         border:1px solid #e5e7eb;
         font-size:13px;
     }
-
     .totals-row {
         display:flex;
         justify-content:space-between;
         margin-bottom:4px;
         gap:10px;
     }
-
     .totals-row strong { color:#0f172a; }
-
     .totals-row.total-grand {
         margin-top:6px;
         font-size:15px;
     }
-
     .totals-row.total-grand strong:last-child {
         color:var(--fagni-orange);
     }
-
     .note {
         font-size:11px;
         color:#6b7280;
         margin-top:6px;
     }
-
     .tag-list {
         display:flex;
         flex-wrap:wrap;
         gap:4px;
         margin-top:4px;
     }
-
     .tag {
         padding:3px 8px;
         border-radius:999px;
@@ -334,7 +285,6 @@
         background:#f9fafb;
         color:#4b5563;
     }
-
     .notes-box {
         padding:10px;
         border-radius:10px;
@@ -345,20 +295,17 @@
         margin-top:4px;
         white-space:pre-wrap;
     }
-
     .photos-grid {
         display:flex;
         flex-wrap:wrap;
         gap:8px;
     }
-
     .photo-card {
         width:120px;
         font-size:11px;
         color:#4b5563;
         text-align:center;
     }
-
     .photo-card img {
         width:100%;
         height:90px;
@@ -367,7 +314,6 @@
         border:1px solid #e5e7eb;
         margin-bottom:4px;
     }
-
     /* ✅ Highlight Express (ligne montants) */
     .highlight-express td,
     .highlight-express strong {
@@ -379,24 +325,20 @@
         padding: 4px 6px;
         border-radius: 10px;
     }
-
     @media (max-width: 900px) {
         .two-cols { grid-template-columns:1fr; }
         table { min-width:0; }
     }
 </style>
 {% endblock %}
-
 {% block content %}
 <div class="page">
-
     <!-- HEADER -->
     <div class="page-header">
         <div>
             <h1 class="page-title">Commande {{ order.code|default:order.id }}</h1>
             <p class="page-subtitle">Vue complète FAGNI – client, logistique, finances et photos pour contrôle qualité.</p>
             <div class="chip">DEBUG ID: {{ order.id }} | CODE: {{ order.code }}</div>
-
             <div style="margin-top:6px;">
                 {% with s=order.status %}
                     <span id="live-order-status" class="badge-status {{ s }}">
@@ -408,33 +350,27 @@
                         {% endif %}
                     </span>
                 {% endwith %}
-
                 {% if order.payment_status %}
                     <span id="live-payment-chip" class="chip">
                         💳 Paiement : {{ order.get_payment_status_display|default:order.payment_status }}
                     </span>
                 {% endif %}
-
                 <span class="chip">🕒 Créée le : {{ order.created_at|date:"d/m/Y H:i" }}</span>
-
                 {% if order.payment_status == "paid" and order.invoice_number %}
                     <span class="chip">🧾 Facture : {{ order.invoice_number }}</span>
                 {% endif %}
             </div>
         </div>
-
         <div class="page-header__right">
             {% include "orders/_order_actions_block.html" %}
         </div>
     </div>
-
     <div class="two-cols">
         <!-- COLONNE GAUCHE -->
         <div>
             <!-- CLIENT -->
             <section class="card">
                 <h2 class="card-title"><span class="emoji">👤</span> Client & contact</h2>
-
                 <div class="grid">
                     <div>
                         <div class="label">Nom</div>
@@ -458,11 +394,9 @@
                     </div>
                 </div>
             </section>
-
             <!-- PARRAINAGE / WALLET -->
             <section class="card">
                 <h2 class="card-title"><span class="emoji">🌱</span> Parrainage & portefeuille</h2>
-
                 <div class="grid">
                     <div>
                         <div class="label">Parrain du client</div>
@@ -477,7 +411,6 @@
                             {% endif %}
                         </div>
                     </div>
-
                     <div>
                         <div class="label">Filleuls</div>
                         <div class="value">
@@ -492,7 +425,6 @@
                             {% endif %}
                         </div>
                     </div>
-
                     <div>
                         <div class="label">Commissions MLM</div>
                         <div class="value">
@@ -510,9 +442,7 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="divider"></div>
-
                 <div class="wallet-card">
                     <div class="wallet-header">
                         <div class="wallet-title">💳 Portefeuille FAGNI du client</div>
@@ -521,7 +451,6 @@
                             Voir le portefeuille ↗
                         </a>
                     </div>
-
                     {% if customer_wallet %}
                         <div class="wallet-balance">{{ customer_wallet.balance|floatformat:0 }} FCFA</div>
                         <div class="wallet-meta">
@@ -546,11 +475,9 @@
                     {% endif %}
                 </div>
             </section>
-
             <!-- LOGISTIQUE -->
             <section class="card">
                 <h2 class="card-title"><span class="emoji">🚚</span> Logistique & partenaires</h2>
-
                 <div class="grid">
                     <div>
                         <div class="label">Livreur</div>
@@ -568,7 +495,6 @@
                             {% endif %}
                         </div>
                     </div>
-
                     <div>
                         <div class="label">Blanchisserie</div>
                         <div id="live-laundry" class="value">
@@ -580,15 +506,11 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="divider"></div>
-
                 <p class="card-subtitle"><strong>Infos collecte / livraison</strong></p>
-
                 <div style="font-size:12px;color:#374151;line-height:1.5;">
                     • Collecte : <strong>{{ order.pickup_address|default:order.customer.address|default:"—" }}</strong><br>
                     • Livraison : <strong>{{ order.delivery_address|default:order.pickup_address|default:order.customer.address|default:"—" }}</strong><br>
-
                     {% if order.distance_km_pickup %}
                         • Distance aller (client → blanchisserie) : <strong>{{ order.distance_km_pickup|floatformat:2 }} km</strong><br>
                     {% endif %}
@@ -602,11 +524,8 @@
                     {% endif %}
                     • Créée : <strong>{{ order.created_at|date:"d/m/Y H:i" }}</strong>
                 </div>
-
                 <div class="divider"></div>
-
                 <p class="card-subtitle"><strong>Modes & timings</strong></p>
-
                 <div class="grid">
                     <div>
                         <div class="label">Collecte</div>
@@ -620,7 +539,6 @@
                             {% endif %}
                         </div>
                     </div>
-
                     <div>
                         <div class="label">Livraison</div>
                         <div class="value">
@@ -635,7 +553,6 @@
                             {% endif %}
                         </div>
                     </div>
-
                     <div>
                         <div class="label">Supplément express (si applicable)</div>
                         <div class="value">
@@ -650,18 +567,15 @@
                     </div>
                 </div>
             </section>
-
             <!-- TIMELINE -->
             <section class="card">
                 <h2 class="card-title"><span class="emoji">🕒</span> Timeline de la commande</h2>
-
                 <div class="timeline">
                     <div class="timeline-item">
                         <div class="timeline-bullet"></div>
                         <p class="timeline-title">Commande créée ({{ order.get_status_display }})</p>
                         <p class="timeline-meta">{{ order.created_at|date:"d/m/Y H:i" }}</p>
                     </div>
-
                     {% if order.pickup_time %}
                         <div class="timeline-item">
                             <div class="timeline-bullet"></div>
@@ -669,7 +583,6 @@
                             <p class="timeline-meta">{{ order.pickup_time|date:"d/m/Y H:i" }}</p>
                         </div>
                     {% endif %}
-
                     {% if order.dropoff_time %}
                         <div class="timeline-item">
                             <div class="timeline-bullet"></div>
@@ -677,7 +590,6 @@
                             <p class="timeline-meta">{{ order.dropoff_time|date:"d/m/Y H:i" }}</p>
                         </div>
                     {% endif %}
-
                     {% if order.wash_complete_time %}
                         <div class="timeline-item">
                             <div class="timeline-bullet"></div>
@@ -685,7 +597,6 @@
                             <p class="timeline-meta">{{ order.wash_complete_time|date:"d/m/Y H:i" }}</p>
                         </div>
                     {% endif %}
-
                     {% if order.return_time %}
                         <div class="timeline-item">
                             <div class="timeline-bullet"></div>
@@ -693,7 +604,6 @@
                             <p class="timeline-meta">{{ order.return_time|date:"d/m/Y H:i" }}</p>
                         </div>
                     {% endif %}
-
                     {% if order.delivered_time %}
                         <div class="timeline-item">
                             <div class="timeline-bullet"></div>
@@ -704,15 +614,12 @@
                 </div>
             </section>
         </div>
-
         <!-- COLONNE DROITE -->
         <div>
             <!-- ARTICLES -->
             <section class="card">
                 <h2 class="card-title"><span class="emoji">📦</span> Articles & prestations</h2>
-
                 <p class="card-subtitle">Détail des pièces confiées pour cette commande.</p>
-
                 <div class="articles-table-wrapper">
                     <table>
                         <thead>
@@ -775,7 +682,6 @@
                         </tbody>
                     </table>
                 </div>
-
                 <!-- NOTES -->
                 <h3 class="card-subtitle" style="margin-top:10px;">Notes / instructions</h3>
                 {% if order.notes %}
@@ -786,17 +692,14 @@
                     </div>
                 {% endif %}
             </section>
-
               <!-- FINANCES & PAIEMENTS -->
               <section class="card">
                   <h2 class="card-title"><span class="emoji">💰</span> Finances & paiements</h2>
                   {% include "orders/_payments_block.html" %}
               </section>
-
             <!-- PHOTOS GLOBALES -->
             <section class="card">
                 <h2 class="card-title"><span class="emoji">📸</span> Toutes les photos liées à la commande</h2>
-
                 {% if all_photos %}
                     <div class="photos-grid">
                         {% for p in all_photos %}
@@ -817,43 +720,32 @@
                 {% else %}
                     <p class="muted" style="font-size:13px;">Aucune photo globale n'est enregistrée pour cette commande.</p>
                 {% endif %}
-
                 <p class="note" style="margin-top:8px;">
                     Cette vue globale est idéale pour le contrôle du livreur à la livraison et pour les vérifications côté blanchisserie.
                 </p>
             </section>
-
         </div>
     </div>
-
 </div>
-
-
-
 <!-- ✅ LIVE POLLING (Back-office detail) -->
 <script>
 (function () {
   const orderId = "{{ order.id }}";
   const url = `/orders/${orderId}/live/`;
-
   const elStatus = document.getElementById("live-order-status");
   const elPay = document.getElementById("live-payment-chip");
   const elDriver = document.getElementById("live-driver");
   const elLaundry = document.getElementById("live-laundry");
-
   let lastUpdated = null;
   let timer = null;
-
   function setStatusClass(el, status) {
     if (!el) return;
     el.classList.remove("pending","in_progress","done","canceled");
     if (status) el.classList.add(status);
   }
-
   async function tick() {
     try {
       if (document.hidden) return;
-
       const res = await fetch(url, {
         headers: {
           "Accept": "application/json",
@@ -861,20 +753,15 @@
         },
         cache: "no-store"
       });
-
       if (!res.ok) return;
-
       const data = await res.json();
       if (!data || data.ok === false) return;
-
       if (data.updated_at && lastUpdated && data.updated_at === lastUpdated) return;
       if (data.updated_at) lastUpdated = data.updated_at;
-
       if (elStatus) {
         elStatus.textContent = data.status_label || data.status || "";
         setStatusClass(elStatus, data.status);
       }
-
       if (elPay) {
         if (data.payment_label) {
           elPay.style.display = "";
@@ -883,7 +770,6 @@
           elPay.style.display = "none";
         }
       }
-
       if (elDriver && typeof data.driver_html === "string") {
         elDriver.innerHTML = data.driver_html;
       }
@@ -894,26 +780,21 @@
       // silencieux
     }
   }
-
   function start() {
     if (timer) return;
     tick();
     timer = setInterval(tick, 4000);
   }
-
   function stop() {
     if (!timer) return;
     clearInterval(timer);
     timer = null;
   }
-
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) stop();
     else start();
   });
-
   start();
 })();
 </script>
-
 {% endblock %}

@@ -1,8 +1,6 @@
 {% extends "orders/client_base.html" %}
 {% load humanize %}
-
 {% block title %}Wallet client – FAGNI{% endblock %}
-
 {% block content %}
 <style>
   .cw-page{
@@ -160,7 +158,6 @@
     .cw-actions .fagni-btn{ width:100%; }
   }
 </style>
-
 <div class="cw-page">
   <div class="cw-head">
     <div>
@@ -172,7 +169,6 @@
       <a class="fagni-btn fagni-btn--primary" href="{% url 'orders:client_new_order' %}">➕ Nouvelle commande</a>
     </div>
   </div>
-
   <div class="cw-grid">
     <div class="cw-stack">
       <section class="cw-card cw-hero">
@@ -185,21 +181,17 @@
             Ton wallet s’activera automatiquement dès ta première activité utile sur FAGNI : paiement, avantage ou commission de parrainage.
           {% endif %}
         </div>
-
         <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
           <a class="fagni-btn fagni-btn--primary" href="{% url 'orders:client_referrals' %}">
             💰 Inviter et gagner
           </a>
         </div>
-
         <div class="cw-note" style="margin-top:14px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#e2e8f0;">
           💡 Chaque commande et chaque parrainage peut te faire gagner de l’argent avec FAGNI.
         </div>
       </section>
-
       <section class="cw-card">
         <h2 class="cw-section-title">Historique des mouvements</h2>
-
         {% if transactions %}
           <div class="cw-list">
             {% for tx in transactions %}
@@ -242,7 +234,6 @@
         {% endif %}
       </section>
     </div>
-
     <div class="cw-stack">
       <section class="cw-card">
         <h2 class="cw-section-title">Mon compte</h2>
@@ -254,7 +245,6 @@
             </div>
             <div class="cw-row-v">{{ customer.phone|default:"—" }}</div>
           </div>
-
           <div class="cw-row">
             <div>
               <div class="cw-row-k">Devise</div>
@@ -264,7 +254,6 @@
               {% if wallet %}{{ wallet.currency }}{% else %}XOF{% endif %}
             </div>
           </div>
-
           <div class="cw-row">
             <div>
               <div class="cw-row-k">Activation</div>
@@ -279,12 +268,10 @@
             </div>
           </div>
         </div>
-
         <div class="cw-note">
           Le wallet client FAGNI est un espace de suivi. Les fonctions avancées seront enrichies progressivement dans ton parcours client.
         </div>
       </section>
-
       <section class="cw-card">
         <h2 class="cw-section-title">Prochaines actions</h2>
         <div class="cw-list">
@@ -295,7 +282,6 @@
             </div>
             <a href="{% url 'orders:client_new_order' %}" class="fagni-btn fagni-btn--primary">Commander</a>
           </div>
-
           <div class="cw-row">
             <div>
               <div class="cw-row-k">Gagner de l’argent</div>

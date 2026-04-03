@@ -44,6 +44,7 @@ from django.utils.encoding import smart_str
 
 from orders.utils.pricing import compute_order_amounts
 from orders.utils import build_order_canonical_snapshot
+from orders.presenters import build_order_display_summary, build_order_finance_summary
 from orders.utils.address_rules import clean_address_or_empty, is_probably_valid_address
 
 from orders.utils.settings_loader import get_pricing_settings
@@ -59,6 +60,7 @@ from .models import (
     ServiceItem,
     DeliveryLeg,
     OrderStatusHistory,
+    OrderUpsell,
     haversine_distance_km,
     LogisticsConfig,
 )
@@ -120,6 +122,17 @@ def _build_client_display_items(order):
     return rows
 
 
+
+def _get_order_upsell_total(order) -> Decimal:
+    try:
+        upsell = getattr(order, "upsell", None)
+        if upsell:
+            return upsell.total
+    except Exception:
+        pass
+    return Decimal("0.00")
+
+
 CLIENT_PHONE_COOKIE = "client_phone"
 CLIENT_REF_COOKIE = "client_ref_code"
 
@@ -155,6 +168,8 @@ def client_login_required(view_func):
             # ✅ IMPORTANT: pour les appels JS, JSON 401 (pas redirect HTML)
             if _is_json_request(request):
                 return JsonResponse({"ok": False, "error": "not_authenticated"}, status=401)
+
+
             return redirect("orders:client_login")
         return view_func(request, *args, **kwargs)
     return _wrapped
@@ -1702,6 +1717,18 @@ def ops_weighing_resolve(request, order_id: int):
             scale_url = ""
 
     if request.method == "POST":
+        address = (request.POST.get("address") or "").strip()
+
+        if not address:
+            error = "Veuillez indiquer votre adresse de collecte pour que le livreur puisse vous trouver."
+            return render(request, "orders/client_new_order.html", {
+                "error": error,
+                "address_init": request.POST.get("address", ""),
+                "name_init": request.POST.get("name", ""),
+                "phone_init": request.POST.get("phone", ""),
+                "email_init": request.POST.get("email", ""),
+            })
+
         w_raw = (request.POST.get("final_weight_kg") or "").strip().replace(",", ".")
         note = (request.POST.get("resolution_notes") or "").strip()
 
@@ -5358,6 +5385,38 @@ def client_new_order(request):
             except Exception:
                 pass
 
+
+            upsell, _ = OrderUpsell.objects.get_or_create(order=order)
+            upsell.express_24h = bool(request.POST.get("express_24h"))
+            upsell.premium_ironing = bool(request.POST.get("premium_ironing"))
+            upsell.fragrance = bool(request.POST.get("fragrance"))
+            upsell.delicate_care = bool(request.POST.get("delicate_care"))
+            upsell.save()
+
+            try:
+                upsell_total = upsell.total
+            except Exception:
+                upsell_total = Decimal("0.00")
+
+            try:
+                base_total = Decimal(str(getattr(order, "total_client_ttc", 0) or 0))
+            except Exception:
+                base_total = Decimal("0.00")
+
+            order.total_client_ttc = (base_total + upsell_total).quantize(Decimal("0.01"))
+            try:
+                order.save(update_fields=["total_client_ttc"])
+            except Exception:
+                order.save()
+
+            
+            request.session["upsell_data"] = {
+                "express_24h": bool(request.POST.get("express_24h")),
+                "premium_ironing": bool(request.POST.get("premium_ironing")),
+                "fragrance": bool(request.POST.get("fragrance")),
+                "delicate_care": bool(request.POST.get("delicate_care")),
+            }
+
             return redirect("orders:client_new_order_step2", order_id=order.id)
 
     return render(request, "orders/client_new_order.html", {
@@ -5680,6 +5739,8 @@ def client_order_detail(request, order_id: int):
 
     amounts = _client_order_amounts(order)
     snapshot = build_order_canonical_snapshot(order)
+    display_summary = build_order_display_summary(order)
+    finance_summary = build_order_finance_summary(order)
 
     legs = []
     try:
@@ -5839,6 +5900,8 @@ def client_order_detail(request, order_id: int):
         "legs_ui": legs_ui,
         "items": items,
         "amounts": amounts,
+        "display_summary": display_summary,
+        "finance_summary": finance_summary,
         "payment_status": snapshot.get("payment_status_raw"),
         "payment_ui": snapshot.get("payment_status_canonical"),
         "payment_label": snapshot.get("payment_label"),
@@ -5890,19 +5953,20 @@ def client_order_detail_json(request, order_id: int):
         return resp
 
     snapshot = build_order_canonical_snapshot(order)
+    finance_summary = build_order_finance_summary(order)
 
     try:
-        total = Decimal(str(snapshot.get("total_client_ttc", 0) or 0))
+        total = Decimal(str(finance_summary.get("total_client_ttc", 0) or 0))
     except Exception:
         total = DECIMAL_ZERO
 
     try:
-        paid = Decimal(str(snapshot.get("amount_paid", 0) or 0))
+        paid = Decimal(str(finance_summary.get("amount_paid", 0) or 0))
     except Exception:
         paid = DECIMAL_ZERO
 
     try:
-        remain = Decimal(str(snapshot.get("amount_due", 0) or 0))
+        remain = Decimal(str(finance_summary.get("amount_remaining", 0) or 0))
     except Exception:
         remain = DECIMAL_ZERO
 
@@ -5988,9 +6052,10 @@ def client_order_pay_simulate(request, order_id: int):
         return resp
 
     snapshot = build_order_canonical_snapshot(order)
+    finance_summary = build_order_finance_summary(order)
 
     try:
-        total = Decimal(str(snapshot.get("total_client_ttc", 0) or 0))
+        total = Decimal(str(finance_summary.get("total_client_ttc", 0) or 0))
     except Exception:
         total = DECIMAL_ZERO
 
@@ -6000,7 +6065,7 @@ def client_order_pay_simulate(request, order_id: int):
         return resp
 
     try:
-        paid_now = Decimal(str(snapshot.get("amount_paid", 0) or 0))
+        paid_now = Decimal(str(finance_summary.get("amount_paid", 0) or 0))
         if paid_now < DECIMAL_ZERO:
             paid_now = DECIMAL_ZERO
     except Exception:
@@ -6039,15 +6104,16 @@ def client_order_pay_simulate(request, order_id: int):
         pass
 
     snap = build_order_canonical_snapshot(order)
+    finance_summary = build_order_finance_summary(order)
 
     resp = JsonResponse({
         "ok": True,
         "payment_ui": "paid" if snap.get("payment_status_canonical") == "paid" else "partial",
         "payment_status": snap.get("payment_status_canonical"),
         "amounts": {
-            "total_ttc": float(Decimal(str(snap.get("total_client_ttc", 0) or 0))),
-            "amount_paid": float(Decimal(str(snap.get("amount_paid", 0) or 0))),
-            "amount_remaining": float(Decimal(str(snap.get("amount_due", 0) or 0))),
+            "total_ttc": float(Decimal(str(finance_summary.get("total_client_ttc", 0) or 0))),
+            "amount_paid": float(Decimal(str(finance_summary.get("amount_paid", 0) or 0))),
+            "amount_remaining": float(Decimal(str(finance_summary.get("amount_remaining", 0) or 0))),
         },
     })
     resp["Cache-Control"] = "no-store"
@@ -6098,8 +6164,8 @@ def client_order_pay_cash(request, order_id: int):
         resp["Cache-Control"] = "no-store"
         return resp
 
-    amounts = _client_order_amounts(order)
-    total = amounts.get("total_ttc") or DECIMAL_ZERO
+    finance_summary = build_order_finance_summary(order)
+    total = finance_summary.get("total_client_ttc") or DECIMAL_ZERO
     try:
         total = Decimal(str(total))
     except Exception:
@@ -6192,6 +6258,7 @@ def client_order_pay_cash(request, order_id: int):
         pass
 
     snap = build_order_canonical_snapshot(order)
+    finance_summary = build_order_finance_summary(order)
 
     resp = JsonResponse({
         "ok": True,
@@ -6199,9 +6266,9 @@ def client_order_pay_cash(request, order_id: int):
         "payment_status": snap.get("payment_status_canonical"),
         "note": note,
         "amounts": {
-            "total_ttc": float(Decimal(str(snap.get("total_client_ttc", 0) or 0))),
-            "amount_paid": float(Decimal(str(snap.get("amount_paid", 0) or 0))),
-            "amount_remaining": float(Decimal(str(snap.get("amount_due", 0) or 0))),
+            "total_ttc": float(Decimal(str(finance_summary.get("total_client_ttc", 0) or 0))),
+            "amount_paid": float(Decimal(str(finance_summary.get("amount_paid", 0) or 0))),
+            "amount_remaining": float(Decimal(str(finance_summary.get("amount_remaining", 0) or 0))),
         },
     })
     resp["Cache-Control"] = "no-store"
@@ -6227,21 +6294,34 @@ def client_order_pay_wave_page(request, order_id: int):
         return redirect("orders:client_home")
 
     amounts = _client_order_amounts(order)
-    total = amounts.get("total_ttc") or DECIMAL_ZERO
-    paid = getattr(order, "amount_paid", DECIMAL_ZERO) or DECIMAL_ZERO
+
+    display_summary = build_order_display_summary(order)
+    finance_summary = build_order_finance_summary(order)
+
+    total = finance_summary.get("total_client_ttc", DECIMAL_ZERO) or DECIMAL_ZERO
+    paid = finance_summary.get("amount_paid", DECIMAL_ZERO) or DECIMAL_ZERO
+    remain = finance_summary.get("amount_remaining", DECIMAL_ZERO) or DECIMAL_ZERO
 
     try:
         total = Decimal(str(total))
-    except Exception as e:
+    except Exception:
         total = DECIMAL_ZERO
     try:
         paid = Decimal(str(paid))
     except Exception:
         paid = DECIMAL_ZERO
+    try:
+        remain = Decimal(str(remain))
+    except Exception:
+        remain = DECIMAL_ZERO
 
-    remain = total - paid
     if remain < DECIMAL_ZERO:
         remain = DECIMAL_ZERO
+
+    pricing_mode = display_summary.get("pricing_mode", "item")
+    bag_label = display_summary.get("bag_label", "")
+    finance_breakdown = finance_summary
+    service_fee_client_ttc = finance_summary.get("service_fee_client_ttc", DECIMAL_ZERO) or DECIMAL_ZERO
 
 
     # ---------------------------------------------------------
@@ -6359,6 +6439,12 @@ def client_order_pay_wave_page(request, order_id: int):
         "total": total,
         "paid": paid,
         "remain": remain,
+        "display_summary": display_summary,
+        "finance_summary": finance_summary,
+        "pricing_mode": pricing_mode,
+        "bag_label": bag_label,
+        "finance_breakdown": finance_breakdown,
+        "service_fee_client_ttc": service_fee_client_ttc,
         "wave_phone": wave_phone,
         "qr_data_uri": qr_data_uri,
               "pay_link": pay_link,
@@ -6420,7 +6506,29 @@ def client_order_item_new(request, order_id):
                 except Exception:
                     pass
 
-                return redirect("orders:client_order_detail", order_id=order.id)
+                
+        upsell_data = request.session.get("upsell_data", {})
+
+        if upsell_data:
+            upsell, _ = OrderUpsell.objects.get_or_create(order=order)
+
+            upsell.express_24h = upsell_data.get("express_24h", False)
+            upsell.premium_ironing = upsell_data.get("premium_ironing", False)
+            upsell.fragrance = upsell_data.get("fragrance", False)
+            upsell.delicate_care = upsell_data.get("delicate_care", False)
+            upsell.save()
+
+            try:
+                upsell_total = upsell.total
+                base_total = Decimal(str(getattr(order, "total_client_ttc", 0) or 0))
+                order.total_client_ttc = (base_total + upsell_total).quantize(Decimal("0.01"))
+                order.save(update_fields=["total_client_ttc"])
+            except Exception:
+                pass
+
+            request.session.pop("upsell_data", None)
+
+        return redirect("orders:client_order_detail", order_id=order.id)
 
     return render(request, "orders/client_order_item_form.html", {
         "order": order,
@@ -11326,6 +11434,35 @@ def change_status(request, order_id):
         messages.error(request, "Statut invalide.")
         return redirect(next_url)
 
+    # --- garde métier : commande chiffrée obligatoire ---
+    items_count = 0
+    try:
+        items_count = order.items.count()
+    except Exception:
+        items_count = 0
+
+    total_client = Decimal("0")
+    try:
+        total_client = Decimal(str(getattr(order, "total_client_ttc", 0) or 0))
+    except Exception:
+        total_client = Decimal("0")
+
+    if new_status in ("in_progress", "done"):
+        if items_count <= 0:
+            messages.error(request, "Commande vide : ajoute au moins un article avant de continuer.")
+            return redirect(next_url)
+
+        if total_client <= 0:
+            try:
+                order.update_financials(save=True)
+                total_client = Decimal(str(getattr(order, "total_client_ttc", 0) or 0))
+            except Exception:
+                total_client = Decimal("0")
+
+        if total_client <= 0:
+            messages.error(request, "Commande non chiffrée : total client égal à 0. Recalcule les montants avant de continuer.")
+            return redirect(next_url)
+
     # --- workflow logique ---
     if new_status == "in_progress":
         # ne passer en cours que si pending
@@ -11997,7 +12134,7 @@ def laundry_weighing(request, order_id):
 
     # Si pas de laundry, on affiche une page propre
     if not laundry:
-        return render(request, "orders/laundry_order_detail.html", {
+        return render(request, "orders/laundry_weighing.html", {
             "laundry": None,
             "order": None,
             "items": [],
@@ -12008,6 +12145,9 @@ def laundry_weighing(request, order_id):
         })
 
     order = get_object_or_404(Order, id=order_id)
+
+    display_summary = build_order_display_summary(order)
+    finance_summary = build_order_finance_summary(order)
 
     selected_driver_id = (request.GET.get("driver_id") or "").strip()
     assigned_driver = getattr(order, "delivery_partner", None)
@@ -12029,7 +12169,7 @@ def laundry_weighing(request, order_id):
     
     # Sécurité: la commande doit appartenir à cette blanchisserie
     if getattr(order, "laundry_partner_id", None) != laundry.id:
-        return render(request, "orders/laundry_order_detail.html", {
+        return render(request, "orders/laundry_weighing.html", {
             "laundry": laundry,
             "order": None,
             "items": [],
@@ -12039,29 +12179,29 @@ def laundry_weighing(request, order_id):
             "evidence": [],
         })
 
-    # Items
-    items_qs = order.items.all().order_by("id") if hasattr(order, "items") else []
+    # Résumé bag/item
     items = []
-    total = Decimal("0")
+    total = Decimal(str(finance_summary.get("prestation_total", 0) or 0))
 
-    for it in items_qs:
-        qty = getattr(it, "quantity", 1) or 1
-        try:
-            qty = int(qty)
-        except Exception:
-            qty = 1
+    if display_summary.get("is_item"):
+        items_qs = order.items.all().order_by("id") if hasattr(order, "items") else []
+        for it in items_qs:
+            qty = getattr(it, "quantity", 1) or 1
+            try:
+                qty = int(qty)
+            except Exception:
+                qty = 1
 
-        unit = _item_unit_price_fcfa(it)
-        line_total = unit * Decimal(qty)
-        total += line_total
+            unit = _item_unit_price_fcfa(it)
+            line_total = unit * Decimal(qty)
 
-        items.append({
-            "obj": it,
-            "designation": getattr(it, "designation", "Article"),
-            "quantity": qty,
-            "unit_price_fcfa": unit,
-            "line_total_fcfa": line_total,
-        })
+            items.append({
+                "obj": it,
+                "designation": getattr(it, "designation", "Article"),
+                "quantity": qty,
+                "unit_price_fcfa": unit,
+                "line_total_fcfa": line_total,
+            })
 
     # Evidence (si modèle dispo)
     evidence = []
@@ -12102,9 +12242,11 @@ def laundry_weighing(request, order_id):
 
         return redirect("orders:laundry_weighing", order_id=order.id) + f"?laundry_id={laundry.id}"
 
-    return render(request, "orders/laundry_order_detail.html", {
+    return render(request, "orders/laundry_weighing.html", {
         "laundry": laundry,
         "order": order,
+        "display_summary": display_summary,
+        "finance_summary": finance_summary,
         "items": items,
         "totals": {"total_fcfa": int(total)},
         "error": error,
@@ -12238,7 +12380,8 @@ def laundry_weighing_dispute(request, order_id):
 def client_new_order_step2(request, order_id: int):
     """
     Step 2/4:
-    - choix catégorie (stockée en session)
+    - choix du mode de commande (bag / item)
+    - catégorie uniquement si mode=item (stockée en session)
     - mode livraison (standard/express/scheduled)
     - scheduled_delivery_at accepte datetime-local (YYYY-MM-DDTHH:MM) ou "YYYY-MM-DD HH:MM"
     """
@@ -12259,15 +12402,29 @@ def client_new_order_step2(request, order_id: int):
     categories = ServiceCategory.objects.all().order_by("name")
     error = None
 
-    if request.method == "POST":
-        # 1) catégorie
-        cat_id = (request.POST.get("category_id") or "").strip()
-        if not cat_id.isdigit():
-            error = "Merci de choisir une catégorie."
-        else:
-            request.session["client_wizard_category_id"] = int(cat_id)
+    selected_pricing_mode = getattr(order, "pricing_mode", None) or request.session.get("client_wizard_pricing_mode") or "bag"
 
-        # 2) mode livraison
+    if request.method == "POST":
+        # 1) mode de commande
+        pricing_mode = (request.POST.get("pricing_mode") or "").strip().lower() or "bag"
+        if pricing_mode not in ("bag", "item"):
+            pricing_mode = "bag"
+
+        request.session["client_wizard_pricing_mode"] = pricing_mode
+        selected_pricing_mode = pricing_mode
+        order.pricing_mode = pricing_mode
+
+        # 2) catégorie uniquement si mode=item
+        if pricing_mode == "item":
+            cat_id = (request.POST.get("category_id") or "").strip()
+            if not cat_id.isdigit():
+                error = "Merci de choisir une catégorie."
+            else:
+                request.session["client_wizard_category_id"] = int(cat_id)
+        else:
+            request.session.pop("client_wizard_category_id", None)
+
+        # 3) mode livraison
         delivery_mode = (request.POST.get("delivery_mode") or "").strip() or "standard"
         scheduled_raw = (request.POST.get("scheduled_delivery_at") or "").strip()
 
@@ -12278,7 +12435,6 @@ def client_new_order_step2(request, order_id: int):
             order.delivery_mode = delivery_mode
 
             if delivery_mode == "scheduled":
-                # datetime-local => souvent "YYYY-MM-DDTHH:MM"
                 dt = parse_datetime(scheduled_raw) if scheduled_raw else None
                 if dt is None and scheduled_raw and "T" in scheduled_raw:
                     dt = parse_datetime(scheduled_raw.replace("T", " ", 1))
@@ -12293,13 +12449,14 @@ def client_new_order_step2(request, order_id: int):
                 order.scheduled_delivery_at = None
 
         if not error:
-            order.save(update_fields=["delivery_mode", "scheduled_delivery_at", "updated_at"])
+            order.save(update_fields=["pricing_mode", "delivery_mode", "scheduled_delivery_at", "updated_at"])
             return redirect("orders:client_new_order_step3", order_id=order.id)
 
     return render(request, "orders/client_new_order_step2.html", {
         "order": order,
         "categories": categories,
         "selected_category_id": request.session.get("client_wizard_category_id"),
+        "selected_pricing_mode": selected_pricing_mode,
         "error": error,
     })
 
@@ -12320,22 +12477,24 @@ def client_new_order_step3(request, order_id: int):
     if not order:
         return redirect("orders:client_new_order")
 
+    pricing_mode = getattr(order, "pricing_mode", None) or request.session.get("client_wizard_pricing_mode") or "bag"
+
     # Catégorie choisie en step2 (stockée en session)
     categories = ServiceCategory.objects.order_by("name")
     selected_id = request.session.get("client_wizard_category_id")
     category = None
     if selected_id:
         category = categories.filter(id=selected_id).first()
-    if not category:
+    if not category and pricing_mode == "item":
         category = categories.first()
 
     services = ServiceItem.objects.none()
-    if category:
+    if category and pricing_mode == "item":
         services = ServiceItem.objects.filter(category=category, is_active=True).order_by("name")
 
     existing_items = _build_client_display_items(order)
 
-    # Pré-remplissage des quantités par service (pour l'UI step3)
+    # Pré-remplissage des quantités par service (pour l'UI step3 item)
     qty_by_service = {}
     try:
         for it in existing_items:
@@ -12354,92 +12513,104 @@ def client_new_order_step3(request, order_id: int):
         qty_by_service = {}
 
     error = None
+    selected_bag_size = getattr(order, "bag_size", None) or "medium"
+    bag_rules_confirmed = bool(request.session.get(f"client_bag_rules_confirmed_{order.id}", False))
 
     if request.method == "POST":
-        if not category:
-            error = "Aucune catégorie de service n'est disponible. Ajoute une catégorie dans l'admin."
-        elif not services.exists():
-            error = "Aucun article actif dans cette catégorie. Ajoute des articles dans l'admin."
-        else:
-            changed = False
+        if pricing_mode == "bag":
+            bag_size = (request.POST.get("bag_size") or "").strip().lower()
+            confirm_rules = (request.POST.get("confirm_bag_rules") or "").strip()
 
-            for svc in services:
-                raw = (request.POST.get(f"qty_{svc.id}") or "").strip()
-                try:
-                    qty = int(raw) if raw != "" else 0
-                except Exception:
-                    qty = 0
+            if bag_size not in ("small", "medium", "large"):
+                error = "Merci de choisir une taille de sac."
+            elif confirm_rules != "1":
+                error = "Merci de confirmer que ton sac contient uniquement des vêtements."
+            else:
+                order.bag_size = bag_size
+                request.session[f"client_bag_rules_confirmed_{order.id}"] = True
 
-                it = (
-                    OrderItem.objects
-                    .filter(order=order, service=svc)
-                    .order_by("-id")
-                    .first()
-                )
-
-                if qty <= 0:
-                    if it:
-                        it.delete()
-                        changed = True
-                    continue
-
-                # qty > 0 : create / update
-                if it:
-                    it.designation = svc.name
-                    it.quantity = qty
-                    it.unit_price = svc.default_price
-                    it.save()
-                    changed = True
-                else:
-                    OrderItem.objects.create(
-                        order=order,
-                        service=svc,
-                        designation=svc.name,
-                        quantity=qty,
-                        unit_price=svc.default_price,
-                    )
-                    changed = True
-
-            if changed:
                 try:
                     order.update_financials(save=True)
                 except Exception:
-                    pass
+                    try:
+                        order.save(update_fields=["bag_size", "updated_at"])
+                    except Exception:
+                        pass
 
-            action = (request.POST.get("action") or "").strip()
-            if action == "add_more":
-                messages.success(request, "Articles ajoutés. Tu peux continuer à compléter la liste.")
-                return redirect("orders:client_new_order_step3", order_id=order.id)
+                return redirect("orders:client_new_order_step4", order_id=order.id)
 
-            return redirect("orders:client_new_order_step4", order_id=order.id)
+        else:
+            if not category:
+                error = "Aucune catégorie de service n'est disponible. Ajoute une catégorie dans l'admin."
+            elif not services.exists():
+                error = "Aucun article actif dans cette catégorie. Ajoute des articles dans l'admin."
+            else:
+                changed = False
 
-    # Pré-remplissage des quantités déjà ajoutées
-    qty_by_service = {}
-    for it in existing_items:
-        try:
-            service_id = getattr(it, "service_id", None)
-            quantity = getattr(it, "quantity", None)
-            if service_id:
-                qty_by_service[service_id] = quantity
-                continue
-        except Exception:
-            pass
+                for svc in services:
+                    raw = (request.POST.get(f"qty_{svc.id}") or "").strip()
+                    try:
+                        qty = int(raw) if raw != "" else 0
+                    except Exception:
+                        qty = 0
 
-        if isinstance(it, dict):
-            service_id = it.get("service_id")
-            quantity = it.get("quantity", 0)
-            if service_id:
-                qty_by_service[service_id] = quantity
+                    it = (
+                        OrderItem.objects
+                        .filter(order=order, service=svc)
+                        .order_by("-id")
+                        .first()
+                    )
+
+                    if qty <= 0:
+                        if it:
+                            it.delete()
+                            changed = True
+                        continue
+
+                    if it:
+                        it.designation = svc.name
+                        it.quantity = qty
+                        it.unit_price = svc.default_price
+                        it.save()
+                        changed = True
+                    else:
+                        OrderItem.objects.create(
+                            order=order,
+                            service=svc,
+                            designation=svc.name,
+                            quantity=qty,
+                            unit_price=svc.default_price,
+                        )
+                        changed = True
+
+                if changed:
+                    try:
+                        order.update_financials(save=True)
+                    except Exception:
+                        pass
+
+                action = (request.POST.get("action") or "").strip()
+                if action == "add_more":
+                    messages.success(request, "Articles ajoutés. Tu peux continuer à compléter la liste.")
+                    return redirect("orders:client_new_order_step3", order_id=order.id)
+
+                if not changed:
+                    error = "Sélectionne au moins un article pour continuer."
+                else:
+                    return redirect("orders:client_new_order_step4", order_id=order.id)
 
     return render(request, "orders/client_new_order_step3.html", {
         "order": order,
+        "display_summary": display_summary,
+        "finance_summary": finance_summary,
+        "pricing_mode": pricing_mode,
         "category": category,
         "services": services,
-        "existing_items": existing_items,
         "qty_by_service": qty_by_service,
+        "selected_bag_size": selected_bag_size,
+        "bag_rules_confirmed": bag_rules_confirmed,
         "error": error,
     })
-
 
 @require_http_methods(["GET", "POST"])
 @client_required
@@ -12455,6 +12626,19 @@ def client_new_order_step4(request, order_id: int):
         return redirect("orders:client_new_order")
 
     from decimal import Decimal
+
+    display_summary = build_order_display_summary(order)
+    finance_summary = build_order_finance_summary(order)
+
+    pricing_mode = display_summary.get("pricing_mode", "bag") or "bag"
+    bag_size = display_summary.get("bag_size", "medium") or "medium"
+    bag_label = display_summary.get("bag_label", "Sac moyen") or "Sac moyen"
+
+    bag_price_map = {
+        "small": 7000,
+        "medium": 10000,
+        "large": 14000,
+    }
 
     # 🔒 Si la commande n'est plus draft, on ne repasse pas par confirmation
     if not getattr(order, "is_draft", True):
@@ -12475,14 +12659,23 @@ def client_new_order_step4(request, order_id: int):
     amounts = _client_order_amounts(order)
     items = _build_client_display_items(order)
 
+    finance_breakdown = finance_summary
 
-    # Si aucun article, on renvoie vers Step3 (évite le recap vide)
+    try:
+        service_fee_client_ttc = Decimal(str(finance_summary.get("service_fee_client_ttc", 0) or 0))
+    except Exception:
+        service_fee_client_ttc = Decimal("0")
+
     try:
         has_items = items.exists()
     except Exception:
         has_items = bool(items)
 
-    if not has_items:
+    is_bag_mode = bool(display_summary.get("is_bag", pricing_mode == "bag"))
+    bag_base_price = finance_summary.get("prestation_total", Decimal("0")) or Decimal("0")
+
+    # En mode item, items obligatoires. En mode bag, bag_size obligatoire.
+    if not is_bag_mode and not has_items:
         try:
             from django.contrib import messages
             messages.error(request, "Ajoute au moins un article avant de confirmer la commande.")
@@ -12490,62 +12683,70 @@ def client_new_order_step4(request, order_id: int):
             pass
         return redirect("orders:client_new_order_step3", order_id=order.id)
 
-    if request.method == "POST":
-        # --- Garde-fou pilote: refuse confirmation si total prestations = 0 ---
-        from decimal import Decimal
+    if is_bag_mode and bag_size not in ("small", "medium", "large"):
         try:
-            items_total = Decimal('0')
-            for it in items:
-                if isinstance(it, dict):
-                    q_raw = it.get('quantity', None)
-                    if q_raw is None:
-                        q_raw = it.get('qty', 0)
-
-                    u_raw = it.get('unit_price', None)
-                    if u_raw is None:
-                        u_raw = it.get('price', 0)
-
-                    line_total = it.get('total', None)
-
-                    q = Decimal(str(q_raw or 0))
-                    u = Decimal(str(u_raw or 0))
-
-                    if q < 0:
-                        q = Decimal('0')
-                    if u < 0:
-                        u = Decimal('0')
-
-                    if line_total is not None:
-                        lt = Decimal(str(line_total or 0))
-                        if lt < 0:
-                            lt = Decimal('0')
-                        items_total += lt
-                    else:
-                        items_total += (q * u)
-                else:
-                    q = Decimal(str(getattr(it, 'quantity', 0) or 0))
-                    u = Decimal(str(getattr(it, 'unit_price', 0) or 0))
-                    if q < 0:
-                        q = Decimal('0')
-                    if u < 0:
-                        u = Decimal('0')
-                    items_total += (q * u)
+            from django.contrib import messages
+            messages.error(request, "Choisis une taille de sac avant de confirmer la commande.")
         except Exception:
-            items_total = Decimal('0')
+            pass
+        return redirect("orders:client_new_order_step3", order_id=order.id)
 
-        if items_total <= Decimal('0'):
+    if request.method == "POST":
+        if not is_bag_mode:
+            # --- Garde-fou item: refuse confirmation si total prestations = 0 ---
             try:
-                from django.contrib import messages
-                messages.error(request, "Montant prestations = 0. Vérifie les quantités et prix de tes articles avant de confirmer.")
+                items_total = Decimal('0')
+                for it in items:
+                    if isinstance(it, dict):
+                        q_raw = it.get('quantity', None)
+                        if q_raw is None:
+                            q_raw = it.get('qty', 0)
+
+                        u_raw = it.get('unit_price', None)
+                        if u_raw is None:
+                            u_raw = it.get('price', 0)
+
+                        line_total = it.get('total', None)
+
+                        q = Decimal(str(q_raw or 0))
+                        u = Decimal(str(u_raw or 0))
+
+                        if q < 0:
+                            q = Decimal('0')
+                        if u < 0:
+                            u = Decimal('0')
+
+                        if line_total is not None:
+                            lt = Decimal(str(line_total or 0))
+                            if lt < 0:
+                                lt = Decimal('0')
+                            items_total += lt
+                        else:
+                            items_total += (q * u)
+                    else:
+                        q = Decimal(str(getattr(it, 'quantity', 0) or 0))
+                        u = Decimal(str(getattr(it, 'unit_price', 0) or 0))
+                        if q < 0:
+                            q = Decimal('0')
+                        if u < 0:
+                            u = Decimal('0')
+                        items_total += (q * u)
             except Exception:
-                pass
-            return redirect('orders:client_new_order_step3', order_id=order.id)
+                items_total = Decimal('0')
+
+            if items_total <= Decimal('0'):
+                try:
+                    from django.contrib import messages
+                    messages.error(request, "Montant prestations = 0. Vérifie les quantités et prix de tes articles avant de confirmer.")
+                except Exception:
+                    pass
+                return redirect('orders:client_new_order_step3', order_id=order.id)
+
         from orders.models import DeliveryLeg
 
         DeliveryLeg.objects.get_or_create(order=order, leg_type="pickup", defaults={"status":"pending"})
         DeliveryLeg.objects.get_or_create(order=order, leg_type="return", defaults={"status":"pending"})
 
-        # Si is_draft existe, on finalise
         if hasattr(order, "is_draft"):
             order.is_draft = False
 
@@ -12559,7 +12760,6 @@ def client_new_order_step4(request, order_id: int):
         except Exception:
             pass
 
-        # Finalisation logistique alignée sur create(request)
         try:
             ensure_order_geocoded(order, save=True)
         except Exception:
@@ -12624,7 +12824,6 @@ def client_new_order_step4(request, order_id: int):
                 order.status = "in_progress"
                 order.save(update_fields=["status"])
 
-                # 🔥 RESYNC FINAL (clé du bug)
                 try:
                     from orders.models import sync_delivery_legs_for_order, DeliveryLeg
                     from orders.service_layer.legs import normalize_order_legs
@@ -12641,53 +12840,33 @@ def client_new_order_step4(request, order_id: int):
         except Exception:
             pass
 
-        from decimal import Decimal
-
-
-        # Re-calcul après update_financials
-
-        amounts2 = _client_order_amounts(order)
-
         try:
-
-            total_ttc = Decimal(str((amounts2 or {}).get('total_ttc', 0) or 0))
-
+            amounts_after = _client_order_amounts(order)
+            total_ttc = Decimal(str((amounts_after or {}).get("total_ttc", 0) or 0))
         except Exception:
+            total_ttc = Decimal("0")
 
-            total_ttc = Decimal('0')
-
-
-        try:
-
-            paid = Decimal(str(getattr(order, 'amount_paid', 0) or 0))
-
-        except Exception:
-
-            paid = Decimal('0')
-
-
+        paid = getattr(order, "amount_paid", Decimal("0")) or Decimal("0")
         remain = total_ttc - paid
 
+        if remain > Decimal("0"):
+            return redirect("orders:client_order_pay_wave_page", order_id=order.id)
+        return redirect("orders:client_order_detail", order_id=order.id)
 
-        # Si reste à payer => Wave, sinon => détail commande
-
-        if remain > Decimal('0'):
-
-            return redirect('orders:client_order_pay_wave_page', order_id=order.id)
-
-
-        return redirect('orders:client_order_detail', order_id=order.id)
     return render(request, "orders/client_new_order_step4.html", {
         "order": order,
-        "items": items,
+        "pricing_mode": pricing_mode,
+        "is_bag_mode": is_bag_mode,
+        "bag_size": bag_size,
+        "bag_label": bag_label_map.get(bag_size, "Sac moyen"),
+        "bag_base_price": bag_price_map.get(bag_size, 10000),
         "amounts": amounts,
+        "finance_breakdown": finance_breakdown,
+        "service_fee_client_ttc": service_fee_client_ttc,
+        "items": items,
+        "has_items": has_items,
     })
 
-
-# ============================================================
-# App Blanchisseur (MVP V1) — zéro infos client
-# ============================================================
-@login_required
 @require_http_methods(["GET"])
 def laundry_app(request):
     """
@@ -12813,7 +12992,7 @@ def laundry_order_detail(request, order_id):
             error = "Aucune blanchisserie liée à ce compte. Contacte l'admin pour associer ton compte à une blanchisserie."
 
     if not laundry:
-        return render(request, "orders/laundry_order_detail.html", {
+        return render(request, "orders/laundry_weighing.html", {
             "order": None,
             "laundry": None,
             "items": [],
@@ -13013,7 +13192,7 @@ def laundry_order_detail(request, order_id):
         return redirect(f"{request.path}?laundry_id={laundry.id}")
 
 
-    return render(request, "orders/laundry_order_detail.html", {
+    return render(request, "orders/laundry_weighing.html", {
         "order": order,
         "laundry": laundry,
         "items": list(items),

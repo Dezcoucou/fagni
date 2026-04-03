@@ -1,11 +1,9 @@
 {% load static %}
-
 {% if invoice_settings %}
   {% if invoice_settings.header_logo %}
     <img class="header-logo" src="{{ invoice_settings.header_logo.url }}" alt="Logo">
   {% endif %}
 {% endif %}
-
 {% if not invoice_settings or not invoice_settings.header_logo %}
   <div class="brand">
     {% if invoice_settings and invoice_settings.company_name %}
@@ -19,7 +17,6 @@
     {% endif %}
   </div>
 {% endif %}
-
 {% if invoice_settings and invoice_settings.company_tagline %}
   <div class="header-sub">{{ invoice_settings.company_tagline }}</div>
 {% else %}
@@ -27,7 +24,6 @@
     <div class="header-sub">{{ default_tagline }}</div>
   {% endif %}
 {% endif %}
-
 {% if invoice_settings %}
   {% if invoice_settings.company_phone or invoice_settings.company_email %}
     <div class="header-contact">
@@ -36,11 +32,9 @@
       {% if invoice_settings.company_email %}{{ invoice_settings.company_email }}{% endif %}
     </div>
   {% endif %}
-
   {% if invoice_settings.company_address %}
     <div class="header-contact">{{ invoice_settings.company_address }}</div>
   {% endif %}
-
   {% if invoice_settings.header_note %}
     <div class="header-note">{{ invoice_settings.header_note }}</div>
   {% endif %}

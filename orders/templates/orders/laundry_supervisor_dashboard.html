@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% block title %}Superviseur Blanchisserie – FAGNI{% endblock %}
-
 {% block content %}
 <div style="max-width:1200px;margin:0 auto;padding:16px;">
   <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
@@ -10,7 +9,6 @@
         {% if laundry %}{{ laundry.name|default:"Blanchisserie" }}{% else %}Blanchisserie non détectée{% endif %}
       </div>
     </div>
-
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       {% if laundry %}
         <a class="btn btn-light btn-sm" href="{% url 'orders:laundry_app' %}?laundry_id={{ laundry.id }}">🧺 App blanchisseur</a>
@@ -21,40 +19,33 @@
       <a class="btn btn-light btn-sm" href="/accounts/logout/">🚪 Déconnexion</a>
     </div>
   </div>
-
   {% if error %}
     <div class="alert alert-warning" style="margin-top:12px;">{{ error }}</div>
   {% endif %}
-
   <div style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
     <div style="padding:16px;border-radius:18px;background:#fff7ed;border:1px solid #fed7aa;">
       <div style="font-size:13px;font-weight:900;color:#9a3412;">📥 À traiter</div>
       <div style="margin-top:8px;font-size:34px;font-weight:1000;color:#0f172a;">{{ stats_todo|default:0 }}</div>
     </div>
-
     <div style="padding:16px;border-radius:18px;background:#eff6ff;border:1px solid #bfdbfe;">
       <div style="font-size:13px;font-weight:900;color:#1d4ed8;">🧺 En cours</div>
       <div style="margin-top:8px;font-size:34px;font-weight:1000;color:#0f172a;">{{ stats_doing|default:0 }}</div>
     </div>
-
     <div style="padding:16px;border-radius:18px;background:#f0fdf4;border:1px solid #bbf7d0;">
       <div style="font-size:13px;font-weight:900;color:#166534;">✅ Prêtes</div>
       <div style="margin-top:8px;font-size:34px;font-weight:1000;color:#0f172a;">{{ stats_ready|default:0 }}</div>
     </div>
-
     <div style="padding:16px;border-radius:18px;background:#f8fafc;border:1px solid #cbd5e1;">
       <div style="font-size:13px;font-weight:900;color:#475569;">🏁 Terminées</div>
       <div style="margin-top:8px;font-size:34px;font-weight:1000;color:#0f172a;">{{ stats_done|default:0 }}</div>
     </div>
   </div>
-
   <div style="margin-top:16px;display:grid;grid-template-columns:1.1fr .9fr;gap:14px;">
     <section style="padding:16px;border-radius:20px;background:#ffffff;border:1px solid #e2e8f0;box-shadow:0 8px 24px rgba(15,23,42,.04);">
       <div style="font-size:18px;font-weight:1000;color:#0f172a;">🧠 Recommandation</div>
       <div style="margin-top:10px;font-size:15px;line-height:1.6;color:#334155;font-weight:800;">
         {{ recommendation|default:"Situation normale." }}
       </div>
-
       <div style="margin-top:16px;font-size:18px;font-weight:1000;color:#0f172a;">⚠️ Alertes</div>
       {% if alerts %}
         <div style="margin-top:10px;display:grid;gap:10px;">
@@ -70,10 +61,8 @@
         </div>
       {% endif %}
     </section>
-
     <section style="padding:16px;border-radius:20px;background:#ffffff;border:1px solid #e2e8f0;box-shadow:0 8px 24px rgba(15,23,42,.04);">
       <div style="font-size:18px;font-weight:1000;color:#0f172a;">📌 Lecture rapide</div>
-
       <div style="margin-top:12px;display:grid;gap:10px;">
         <div style="padding:12px 14px;border-radius:14px;background:#f8fafc;border:1px solid #e2e8f0;">
           <div style="font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;font-weight:900;">Point clé</div>
@@ -89,7 +78,6 @@
             {% endif %}
           </div>
         </div>
-
         <div style="padding:12px 14px;border-radius:14px;background:#f8fafc;border:1px solid #e2e8f0;">
           <div style="font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;font-weight:900;">Vue terrain</div>
           <div style="margin-top:6px;font-size:15px;color:#0f172a;font-weight:900;">
@@ -99,13 +87,11 @@
       </div>
     </section>
   </div>
-
   <section style="margin-top:16px;padding:16px;border-radius:20px;background:#ffffff;border:1px solid #e2e8f0;box-shadow:0 8px 24px rgba(15,23,42,.04);">
     <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
       <div style="font-size:18px;font-weight:1000;color:#0f172a;">🧾 Commandes récentes</div>
       <div style="font-size:13px;color:#64748b;font-weight:800;">Aucune information client affichée</div>
     </div>
-
     {% if orders %}
       <div style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">
         {% for o in orders %}
@@ -114,7 +100,6 @@
               <div style="font-size:20px;font-weight:1000;color:#0f172a;">Commande #{{ o.id }}</div>
               <div style="font-size:12px;color:#64748b;font-weight:800;">{{ o.created_at|date:"d/m H:i" }}</div>
             </div>
-
             <div style="margin-top:10px;">
               {% if o.status == "done" %}
                 <div style="display:inline-flex;min-height:38px;padding:0 14px;border-radius:999px;background:#f8fafc;border:1px solid #cbd5e1;align-items:center;font-weight:1000;color:#0f172a;">
@@ -134,11 +119,9 @@
                 </div>
               {% endif %}
             </div>
-
             <div style="margin-top:12px;font-size:16px;font-weight:1000;color:#0f172a;">
               🧺 {{ o.items.all|length }} article(s)
             </div>
-
             <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
               {% if o.status == "done" %}
                 <a class="btn btn-primary btn-sm" href="{% url 'orders:laundry_order_detail' o.id %}{% if laundry %}?laundry_id={{ laundry.id }}{% endif %}" style="min-height:46px;font-size:15px;font-weight:1000;">
@@ -169,7 +152,6 @@
                   </button>
                 </form>
               {% endif %}
-
               <a class="btn btn-light btn-sm" href="{% url 'orders:laundry_app' %}{% if laundry %}?laundry_id={{ laundry.id }}{% endif %}" style="min-height:46px;font-size:15px;font-weight:1000;">
                 🧺 App
               </a>

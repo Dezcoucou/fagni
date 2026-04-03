@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block content %}
 <div class="page-header">
     <div class="page-header__left">
@@ -9,30 +8,24 @@
         </p>
     </div>
 </div>
-
 <div class="driver-performance container">
-
     <!-- 🔙 NAVIGATION -->
     <div class="card perf-nav">
         <a href="{% url 'orders:driver_hub' %}" class="btn btn-secondary btn-pill">
             ← Retour Hub Livreur
         </a>
-
         <div class="perf-nav-right">
             <a href="{% url 'orders:driver_hub' %}" class="btn btn-primary btn-pill">
                 📊 KPI
             </a>
-
             <a href="{% url 'orders:driver_app' %}" class="btn btn-light btn-pill">
                 📱 Vue globale
             </a>
-
             <a href="{% url 'orders:driver_map' %}" class="btn btn-light btn-pill">
                 🗺 Carte
             </a>
         </div>
     </div>
-
     <!-- 🧑‍✈️ INFORMATIONS LIVREUR -->
     <div class="card driver-header">
         <div class="driver-main-info">
@@ -40,7 +33,6 @@
             <p class="driver-email">{{ driver.email }}</p>
             <p class="driver-phone">{{ driver.phone }}</p>
         </div>
-
         <div class="driver-badges">
             <div class="badge badge-blue">
                 Total courses : {{ stats.total_orders }}
@@ -56,37 +48,30 @@
             </div>
         </div>
     </div>
-
     <!-- 📈 KPI PRINCIPAUX -->
     <div class="kpi-grid mb-4">
-
         <div class="kpi-card kpi-blue">
             <div class="kpi-label">Total courses</div>
             <div class="kpi-value">{{ stats.total_orders }}</div>
         </div>
-
         <div class="kpi-card kpi-orange">
             <div class="kpi-label">En cours</div>
             <div class="kpi-value">{{ stats.in_progress }}</div>
         </div>
-
         <div class="kpi-card kpi-green">
             <div class="kpi-label">Terminées</div>
             <div class="kpi-value">{{ stats.done }}</div>
         </div>
-
         <div class="kpi-card kpi-red">
             <div class="kpi-label">Annulées</div>
             <div class="kpi-value">{{ stats.canceled }}</div>
         </div>
-
         <div class="kpi-card kpi-blue">
             <div class="kpi-label">Distance totale</div>
             <div class="kpi-value">
                 {{ stats.total_distance|floatformat:"2" }} <span class="kpi-unit">km</span>
             </div>
         </div>
-
         <div class="kpi-card kpi-orange">
             <div class="kpi-label">Revenu total</div>
             <div class="kpi-value">
@@ -94,22 +79,18 @@
             </div>
         </div>
     </div>
-
     <!-- 📊 GRAPHIQUES -->
     <div class="card">
         <h2 class="section-title">Graphique des revenus par période</h2>
         <canvas id="revenuesChart" height="120"></canvas>
     </div>
-
     <div class="card">
         <h2 class="section-title">Courses terminées par période</h2>
         <canvas id="ordersChart" height="120"></canvas>
     </div>
-
     <!-- 📜 LISTE DES COURSES -->
     <div class="card">
         <h2 class="section-title">Historique des courses</h2>
-
         {% if orders %}
             <table class="perf-table">
                 <thead>
@@ -145,15 +126,12 @@
             <p class="muted">Aucune course à afficher.</p>
         {% endif %}
     </div>
-
 </div>
-
 <!-- 📈 SCRIPTS CHARTJS -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 const revenuesCtx = document.getElementById('revenuesChart');
 const ordersCtx = document.getElementById('ordersChart');
-
 // Revenus
 new Chart(revenuesCtx, {
     type: 'line',
@@ -169,7 +147,6 @@ new Chart(revenuesCtx, {
         }]
     }
 });
-
 // Nombre de courses
 new Chart(ordersCtx, {
     type: 'bar',
@@ -183,14 +160,11 @@ new Chart(ordersCtx, {
     }
 });
 </script>
-
 <style>
-
 .driver-performance {
     max-width: 1100px;
     margin: 0 auto 24px;
 }
-
 /* ─────────────────────────────── */
 /* NAVIGATION */
 /* ─────────────────────────────── */
@@ -200,13 +174,11 @@ new Chart(ordersCtx, {
     align-items: center;
     margin-bottom: 14px;
 }
-
 .perf-nav-right {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
 }
-
 /* ─────────────────────────────── */
 /* LIVREUR HEADER */
 /* ─────────────────────────────── */
@@ -217,23 +189,19 @@ new Chart(ordersCtx, {
     flex-wrap: wrap;
     align-items: center;
 }
-
 .driver-name {
     font-size: 22px;
     font-weight: 700;
     color: #173B63;
 }
-
 .driver-email,
 .driver-phone {
     font-size: 13px;
     color: #64748b;
 }
-
 .badges {
     display: flex;
 }
-
 .badge {
     padding: 8px 12px;
     border-radius: 10px;
@@ -241,12 +209,10 @@ new Chart(ordersCtx, {
     font-weight: 600;
     color: #fff;
 }
-
 .badge-blue { background: #173B63; }
 .badge-orange { background: #F07C22; }
 .badge-green { background: #16a34a; }
 .badge-red { background: #dc2626; }
-
 /* ─────────────────────────────── */
 /* KPI GRID */
 /* ─────────────────────────────── */
@@ -255,7 +221,6 @@ new Chart(ordersCtx, {
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 12px;
 }
-
 .kpi-card {
     background: #fff;
     border-radius: 12px;
@@ -263,31 +228,26 @@ new Chart(ordersCtx, {
     border-left: 4px solid;
     box-shadow: 0 1px 4px rgba(15,23,42,0.08);
 }
-
 .kpi-label {
     color: #64748b;
     font-size: 11px;
     text-transform: uppercase;
 }
-
 .kpi-value {
     font-size: 22px;
     font-weight: 700;
     color: #0f172a;
     margin-top: 4px;
 }
-
 .kpi-unit {
     font-size: 12px;
     margin-left: 2px;
     color: #475569;
 }
-
 .kpi-blue { border-left-color:#173B63; }
 .kpi-orange { border-left-color:#F07C22; }
 .kpi-green { border-left-color:#16a34a; }
 .kpi-red { border-left-color:#dc2626; }
-
 /* ─────────────────────────────── */
 /* HISTORIQUE TABLE */
 /* ─────────────────────────────── */
@@ -296,24 +256,19 @@ new Chart(ordersCtx, {
     font-size: 12px;
     border-collapse: collapse;
 }
-
 .perf-table th {
     background: #f1f5f9;
     padding: 6px;
     color: #475569;
     font-weight: 600;
 }
-
 .perf-table td {
     padding: 6px;
     border-bottom: 1px solid #e5e7eb;
 }
-
 .muted {
     font-size: 12px;
     color: #94a3b8;
 }
-
 </style>
-
 {% endblock %}

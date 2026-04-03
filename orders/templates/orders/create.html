@@ -1,42 +1,32 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block title %}Nouvelle commande – FAGNI{% endblock %}
-
 {% block extra_head %}
   {% include "orders/_create/_head_styles.html" %}
 {% endblock %}
-
 {% block content %}
 <div class="page">
-
   {% include "orders/_create/_header.html" %}
-
   <form id="orderForm" method="post" enctype="multipart/form-data">
     {% csrf_token %}
-
     {% if error %}
       <div class="error">{{ error }}</div>
     {% endif %}
-
     <div class="two-cols">
       <!-- GAUCHE -->
       <section class="card">
         {% include "orders/_create/_left_client.html" %}
         {% include "orders/_create/_left_timings_map.html" %}
       </section>
-
       <!-- DROITE -->
       <section class="card">
         {% include "orders/_create/_right_services.html" %}
         {% include "orders/_create/_right_table_notes_totals.html" %}
       </section>
     </div>
-
     {% include "orders/_create/_actions.html" %}
   </form>
 </div>
-
 {% include "orders/_create/_scripts_main.html" %}
 {% include "orders/_create/_scripts_maps.html" %}
 {% endblock %}

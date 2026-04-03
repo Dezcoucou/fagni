@@ -1,10 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block title %}Ops FAGNI – Suivi opérationnel des commandes{% endblock %}
-
 {% block content %}
-
 <style>
   :root{
     --fagni-orange:#ff7a00;
@@ -14,35 +11,27 @@
     --ops-text-main:#111827;
     --ops-text-muted:#6b7280;
   }
-
   .ops-page{max-width:1200px;margin:0 auto 30px;padding:0 10px;}
-
   .ops-card{
     background:#fff;border-radius:16px;box-shadow:0 12px 30px rgba(15,23,42,.06);
     padding:16px 18px 18px;margin-bottom:16px;border:1px solid var(--ops-border);
   }
-
   .ops-top-bar{
     display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:6px;
   }
-
   .ops-summary{font-size:13px;color:var(--ops-text-main);}
   .ops-summary span{margin-right:12px;}
-
   .ops-summary-row2{
     font-size:11px;color:var(--ops-text-muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;
   }
-
   .ops-pill{
     display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;
     background:#f3f4f6;font-size:11px;border:1px solid #e5e7eb;
   }
   .ops-pill strong{font-weight:700;}
-
   .ops-actions-right,.ops-actions-left{
     display:flex;gap:8px;flex-wrap:wrap;align-items:center;
   }
-
   .ops-btn{
     text-decoration:none;display:inline-flex;align-items:center;justify-content:center;
     border-radius:999px;padding:7px 12px;font-size:13px;border:1px solid #e5e7eb;
@@ -50,19 +39,14 @@
     transition:background .15s ease, box-shadow .15s ease, transform .05s ease, border-color .15s ease;
   }
   .ops-btn:hover{background:#f3f4f6;box-shadow:0 6px 16px rgba(15,23,42,.10);transform:translateY(-1px);}
-
   .ops-btn-secondary{ /* volontairement “neutre” */ }
-
   .ops-btn-primary{
     border-color:var(--fagni-blue);background:var(--fagni-blue);color:#fff;
   }
   .ops-btn-primary:hover{background:#00408a;border-color:#00408a;}
-
   .ops-mini-legend{font-size:11px;color:var(--ops-text-muted);margin-top:8px;}
-
   .ops-board{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
   @media (max-width:900px){.ops-board{grid-template-columns:1fr;}}
-
   .ops-col{
     background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(15,23,42,.05);
     padding:10px 10px 12px;border:1px solid #e5e7eb;
@@ -70,24 +54,19 @@
   .ops-col-header{display:flex;justify-content:space-between;align-items:flex-end;gap:6px;margin-bottom:6px;}
   .ops-col h2{margin:0;font-size:15px;display:flex;align-items:center;gap:6px;}
   .ops-col small{display:block;font-size:11px;color:var(--ops-text-muted);}
-
   .ops-badge-total{
     background:#f3f4ff;border-radius:999px;padding:2px 8px;font-size:11px;color:#3730a3;border:1px solid #e0e7ff;
   }
-
   .ops-table{width:100%;border-collapse:collapse;font-size:12px;}
   .ops-table th,.ops-table td{padding:6px 4px;border-bottom:1px solid #f0f0f0;vertical-align:top;}
   .ops-table th{background:#f9fafb;font-weight:600;white-space:nowrap;color:#374151;}
   .ops-table tr:hover{background:#f9fafb;}
-
   .ops-link-detail{font-size:11px;text-decoration:none;color:var(--fagni-blue);}
   .ops-link-detail:hover{text-decoration:underline;}
-
   .ops-subtext{display:block;font-size:11px;color:var(--ops-text-muted);margin-top:2px;}
   .ops-metric{display:block;font-size:10px;color:#6b7280;margin-top:1px;}
   .ops-metric strong{font-weight:700;}
   .ops-empty-col{font-size:12px;color:#9ca3af;padding:10px 0;}
-
   /* Boutons étapes */
   .ops-step-btn{
     font-size:11px;border-radius:999px;border:none;padding:4px 9px;cursor:pointer;
@@ -101,7 +80,6 @@
   .ops-step-wash{background:#0ea5e9;color:#fff;}
   .ops-step-return{background:#6b7280;color:#fff;}
   .ops-step-delivered{background:#22c55e;color:#fff;}
-
   /* Flash messages */
   .ops-flashes{margin:10px 0 12px;display:grid;gap:8px;}
   .ops-flash{
@@ -111,13 +89,11 @@
   .ops-flash.success{border-color:#bbf7d0;background:#ecfdf3;color:#15803d;}
   .ops-flash.warning{border-color:#fed7aa;background:#fff7ed;color:#9a3412;}
   .ops-flash.error{border-color:#fecaca;background:#fef2f2;color:#b91c1c;}
-
   .ops-row-highlight{
     outline:2px solid rgba(255,122,0,.55);
     box-shadow:0 0 0 6px rgba(255,122,0,.12);
     border-radius:10px;
   }
-
   /* Badges statut */
   .ops-badge-status{
     padding:3px 8px;border-radius:999px;font-size:11px;white-space:nowrap;
@@ -128,9 +104,7 @@
   .ops-badge-done{background:#ecfdf3;color:#15803d;border-color:#bbf7d0;}
   .ops-badge-danger{background:#fef2f2;color:#b91c1c;border-color:#fecaca;}
   .ops-badge-warn{background:#fff7ed;color:#9a3412;border-color:#fed7aa;}
-
   .ops-timeline-inline{display:block;font-size:10px;margin-top:4px;color:#4b5563;line-height:1.25;}
-
   /* Pagination */
   .ops-pager{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;}
   .ops-pagebtn{
@@ -140,7 +114,6 @@
   .ops-pagebtn:hover{background:#f3f4f6;}
   .ops-pagebtn.active{background:var(--fagni-blue);border-color:var(--fagni-blue);color:#fff;pointer-events:none;}
   .ops-pagebtn.disabled{opacity:.4;pointer-events:none;}
-
   /* ===== Alertes ===== */
   .ops-alerts-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0 16px;}
   @media (max-width:900px){.ops-alerts-grid{grid-template-columns:1fr;}}
@@ -161,7 +134,6 @@
   .ops-alert-item small{display:block;color:#6b7280;margin-top:2px;font-size:11px;}
   .ops-alert-empty{font-size:12px;color:#6b7280;padding:6px 2px;}
 </style>
-
 <div class="page-header">
   <div class="page-header__left">
     <h1 class="page-title">Tableau Ops – Commandes FAGNI</h1>
@@ -172,9 +144,7 @@
     <a href="{% url 'orders:create' %}" class="ops-btn ops-btn-primary">+ Nouvelle</a>
   </div>
 </div>
-
 <div class="ops-page">
-
   {# Bandeau filtre driver #}
   {% if selected_driver_id and selected_driver %}
     <div class="ops-card" style="border-left:6px solid var(--fagni-orange);">
@@ -190,29 +160,22 @@
       </div>
     </div>
   {% endif %}
-
   {# Carte OPS (bloc séparé) #}
   {% include "orders/_driver_map_block.html" %}
-
   {# ===== Alertes OPS ===== #}
   <div class="ops-alerts-grid">
-
     <div class="ops-alert-box">
       <div class="ops-alert-head">
         <p class="ops-alert-title">🚨 Retards SLA</p>
         <span class="ops-alert-count">{{ alerts_sla_count|default:0 }}</span>
       </div>
-
       {% if alerts_sla_orders %}
         <ul class="ops-alert-list">
           {% for a in alerts_sla_orders %}
-
             <li class="ops-alert-item">
               <strong>{{ a.order.code }}</strong>
-
               <br>
               <span style="display:block;margin-top:4px;">{{ a.reason }}</span>
-
               <small>
                 ⏱️ {{ a.age_h }}h
                 · <a class="ops-link-detail" href="{% url 'orders:detail' a.order.id %}">Détail</a>
@@ -222,23 +185,19 @@
                   {% if laundry_url %}· <a class="ops-link-detail" href="{{ laundry_url }}">🧺 Pesée blanchisserie</a>{% endif %}
               </small>
             </li>
-
           {% endfor %}
         </ul>
       {% else %}
         <div class="ops-alert-empty">✅ Aucun retard SLA pour le moment.</div>
       {% endif %}
     </div>
-
     <div class="ops-alert-box">
       <div class="ops-alert-head">
         <p class="ops-alert-title">🧷 Litiges – Pesées contestées</p>
         <span class="ops-alert-count">{{ alerts_disputes_count|default:0 }}</span>
       </div>
-
       {% if alerts_disputes_orders %}
         <ul class="ops-alert-list">
-          
 {% for a in alerts_disputes_orders %}
             <li class="ops-alert-item">
               <strong>{{ a.order.code }}</strong>
@@ -268,13 +227,11 @@
         <div class="ops-alert-empty">✅ Aucun litige de pesée.</div>
       {% endif %}
     </div>
-
     <div class="ops-alert-box">
       <div class="ops-alert-head">
         <p class="ops-alert-title">🛵 Livreurs inactifs / offline</p>
         <span class="ops-alert-count">{{ drivers_offline_count|default:0 }}</span>
       </div>
-
       {% if drivers_offline %}
         <ul class="ops-alert-list">
           {% for x in drivers_offline %}
@@ -293,18 +250,15 @@
       {% endif %}
     </div>
   </div>
-
   <!-- Header & actions -->
   <div class="ops-card">
     <div class="ops-top-bar">
       <div class="ops-actions-left">
         <a href="{% url 'orders:driver_dashboard' %}" class="ops-btn ops-btn-secondary">🛵 Livreurs</a>
-
         <form method="get" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           {% if per_page %}
             <input type="hidden" name="per_page" value="{{ per_page }}">
           {% endif %}
-
           <select name="driver_id" class="ops-btn" style="padding-right:28px;">
             <option value="">— Filtrer par livreur —</option>
             {% for d in drivers_list %}
@@ -313,14 +267,12 @@
               </option>
             {% endfor %}
           </select>
-
           <button type="submit" class="ops-btn">Appliquer</button>
           {% if selected_driver_id %}
             <a href="{{ reset_url }}" class="ops-btn">Reset</a>
           {% endif %}
         </form>
       </div>
-
       <div>
         <div class="ops-summary">
           <span><strong>En attente :</strong> {{ pending_count }}</span>
@@ -333,22 +285,18 @@
           </span>
         </div>
       </div>
-
       <div class="ops-actions-right">
         <a href="{% url 'orders:ops_planning' %}" class="ops-btn ops-btn-secondary">📅 Planning</a>
         <a href="{% url 'orders:finance_dashboard' %}" class="ops-btn ops-btn-secondary">💰 Finance</a>
         <a href="{% url 'orders:dashboard' %}" class="ops-btn ops-btn-secondary">📊 Dashboard</a>
       </div>
     </div>
-
     <div class="ops-mini-legend">
       💡 Valide les étapes dans « En cours » : la timeline et le statut se mettent à jour automatiquement.
     </div>
   </div>
-
   {% with hid=highlight_id|default:'' %}
   <div class="ops-board">
-
     <!-- ===== En attente ===== -->
     <div class="ops-col">
       <div class="ops-col-header">
@@ -357,7 +305,6 @@
           <small>Commandes créées, en attente de collecte.</small>
         </div>
       </div>
-
       {% if pending_page_obj and pending_page_obj.object_list %}
         <table class="ops-table">
           <thead>
@@ -377,7 +324,6 @@
                   <strong>{{ order.code }}</strong>
                   <span class="ops-subtext">Créée le {{ order.created_at|date:"d/m H:i" }}</span>
                   <span class="ops-badge-status ops-badge-pending">En attente</span>
-
                   {% if total_disp <= 0 %}
                     <span class="ops-badge-status ops-badge-danger">Non chiffrée</span>
                   {% endif %}
@@ -385,7 +331,6 @@
                     <span class="ops-badge-status ops-badge-warn">Livraison = 0</span>
                   {% endif %}
                 </td>
-
                 <td>
                   <strong>{{ order.customer.name }}</strong>
                   {% if order.customer.phone %}
@@ -395,13 +340,11 @@
                     <span class="ops-metric">📍 {{ order.customer.address }}</span>
                   {% endif %}
                 </td>
-
                 <td>
                   <strong>{{ total_disp }} FCFA</strong>
                   <span class="ops-metric">Service FAGNI : <strong>{{ order.service_fee|default:0 }} FCFA</strong></span>
                   <span class="ops-metric">Livraison : <strong>{{ delivery_fee_val }} FCFA</strong></span>
                 </td>
-
                 <td>
                   {% if order.laundry_partner %}
                     🧺 {{ order.laundry_partner.name }}
@@ -415,11 +358,9 @@
                     <span class="ops-metric" style="color:#9ca3af;">Livreur ?</span>
                   {% endif %}
                 </td>
-
                 <td>
                   <a href="{% url 'orders:detail' order.id %}" class="ops-link-detail">Détail</a><br>
                   <a href="{% url 'orders:order_ticket_pdf' order.id %}" class="ops-btn ops-btn-secondary" style="margin-top:4px;" target="_blank">📄 Ticket PDF</a>
-
                   <form method="post" action="{% url 'orders:ops_update_step' order.id 'pickup' %}" style="margin-top:4px;">
                     {% csrf_token %}
                     {% with delivery_fee_val=order.delivery_fee|default:0 %}
@@ -439,7 +380,6 @@
             {% endfor %}
           </tbody>
         </table>
-
         {% if pending_page_obj.paginator.num_pages > 1 %}
           <div class="ops-pager">
             {% if pending_page_obj.has_previous %}
@@ -459,7 +399,6 @@
         <div class="ops-empty-col">Aucune commande en attente.</div>
       {% endif %}
     </div>
-
     <!-- ===== En cours ===== -->
     <div class="ops-col">
       <div class="ops-col-header">
@@ -468,7 +407,6 @@
           <small>Commandes en collecte, lavage ou retour livreur.</small>
         </div>
       </div>
-
       {% if progress_page_obj and progress_page_obj.object_list %}
         <table class="ops-table">
           <thead>
@@ -488,7 +426,6 @@
                   <strong>{{ order.code }}</strong>
                   <span class="ops-subtext">Créée le {{ order.created_at|date:"d/m H:i" }}</span>
                   <span class="ops-badge-status ops-badge-in-progress">En cours</span>
-
                   {% if total_disp <= 0 %}
                     <span class="ops-badge-status ops-badge-danger">Non chiffrée</span>
                   {% endif %}
@@ -496,7 +433,6 @@
                     <span class="ops-badge-status ops-badge-warn">Livraison = 0</span>
                   {% endif %}
                 </td>
-
                 <td>
                   <strong>{{ order.customer.name }}</strong>
                   {% if order.customer.phone %}
@@ -506,13 +442,11 @@
                     <span class="ops-metric">📍 {{ order.customer.address }}</span>
                   {% endif %}
                 </td>
-
                 <td>
                   <strong>{{ total_disp }} FCFA</strong>
                   <span class="ops-metric">Service FAGNI : <strong>{{ order.service_fee|default:0 }} FCFA</strong></span>
                   <span class="ops-metric">Livraison : <strong>{{ delivery_fee_val }} FCFA</strong></span>
                   <span class="ops-metric">Distance AR : <strong>{% if order.distance_km %}{{ order.distance_km }}{% else %}—{% endif %} km</strong></span>
-
                   <span class="ops-timeline-inline">
                     {% if order.pickup_time %}✅ Collectée{% else %}⏳ Collecte{% endif %}
                     · {% if order.dropoff_time %}✅ Déposée{% else %}⏳ Dépôt{% endif %}
@@ -521,7 +455,6 @@
                     · {% if order.delivered_time %}✅ Livrée{% else %}⏳ Livraison{% endif %}
                   </span>
                 </td>
-
                 <td>
                   {% if order.laundry_partner %}
                     🧺 {{ order.laundry_partner.name }}
@@ -535,11 +468,9 @@
                     <span class="ops-metric" style="color:#9ca3af;">Livreur ?</span>
                   {% endif %}
                 </td>
-
                 <td>
                   <a href="{% url 'orders:detail' order.id %}" class="ops-link-detail">Détail</a><br>
                   <a href="{% url 'orders:order_ticket_pdf' order.id %}" class="ops-btn ops-btn-secondary" style="margin-top:4px;" target="_blank">📄 Ticket PDF</a>
-
                   <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">
                     <form method="post" action="{% url 'orders:ops_update_step' order.id 'dropoff' %}">
                       {% csrf_token %}
@@ -547,21 +478,18 @@
                         🧺 Dépôt blanchisserie
                       </button>
                     </form>
-
                     <form method="post" action="{% url 'orders:ops_update_step' order.id 'wash_done' %}">
                       {% csrf_token %}
                       <button type="submit" class="ops-step-btn ops-step-wash" {% if order.wash_complete_time or not order.dropoff_time %}disabled{% endif %}>
                         ✅ Lavage terminé
                       </button>
                     </form>
-
                     <form method="post" action="{% url 'orders:ops_update_step' order.id 'return' %}">
                       {% csrf_token %}
                       <button type="submit" class="ops-step-btn ops-step-return" {% if order.return_time or not order.wash_complete_time %}disabled{% endif %}>
                         🚚 Reprise livreur
                       </button>
                     </form>
-
                     <form method="post" action="{% url 'orders:ops_update_step' order.id 'delivered' %}">
                       {% csrf_token %}
                       <button type="submit" class="ops-step-btn ops-step-delivered" {% if order.delivered_time or not order.return_time %}disabled{% endif %}>
@@ -575,7 +503,6 @@
             {% endfor %}
           </tbody>
         </table>
-
         {% if progress_page_obj.paginator.num_pages > 1 %}
           <div class="ops-pager">
             {% if progress_page_obj.has_previous %}
@@ -595,7 +522,6 @@
         <div class="ops-empty-col">Aucune commande en cours.</div>
       {% endif %}
     </div>
-
     <!-- ===== Terminées ===== -->
     <div class="ops-col">
       <div class="ops-col-header">
@@ -604,7 +530,6 @@
           <small>Commandes livrées au client.</small>
         </div>
       </div>
-
       {% if done_page_obj and done_page_obj.object_list %}
         <table class="ops-table">
           <thead>
@@ -624,21 +549,18 @@
                   <span class="ops-subtext">Créée le {{ order.created_at|date:"d/m H:i" }}</span>
                   <span class="ops-badge-status ops-badge-done">Terminée</span>
                 </td>
-
                 <td>
                   <strong>{{ order.customer.name }}</strong>
                   {% if order.customer.phone %}
                     <span class="ops-subtext">📞 {{ order.customer.phone }}</span>
                   {% endif %}
                 </td>
-
                 <td>
                   <strong>{{ total_disp }} FCFA</strong>
                   <span class="ops-metric">Service FAGNI : <strong>{{ order.service_fee|default:0 }} FCFA</strong></span>
                   <span class="ops-metric">Livraison : <strong>{{ order.delivery_fee|default:0 }} FCFA</strong></span>
                   <span class="ops-metric">Distance AR : <strong>{% if order.distance_km %}{{ order.distance_km }}{% else %}—{% endif %} km</strong></span>
                 </td>
-
                 <td>
                   {% if order.delivered_time %}
                     {{ order.delivered_time|date:"d/m/Y H:i" }}
@@ -653,7 +575,6 @@
             {% endfor %}
           </tbody>
         </table>
-
         {% if done_page_obj.paginator.num_pages > 1 %}
           <div class="ops-pager">
             {% if done_page_obj.has_previous %}
@@ -673,12 +594,9 @@
         <div class="ops-empty-col">Aucune commande terminée pour le moment.</div>
       {% endif %}
     </div>
-
   </div>
   {% endwith %}
-
 </div>
-
 <script>
 (function(){
   "use strict";
@@ -686,7 +604,6 @@
   const focus = params.get("focus");
   const highlightId = params.get("highlight");
   const driverId = params.get("driver_id");
-
   // Focus commande -> scroll + highlight
   if (focus === "order" && highlightId){
     const row = document.getElementById("order-row-" + highlightId);
@@ -696,7 +613,6 @@
       setTimeout(() => row.classList.remove("ops-row-highlight"), 6000);
     }
   }
-
   // Focus driver -> signal à la carte
   if (focus === "driver" && driverId){
     window.__OPS_FOCUS_DRIVER_ID__ = Number(driverId);
@@ -704,5 +620,4 @@
   }
 })();
 </script>
-
 {% endblock content %}

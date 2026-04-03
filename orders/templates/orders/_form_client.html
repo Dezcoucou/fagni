@@ -1,5 +1,4 @@
 {# orders/templates/orders/_form_client.html #}
-
 <div class="mb-4">
     <label for="client_phone" class="block text-sm font-medium text-gray-700">
         Téléphone :
@@ -15,7 +14,6 @@
         data-lookup-url="{% url 'orders:client_lookup' %}"
     >
 </div>
-
 <div id="client_data_fields">
     <div class="mb-4">
         <label for="client_name" class="block text-sm font-medium text-gray-700">
@@ -31,7 +29,6 @@
                    focus:border-fagni-blue focus:ring-fagni-blue sm:text-sm p-2"
         >
     </div>
-
     <div class="mb-4">
         <label for="client_address" class="block text-sm font-medium text-gray-700">
             Adresse :
@@ -61,10 +58,8 @@
         </small>
     </div>
 </div>
-
 <input type="hidden" id="client_lat" name="client_lat" value="{{ order.customer.latitude|default:'' }}">
 <input type="hidden" id="client_lng" name="client_lng" value="{{ order.customer.longitude|default:'' }}">
-
 {# Champ code parrain si tu l’avais déjà #}
 {% if order.customer and order.customer.referral_code %}
     <div class="mb-4">

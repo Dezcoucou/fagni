@@ -1,13 +1,10 @@
 {% extends "base.html" %}
 {% load static %}
-
 {# Base Client : centralise le CSS + la topbar côté client #}
-
 {% block page_css %}
   {{ block.super }}
   <link rel="stylesheet" href="{% static 'css/client_app.css' %}">
 {% endblock %}
-
 {% block topbar %}
   {% include "orders/_client_topbar.html" %}
 {% endblock %}

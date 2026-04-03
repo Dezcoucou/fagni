@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block content %}
 <style>
     :root {
@@ -12,17 +11,14 @@
         --text-main: #222222;
         --text-muted: #6b7280;
     }
-
     * {
         box-sizing: border-box;
     }
-
     .order-edit-page {
         max-width: 1100px;
         margin: 0 auto 30px;
         padding: 0 10px;
     }
-
     .card-order {
         background: #fff;
         border-radius: 16px;
@@ -31,14 +27,12 @@
         margin-top: 12px;
         border: 1px solid var(--border-soft);
     }
-
     .card-order h2 {
         margin-top: 0;
         font-size: 18px;
         border-left: 4px solid #ff7a00;
         padding-left: 8px;
     }
-
     .top-actions-inline {
         display:flex;
         justify-content:space-between;
@@ -47,12 +41,10 @@
         margin-bottom:14px;
         flex-wrap:wrap;
     }
-
     .top-actions-inline-title {
         font-size: 14px;
         color: var(--text-muted);
     }
-
     .btn-link {
         text-decoration:none;
         border-radius:999px;
@@ -67,28 +59,23 @@
         color:#374151;
         transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
     }
-
     .btn-link:hover {
         background:#f3f4f6;
         box-shadow: 0 4px 10px rgba(15,23,42,0.08);
         transform: translateY(-1px);
     }
-
     .btn-link-primary {
         border-color: var(--fagni-blue);
         color: var(--fagni-blue);
     }
-
     .grid {
         display: grid;
         grid-template-columns: 1.1fr 0.9fr;
         gap: 16px;
     }
-
     .field-group {
         margin-bottom: 10px;
     }
-
     .field-group label {
         display: block;
         font-size: 13px;
@@ -96,7 +83,6 @@
         color: var(--text-main);
         font-weight: 500;
     }
-
     .field-group input[type="text"],
     .field-group input[type="number"],
     .field-group select {
@@ -108,7 +94,6 @@
         box-sizing: border-box;
         background:#fff;
     }
-
     .field-group input[type="text"]:focus,
     .field-group input[type="number"]:focus,
     .field-group select:focus {
@@ -116,7 +101,6 @@
         border-color: var(--fagni-blue);
         box-shadow: 0 0 0 1px rgba(0,86,179,0.15);
     }
-
     .field-group textarea {
         width: 100%;
         padding: 7px 8px;
@@ -128,23 +112,19 @@
         box-sizing: border-box;
         background:#fff;
     }
-
     .field-group textarea:focus {
         outline: none;
         border-color: var(--fagni-blue);
         box-shadow: 0 0 0 1px rgba(0,86,179,0.15);
     }
-
     .address-row {
         display:flex;
         gap:8px;
         align-items:center;
     }
-
     .address-row input[type="text"] {
         flex:1;
     }
-
     .btn-small {
         border-radius:999px;
         border:1px solid #ff7a00;
@@ -159,13 +139,11 @@
         gap:4px;
         transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
     }
-
     .btn-small:hover {
         background:#fff5eb;
         box-shadow: 0 4px 10px rgba(248, 115, 22, 0.2);
         transform: translateY(-1px);
     }
-
     .btn-icon {
         padding:4px 7px;
         border-radius:999px;
@@ -175,54 +153,45 @@
         cursor:pointer;
         transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
     }
-
     .btn-icon:hover {
         background:#fee2e2;
         border-color:#fecaca;
         box-shadow: 0 4px 10px rgba(220, 38, 38, 0.15);
         transform: translateY(-1px);
     }
-
     table {
         width: 100%;
         border-collapse: collapse;
         font-size: 13px;
         margin-top: 4px;
     }
-
     th, td {
         padding: 6px 4px;
         border-bottom: 1px solid #f1f1f1;
         text-align: left;
         vertical-align: top;
     }
-
     th {
         background: #fafafa;
         font-weight: 600;
         font-size: 12px;
     }
-
     tbody tr:nth-child(even) {
         background:#fcfcfd;
     }
-
     tbody tr:hover {
         background:#f5f5ff;
     }
-
     td.num {
         text-align:right;
         white-space:nowrap;
     }
-
     .btn-row {
         display: flex;
         gap: 10px;
         margin-top: 12px;
         flex-wrap:wrap;
     }
-
     button {
         border: none;
         padding: 8px 14px;
@@ -230,26 +199,21 @@
         font-size: 14px;
         cursor: pointer;
     }
-
     #previewBtn {
         background: #fff;
         border: 1px solid #ff7a00;
         color: #ff7a00;
     }
-
     #previewBtn:hover {
         background: #fff5eb;
     }
-
     #submitBtn {
         background: #0056b3;
         color: #fff;
     }
-
     #submitBtn:hover {
         background: #00408a;
     }
-
     #summaryBox {
         margin-top: 10px;
         border-radius: 8px;
@@ -257,15 +221,12 @@
         padding: 10px;
         background: #fafafa;
     }
-
     #summaryBox.hidden {
         display: none;
     }
-
     .summary-item {
         margin: 0 0 4px;
     }
-
     #map {
         width: 100%;
         height: 260px;
@@ -273,7 +234,6 @@
         border-radius: 8px;
         border: 1px solid #ddd;
     }
-
     .error {
         background: #ffe5e5;
         color: #b00020;
@@ -282,33 +242,27 @@
         font-size: 13px;
         margin-bottom: 8px;
     }
-
     .totals-block p {
         margin: 3px 0;
         font-size: 13px;
         clear: both;
     }
-
     .totals-block .label {
         font-weight:600;
     }
-
     .totals-block .value {
         float:right;
     }
-
     .totals-block .grand {
         color:#ff7a00;
         font-weight:700;
     }
-
     .note {
         font-size:11px;
         color:#777;
         margin-top:6px;
         clear:both;
     }
-
     .photo-thumbs,
     .photos-preview {
         margin-top:4px;
@@ -316,7 +270,6 @@
         gap:4px;
         flex-wrap:wrap;
     }
-
     .photo-thumbs img,
     .photos-preview img {
         width:36px;
@@ -325,23 +278,19 @@
         border-radius:6px;
         border:1px solid #ddd;
     }
-
     .photo-info {
         font-size:11px;
         color:#555;
         margin-left:4px;
     }
-
     .line-designation {
         font-weight:500;
     }
-
     .line-meta {
         font-size:10px;
         color:#6b7280;
         margin-top:2px;
     }
-
     .sticky-totals {
         position: sticky;
         bottom: 0;
@@ -349,18 +298,15 @@
         padding-top: 8px;
         z-index: 5;
     }
-
     @media (max-width: 800px) {
         .grid {
             grid-template-columns: 1fr;
         }
-
         .top-actions-inline {
             align-items:flex-start;
         }
     }
 </style>
-
 <div class="page-header">
     <div class="page-header__left">
         <h1 class="page-title">Modifier la commande {{ order.code }}</h1>
@@ -389,12 +335,10 @@
         </a>
     </div>
 </div>
-
 <div class="order-edit-page">
     {% if error %}
         <div class="error">{{ error }}</div>
     {% endif %}
-
     <div class="card-order">
         <div class="top-actions-inline">
             <div>
@@ -404,15 +348,12 @@
                 </span>
             </div>
         </div>
-
         <form id="orderForm" method="post" enctype="multipart/form-data">
             {% csrf_token %}
-
             <div class="grid">
                 <!-- Colonne gauche : client + adresse + map -->
                 <div>
                     <h2>Client</h2>
-
                     <div class="field-group">
                         <label for="client_phone">Téléphone :</label>
                         <input
@@ -428,7 +369,6 @@
                             Le numéro se modifie depuis le compte client, pas ici.
                         </small>
                     </div>
-
                     <div class="field-group">
                         <label for="client_name">Nom et prénoms :</label>
                         <input type="text" id="client_name" name="client_name"
@@ -439,14 +379,12 @@
                             Le nom du client se modifie depuis sa fiche client.
                         </small>
                     </div>
-
                     <div class="field-group">
                         <label for="referral_code">Code parrain (optionnel) :</label>
                         <input type="text" id="referral_code" name="referral_code"
                                value="{{ order.referral_code|default:'' }}"
                                placeholder="Ex : PARRAIN123">
                     </div>
-
                     <div class="field-group">
                         <label for="client_address">Adresse :</label>
                         <div class="address-row">
@@ -461,20 +399,16 @@
                             Suggestions Google + géolocalisation si tu es chez le client.
                         </small>
                     </div>
-
                     <input type="hidden" id="client_lat" name="client_lat"
                            value="{{ order.customer.latitude|default:'' }}">
                     <input type="hidden" id="client_lng" name="client_lng"
                            value="{{ order.customer.longitude|default:'' }}">
-
                     <h2>Localisation</h2>
                     <div id="map"></div>
                 </div>
-
                 <!-- Colonne droite : prestations + lignes + totaux -->
                 <div>
                     <h2>Prestations FAGNI</h2>
-
                     <div class="field-group">
                         <label for="category_select">Catégorie de service :</label>
                         <select id="category_select">
@@ -484,7 +418,6 @@
                             {% endfor %}
                         </select>
                     </div>
-
                     <div class="field-group">
                         <label for="service_select">Prestation / Article :</label>
                         <select id="service_select" disabled>
@@ -500,12 +433,10 @@
                             {% endfor %}
                         </select>
                     </div>
-
                     <div class="field-group">
                         <label for="item_designation">Désignation (modifiable) :</label>
                         <input type="text" id="item_designation" placeholder="Texte qui apparaîtra sur la commande">
                     </div>
-
                     <div class="field-group" style="display:flex;gap:8px;align-items:flex-end;">
                         <div style="flex:0.7;">
                             <label for="item_quantity">Quantité :</label>
@@ -521,11 +452,9 @@
                             </div>
                         </div>
                     </div>
-
                     <button type="button" id="addItemBtn" class="btn-small" style="margin-top:4px;">
                         ➕ Ajouter une nouvelle ligne
                     </button>
-
                     <h2 style="margin-top:18px;">Lignes de commande</h2>
                     <table id="itemsTable">
                         <thead>
@@ -607,7 +536,6 @@
                             {% endfor %}
                         </tbody>
                     </table>
-
                     <h2 style="margin-top:16px;">Notes / instructions</h2>
                     <div class="field-group">
                         <label for="order_notes">Notes internes / instructions :</label>
@@ -643,7 +571,6 @@
                                 {{ order.grand_total|default:0|floatformat:0 }} FCFA
                             </span>
                         </p>
-
                         <p class="note">
                             * Transport (estimation) :
                             min <strong>{{ delivery_min_fee|default:0 }} FCFA</strong>,
@@ -652,75 +579,61 @@
                             Le montant officiel est recalculé côté serveur selon la distance réelle client ↔ blanchisserie.
                         </p>
                     </div>
-
                     <div class="btn-row">
                         <button type="button" id="previewBtn">Voir le résumé</button>
                         <button type="submit" id="submitBtn">
                             Enregistrer les modifications
                         </button>
                     </div>
-
                     <div id="summaryBox" class="hidden">
                         <h3 style="margin-top:0;">Résumé des articles</h3>
                         <div id="summaryContent"></div>
                     </div>
-
                 </div>
             </div>
         </form>
     </div>
 </div>
-
 <script>
 let map, marker, geocoder, autocomplete;
-
 function initMap() {
     const mapElement = document.getElementById('map');
     if (!mapElement || !window.google || !google.maps) {
         console.log("Google Maps non disponible pour le moment.");
         return;
     }
-
     const latField = document.getElementById('client_lat');
     const lngField = document.getElementById('client_lng');
-
     let latVal = parseFloat(latField && latField.value ? latField.value : '0');
     let lngVal = parseFloat(lngField && lngField.value ? lngField.value : '0');
-
     let center;
     if (!isNaN(latVal) && !isNaN(lngVal) && latVal !== 0 && lngVal !== 0) {
         center = {lat: latVal, lng: lngVal};
     } else {
         center = {lat: 5.347, lng: -4.026}; // Abidjan
     }
-
     map = new google.maps.Map(mapElement, {
         zoom: (!isNaN(latVal) && !isNaN(lngVal) && latVal !== 0 && lngVal !== 0) ? 14 : 12,
         center: center,
     });
-
     geocoder = new google.maps.Geocoder();
     marker = new google.maps.Marker({
         map: map,
         position: center,
     });
-
     const addressInput = document.getElementById('client_address');
     if (addressInput && google.maps.places) {
         autocomplete = new google.maps.places.Autocomplete(addressInput, {
             componentRestrictions: { country: "ci" },
             fields: ["geometry", "formatted_address"]
         });
-
         autocomplete.addListener("place_changed", function () {
             const place = autocomplete.getPlace();
             if (!place.geometry || !place.geometry.location) return;
-
             const loc = place.geometry.location;
             map.setCenter(loc);
             map.setZoom(14);
             marker.setPosition(loc);
-
             if (latField && lngField) {
                 latField.value = loc.lat();
                 lngField.value = loc.lng();
@@ -728,12 +641,10 @@ function initMap() {
         });
     }
 }
-
 document.addEventListener('DOMContentLoaded', function () {
     const DELIVERY_MIN_FEE = {{ delivery_min_fee|default:0 }};
     const DELIVERY_PRICE_PER_KM = {{ delivery_price_per_km|default:0 }};
     const DELIVERY_FIXED_FEE = {{ delivery_fixed_fee|default:0 }};
-
     const phoneInput = document.getElementById('client_phone');
     const nameInput = document.getElementById('client_name');
     const addressInput = document.getElementById('client_address');
@@ -741,7 +652,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const lngInput = document.getElementById('client_lng');
     const locateBtn = document.getElementById('locateBtn');
     const form = document.getElementById('orderForm');
-
     const categorySelect = document.getElementById('category_select');
     const serviceSelect = document.getElementById('service_select');
     const designationInput = document.getElementById('item_designation');
@@ -749,47 +659,36 @@ document.addEventListener('DOMContentLoaded', function () {
     const priceInput = document.getElementById('item_price');
     const addItemBtn = document.getElementById('addItemBtn');
     const itemsTableBody = document.querySelector('#itemsTable tbody');
-
     const totalPrestDisplay = document.getElementById('total_prestation');
     const serviceDisplay = document.getElementById('service_fee_display');
     const deliveryDisplay = document.getElementById('delivery_fee_display');
     const totalGlobalDisplay = document.getElementById('total_global_display');
-
     const previewBtn = document.getElementById('previewBtn');
     const summaryBox = document.getElementById('summaryBox');
     const summaryContent = document.getElementById('summaryContent');
-
     // Autocomplétion client par téléphone (lecture seule mais utile pour adresse)
     if (phoneInput && nameInput && addressInput) {
         const lookupUrl = phoneInput.getAttribute('data-lookup-url') || '/orders/api/client/';
-
         phoneInput.addEventListener('input', function () {
             const phone = phoneInput.value.trim();
             if (phone.length < 4) return;
-
             const url = lookupUrl + (lookupUrl.includes('?') ? '&' : '?') + 'phone=' + encodeURIComponent(phone);
-
             fetch(url)
                 .then(res => res.ok ? res.json() : null)
                 .then(data => {
                     if (!data) return;
-
                     let existsFlag = data.exists;
                     let c = data.customer || data;
-
                     if (existsFlag === false) {
                         return;
                     }
-
                     const addressVal =
                         c.address ||
                         c.customer_address ||
                         c.location ||
                         '';
-
                     const latVal = c.latitude || c.lat || null;
                     const lngVal = c.longitude || c.lng || null;
-
                     if (addressVal && !addressInput.value.trim()) {
                         addressInput.value = addressVal;
                     }
@@ -803,30 +702,25 @@ document.addEventListener('DOMContentLoaded', function () {
                 .catch(err => console.error('Erreur API client :', err));
         });
     }
-
     // "Me localiser" : GPS + reverse geocoding
     if (locateBtn && navigator.geolocation) {
         locateBtn.addEventListener('click', function () {
             locateBtn.disabled = true;
             locateBtn.textContent = "📍 Localisation...";
-
             navigator.geolocation.getCurrentPosition(
                 function (pos) {
                     const lat = pos.coords.latitude;
                     const lng = pos.coords.longitude;
-
                     if (latInput && lngInput) {
                         latInput.value = lat;
                         lngInput.value = lng;
                     }
-
                     if (map && marker) {
                         const loc = {lat: lat, lng: lng};
                         map.setCenter(loc);
                         map.setZoom(14);
                         marker.setPosition(loc);
                     }
-
                     if (geocoder) {
                         geocoder.geocode({ location: { lat: lat, lng: lng } }, function(results, status) {
                             if (status === 'OK' && results && results[0]) {
@@ -838,7 +732,6 @@ document.addEventListener('DOMContentLoaded', function () {
                             }
                         });
                     }
-
                     locateBtn.disabled = false;
                     locateBtn.textContent = "📍 Me localiser";
                 },
@@ -856,7 +749,6 @@ document.addEventListener('DOMContentLoaded', function () {
             );
         });
     }
-
     // Filtrage prestations par catégorie + prix catalogue non modifiable
     if (categorySelect && serviceSelect) {
         serviceSelect.disabled = true;
@@ -865,7 +757,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 opt.hidden = true;
             }
         });
-
         categorySelect.addEventListener('change', function () {
             const catId = categorySelect.value;
             serviceSelect.value = "";
@@ -873,7 +764,6 @@ document.addEventListener('DOMContentLoaded', function () {
             priceInput.value = 0;
             priceInput.readOnly = true;
             priceInput.style.background = "#f8f8f8";
-
             if (!catId) {
                 serviceSelect.disabled = true;
                 Array.from(serviceSelect.options).forEach(opt => {
@@ -886,7 +776,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 return;
             }
-
             serviceSelect.disabled = false;
             Array.from(serviceSelect.options).forEach(opt => {
                 if (!opt.value) {
@@ -897,10 +786,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 const optCat = opt.getAttribute('data-category');
                 opt.hidden = (optCat !== catId);
             });
-
             serviceSelect.focus();
         });
-
         serviceSelect.addEventListener('change', function () {
             const opt = serviceSelect.options[serviceSelect.selectedIndex];
             if (!opt || !opt.value) {
@@ -913,14 +800,12 @@ document.addEventListener('DOMContentLoaded', function () {
             priceInput.value = parseFloat(defaultPrice) || 0;
             priceInput.readOnly = true;
             priceInput.style.background = "#f8f8f8";
-
             if (!designationInput.value.trim()) {
                 designationInput.value = opt.textContent.trim();
             }
             quantityInput.focus();
         });
     }
-
     // Recalcul des totaux
     function recalcTotals() {
         let total = 0;
@@ -931,17 +816,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const val = parseFloat(cell.getAttribute('data-line-total') || '0');
             if (!isNaN(val)) total += val;
         });
-
         let serviceFee = Math.round(total * 0.05);
         if (serviceFee < 500 && total > 0) {
             serviceFee = 500;
         }
-
         let deliveryFee = 0;
         if (total > 0) {
             deliveryFee = DELIVERY_MIN_FEE;
         }
-
         if (totalPrestDisplay) {
             totalPrestDisplay.textContent = total.toLocaleString('fr-FR') + ' FCFA';
         }
@@ -956,14 +838,11 @@ document.addEventListener('DOMContentLoaded', function () {
             totalGlobalDisplay.textContent = grand.toLocaleString('fr-FR') + ' FCFA';
         }
     }
-
     recalcTotals();
-
     // Helper pour ajouter une nouvelle ligne (création ou duplication)
     function appendItemRow(serviceId, designation, qty, price, catName) {
         const rowIndex = itemsTableBody.querySelectorAll('tr').length;
         const lineTotal = qty * price;
-
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>
@@ -1009,7 +888,6 @@ document.addEventListener('DOMContentLoaded', function () {
         itemsTableBody.appendChild(tr);
         recalcTotals();
     }
-
     // Ajout d'une nouvelle ligne
     if (addItemBtn && itemsTableBody) {
         addItemBtn.addEventListener('click', function () {
@@ -1017,11 +895,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const selectedOpt = serviceSelect.options[serviceSelect.selectedIndex] || null;
             const serviceText = selectedOpt ? selectedOpt.textContent.trim() : "";
             const catName = selectedOpt ? (selectedOpt.getAttribute('data-cat-name') || "") : "";
-
             let designation = designationInput.value.trim();
             const qty = parseInt(quantityInput.value || '0', 10);
             const price = parseFloat(priceInput.value || '0');
-
             if (!serviceId) {
                 alert("Choisis une prestation dans le catalogue.");
                 if (categorySelect && !categorySelect.value) {
@@ -1040,25 +916,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert("Cette prestation du catalogue doit avoir un prix valide.");
                 return;
             }
-
             if (!designation) {
                 designation = serviceText;
             }
-
             appendItemRow(serviceId, designation, qty, price, catName);
-
             designationInput.value = "";
             quantityInput.value = 1;
             priceInput.value = 0;
             priceInput.readOnly = true;
             priceInput.style.background = "#f8f8f8";
-
             if (serviceSelect) {
                 serviceSelect.value = "";
                 serviceSelect.focus();
             }
         });
-
         // Boutons photo / duplication / suppression + preview
         itemsTableBody.addEventListener('click', function (e) {
             if (e.target.classList.contains('btn-remove')) {
@@ -1068,7 +939,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     recalcTotals();
                 }
             }
-
             if (e.target.classList.contains('btn-photo')) {
                 const td = e.target.closest('td');
                 const fileInput = td ? td.querySelector('input[type="file"]') : null;
@@ -1076,21 +946,17 @@ document.addEventListener('DOMContentLoaded', function () {
                     fileInput.click();
                 }
             }
-
             if (e.target.classList.contains('btn-duplicate')) {
                 const tr = e.target.closest('tr');
                 if (!tr) return;
-
                 const serviceInput = tr.querySelector('input[name="service_id[]"]');
                 const designationHidden = tr.querySelector('input[name="designation[]"]');
                 const qtyHidden = tr.querySelector('input[name="quantity[]"]');
                 const priceHidden = tr.querySelector('input[name="unit_price[]"]');
-
                 const serviceId = serviceInput ? serviceInput.value : "";
                 const designation = designationHidden ? designationHidden.value : "";
                 const qty = qtyHidden ? parseInt(qtyHidden.value || '0', 10) : 0;
                 const price = priceHidden ? parseFloat(priceHidden.value || '0') : 0;
-
                 const meta = tr.querySelector('.line-meta');
                 let catName = "";
                 if (meta) {
@@ -1099,39 +965,30 @@ document.addEventListener('DOMContentLoaded', function () {
                         catName = spans[0].textContent.trim();
                     }
                 }
-
                 if (!serviceId || !qty || !price) {
                     alert("Impossible de dupliquer cette ligne (données incomplètes).");
                     return;
                 }
-
                 appendItemRow(serviceId, designation, qty, price, catName);
             }
         });
-
         itemsTableBody.addEventListener('change', function (e) {
             const input = e.target;
             if (input.tagName.toLowerCase() !== 'input' || input.type !== 'file') return;
-
             const td = input.closest('td');
             if (!td) return;
-
             const previewDiv = td.querySelector('.photos-preview');
             const infoSpan = td.querySelector('.photo-info');
             if (!previewDiv) return;
-
             previewDiv.innerHTML = '';
             if (infoSpan) infoSpan.textContent = '';
-
             const files = Array.from(input.files || []);
             if (!files.length) {
                 previewDiv.innerHTML = '<span style="font-size:10px;color:#777;">Aucune nouvelle photo.</span>';
                 return;
             }
-
             files.forEach((file, idx) => {
                 if (!file.type.startsWith('image/')) return;
-
                 const reader = new FileReader();
                 reader.onload = function (ev) {
                     const img = document.createElement('img');
@@ -1141,7 +998,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 };
                 reader.readAsDataURL(file);
             });
-
             if (infoSpan) {
                 infoSpan.textContent = files.length === 1
                     ? '1 nouvelle photo'
@@ -1149,7 +1005,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
-
     // Résumé
     if (previewBtn && summaryBox && summaryContent) {
         previewBtn.addEventListener('click', function (e) {
@@ -1175,7 +1030,6 @@ document.addEventListener('DOMContentLoaded', function () {
             summaryBox.classList.remove('hidden');
         });
     }
-
     // Validation avant submit
     if (form) {
         form.addEventListener('submit', function (e) {
@@ -1194,7 +1048,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
-
 {% if GOOGLE_MAPS_API_KEY %}
 <script
   async

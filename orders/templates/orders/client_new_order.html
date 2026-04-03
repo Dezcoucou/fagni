@@ -385,6 +385,60 @@
       font-size:24px;
     }
   }
+
+  .client-option-card{
+    position:relative;
+    display:block;
+    border:1px solid #e2e8f0;
+    border-radius:18px;
+    background:#fff;
+    padding:0;
+    overflow:hidden;
+    cursor:pointer;
+    transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  }
+  .client-option-card:hover{
+    transform:translateY(-1px);
+    border-color:#fdba74;
+    box-shadow:0 10px 24px rgba(255,122,0,.10);
+  }
+  .client-option-check{
+    position:absolute;
+    top:14px;
+    right:14px;
+    width:18px;
+    height:18px;
+  }
+  .client-option-body{
+    padding:16px;
+  }
+  .client-option-title{
+    font-size:15px;
+    font-weight:1000;
+    color:#0f172a;
+    line-height:1.2;
+  }
+  .client-option-desc{
+    margin-top:6px;
+    font-size:13px;
+    line-height:1.55;
+    color:#64748b;
+    font-weight:700;
+  }
+  .client-option-price{
+    margin-top:10px;
+    display:inline-flex;
+    min-height:30px;
+    align-items:center;
+    padding:0 12px;
+    border-radius:999px;
+    background:#fff7ed;
+    color:#c2410c;
+    font-size:12px;
+    font-weight:1000;
+    border:1px solid #fed7aa;
+  }
+
 </style>
 {% endblock %}
 {% block content %}
@@ -393,11 +447,11 @@
     <div>
       <h1 class="client-create-title">Nouvelle commande</h1>
       <p class="client-create-sub">
-        Étape 1/4 — Tes informations. Ensuite tu choisis la catégorie, le mode logistique, les articles et tu valides le récapitulatif.
+        Étape 1/4 — Tes informations. Ensuite tu choisiras ton mode de commande, la livraison, puis tu valideras le récapitulatif.
       </p>
       <div class="client-steps" aria-label="progression">
         <span class="client-step active">1 • Infos</span>
-        <span class="client-step">2 • Catégorie & livraison</span>
+        <span class="client-step">2 • Mode & livraison</span>
         <span class="client-step">3 • Articles</span>
         <span class="client-step">4 • Récap</span>
       </div>
@@ -411,7 +465,7 @@
       <div class="fagni-eyebrow">FAGNI • Création de commande</div>
       <h2 class="fagni-title">Un parcours simple, rapide et propre.</h2>
       <p class="fagni-subtitle">
-        Tu décris le besoin, nous organisons la collecte, le traitement puis la livraison. Cette première étape sert à sécuriser tes informations avant le reste du parcours.
+        Renseigne tes informations de collecte pour démarrer ta commande. Tu choisiras ensuite ton mode de commande et ton mode de livraison.
       </p>
       <div class="client-create-badges" aria-label="atouts">
         <span class="fagni-badge fagni-badge--glass">Collecte & livraison</span>
@@ -421,11 +475,11 @@
       <div class="client-create-mini" aria-label="infos rapides">
         <div class="client-create-mini-card">
           <p class="k">Ensuite</p>
-          <p class="v">Catégorie + mode de livraison</p>
+          <p class="v">Mode de commande et livraison</p>
         </div>
         <div class="client-create-mini-card">
           <p class="k">Puis</p>
-          <p class="v">Choix des articles et quantités</p>
+          <p class="v">Sac ou articles selon ton choix</p>
         </div>
         <div class="client-create-mini-card">
           <p class="k">Enfin</p>
@@ -517,7 +571,6 @@
 
             <div class="client-geo-tools" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
               <button type="button" id="btn-use-location" class="btn btn-light" style="min-height:44px;font-weight:900;">
-                📍 Utiliser ma position
               </button>
               <div id="geo-feedback" style="font-size:12px;font-weight:800;color:#64748b;"></div>
             </div>
@@ -554,7 +607,48 @@
         </div>
       </div>
       <div class="client-cta">
-        <button type="submit" class="fagni-btn fagni-btn--primary">Continuer → Étape 2</button>
+        
+<div class="client-form-panel" style="margin-top:14px;">
+  <div class="client-form-head">
+    <div>
+      <h2 class="client-form-title">Options premium</h2>
+      <div class="client-form-sub">
+        Améliore ton service avec des options rapides et rentables.
+      </div>
+    </div>
+  </div>
+
+  <div class="client-form-grid">
+    <label class="client-field client-option-card">
+      <input type="checkbox" name="premium_ironing" value="1" class="client-option-check">
+      <div class="client-option-body">
+        <div class="client-option-title">Repassage premium</div>
+        <div class="client-option-desc">Finition plus soignée et présentation renforcée.</div>
+        <div class="client-option-price">+ 500 FCFA</div>
+      </div>
+    </label>
+
+    <label class="client-field client-option-card">
+      <input type="checkbox" name="fragrance" value="1" class="client-option-check">
+      <div class="client-option-body">
+        <div class="client-option-title">Parfum linge</div>
+        <div class="client-option-desc">Ajout d’une touche parfumée agréable.</div>
+        <div class="client-option-price">+ 300 FCFA</div>
+      </div>
+    </label>
+
+    <label class="client-field client-option-card">
+      <input type="checkbox" name="delicate_care" value="1" class="client-option-check">
+      <div class="client-option-body">
+        <div class="client-option-title">Soin délicat</div>
+        <div class="client-option-desc">Traitement spécial pour textiles sensibles.</div>
+        <div class="client-option-price">+ 1 000 FCFA</div>
+      </div>
+    </label>
+  </div>
+</div>
+
+<button type="submit" class="fagni-btn fagni-btn--primary">Continuer → Étape 2</button>
         <span class="client-cta-meta">Temps estimé : <strong>30 secondes</strong></span>
       </div>
       <div class="client-note">

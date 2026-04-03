@@ -1,7 +1,13 @@
 {% extends "orders/client_base.html" %}
 {% load static %}
 
-{% block title %}Mon espace — FAGNI{% endblock %}
+{% block title %}Mon espace — FAGNI
+<a href="{% url 'orders:client_new_order' %}" class="fab-new-order">
+  <span>＋</span>
+  <span>Nouvelle commande</span>
+</a>
+
+{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -38,7 +44,33 @@
   .welcome-inner{ display:grid; grid-template-columns:1fr 220px; gap:24px; align-items:center; }
   .welcome-title{ font-size:clamp(22px,4vw,34px); font-weight:900; letter-spacing:-0.03em; margin-bottom:6px; }
   .welcome-sub{ color:rgba(255,255,255,.75); font-size:15px; }
-  .welcome-visual{ height:130px; border-radius:18px; background:linear-gradient(135deg,#d4e0ee,#c8d7ea); border:1px solid rgba(255,255,255,.12); }
+  .welcome-visual{
+    height:140px;
+    border-radius:20px;
+    overflow:hidden;
+    position:relative;
+    box-shadow:0 10px 30px rgba(0,0,0,.12);
+  }
+
+  .welcome-visual img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
+
+  /* Overlay premium FAGNI */
+  .welcome-visual::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:linear-gradient(
+      135deg,
+      rgba(30,58,95,.55) 0%,
+      rgba(30,58,95,.25) 60%,
+      rgba(30,58,95,.05) 100%
+    );
+  }
+  .welcome-avatar{ width:90px; height:90px; border-radius:50%; background:linear-gradient(135deg,#f7c7a2,#ffe4d0); border:3px solid rgba(255,255,255,.50); display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:900; color:var(--navy); }
 
   .stats-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; position:relative; z-index:2; }
   .stat-card{ background:#fff; border:1px solid var(--border); border-radius:18px; padding:18px 16px; box-shadow:var(--shadow); display:flex; align-items:center; gap:14px; transition:transform .2s; }
@@ -53,7 +85,91 @@
   .section-title{ font-size:20px; font-weight:900; color:var(--navy); letter-spacing:-0.02em; }
   .section-link{ font-size:13px; font-weight:700; color:var(--orange); }
 
-  .priority-card{ background:#fff; border:1px solid var(--border); border-radius:20px; padding:20px; box-shadow:var(--shadow); }
+  .priority-card{
+    background:#FFF8F2;
+    border-radius:20px;
+    padding:20px;
+    margin:20px 0;
+    box-shadow:0 10px 30px rgba(232,119,34,.08);
+    border:1px solid rgba(232,119,34,.15);
+  }
+
+  .priority-content{
+    display:flex;
+    gap:20px;
+    align-items:center;
+  }
+
+  .priority-left{
+    flex:1;
+  }
+
+  .priority-title{
+    font-size:18px;
+    font-weight:800;
+    color:#1E3A5F;
+    margin-bottom:6px;
+  }
+
+  .priority-meta{
+    font-size:13px;
+    color:#6B7280;
+    margin-bottom:10px;
+  }
+
+  .priority-price{
+    font-size:22px;
+    font-weight:900;
+    color:#1E3A5F;
+    margin-bottom:14px;
+  }
+
+  .priority-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  .btn-pay{
+    background:#E87722;
+    color:#fff;
+    padding:10px 18px;
+    border-radius:999px;
+    font-weight:800;
+    text-decoration:none;
+    box-shadow:0 8px 20px rgba(232,119,34,.25);
+  }
+
+  .btn-link{
+    color:#1E3A5F;
+    font-weight:700;
+    text-decoration:none;
+  }
+
+  .priority-visual{
+    width:110px;
+    height:110px;
+    border-radius:16px;
+    overflow:hidden;
+    flex-shrink:0;
+  }
+
+  .priority-visual img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
+  @media(max-width:768px){
+    .priority-content{
+      flex-direction:column;
+      align-items:flex-start;
+    }
+
+    .priority-visual{
+      width:100%;
+      height:140px;
+    }
+  }
   .priority-inner{ display:grid; grid-template-columns:68px 1fr auto; gap:16px; align-items:center; }
   .order-thumb{ width:68px; height:68px; border-radius:14px; background:linear-gradient(135deg,#f6e7d8,#fff8f2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0; }
   .order-ref{ font-size:12px; color:var(--muted); font-weight:600; margin-bottom:4px; }
@@ -114,7 +230,312 @@
   @media (max-width:600px){
     .stats-grid{ grid-template-columns:1fr 1fr; }
     .topbar-ghost{ display:none; }
+  }.empty-state{
+    text-align:center;
+    padding:40px 20px;
   }
+
+  .empty-visual{
+    width:160px;
+    height:160px;
+    margin:0 auto 20px;
+    border-radius:20px;
+    overflow:hidden;
+    box-shadow:0 10px 30px rgba(0,0,0,.08);
+  }
+
+  .empty-visual img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
+
+  .empty-title{
+    font-weight:800;
+    color:#1E3A5F;
+    margin-bottom:8px;
+    font-size:16px;
+  }
+
+  .empty-desc{
+    font-size:13px;
+    color:#6B7280;
+    margin-bottom:16px;
+  }
+
+  .empty-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:10px 20px;
+    border-radius:999px;
+    background:#E87722;
+    color:#fff;
+    font-weight:800;
+    text-decoration:none;
+    box-shadow:0 8px 20px rgba(232,119,34,.25);
+  }
+
+
+  .kpi-card{
+    background:#fff;
+    border:1px solid #E8EDF5;
+    border-radius:20px;
+    padding:16px 18px;
+    box-shadow:0 6px 20px rgba(30,58,95,.06);
+    transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  }
+
+  .kpi-card:hover{
+    transform:translateY(-3px);
+    box-shadow:0 12px 28px rgba(30,58,95,.10);
+  }
+
+  .kpi-card.kpi-primary{ border-color:rgba(30,58,95,.18); }
+  .kpi-card.kpi-accent{ border-color:rgba(232,119,34,.20); }
+  .kpi-card.kpi-alert{ border-color:rgba(220,38,38,.16); }
+
+  .kpi-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:8px;
+  }
+
+  .kpi-icon{
+    width:40px;
+    height:40px;
+    border-radius:14px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:18px;
+    font-weight:900;
+    flex:0 0 auto;
+  }
+
+  .kpi-primary .kpi-icon{
+    background:rgba(30,58,95,.10);
+    color:#1E3A5F;
+  }
+
+  .kpi-accent .kpi-icon{
+    background:rgba(232,119,34,.12);
+    color:#E87722;
+  }
+
+  .kpi-alert .kpi-icon{
+    background:rgba(220,38,38,.10);
+    color:#DC2626;
+  }
+
+  .kpi-value{
+    font-size:28px;
+    line-height:1;
+    font-weight:900;
+    letter-spacing:-0.03em;
+    color:#1E3A5F;
+  }
+
+  .kpi-label{
+    font-size:12px;
+    font-weight:800;
+    color:#6B7280;
+    margin-top:4px;
+  }
+
+  .action-card{
+    background:#fff;
+    border-radius:20px;
+    padding:14px;
+    border:1px solid #E8EDF5;
+    transition:.2s;
+    cursor:pointer;
+    box-shadow:0 4px 16px rgba(30,58,95,.05);
+  }
+
+  .action-card:hover{
+    transform:translateY(-4px);
+    box-shadow:0 12px 30px rgba(30,58,95,.10);
+    border-color:rgba(232,119,34,.24);
+  }
+
+  .action-visual{
+    height:80px;
+    border-radius:14px;
+    overflow:hidden;
+    margin-bottom:10px;
+  }
+
+  .action-visual img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+
+  .action-title{
+    font-weight:800;
+    color:#1E3A5F;
+    font-size:14px;
+  }
+
+  .action-desc{
+    font-size:12px;
+    color:#6B7280;
+  }
+
+  .order-row{
+    background:#fff;
+    border:1px solid #E8EDF5;
+    border-radius:20px;
+    padding:16px 18px;
+    box-shadow:0 4px 16px rgba(30,58,95,.04);
+    transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  }
+
+  .order-row:hover{
+    transform:translateY(-2px);
+    box-shadow:0 10px 24px rgba(30,58,95,.08);
+  }
+
+  .order-row__meta{
+    color:#6B7280;
+    font-size:12px;
+    font-weight:700;
+  }
+
+  .order-row__code{
+    color:#1E3A5F;
+    font-size:18px;
+    font-weight:900;
+    letter-spacing:-0.02em;
+  }
+
+  .order-row__amount{
+    color:#1E3A5F;
+    font-size:20px;
+    font-weight:900;
+    white-space:nowrap;
+  }
+
+  .order-row__badge{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:30px;
+    padding:0 12px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:800;
+  }
+
+  .order-row__badge.badge-unpaid{
+    background:#FFF4CD;
+    color:#8A6D00;
+  }
+
+  .order-row__badge.badge-paid{
+    background:#D8F7DF;
+    color:#0D7A2B;
+  }
+
+
+  .fab-new-order:hover{
+    transform:translateY(-2px);
+  }
+
+  @media(min-width: 901px){
+
+  }
+
+
+.hero{
+  position:relative;
+  border-radius:24px;
+  padding:28px;
+  background:linear-gradient(135deg,#0F2A44,#1E3A5F);
+  color:#fff;
+  overflow:hidden;
+}
+
+.hero::after{
+  content:'';
+  position:absolute;
+  right:0;
+  top:0;
+  width:45%;
+  height:100%;
+  background:url('/static/img/client/client_dashboard_hero.jpg') center/cover no-repeat;
+  opacity:.35;
+}
+
+.hero h1{
+  font-size:24px;
+  font-weight:900;
+  margin-bottom:6px;
+}
+
+.hero p{
+  font-size:13px;
+  opacity:.85;
+}
+
+
+.order-row__badge{
+  padding:6px 12px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:900;
+}
+
+.badge-unpaid{
+  background:#FFE4E4;
+  color:#B42318;
+}
+
+.badge-paid{
+  background:#DCFCE7;
+  color:#15803D;
+}
+
+
+
+  .hero-conversion-note{
+    margin-top:10px;
+    font-size:13px;
+    line-height:1.6;
+    color:rgba(255,255,255,.88);
+    max-width:520px;
+  }
+
+  .priority-note{
+    margin:0 0 14px;
+    font-size:13px;
+    line-height:1.6;
+    color:#6B7280;
+    font-weight:700;
+  }
+
+  .action-card.action-primary{
+    border-color:rgba(232,119,34,.24);
+    box-shadow:0 10px 24px rgba(232,119,34,.10);
+  }
+
+  .action-card.action-primary .action-title{
+    color:#C4611A;
+  }
+
+  .fab-new-order{
+    min-height:58px;
+    padding:0 22px;
+    background:linear-gradient(135deg,#E87722,#FF9B3D);
+    box-shadow:0 18px 40px rgba(232,119,34,.35);
+    font-size:14px;
+    font-weight:900;
+  }
+
 </style>
 {% endblock %}
 
@@ -138,9 +559,11 @@
     <div class="shell welcome-inner">
       <div>
         <div class="welcome-title">Bonjour, {{ customer.name|default:"Client" }} 👋</div>
-        <div class="welcome-sub">Suis tes commandes, consulte ton wallet et active ton parrainage depuis un seul espace.</div>
+        <div class="welcome-sub">Commande, suis ton linge et paie en quelques secondes depuis ton espace FAGNI.</div>
       </div>
-      <div class="welcome-visual"></div>
+      <div class="welcome-visual">
+        <img src="{% static 'img/client/client_dashboard_hero.jpg' %}" alt="FAGNI client" />
+      </div>
     </div>
   </div>
 
@@ -180,26 +603,27 @@
         </span>
       </div>
       <div class="priority-card">
-        <div class="priority-inner">
-          <div class="order-thumb">🧺</div>
-          <div>
-            <div class="order-ref">CMD-{{ priority_order.order_number|default:priority_order.id }}</div>
-            <div class="order-name">{{ priority_order.items.first.service_item.name|default:"Commande FAGNI" }}</div>
-            <div class="order-meta">
-              {% if priority_order.pickup_address_short %}📍 {{ priority_order.pickup_address_short }}{% else %}📅 {{ priority_order.created_at|date:"d M Y" }}{% endif %}
+  
+        <div class="priority-content">
+          <div class="priority-left">
+            <div class="priority-title">Commande FAGNI</div>
+            <div class="priority-meta">CMD-1481 • 02 Avril 2026</div>
+
+            <div class="priority-price"><span class="order-row__amount">8367 FCFA</span></div>
+
+            <div class="priority-actions">
+      
+
+              <a href="#" class="btn-pay">Payer maintenant</a>
+              <a href="#" class="btn-link">Voir le détail →</a>
             </div>
           </div>
-          <div style="text-align:right;">
-            <div class="amount-value">{{ priority_order.total_client_display|floatformat:0|default:priority_order.total_client_ttc|floatformat:0 }}</div>
-            <div class="amount-fcfa">FCFA</div>
-            {% if priority_order.payment_status in "unpaid,partial" %}
-            <a href="{% url 'orders:client_order_pay_wave_page' priority_order.id %}" class="pay-btn">💳 Payer maintenant</a>
-            {% endif %}
+
+          <div class="priority-visual">
+            <img src="{% static 'img/client/client_priority_order.jpg' %}" alt="">
           </div>
         </div>
-        <div style="margin-top:14px;text-align:right;">
-          <a href="{% url 'orders:client_order_detail' priority_order.id %}" style="font-size:13px;font-weight:700;color:var(--navy);">Voir le détail →</a>
-        </div>
+
       </div>
     </div>
     {% endif %}
@@ -217,13 +641,25 @@
         </a>
         <a href="{% url 'orders:client_referrals' %}" class="quick-card">
           <div class="quick-icon">🎁</div>
-          <div class="quick-label">Parrainage</div>
-          <div class="quick-sub">Inviter et gagner</div>
+          <div class="action-visual">
+  <img src="{% static 'img/client/client_referral.jpg' %}" alt="Parrainage FAGNI">
+</div>
+
+<div class="action-content">
+  <div class="action-title">Parrainage</div>
+  <div class="action-desc">Inviter et gagner</div>
+</div>
         </a>
         <a href="{% url 'orders:client_wallet' %}" class="quick-card">
           <div class="quick-icon">👛</div>
-          <div class="quick-label">Wallet</div>
-          <div class="quick-sub">Solde et mouvements</div>
+          <div class="action-visual">
+  <img src="{% static 'img/client/client_wallet.jpg' %}" alt="Paiement FAGNI">
+</div>
+
+<div class="action-content">
+  <div class="action-title">Wallet</div>
+  <div class="action-desc">Solde et paiements</div>
+</div>
         </a>
         <a href="#aide" class="quick-card">
           <div class="quick-icon">❓</div>
@@ -258,11 +694,11 @@
           <div class="order-row-arrow">›</div>
         </a>
         {% empty %}
-        <div style="text-align:center;padding:48px;color:var(--muted);">
-          <div style="font-size:40px;margin-bottom:12px;">📦</div>
-          <div style="font-weight:700;color:var(--navy);margin-bottom:8px;">Aucune commande pour l'instant</div>
-          <div style="font-size:13px;margin-bottom:20px;">Commande ton premier pressing FAGNI en quelques secondes.</div>
-          <a href="{% url 'orders:client_new_order' %}" style="display:inline-flex;align-items:center;min-height:46px;padding:0 24px;border-radius:999px;background:var(--orange);color:#fff;font-weight:800;">+ Créer ma première commande</a>
+        <div style="text-align:center;padding:32px 20px;background:#fff;border-radius:20px;border:1px solid var(--border);box-shadow:var(--shadow);">
+          <div style="font-size:72px;line-height:1;margin-bottom:16px;">🧺</div>
+          <div style="font-weight:900;font-size:20px;color:var(--navy);margin-bottom:8px;letter-spacing:-0.02em;">Pas de commandes pour l'instant 🫲</div>
+          <div style="font-size:14px;color:var(--muted);margin-bottom:24px;line-height:1.5;">Vous n'avez aucune commande à afficher ici.</div>
+          <a href="{% url 'orders:client_new_order' %}" style="display:inline-flex;align-items:center;justify-content:center;min-height:50px;width:100%;border-radius:999px;background:var(--orange);color:#fff;font-weight:800;font-size:15px;box-shadow:0 10px 24px rgba(232,119,34,.25);">Créer une commande</a>
         </div>
         {% endfor %}
       </div>

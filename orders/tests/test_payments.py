@@ -57,7 +57,10 @@ class PaymentGuardsTests(TestCase):
             phone="0700000109",
             defaults={"name": "T", "address": "X", "latitude": 0, "longitude": 0},
         )
-        o = Order.objects.create(customer=c)  # total_client_ttc = 0
+        o = Order.objects.create(customer=c, pricing_mode="item")
+        o.update_financials(save=True)
+        o.refresh_from_db()
+        self.assertEqual(Decimal(str(o.total_client_ttc or 0)), Decimal("0"))
         with self.assertRaises(ValidationError):
             o.add_payment(amount=1000, channel="test", reference=f"TEST-{o.code}-P1", source="system", save=True)
 
@@ -66,7 +69,10 @@ class PaymentGuardsTests(TestCase):
             phone="0700000110",
             defaults={"name": "T2", "address": "X", "latitude": 0, "longitude": 0},
         )
-        o = Order.objects.create(customer=c)  # total_client_ttc = 0
+        o = Order.objects.create(customer=c, pricing_mode="item")
+        o.update_financials(save=True)
+        o.refresh_from_db()
+        self.assertEqual(Decimal(str(o.total_client_ttc or 0)), Decimal("0"))
         with self.assertRaises(ValidationError):
             Payment.objects.create(order=o, amount=1000, channel="test", reference="DIRECT", source="system")
 

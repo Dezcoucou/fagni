@@ -1,12 +1,10 @@
 {% extends "base.html" %}
 {% load humanize %}
-
 {% block extra_head %}
 <style>
     body{
         background:#f5f5f7;
     }
-
     /* HERO HEADER DASHBOARD */
     .dashboard-hero {
         background:linear-gradient(90deg,#F07C22,#173B63);
@@ -23,7 +21,6 @@
         font-size:13px;
         opacity:.9;
     }
-
     .page{
         max-width:1200px;
         margin:20px auto 30px;
@@ -72,7 +69,6 @@
         font-size:11px;
         color:#64748b;
     }
-
     /* Cartes KPI */
     .cards{
         display:grid;
@@ -114,7 +110,6 @@
         color:#6b7280;
         margin-top:2px;
     }
-
     /* Boutons filtres période graphique */
     .graph-filters{
         display:flex;
@@ -138,7 +133,6 @@
         border-color:#173B63;
         color:#ffffff;
     }
-
     /* Zone graphique */
     .charts-grid{
         display:grid;
@@ -168,7 +162,6 @@
         color:#6b7280;
         margin-bottom:6px;
     }
-
     /* Conteneur du graphique (hauteur maîtrisée) */
     .chart-container{
         position:relative;
@@ -181,7 +174,6 @@
             height:180px;
         }
     }
-
     /* Tables */
     table{
         width:100%;
@@ -208,7 +200,6 @@
     }
     .t-right{ text-align:right; }
     .t-nowrap{ white-space:nowrap; }
-
     .legend{
         margin-top:8px;
         font-size:11px;
@@ -216,16 +207,12 @@
     }
 </style>
 {% endblock %}
-
 {% block content %}
-
 <header class="dashboard-hero">
     <h1>Dashboard commandes – FAGNI</h1>
     <p>Vision synthétique des commandes, du CA et des comportements clients.</p>
 </header>
-
 <div class="page">
-
     <!-- Barre du haut : navigation -->
     <div class="card">
         <div class="top-bar">
@@ -256,7 +243,6 @@
                 </a>
             </div>
         </div>
-
         <!-- KPIs principaux -->
         <div class="cards">
             <div class="stat-card">
@@ -297,7 +283,6 @@
                 </div>
             </div>
         </div>
-
         <!-- KPIs jour / semaine / mois -->
         <div class="cards" style="margin-top:10px;">
             <div class="stat-card">
@@ -343,10 +328,8 @@
             </div>
         </div>
     </div>
-
     <!-- Graphiques + bloc résumé Top -->
     <div class="card">
-
         <div class="top-bar" style="margin-bottom:6px;">
             <div>
                 <div style="font-size:14px;font-weight:600;color:#0f172a;">
@@ -372,7 +355,6 @@
                 </a>
             </div>
         </div>
-
         <div class="charts-grid">
             <!-- Graphique ligne commandes & CA -->
             <div class="chart-box">
@@ -384,7 +366,6 @@
                     <canvas id="ordersChart"></canvas>
                 </div>
             </div>
-
             <!-- Bloc explicatif Top -->
             <div class="chart-box">
                 <div class="chart-title">Vue rapide "Top"</div>
@@ -399,7 +380,6 @@
             </div>
         </div>
     </div>
-
     <!-- Top clients + Top prestations -->
     <div class="card">
         <div class="top-bar" style="margin-bottom:6px;">
@@ -412,7 +392,6 @@
                 </div>
             </div>
         </div>
-
         <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:12px;">
             <!-- Top clients -->
             <div>
@@ -451,7 +430,6 @@
                     <div class="mini">Pas encore de données suffisantes pour les top clients.</div>
                 {% endif %}
             </div>
-
             <!-- Top prestations -->
             <div>
                 <h3 style="font-size:13px;margin:0 0 4px;border-left:3px solid #F07C22;padding-left:6px;color:#0f172a;">
@@ -487,16 +465,13 @@
                 {% endif %}
             </div>
         </div>
-
         <div class="legend">
             💡 <strong>Idées d’usage :</strong><br>
             – Cibler les top clients pour des offres VIP ou des codes promo.<br>
             – Construire des packs ou abonnements basés sur les prestations les plus demandées.
         </div>
     </div>
-
 </div>
-
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
@@ -504,7 +479,6 @@
         const labels = {{ chart_labels|default:"[]"|safe }};
         const ordersData = {{ chart_orders|default:"[]"|safe }};
         const totalsData = {{ chart_totals|default:"[]"|safe }};
-
         const ctx = document.getElementById('ordersChart');
         if (ctx && labels.length) {
             new Chart(ctx, {

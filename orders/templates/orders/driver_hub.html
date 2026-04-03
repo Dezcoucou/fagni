@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% load money_filters %}
-
 {% block title %}Accueil livreur – FAGNI{% endblock %}
-
 {% block content %}
 <style>
   :root{
@@ -18,15 +16,12 @@
     --green:#16a34a;
     --shadow:0 10px 24px rgba(15,23,42,.08);
   }
-
   body{ background:var(--bg); }
-
   .driver-page{
     max-width:540px;
     margin:0 auto 110px;
     padding:12px 12px 24px;
   }
-
   .hero{
     border-radius:22px;
     padding:16px;
@@ -37,7 +32,6 @@
     box-shadow:0 14px 28px rgba(15,23,42,.18);
     margin-bottom:14px;
   }
-
   .hero-top{
     display:flex;
     justify-content:space-between;
@@ -45,7 +39,6 @@
     align-items:flex-start;
     flex-wrap:wrap;
   }
-
   .hero-kicker{
     font-size:11px;
     text-transform:uppercase;
@@ -53,7 +46,6 @@
     font-weight:900;
     opacity:.9;
   }
-
   .hero-title{
     margin-top:6px;
     font-size:24px;
@@ -61,7 +53,6 @@
     font-weight:1000;
     letter-spacing:-.02em;
   }
-
   .hero-sub{
     margin-top:6px;
     font-size:12px;
@@ -69,7 +60,6 @@
     opacity:.92;
     max-width:360px;
   }
-
   .hero-chip{
     display:inline-flex;
     align-items:center;
@@ -82,14 +72,12 @@
     font-weight:900;
     white-space:nowrap;
   }
-
   .hero-stats{
     margin-top:14px;
     display:grid;
     grid-template-columns:repeat(3,minmax(0,1fr));
     gap:10px;
   }
-
   .hero-meta-row{
     margin-top:10px;
     display:flex;
@@ -97,7 +85,6 @@
     flex-wrap:wrap;
     align-items:center;
   }
-
   .hero-soft-pill{
     display:inline-flex;
     align-items:center;
@@ -110,14 +97,12 @@
     font-weight:900;
     white-space:nowrap;
   }
-
   .hero-stat{
     border:1px solid rgba(255,255,255,.12);
     background:rgba(255,255,255,.10);
     border-radius:16px;
     padding:10px 12px;
   }
-
   .hero-stat-label{
     font-size:10px;
     text-transform:uppercase;
@@ -125,21 +110,18 @@
     font-weight:900;
     opacity:.82;
   }
-
   .hero-stat-value{
     margin-top:4px;
     font-size:20px;
     line-height:1.05;
     font-weight:1000;
   }
-
   .hero-stat-sub{
     margin-top:4px;
     font-size:11px;
     line-height:1.35;
     opacity:.9;
   }
-
   .card{
     background:var(--card);
     border:1px solid var(--line);
@@ -148,7 +130,6 @@
     box-shadow:var(--shadow);
     margin-bottom:14px;
   }
-
   .section-head{
     display:flex;
     justify-content:space-between;
@@ -156,7 +137,6 @@
     align-items:flex-start;
     margin-bottom:10px;
   }
-
   .section-title{
     margin:0;
     font-size:18px;
@@ -164,14 +144,12 @@
     color:var(--text);
     letter-spacing:-.01em;
   }
-
   .section-sub{
     margin-top:4px;
     font-size:12px;
     color:var(--muted);
     line-height:1.4;
   }
-
   .mission-card{
     border-radius:18px;
     border:2px solid #ff7a00;
@@ -179,7 +157,6 @@
     padding:14px;
     box-shadow:0 10px 25px rgba(255,122,0,.16);
   }
-
   .mission-badge{
     display:inline-flex;
     align-items:center;
@@ -192,33 +169,28 @@
     font-weight:900;
     margin-bottom:8px;
   }
-
   .mission-title{
     font-size:14px;
     font-weight:900;
     color:var(--text);
     line-height:1.35;
   }
-
   .mission-hint{
     margin-top:6px;
     font-size:12px;
     color:var(--muted);
     line-height:1.45;
   }
-
   .mission-actions{
     margin-top:12px;
     display:grid;
     gap:10px;
   }
-
   .kpi-grid{
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
     gap:10px;
   }
-
   .kpi{
     border:1px solid #e8edf3;
     border-radius:16px;
@@ -226,11 +198,9 @@
     min-height:94px;
     background:#fff;
   }
-
   .kpi.orange{ background:linear-gradient(180deg,#fff,#fff7ed); border-color:#fed7aa; }
   .kpi.blue{ background:linear-gradient(180deg,#fff,#eff6ff); border-color:#bfdbfe; }
   .kpi.green{ background:linear-gradient(180deg,#fff,#ecfdf3); border-color:#bbf7d0; }
-
   .kpi-label{
     font-size:10px;
     text-transform:uppercase;
@@ -238,7 +208,6 @@
     color:#94a3b8;
     font-weight:900;
   }
-
   .kpi-value{
     margin-top:4px;
     font-size:22px;
@@ -246,20 +215,17 @@
     font-weight:1000;
     color:var(--text);
   }
-
   .kpi-sub{
     margin-top:5px;
     font-size:11px;
     line-height:1.4;
     color:var(--muted);
   }
-
   .action-grid{
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
     gap:10px;
   }
-
   .action-card{
     display:flex;
     gap:10px;
@@ -271,13 +237,11 @@
     padding:13px;
     background:#fff;
   }
-
   .action-card.primary{
     color:#fff;
     border-color:#1d4ed8;
     background:linear-gradient(135deg,#203a76 0%,#1e3a8a 100%);
   }
-
   .action-ico{
     width:40px;
     height:40px;
@@ -289,40 +253,33 @@
     background:#fff7ed;
     flex:0 0 auto;
   }
-
   .action-card.primary .action-ico{
     background:rgba(255,255,255,.14);
   }
-
   .action-title{
     font-size:14px;
     font-weight:900;
     line-height:1.25;
   }
-
   .action-text{
     margin-top:3px;
     font-size:12px;
     line-height:1.4;
     color:var(--muted);
   }
-
   .action-card.primary .action-text{
     color:rgba(255,255,255,.84);
   }
-
   .orders-list{
     display:grid;
     gap:10px;
   }
-
   .order-card{
     border:1px solid #e5e7eb;
     border-radius:18px;
     padding:12px;
     background:#fff;
   }
-
   .order-head{
     display:flex;
     justify-content:space-between;
@@ -330,20 +287,17 @@
     align-items:flex-start;
     flex-wrap:wrap;
   }
-
   .order-code{
     font-size:14px;
     font-weight:1000;
     color:var(--text);
     word-break:break-word;
   }
-
   .order-date{
     margin-top:3px;
     font-size:11px;
     color:var(--muted);
   }
-
   .status{
     display:inline-flex;
     align-items:center;
@@ -355,19 +309,16 @@
     border:1px solid transparent;
     white-space:nowrap;
   }
-
   .status.pending{ background:#fff7ed; color:#9a3412; border-color:#fed7aa; }
   .status.in_progress{ background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
   .status.done{ background:#ecfdf3; color:#166534; border-color:#bbf7d0; }
   .status.canceled{ background:#fef2f2; color:#991b1b; border-color:#fecaca; }
-
   .order-grid{
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
     gap:10px;
     margin-top:10px;
   }
-
   .meta-k{
     font-size:10px;
     text-transform:uppercase;
@@ -375,7 +326,6 @@
     color:#94a3b8;
     font-weight:900;
   }
-
   .meta-v{
     margin-top:3px;
     font-size:13px;
@@ -384,7 +334,6 @@
     line-height:1.35;
     word-break:break-word;
   }
-
   .btn-line{
     margin-top:12px;
     display:flex;
@@ -392,7 +341,6 @@
     gap:8px;
     flex-wrap:wrap;
   }
-
   .btn{
     display:inline-flex;
     align-items:center;
@@ -405,23 +353,19 @@
     font-weight:1000;
     border:1px solid transparent;
   }
-
   .btn-dark{
     background:var(--navy);
     color:#fff;
   }
-
   .btn-light{
     background:#fff;
     color:var(--text);
     border-color:#e5e7eb;
   }
-
   .btn-orange{
     background:var(--orange);
     color:#fff;
   }
-
   .empty-state{
     border:1px dashed #d7dee8;
     border-radius:18px;
@@ -431,7 +375,6 @@
     color:var(--muted);
     font-size:13px;
   }
-
   .pager{
     margin-top:12px;
     display:flex;
@@ -439,18 +382,15 @@
     justify-content:space-between;
     gap:10px;
   }
-
   .pager-info{
     font-size:12px;
     color:var(--muted);
     font-weight:800;
   }
-
   .pager-actions{
     display:flex;
     gap:8px;
   }
-
   .pager-btn{
     min-width:92px;
     min-height:40px;
@@ -461,12 +401,10 @@
     font-weight:900;
     cursor:pointer;
   }
-
   .pager-btn[disabled]{
     opacity:.45;
     cursor:not-allowed;
   }
-
   .bottom-nav{
     position:fixed;
     left:0;
@@ -476,7 +414,6 @@
     padding:10px 10px calc(10px + env(safe-area-inset-bottom));
     background:linear-gradient(180deg, rgba(246,248,252,0), rgba(246,248,252,.92) 30%, rgba(246,248,252,1) 100%);
   }
-
   .bottom-wrap{
     max-width:540px;
     margin:0 auto;
@@ -490,7 +427,6 @@
     gap:8px;
     box-shadow:0 14px 30px rgba(15,23,42,.12);
   }
-
   .nav-item{
     min-height:56px;
     border-radius:16px;
@@ -504,12 +440,10 @@
     font-size:11px;
     font-weight:900;
   }
-
   .nav-item.active{
     background:#fff7ed;
     color:var(--orange-dark);
   }
-
   @media (max-width:640px){
     .driver-page{ padding:12px 10px 24px; }
     .hero-title{ font-size:22px; }
@@ -517,9 +451,7 @@
     .btn-line .btn{ width:100%; }
   }
 </style>
-
 <div class="driver-page">
-
   <section class="hero">
     <div class="hero-top">
       <div>
@@ -531,30 +463,25 @@
           Ton cockpit terrain simple pour suivre ta mission, tes chiffres utiles et tes dernières courses.
         </div>
       </div>
-
       <div>
         <div class="hero-chip">Période • {{ period_display|default:"Aujourd'hui" }}</div>
       </div>
     </div>
-
     <div class="hero-meta-row">
       <div class="hero-soft-pill">🕒 Dernière mise à jour : maintenant</div>
       <div class="hero-soft-pill">🎯 Objectif du jour : {{ stats.done_orders|default:0 }} mission(s) terminée(s)</div>
     </div>
-
     <div class="hero-stats">
       <div class="hero-stat">
         <div class="hero-stat-label">Actives</div>
         <div class="hero-stat-value">{{ stats.pending_orders|default:0|add:stats.in_progress_orders|default:0 }}</div>
         <div class="hero-stat-sub">{{ stats.pending_orders|default:0 }} attente · {{ stats.in_progress_orders|default:0 }} en cours</div>
       </div>
-
       <div class="hero-stat">
         <div class="hero-stat-label">Terminées</div>
         <div class="hero-stat-value">{{ stats.done_orders|default:0 }}</div>
         <div class="hero-stat-sub">Missions clôturées</div>
       </div>
-
       <div class="hero-stat">
         <div class="hero-stat-label">Revenus</div>
         <div class="hero-stat-value">{{ stats.total_driver_income|default:0|fcfa }}</div>
@@ -562,7 +489,6 @@
       </div>
     </div>
   </section>
-
   <section class="card">
     <div class="section-head">
       <div>
@@ -570,7 +496,6 @@
         <div class="section-sub">Le raccourci terrain le plus important pour toi.</div>
       </div>
     </div>
-
     {% if current_mission_cta %}
       <div class="mission-card">
         <div class="mission-badge">{{ current_mission_label|default:"Mission active" }}</div>
@@ -596,7 +521,6 @@
       </div>
     {% endif %}
   </section>
-
   <section class="card">
     <div class="section-head">
       <div>
@@ -604,7 +528,6 @@
         <div class="section-sub">Seulement les chiffres utiles pour piloter ta journée.</div>
       </div>
     </div>
-
     <div class="kpi-grid">
       <article class="kpi">
         <div class="kpi-label">Courses totales</div>
@@ -614,7 +537,6 @@
           Annulées : <strong>{{ stats.canceled_orders|default:0 }}</strong>
         </div>
       </article>
-
       <article class="kpi orange">
         <div class="kpi-label">Courses actives</div>
         <div class="kpi-value">{{ stats.pending_orders|default:0|add:stats.in_progress_orders|default:0 }}</div>
@@ -623,7 +545,6 @@
           En cours : <strong>{{ stats.in_progress_orders|default:0 }}</strong>
         </div>
       </article>
-
       <article class="kpi blue">
         <div class="kpi-label">Distance cumulée</div>
         <div class="kpi-value">{{ stats.total_distance_km|default:0|floatformat:"1" }} km</div>
@@ -631,7 +552,6 @@
           Moyenne : <strong>{{ stats.avg_distance_km|default:0|floatformat:"1" }} km</strong>
         </div>
       </article>
-
       <article class="kpi green">
         <div class="kpi-label">Revenus logistiques</div>
         <div class="kpi-value">{{ stats.total_driver_income|default:0|fcfa }}</div>
@@ -639,7 +559,6 @@
       </article>
     </div>
   </section>
-
   <section class="card">
     <div class="section-head">
       <div>
@@ -647,7 +566,6 @@
         <div class="section-sub">Seulement l’essentiel.</div>
       </div>
     </div>
-
     <div class="action-grid">
       <a href="{% if current_mission_cta %}{{ current_mission_cta }}{% else %}{% url 'orders:driver_app' %}{% endif %}" class="action-card primary">
         <div class="action-ico">▶</div>
@@ -656,7 +574,6 @@
           <div class="action-text">Accéder directement à l’action terrain du moment.</div>
         </div>
       </a>
-
       <a href="{% url 'orders:driver_wallet' %}" class="action-card">
         <div class="action-ico">💼</div>
         <div>
@@ -664,7 +581,6 @@
           <div class="action-text">Consulter ton solde et les mouvements liés à tes missions.</div>
         </div>
       </a>
-
       <a href="{% url 'orders:driver_history_me' %}" class="action-card">
         <div class="action-ico">🕘</div>
         <div>
@@ -672,7 +588,6 @@
           <div class="action-text">Retrouver rapidement tes dernières missions.</div>
         </div>
       </a>
-
       <a href="{% url 'orders:driver_me_app' %}" class="action-card">
         <div class="action-ico">👤</div>
         <div>
@@ -682,7 +597,6 @@
       </a>
     </div>
   </section>
-
   <section class="card">
     <div class="section-head">
       <div>
@@ -691,7 +605,6 @@
       </div>
       <a class="btn btn-light" href="{% url 'orders:driver_app' %}">Voir tout</a>
     </div>
-
     {% if last_orders %}
       <div id="ordersList" class="orders-list">
         {% for order in last_orders %}
@@ -705,7 +618,6 @@
               </div>
               <span class="status {{ order.status }}">{{ order.get_status_display }}</span>
             </div>
-
             <div class="order-grid">
               <div>
                 <div class="meta-k">Client</div>
@@ -713,14 +625,12 @@
                   {% if order.customer and order.customer.name %}{{ order.customer.name }}{% else %}Client inconnu{% endif %}
                 </div>
               </div>
-
               <div>
                 <div class="meta-k">Téléphone</div>
                 <div class="meta-v">
                   {% if order.customer and order.customer.phone %}{{ order.customer.phone }}{% else %}—{% endif %}
                 </div>
               </div>
-
               <div>
                 <div class="meta-k">Adresse</div>
                 <div class="meta-v">
@@ -735,7 +645,6 @@
                   {% endif %}
                 </div>
               </div>
-
               <div>
                 <div class="meta-k">Montant client</div>
                 <div class="meta-v">
@@ -749,7 +658,6 @@
                 </div>
               </div>
             </div>
-
             <div class="btn-line">
               <a class="btn btn-dark" href="{% url 'orders:driver_order_detail' order.id %}{% if connected_driver %}?driver_id={{ connected_driver.id }}{% elif driver %}?driver_id={{ driver.id }}{% endif %}">
                 Voir
@@ -758,7 +666,6 @@
           </article>
         {% endfor %}
       </div>
-
       <div class="pager">
         <div id="pagerInfo" class="pager-info"></div>
         <div class="pager-actions">
@@ -772,9 +679,7 @@
       </div>
     {% endif %}
   </section>
-
 </div>
-
 <div class="bottom-nav">
   <div class="bottom-wrap">
     <a href="{% url 'orders:driver_hub' %}" class="nav-item active">
@@ -795,42 +700,35 @@
     </a>
   </div>
 </div>
-
 <script>
 (function(){
   const pageSize = 5;
   const cards = Array.from(document.querySelectorAll('.js-order-card'));
   if (!cards.length) return;
-
   let currentPage = 1;
   const totalPages = Math.max(1, Math.ceil(cards.length / pageSize));
   const prevBtn = document.getElementById('prevPageBtn');
   const nextBtn = document.getElementById('nextPageBtn');
   const pagerInfo = document.getElementById('pagerInfo');
-
   function renderPage(page){
     currentPage = Math.min(Math.max(1, page), totalPages);
-
     cards.forEach((card, index) => {
       const start = (currentPage - 1) * pageSize;
       const end = start + pageSize;
       card.style.display = (index >= start && index < end) ? '' : 'none';
     });
-
     if (pagerInfo){
       pagerInfo.textContent = "Page " + currentPage + " / " + totalPages;
     }
     if (prevBtn) prevBtn.disabled = currentPage <= 1;
     if (nextBtn) nextBtn.disabled = currentPage >= totalPages;
   }
-
   if (prevBtn){
     prevBtn.addEventListener('click', function(){ renderPage(currentPage - 1); });
   }
   if (nextBtn){
     nextBtn.addEventListener('click', function(){ renderPage(currentPage + 1); });
   }
-
   renderPage(1);
 })();
 </script>

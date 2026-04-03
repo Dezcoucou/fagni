@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block content %}
 <div class="page-header">
     <div class="page-header__left">
@@ -9,9 +8,7 @@
         </p>
     </div>
 </div>
-
 <div class="container">
-
     <!-- Filtres -->
     <div class="card mb-4">
         <form method="get" class="filters-grid">
@@ -23,7 +20,6 @@
                     <option value="month" {% if period == "month" %}selected{% endif %}>Mois en cours</option>
                 </select>
             </div>
-
             <div class="filter-item">
                 <label for="status">Statut</label>
                 <select name="status" id="status">
@@ -35,7 +31,6 @@
                     <option value="canceled" {% if status_filter == "canceled" %}selected{% endif %}>Annulées</option>
                 </select>
             </div>
-
             <div class="filter-actions">
                 <button type="submit" class="btn btn-primary">Filtrer</button>
                 <a href="{% url 'orders:driver_history_me' %}" class="btn btn-secondary btn-reset">
@@ -48,7 +43,6 @@
             <strong>{{ end_date|date:"d/m/Y" }}</strong>.
         </p>
     </div>
-
     <!-- KPIs Bilan -->
     <div class="kpi-grid mb-4">
         <div class="kpi-card kpi-card--blue kpi-card--full">
@@ -58,21 +52,18 @@
                 Dont terminées : {{ done_count }} • Distance : {{ total_distance_km|floatformat:"g" }} km
             </div>
         </div>
-
         <div class="kpi-card kpi-card--green">
             <div class="kpi-label">Revenus logistique estimés</div>
             <div class="kpi-value">
                 {{ total_driver_earnings|floatformat:"g" }} FCFA
             </div>
         </div>
-
         <div class="kpi-card kpi-card--orange">
             <div class="kpi-label">Montant payé par les clients</div>
             <div class="kpi-value">
                 {{ client_total|floatformat:"g" }} FCFA
             </div>
         </div>
-
         <div class="kpi-card kpi-card--red">
             <div class="kpi-label">Cash à remettre</div>
             <div class="kpi-value">
@@ -83,7 +74,6 @@
             </div>
         </div>
     </div>
-
     <!-- Liste des courses -->
     {% if orders %}
         <div class="card">
@@ -106,7 +96,6 @@
                             <td data-label="Code">{{ o.code|default:o.id }}</td>
                             <td data-label="Client">{{ o.customer.name|default:"-" }}</td>
                             <td data-label="Statut">{{ o.get_status_display }}</td>
-
                             <td data-label="Distance (km)">
                                 {% if o.distance_km %}
                                     {{ o.distance_km|floatformat:"g" }}
@@ -114,11 +103,9 @@
                                     -
                                 {% endif %}
                             </td>
-
                             <td data-label="Montant client (FCFA)">
                                 {{ o.total_client|floatformat:"g" }}
                             </td>
-
                             <td data-label="Revenu livreur (FCFA)">
                                 {{ o.driver_earnings_display|floatformat:"g" }}
                             </td>
@@ -133,31 +120,26 @@
         </div>
     {% endif %}
 </div>
-
 <style>
     .container {
         max-width: 900px;
         margin: 0 auto;
     }
-
     .card {
         background: #ffffff;
         border-radius: 12px;
         padding: 14px 16px;
         box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
     }
-
     .mb-4 {
         margin-bottom: 1.5rem;
     }
-
     .filters-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
         gap: 12px;
         align-items: end;
     }
-
     .filter-item label {
         display: block;
         font-size: 13px;
@@ -165,7 +147,6 @@
         color: #475569;
         font-weight: 500;
     }
-
     .filter-item select {
         width: 100%;
         padding: 6px 8px;
@@ -173,20 +154,17 @@
         border: 1px solid #cbd5f5;
         font-size: 14px;
     }
-
     .filter-actions {
         display: flex;
         gap: 8px;
         align-items: center;
         margin-top: 4px;
     }
-
     .filters-info {
         font-size: 12px;
         color: #64748b;
         margin-top: 8px;
     }
-
     .btn {
         display: inline-flex;
         align-items: center;
@@ -199,27 +177,22 @@
         cursor: pointer;
         white-space: nowrap;
     }
-
     .btn-primary {
         background: #0056b3;
         color: #fff;
     }
-
     .btn-secondary {
         background: #e2e8f0;
         color: #1e293b;
     }
-
     .btn-reset {
         font-size: 12px;
     }
-
     .kpi-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
         gap: 10px;
     }
-
     .kpi-card {
         background: #ffffff;
         border-radius: 12px;
@@ -227,53 +200,43 @@
         box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
         border-left: 4px solid transparent;
     }
-
     .kpi-card--full {
         grid-column: 1 / -1;
     }
-
     .kpi-card--blue {
         border-left-color: #0056b3;
     }
-
     .kpi-card--green {
         border-left-color: #16a34a;
     }
-
     .kpi-card--orange {
         border-left-color: #f97316;
     }
-
     .kpi-card--red {
         border-left-color: #dc2626;
     }
-
     .kpi-label {
         font-size: 11px;
         color: #64748b;
         text-transform: uppercase;
         letter-spacing: 0.04em;
     }
-
     .kpi-value {
         font-size: 20px;
         font-weight: 700;
         color: #0f172a;
         margin-top: 2px;
     }
-
     .kpi-sub {
         font-size: 11px;
         color: #94a3b8;
         margin-top: 2px;
     }
-
     .history-table {
         width: 100%;
         border-collapse: collapse;
         font-size: 13px;
     }
-
     .history-table th,
     .history-table td {
         padding: 8px 6px;
@@ -281,7 +244,6 @@
         text-align: left;
         vertical-align: middle;
     }
-
     .history-table th {
         font-size: 12px;
         text-transform: uppercase;
@@ -289,15 +251,12 @@
         color: #64748b;
         background: #f8fafc;
     }
-
     .history-table tbody tr:nth-child(even) {
         background: #f9fafb;
     }
-
     .history-table tbody tr:hover {
         background: #eff6ff;
     }
-
     @media (max-width: 768px) {
         .history-table thead {
             display: none;

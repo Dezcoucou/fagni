@@ -3,7 +3,6 @@
 {% block title %}Nos Services – FAGNI{% endblock %}
 {% block content %}
 <h2>Nos Services</h2>
-
 <style>
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:12px}
 .card{border:1px solid #d7d7d7;border-radius:12px;padding:16px;background:#fff}
@@ -14,9 +13,7 @@
 .cta:hover{background:#2c5cc5;color:#fff}
 .badge{display:inline-block;background:#eef4ff;border:1px solid #c9dbff;padding:2px 8px;border-radius:999px;font-size:.8rem;margin-left:6px}
 </style>
-
 <div class="grid">
-
   <div class="card">
     <h3>Collecte & Livraison <span class="badge">Domicile</span></h3>
     <p>Prise de rendez-vous rapide, ramassage et retour chez vous.</p>
@@ -27,7 +24,6 @@
     </ul>
     <a class="cta" href="{% url 'order' %}">Commander</a>
   </div>
-
   <div class="card">
     <h3>Blanchisserie professionnelle</h3>
     <p>Traitement complet pour votre linge quotidien.</p>
@@ -38,7 +34,6 @@
     </ul>
     <a class="cta" href="/tarifs/">Voir les tarifs</a>
   </div>
-
   <div class="card">
     <h3>Repassage & pliage</h3>
     <p>Finitions nettes pour chemises, pantalons, tenues pro.</p>
@@ -49,7 +44,6 @@
     </ul>
     <a class="cta" href="/tarifs/">Voir les tarifs</a>
   </div>
-
   <div class="card">
     <h3>Pressing / Nettoyage à sec</h3>
     <p>Soin des pièces délicates : costumes, robes, vestes.</p>
@@ -60,7 +54,6 @@
     </ul>
     <a class="cta" href="{% url 'contact' %}">Demander un devis</a>
   </div>
-
   <div class="card">
     <h3>Retouches & couture</h3>
     <p>Ourlets, reprises, boutons, fermetures éclair.</p>
@@ -71,7 +64,6 @@
     </ul>
     <a class="cta" href="{% url 'contact' %}">Prendre RDV</a>
   </div>
-
   <div class="card">
     <h3>Abonnements entreprises</h3>
     <p>Offres mensuelles pour bureaux, hôtels, restos, équipes.</p>
@@ -82,9 +74,7 @@
     </ul>
     <a class="cta" href="/tarifs/">Formules & tarifs</a>
   </div>
-
 </div>
-
 <p style="margin-top:14px">
 Besoin d’un service spécifique (couettes, rideaux, tapis, robes de soirée) ?
 Passe par la page <a href="{% url 'contact' %}">Contact</a> pour un devis rapide.

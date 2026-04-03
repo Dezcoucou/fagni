@@ -1,7 +1,5 @@
 {% extends "base.html" %}
-
 {% block title %}Tableau livreurs – FAGNI{% endblock %}
-
 {% block content %}
 <style>
   .drv-page{
@@ -29,7 +27,6 @@
     font-size:13px;
     color:#6b7280;
   }
-
   .drv-header-actions{
     display:flex;
     flex-wrap:wrap;
@@ -60,7 +57,6 @@
   .drv-btn-primary:hover{
     background:#00408a;
   }
-
   /* KPI bandeau */
   .drv-kpi-strip{
     display:grid;
@@ -97,7 +93,6 @@
     font-size:11px;
     color:#9ca3af;
   }
-
   /* Filtre */
   .drv-filter-bar{
     background:#ffffff;
@@ -155,7 +150,6 @@
   .drv-filter-reset:hover{
     background:#f9fafb;
   }
-
   /* Badge statut */
   .drv-status{
     display:inline-flex;
@@ -182,7 +176,6 @@
     background:#fef2f2;
     color:#b91c1c;
   }
-
   /* Liste des commandes en cartes */
   .drv-list{
     display:flex;
@@ -202,7 +195,6 @@
   @media(max-width:800px){
     .drv-card{grid-template-columns:1fr;}
   }
-
   .drv-card-main{
     display:flex;
     flex-direction:column;
@@ -240,7 +232,6 @@
     font-size:12px;
     color:#4b5563;
   }
-
   .drv-card-side{
     font-size:12px;
     border-left:1px dashed #e5e7eb;
@@ -267,7 +258,6 @@
     font-size:11px;
     color:#6b7280;
   }
-
   .drv-card-actions{
     display:flex;
     flex-wrap:wrap;
@@ -281,7 +271,6 @@
     background:#f3f4f6;
     color:#374151;
   }
-
   .drv-empty{
     margin-top:10px;
     font-size:13px;
@@ -289,9 +278,7 @@
     font-style:italic;
   }
 </style>
-
 <div class="drv-page">
-
   <!-- En-tête -->
   <div class="drv-header">
     <div class="drv-header-title">
@@ -312,7 +299,6 @@
       </a>
     </div>
   </div>
-
   <!-- Bandeau KPI -->
   <div class="drv-kpi-strip">
     <div class="drv-kpi">
@@ -324,7 +310,6 @@
         Basé sur les commandes ayant un livreur partenaire.
       </div>
     </div>
-
     <div class="drv-kpi">
       <div class="drv-kpi-label">Filtre livreur</div>
       <div class="drv-kpi-value">
@@ -342,7 +327,6 @@
         Change le filtre ci-dessous pour voir un livreur en particulier.
       </div>
     </div>
-
     <div class="drv-kpi">
       <div class="drv-kpi-label">Statut dominant</div>
       <div class="drv-kpi-value">
@@ -354,7 +338,6 @@
         Vision rapide du mix de statuts sur la sélection en cours.
       </div>
     </div>
-
     <div class="drv-kpi">
       <div class="drv-kpi-label">Distance & logistique</div>
       <div class="drv-kpi-value">
@@ -371,11 +354,9 @@
       </div>
     </div>
   </div>
-
   <!-- Filtre par livreur -->
   <form method="get" class="drv-filter-bar">
     <span>Filtrer par livreur :</span>
-
     <select name="driver_id" class="drv-select">
       <option value="">— Tous les livreurs —</option>
       {% for d in drivers %}
@@ -385,18 +366,15 @@
         </option>
       {% endfor %}
     </select>
-
     <button type="submit" class="drv-filter-submit">
       Appliquer
     </button>
-
     {% if selected_driver_id %}
       <a href="?" class="drv-filter-reset">
         Réinitialiser
       </a>
     {% endif %}
   </form>
-
   <!-- Liste des commandes -->
   {% if orders %}
     <div class="drv-list">
@@ -428,27 +406,23 @@
                 {% endif %}
               </div>
             </div>
-
             <div class="drv-timestamps">
               Créée le {{ o.created_at|date:"d/m/Y H:i" }}
               {% if o.delivered_time %}
                 • Livrée le {{ o.delivered_time|date:"d/m/Y H:i" }}
               {% endif %}
             </div>
-
             <div class="drv-client">
               👤 {{ o.customer.name }}
               {% if o.customer.phone %}
                 <span>• 📞 {{ o.customer.phone }}</span>
               {% endif %}
             </div>
-
             {% if o.customer.address %}
               <div class="drv-address">
                 📍 {{ o.customer.address }}
               </div>
             {% endif %}
-
             <div class="drv-leg-line">
               {% if o.pickup_time %}
                 ✅ Collecte effectuée
@@ -469,7 +443,6 @@
               {% endif %}
             </div>
           </div>
-
           <!-- Colonne droite : livreur, distances, montants & actions -->
           <div class="drv-card-side">
             <div class="drv-money">
@@ -486,7 +459,6 @@
               Coût livreur : {{ o.driver_logistic_cost|default:0|floatformat:0 }} FCFA<br>
               Marge logistique FAGNI : {{ o.logistic_margin|default:0 }} FCFA
             </div>
-
             <div class="drv-meta">
               {% if o.distance_km %}
                 Distance A/R : {{ o.distance_km }} km
@@ -494,7 +466,6 @@
                 Distance non calculée.
               {% endif %}
             </div>
-
             <div class="drv-meta">
               Livreurs :
               {% if o.delivery_partner %}
@@ -507,14 +478,12 @@
                 </span>
               {% endif %}
             </div>
-
             <!-- FORMULAIRE D'ACTIONS LIVREUR (avec GPS) -->
             <form method="post" class="drv-card-actions-form">
               {% csrf_token %}
               <input type="hidden" name="order_id" value="{{ o.id }}">
               <input type="hidden" name="lat" class="js-lat">
               <input type="hidden" name="lng" class="js-lng">
-
               <div class="drv-card-actions">
                 {% if not o.pickup_time and o.status != "canceled" %}
                   <button
@@ -527,7 +496,6 @@
                     ✅ Collecte effectuée
                   </button>
                 {% endif %}
-
                 {% if o.pickup_time and not o.dropoff_time and o.status != "canceled" %}
                   <button
                     type="submit"
@@ -539,7 +507,6 @@
                     🧺 Dépôt blanchisserie OK
                   </button>
                 {% endif %}
-
                 {% if o.dropoff_time and not o.delivered_time and o.status != "canceled" %}
                   <button
                     type="submit"
@@ -551,7 +518,6 @@
                     📦 Livraison client OK
                   </button>
                 {% endif %}
-
                 {% if o.status != "canceled" and not o.delivered_time %}
                   <button
                     type="submit"
@@ -564,7 +530,6 @@
                 {% endif %}
               </div>
             </form>
-
             <!-- Liens info (détail, appels) -->
             <div class="drv-card-actions">
               <a href="{% url 'orders:detail' o.id %}" class="drv-btn" style="padding:5px 10px;font-size:11px;">
@@ -590,30 +555,23 @@
       Aucune commande avec livreur pour ce filtre.
     </p>
   {% endif %}
-
 </div>
-
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const forms = document.querySelectorAll('.drv-card-actions-form');
-
   forms.forEach(function (form) {
     form.addEventListener('click', function (event) {
       const btn = event.target.closest('button[data-need-geo="1"]');
       if (!btn) {
         return;
       }
-
       event.preventDefault();
-
       const latInput = form.querySelector('.js-lat');
       const lngInput = form.querySelector('.js-lng');
-
       if (!navigator.geolocation) {
         form.submit();
         return;
       }
-
       navigator.geolocation.getCurrentPosition(
         function (pos) {
           if (latInput && lngInput) {

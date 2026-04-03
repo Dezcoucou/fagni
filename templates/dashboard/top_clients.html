@@ -1,7 +1,5 @@
 {% extends "base.html" %}
-
 {% block title %}Top clients – FAGNI{% endblock %}
-
 {% block content %}
 <style>
   .tc-page{
@@ -24,7 +22,6 @@
     font-size:13px;
     color:#6b7280;
   }
-
   .tc-badge{
     display:inline-block;
     padding:2px 7px;
@@ -34,7 +31,6 @@
     color:#92400e;
     margin-bottom:4px;
   }
-
   .tc-grid-top{
     display:grid;
     grid-template-columns:1.3fr 1.7fr;
@@ -43,7 +39,6 @@
   @media(max-width:900px){
     .tc-grid-top{grid-template-columns:1fr;}
   }
-
   .tc-box{
     background:#ffffff;
     border-radius:12px;
@@ -60,7 +55,6 @@
     font-size:12px;
     color:#4b5563;
   }
-
   .tc-best-name{
     font-size:15px;
     font-weight:600;
@@ -76,7 +70,6 @@
     font-size:12px;
     color:#374151;
   }
-
   .tc-client-cards{
     display:grid;
     grid-template-columns:repeat(3,1fr);
@@ -124,7 +117,6 @@
     background:#ecfeff;
     color:#0f766e;
   }
-
   .tc-table-wrapper{
     margin-top:18px;
   }
@@ -138,7 +130,6 @@
     color:#6b7280;
     margin-bottom:6px;
   }
-
   .tc-table{
     width:100%;
     border-collapse:collapse;
@@ -164,7 +155,6 @@
     text-align:right;
     white-space:nowrap;
   }
-
   .tc-seg-vip{
     color:#92400e;
   }
@@ -174,16 +164,13 @@
   .tc-seg-to-win{
     color:#047857;
   }
-
   .tc-empty{
     font-size:12px;
     color:#9ca3af;
     font-style:italic;
   }
 </style>
-
 <div class="tc-page">
-
   <div class="tc-header">
     <div class="tc-badge">⭐ Segment client premium</div>
     <h1>Top clients FAGNI</h1>
@@ -192,9 +179,7 @@
       de leurs commandes. Idéal pour programmes VIP, parrainage et fidélisation.
     </p>
   </div>
-
   {% if top_clients %}
-
     {% with best=top_clients.0 %}
     <div class="tc-grid-top">
       <!-- Meilleur client -->
@@ -203,7 +188,6 @@
         <p>
           Client qui génère le plus de chiffre d'affaires cumulé sur FAGNI.
         </p>
-
         <div class="tc-best-name">{{ best.customer__name }}</div>
         <div class="tc-best-phone">
           📞 {{ best.customer__phone|default:"Non renseigné" }}
@@ -214,14 +198,12 @@
         </div>
       </div>
       {% endwith %}
-
       <!-- Top 3 cartes -->
       <div class="tc-box">
         <h2>🏆 Top 3 – Clients à chouchouter</h2>
         <p>
           Mini “carte” pour repérer tes VIP en un coup d’œil.
         </p>
-
         <div class="tc-client-cards">
           {% for c in top_clients|slice:":3" %}
             <div class="tc-client-card">
@@ -245,7 +227,6 @@
         </div>
       </div>
     </div>
-
     <!-- Tableau complet -->
     <div class="tc-table-wrapper">
       <div class="tc-table-title">Classement détaillé</div>
@@ -254,7 +235,6 @@
         <strong>VIP</strong> = top 3 &nbsp; • &nbsp; <strong>Récurrent</strong> = 5+ commandes &nbsp; • &nbsp;
         <strong>À fidéliser</strong> = potentiel à exploiter.
       </div>
-
       <table class="tc-table">
         <thead>
           <tr>
@@ -297,13 +277,11 @@
         </tbody>
       </table>
     </div>
-
   {% else %}
     <p class="tc-empty">
       Aucun client trouvé pour l’instant. Dès que des commandes seront enregistrées,
       le classement apparaîtra ici.
     </p>
   {% endif %}
-
 </div>
 {% endblock %}

@@ -9,7 +9,6 @@
   <link rel="stylesheet" href="{% static 'style.css' %}">
 </head>
 <body>
-
   <nav class="topbar">
     <div class="container">
       <a class="brand" href="{% url 'home' %}">FAGNI</a>
@@ -23,10 +22,8 @@
       </div>
     </div>
   </nav>
-
   <main class="page">
     {% block content %}{% endblock %}
   </main>
-
 </body>
 </html>

@@ -96,28 +96,23 @@
     </style>
 </head>
 <body>
-
 <header>
     <h1>Demande de retrait – FAGNI MLM</h1>
     <p>Retirez une partie de vos commissions disponibles.</p>
 </header>
-
 <div class="page">
     <div class="card">
         <p class="mini" style="margin-top:0;">
             Solde disponible :
             <strong>{{ wallet_balance }} FCFA</strong>
         </p>
-
         {% if error %}
             <div class="error">
                 {{ error }}
             </div>
         {% endif %}
-
         <form method="post">
             {% csrf_token %}
-
             <div class="field">
                 <label for="amount">Montant à retirer (FCFA)</label>
                 <input type="number" name="amount" id="amount" min="1" max="{{ wallet_balance }}" required>
@@ -125,7 +120,6 @@
                     Vous ne pouvez pas dépasser votre solde disponible.
                 </div>
             </div>
-
             <div class="field">
                 <label for="payout_method">Mode de paiement souhaité</label>
                 <input type="text"
@@ -134,13 +128,11 @@
                        placeholder="Ex : Mobile Money (Orange Money), virement bancaire, espèces…"
                        required>
             </div>
-
             <div class="field">
                 <label for="note">Commentaire (optionnel)</label>
                 <textarea name="note" id="note" rows="3"
                           placeholder="Précisez une info utile (numéro Mobile Money, banque, etc.)."></textarea>
             </div>
-
             <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:10px;">
                 <a href="{% url 'mlm:affiliate_dashboard' %}" class="btn btn-secondary">
                     Annuler
@@ -152,6 +144,5 @@
         </form>
     </div>
 </div>
-
 </body>
 </html>

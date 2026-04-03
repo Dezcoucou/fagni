@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block content %}
 <div class="page-header">
     <div class="page-header__left">
@@ -9,9 +8,7 @@
         </p>
     </div>
 </div>
-
 <div class="container">
-
     <!-- Statistiques globales -->
     <div class="cards-grid">
         <div class="card">
@@ -19,24 +16,20 @@
             <p class="metric">{{ total_profiles }}</p>
             <p class="metric-label">Clients / partenaires avec un code MLM actif</p>
         </div>
-
         <div class="card">
             <h2 class="card-title">Total commissions générées</h2>
             <p class="metric">{{ total_commissions }} FCFA</p>
             <p class="metric-label">Somme des ReferralCommission (tous niveaux)</p>
         </div>
-
         <div class="card">
             <h2 class="card-title">Solde total des wallets</h2>
             <p class="metric">{{ total_wallet_balance }} FCFA</p>
             <p class="metric-label">Somme des Wallets (owner_type = "customer")</p>
         </div>
     </div>
-
     <!-- Top parrains -->
     <div class="card mt-4">
         <h2 class="card-title">Top parrains par commissions cumulées</h2>
-
         {% if top_sponsors %}
             <div class="table-wrapper">
                 <table class="table">
@@ -77,6 +70,5 @@
             <p>Aucune commission MLM n’a encore été générée.</p>
         {% endif %}
     </div>
-
 </div>
 {% endblock %}

@@ -4,7 +4,6 @@
     <meta charset="utf-8">
     <title>Demande de retrait – FAGNI</title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
-
     <style>
         body{
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -98,12 +97,10 @@
     </style>
 </head>
 <body>
-
 <header>
     <h1>Demande de retrait – FAGNI</h1>
     <p>Convertissez vos commissions en cash selon les règles du programme.</p>
 </header>
-
 <div class="page">
     <div class="card">
         <div class="top-actions">
@@ -129,7 +126,6 @@
                 </a>
             </div>
         </div>
-
         <form method="post">
             {% csrf_token %}
             <label class="label" for="id_amount">
@@ -149,7 +145,6 @@
                 Par défaut, le montant proposé correspond à votre solde actuel.
                 Vous pouvez saisir un montant inférieur.
             </div>
-
             <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
                 <button type="submit" class="btn btn-primary">
                     💸 Valider la demande de retrait
@@ -159,13 +154,11 @@
                 </a>
             </div>
         </form>
-
         <p class="help" style="margin-top:16px;">
             Votre demande sera vérifiée par l'équipe FAGNI. Une fois validée,
             le paiement sera effectué selon les modalités prévues dans votre contrat.
         </p>
     </div>
 </div>
-
 </body>
 </html>

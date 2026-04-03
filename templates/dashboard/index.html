@@ -1,7 +1,5 @@
 {% extends "base.html" %}
-
 {% block title %}Dashboard FAGNI{% endblock %}
-
 {% block content %}
 <style>
   .dash-page{
@@ -24,7 +22,6 @@
     font-size:13px;
     color:#6b7280;
   }
-
   .dash-grid{
     display:grid;
     grid-template-columns:repeat(4,1fr);
@@ -36,7 +33,6 @@
   @media(max-width:640px){
     .dash-grid{grid-template-columns:1fr;}
   }
-
   .dash-card{
     background:#ffffff;
     border-radius:12px;
@@ -72,7 +68,6 @@
   .dash-card-accent-amber{
     border-top:3px solid #f59e0b;
   }
-
   .dash-section{
     margin-top:18px;
     display:grid;
@@ -82,7 +77,6 @@
   @media(max-width:900px){
     .dash-section{grid-template-columns:1fr;}
   }
-
   .dash-box{
     background:#ffffff;
     border-radius:12px;
@@ -99,7 +93,6 @@
     font-size:12px;
     color:#4b5563;
   }
-
   .dash-actions{
     display:flex;
     flex-wrap:wrap;
@@ -131,7 +124,6 @@
   .dash-btn-primary:hover{
     background:#00408a;
   }
-
   .dash-list{
     margin:6px 0 0;
     padding-left:18px;
@@ -141,7 +133,6 @@
   .dash-list li{
     margin-bottom:3px;
   }
-
   .dash-tag{
     display:inline-block;
     padding:2px 7px;
@@ -151,21 +142,17 @@
     color:#3730a3;
     margin-left:4px;
   }
-
   .dash-footer-note{
     margin-top:10px;
     font-size:11px;
     color:#9ca3af;
   }
 </style>
-
 <div class="dash-page">
-
   <div class="dash-header">
     <h1>Dashboard FAGNI</h1>
     <p>Vue d’ensemble de l’activité Ops & Finance sur la période récente.</p>
   </div>
-
   <!-- KPIs principaux -->
   <div class="dash-grid">
     <div class="dash-card dash-card-accent-blue">
@@ -177,7 +164,6 @@
         Volume total de commandes sur la plateforme.
       </div>
     </div>
-
     <div class="dash-card dash-card-accent-orange">
       <div class="dash-card-title">Chiffre d’affaires cumulé (TTC)</div>
       <div class="dash-card-value">
@@ -187,7 +173,6 @@
         Basé sur le montant TTC des commandes (Order.total).
       </div>
     </div>
-
     <div class="dash-card dash-card-accent-amber">
       <div class="dash-card-title">Restant dû estimé</div>
       <div class="dash-card-value">
@@ -197,7 +182,6 @@
         Montant à encaisser (commandes partiellement payées ou à crédit).
       </div>
     </div>
-
     <div class="dash-card dash-card-accent-green">
       <div class="dash-card-title">Aujourd’hui</div>
       <div class="dash-card-value">
@@ -208,17 +192,14 @@
       </div>
     </div>
   </div>
-
   <!-- Section actions + focus période -->
   <div class="dash-section">
-
     <div class="dash-box">
       <h2>Analytics & Finance</h2>
       <p>
         Surveille le rythme des commandes, le chiffre d’affaires et les meilleures
         prestations pour piloter FAGNI au quotidien.
       </p>
-
       <ul class="dash-list">
         <li>
           <strong>Analytics</strong> :
@@ -241,16 +222,13 @@
           <span class="dash-tag">/orders/ops-dashboard/</span>
         </li>
       </ul>
-
       <div class="dash-footer-note">
         Combine ces vues pour alimenter ton reporting hebdo / mensuel.
       </div>
     </div>
-
     <div class="dash-box">
       <h2>Actions rapides</h2>
       <p>Accès direct aux outils clés FAGNI.</p>
-
       <div class="dash-actions">
         <a href="{% url 'orders:create' %}" class="dash-btn dash-btn-primary">
           ➕ Nouvelle commande
@@ -261,19 +239,15 @@
         <a href="{% url 'dashboard:top_clients' %}" class="dash-btn">
           🏆 Top clients
         </a>
-
         <a href="{% url 'orders:finance_dashboard' %}" class="dash-btn">
           💰 Dashboard financier
         </a>
       </div>
-
       <div class="dash-footer-note">
         Utilise ces raccourcis quand tu es en exploitation terrain
         ou en revue de performance rapide.
       </div>
     </div>
-
   </div>
-
 </div>
 {% endblock %}

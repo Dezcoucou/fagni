@@ -2,19 +2,16 @@
 {% load static %}
 {% block content %}
 <h2>Photos – {{ oi.item.name }} (commande #{{ oi.order_id }})</h2>
-
 {% if messages %}
   <ul>
     {% for m in messages %}<li>{{ m }}</li>{% endfor %}
   </ul>
 {% endif %}
-
 <form method="post" enctype="multipart/form-data" style="margin:1rem 0">
   {% csrf_token %}
   {{ form.images }}
   <button type="submit" class="btn">Ajouter</button>
 </form>
-
 {% if photos %}
   <div style="display:flex; flex-wrap:wrap; gap:12px;">
     {% for p in photos %}
@@ -30,6 +27,5 @@
 {% else %}
   <p>Aucune photo pour cet article.</p>
 {% endif %}
-
 <p style="margin-top:1rem;"><a href="{% url 'order_detail' oi.order_id %}">← Retour à la commande</a></p>
 {% endblock %}

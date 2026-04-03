@@ -72,7 +72,6 @@
         <p class="mini">
             Solde wallet actuel : <strong>{{ wallet_balance }} FCFA</strong>
         </p>
-
         {% if withdrawals %}
             <table>
                 <thead>
@@ -117,7 +116,6 @@
                 Vous n'avez pas encore effectué de demande de retrait.
             </p>
         {% endif %}
-
         <a href="{% url 'mlm:affiliate_withdrawal_request' %}" class="btn-link">
             💸 Faire une nouvelle demande
         </a><br>

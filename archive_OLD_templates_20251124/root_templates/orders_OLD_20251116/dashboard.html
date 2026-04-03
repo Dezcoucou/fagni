@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <title>Dashboard FAGNI - Commandes</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
     <style>
         body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -109,9 +108,7 @@
     <h1>Dashboard FAGNI – Commandes</h1>
     <p>Vue synthétique des commandes et du chiffre d’affaires.</p>
 </header>
-
 <div class="page">
-
     <div class="top-actions">
         <div>
             <a href="{% url 'orders:list' %}" class="btn-link btn-secondary">← Retour à la liste des commandes</a>
@@ -120,7 +117,6 @@
             <a href="{% url 'orders:create' %}" class="btn-link btn-primary">+ Nouvelle commande</a>
         </div>
     </div>
-
     <!-- Sélecteur de période pour le graphique -->
     <div class="card" style="margin-bottom:16px;">
         <h2 style="font-size:14px;margin-bottom:8px;">Période du graphique</h2>
@@ -154,7 +150,6 @@
             </a>
         </div>
     </div>
-
     <!-- KPIs globaux -->
     <div class="grid-cards">
         <div class="card">
@@ -162,25 +157,21 @@
             <p class="kpi-main">{{ total_count }}</p>
             <p class="kpi-sub">Toutes périodes confondues</p>
         </div>
-
         <div class="card">
             <h2>Commandes en cours</h2>
             <p class="kpi-main">{{ in_progress_count }}</p>
             <p class="kpi-sub">Statut : en cours</p>
         </div>
-
         <div class="card">
             <h2>Commandes terminées</h2>
             <p class="kpi-main">{{ done_count }}</p>
             <p class="kpi-sub">Statut : terminées</p>
         </div>
     </div>
-
     <!-- Performance globale -->
     <div class="card" style="margin-bottom:16px;">
         <h2>Performance globale</h2>
         <p class="kpi-sub">Vue synthétique de la qualité et de la valeur des commandes.</p>
-
         <ul style="list-style:none;padding-left:0;margin-top:10px;font-size:13px;">
             <li style="margin-bottom:4px;">
                 ✅ Taux de commandes terminées :
@@ -208,7 +199,6 @@
             </li>
         </ul>
     </div>
-
     <!-- Répartition par statut -->
     <div class="grid-cards">
         <div class="card">
@@ -216,20 +206,17 @@
             <p class="kpi-main">{{ pending_count }}</p>
             <p class="kpi-sub">Commandes non encore traitées</p>
         </div>
-
         <div class="card">
             <h2>Annulées</h2>
             <p class="kpi-main">{{ canceled_count }}</p>
             <p class="kpi-sub">Commandes annulées</p>
         </div>
-
         <div class="card">
             <h2>CA total terminé</h2>
             <p class="kpi-main">{{ done_total }} FCFA</p>
             <p class="kpi-sub">Somme des commandes terminées</p>
         </div>
     </div>
-
     <!-- Focus sur aujourd'hui -->
     <div class="grid-cards">
         <div class="card">
@@ -237,7 +224,6 @@
             <p class="kpi-main">{{ today_count }}</p>
             <p class="kpi-sub">Toutes commandes créées aujourd'hui</p>
         </div>
-
     <!-- Statistiques hebdomadaires -->
     <div class="grid-cards">
         <div class="card">
@@ -245,13 +231,11 @@
             <p class="kpi-main">{{ week_count }}</p>
             <p class="kpi-sub">Commandes créées cette semaine</p>
         </div>
-
         <div class="card">
             <h2>CA terminé cette semaine</h2>
             <p class="kpi-main">{{ week_done_total }} FCFA</p>
             <p class="kpi-sub">Commandes terminées cette semaine</p>
         </div>
-
         <div class="card">
             <h2>Performance hebdomadaire</h2>
             <p class="kpi-main">
@@ -264,7 +248,6 @@
             <p class="kpi-sub">Panier moyen semaine</p>
         </div>
     </div>
-
     <!-- Statistiques mensuelles -->
     <div class="grid-cards">
         <div class="card">
@@ -272,13 +255,11 @@
             <p class="kpi-main">{{ month_count }}</p>
             <p class="kpi-sub">Commandes créées ce mois</p>
         </div>
-
         <div class="card">
             <h2>CA terminé ce mois</h2>
             <p class="kpi-main">{{ month_done_total }} FCFA</p>
             <p class="kpi-sub">Total ventes confirmées ce mois</p>
         </div>
-
         <div class="card">
             <h2>Performance mensuelle</h2>
             <p class="kpi-main">
@@ -291,13 +272,11 @@
             <p class="kpi-sub">Panier moyen mois</p>
         </div>
     </div>
-
         <div class="card">
             <h2>CA terminé aujourd'hui</h2>
             <p class="kpi-main">{{ today_done_total }} FCFA</p>
             <p class="kpi-sub">Commandes terminées aujourd'hui</p>
         </div>
-
         <div class="card">
             <h2>Actions rapides</h2>
             <p>
@@ -312,12 +291,10 @@
             </p>
         </div>
     </div>
-
 <!-- Top 5 clients par CA -->
     <div class="card" style="margin-top:18px;">
         <h2>Top 5 clients (commandes terminées)</h2>
         <p class="kpi-sub">Clients avec le plus fort chiffre d'affaires cumulé.</p>
-
         {% if top_clients %}
             <div style="overflow-x:auto;">
                 <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;">
@@ -355,12 +332,10 @@
             </p>
         {% endif %}
     </div>
-
 <!-- Top 5 articles par quantité -->
     <div class="card" style="margin-top:18px;">
         <h2>Top 5 articles (commandes terminées)</h2>
         <p class="kpi-sub">Articles les plus traités (en quantité), sur les commandes terminées.</p>
-
         {% if top_items %}
             <div style="overflow-x:auto;">
                 <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;">
@@ -394,21 +369,17 @@
             </p>
         {% endif %}
     </div>
-
     <!-- Graphique commandes et CA sur 7 jours -->
     <div class="card" style="margin-top:18px;">
         <h2>Évolution sur {{ current_days }} jours</h2>
         <p class="kpi-sub">Nombre de commandes et CA des commandes terminées par jour</p>
         <canvas id="ordersChart" style="max-height:280px;"></canvas>
     </div>    
-
 </div>
-
 <!-- Données JSON pour le graphique -->
 {{ chart_labels|json_script:"chart-labels" }}
 {{ chart_orders|json_script:"chart-orders" }}
 {{ chart_totals|json_script:"chart-totals" }}
-
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
@@ -416,9 +387,7 @@
         const labels = JSON.parse(document.getElementById('chart-labels').textContent);
         const ordersData = JSON.parse(document.getElementById('chart-orders').textContent);
         const totalsData = JSON.parse(document.getElementById('chart-totals').textContent);
-
         const ctx = document.getElementById('ordersChart').getContext('2d');
-
         new Chart(ctx, {
             type: 'bar',
             data: {
@@ -490,6 +459,5 @@
         });
     })();
 </script>
-
 </body>
 </html>

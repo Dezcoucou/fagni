@@ -1,9 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load money_filters %}
-
 {% block title %}Chaîne de filleuls – FAGNI{% endblock %}
-
 {% block extra_head %}
 <style>
     .page {
@@ -11,7 +9,6 @@
         margin: 0 auto 32px;
         padding: 12px 10px 24px;
     }
-
     .page-header {
         display:flex;
         justify-content:space-between;
@@ -19,20 +16,17 @@
         gap:12px;
         margin-bottom:18px;
     }
-
     .page-title {
         font-size:20px;
         font-weight:700;
         color:#0f172a;
         margin:0;
     }
-
     .page-subtitle {
         font-size:13px;
         color:#64748b;
         margin:4px 0 0;
     }
-
     .tag-code {
         font-size:12px;
         background:#eff6ff;
@@ -44,7 +38,6 @@
         align-items:center;
         gap:6px;
     }
-
     .card {
         background:#ffffff;
         border-radius:16px;
@@ -53,7 +46,6 @@
         border:1px solid #e5e7eb;
         box-shadow:0 2px 6px rgba(15,23,42,0.08);
     }
-
     .card-title {
         font-size:15px;
         font-weight:600;
@@ -63,81 +55,68 @@
         align-items:center;
         gap:6px;
     }
-
     .card-title .emoji {
         font-size:18px;
     }
-
     .grid-2 {
         display:grid;
         grid-template-columns: 1.05fr 0.95fr;
         gap:14px;
     }
-
     .stats-grid {
         display:grid;
         grid-template-columns: repeat(3, minmax(0,1fr));
         gap:10px;
     }
-
     .stat-pill {
         background:#f9fafb;
         border-radius:12px;
         padding:10px 10px;
         border:1px solid #e5e7eb;
     }
-
     .stat-label {
         font-size:11px;
         color:#9ca3af;
         text-transform:uppercase;
         letter-spacing:.04em;
     }
-
     .stat-value {
         font-size:16px;
         font-weight:600;
         color:#111827;
         margin-top:2px;
     }
-
     .stat-helper {
         font-size:11px;
         color:#6b7280;
         margin-top:2px;
     }
-
     .field-value-muted {
         font-size:12px;
         color:#6b7280;
     }
-
     table.table {
         width:100%;
         border-collapse:collapse;
         font-size:13px;
         margin-top:6px;
     }
-
     table.table th,
     table.table td {
         padding:7px 6px;
         border-bottom:1px solid #e5e7eb;
         vertical-align:top;
     }
-
     table.table thead th {
         background:#f9fafb;
         font-weight:600;
         color:#6b7280;
         font-size:12px;
     }
-
     td.num {
         text-align:right;
         white-space:nowrap;
     }
-
     .badge-soft {
         padding:3px 8px;
         border-radius:999px;
@@ -148,12 +127,10 @@
         align-items:center;
         gap:4px;
     }
-
     .badge-soft--info {
         background:#e0f2fe;
         color:#0369a1;
     }
-
     .btn {
         display:inline-flex;
         align-items:center;
@@ -166,27 +143,22 @@
         text-decoration:none;
         white-space:nowrap;
     }
-
     .btn-light {
         background:#fff;
         border-color:#e5e7eb;
         color:#374151;
     }
-
     .btn-light:hover {
         background:#f9fafb;
     }
-
     .btn-primary {
         background:linear-gradient(90deg,#ff7a00,#0056b3);
         color:#fff;
         border:none;
     }
-
     .btn-primary:hover {
         opacity:0.95;
     }
-
     @media (max-width: 1050px) {
         .stats-grid {
             grid-template-columns: repeat(2, minmax(0,1fr));
@@ -195,21 +167,18 @@
             grid-template-columns: 1fr;
         }
     }
-
     @media (max-width: 640px) {
         .stats-grid {
             grid-template-columns: 1fr;
         }
     }
 </style>
-
 <script>
     function copyChainCode() {
         const el = document.getElementById("chain-code");
         if (!el) return;
         const text = el.dataset.code || el.textContent || "";
         if (!text) return;
-
         try {
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(text.trim());
@@ -228,10 +197,8 @@
     }
 </script>
 {% endblock %}
-
 {% block content %}
 <div class="page">
-
     {% comment %}
         Contexte dispo (vu dans l’erreur) :
         - profile : ReferralLink (ex: CHAIN_FILLEUL - FILLEUL N1-N2-N3)
@@ -240,7 +207,6 @@
         - total_comm : commissions cumulées
         - tx_page : Page de transactions
     {% endcomment %}
-
     <!-- HEADER -->
     <div class="page-header">
         <div>
@@ -251,7 +217,6 @@
                     <strong>{{ profile.referral_code }}</strong>
                 {% endif %}.
             </p>
-
             <p class="field-value-muted" style="margin-top:6px;">
                 Profil : {{ profile }}
                 {% if customer_wallet %}
@@ -260,7 +225,6 @@
                 {% endif %}
             </p>
         </div>
-
         <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
             {% if profile and profile.referral_code %}
                 <div id="chain-code"
@@ -269,7 +233,6 @@
                     🔗 Code parrain : <strong>{{ profile.referral_code }}</strong>
                 </div>
             {% endif %}
-
             <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
                 <a href="{% url 'mlm:affiliate_dashboard' %}" class="btn btn-light">
                     ⬅️ Retour à mon espace affilié
@@ -288,13 +251,11 @@
             </div>
         </div>
     </div>
-
     <!-- STATS CHAÎNE -->
     <section class="card">
         <h2 class="card-title">
             <span class="emoji">📊</span> Indicateurs de la chaîne
         </h2>
-
         <div class="stats-grid">
             <div class="stat-pill">
                 <div class="stat-label">Filleuls directs</div>
@@ -305,7 +266,6 @@
                     Comptes reliés directement à ce code.
                 </div>
             </div>
-
             <div class="stat-pill">
                 <div class="stat-label">Solde portefeuille client</div>
                 <div class="stat-value">
@@ -315,7 +275,6 @@
                     Solde du portefeuille lié à ce client/FAGNI.
                 </div>
             </div>
-
             <div class="stat-pill">
                 <div class="stat-label">Commissions cumulées</div>
                 <div class="stat-value">
@@ -327,16 +286,13 @@
             </div>
         </div>
     </section>
-
     <div class="grid-2">
-
         <!-- COLONNE GAUCHE : NIVEAU 1 -->
         <div>
             <section class="card">
                 <h2 class="card-title">
                     <span class="emoji">👥</span> Filleuls directs (Niveau 1)
                 </h2>
-
                 {% if n1_children %}
                     <table class="table">
                         <thead>
@@ -400,14 +356,12 @@
                 {% endif %}
             </section>
         </div>
-
         <!-- COLONNE DROITE : MOUVEMENTS / TRANSACTIONS LIÉS -->
         <div>
             <section class="card">
                 <h2 class="card-title">
                     <span class="emoji">💳</span> Mouvements liés à cette chaîne
                 </h2>
-
                 {% if tx_page and tx_page.object_list %}
                     <table class="table">
                         <thead>
@@ -443,7 +397,6 @@
                         {% endfor %}
                         </tbody>
                     </table>
-
                     {# pagination simple si nécessaire #}
                     {% if tx_page.paginator.num_pages > 1 %}
                         <div style="margin-top:8px; font-size:12px; color:#6b7280; display:flex; justify-content:space-between; align-items:center;">
@@ -472,6 +425,5 @@
             </section>
         </div>
     </div>
-
 </div>
 {% endblock %}

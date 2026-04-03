@@ -22,20 +22,17 @@
     <h1>Photos – {{ item }}</h1>
     <a href="javascript:history.back()" class="btn">← Retour</a>
   </div>
-
   {% if messages %}
     <div class="msg">
       {% for m in messages %}<div>{{ m }}</div>{% endfor %}
     </div>
   {% endif %}
-
   <form class="upload" method="post" enctype="multipart/form-data">
     {% csrf_token %}
     <p><strong>Ajouter des photos</strong> (JPEG/PNG, ≤ 6 Mo chacune)</p>
     {{ form.images }}
     <button class="btn" type="submit">Téléverser</button>
   </form>
-
   <h2>Photos existantes</h2>
   <div class="grid">
     {% for p in photos %}

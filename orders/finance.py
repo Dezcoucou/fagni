@@ -37,7 +37,9 @@ def compute_order_financials(order) -> Dict[str, Any]:
     express_for_client = base.get("express_for_client", Decimal("0"))
 
     commission_laundry_ht = base["commission_laundry_ht"]
+    amount_laundry_partner = base.get("amount_laundry_partner", Decimal("0"))
     commission_delivery_ht = base["commission_delivery_ht"]
+    amount_driver_partner = base.get("amount_driver_partner", commission_delivery_ht)
     margin_delivery = base["margin_delivery"]
 
     # ------------------------------------------------------------
@@ -53,8 +55,8 @@ def compute_order_financials(order) -> Dict[str, Any]:
         delivery_fee_client = delivery_cost_driver
         margin_delivery = Decimal("0")
 
-    # Revenu FAGNI HT (source-of-truth) = marge livraison + service
-    fagni_revenue_ht = (margin_delivery + service_fee_ht).quantize(
+    # Revenu FAGNI HT = commission blanchisserie + marge livraison + service
+    fagni_revenue_ht = (commission_laundry_ht + margin_delivery + service_fee_ht).quantize(
         Decimal("1"), rounding=ROUND_HALF_UP
     )
 
@@ -94,6 +96,8 @@ def compute_order_financials(order) -> Dict[str, Any]:
         # Commissions + marge
         "commission_laundry_ht": commission_laundry_ht,
         "commission_delivery_ht": commission_delivery_ht,
+        "amount_laundry": amount_laundry_partner,
+        "amount_driver": amount_driver_partner,
         "margin_delivery": margin_delivery,
 
         # Revenu + TVA

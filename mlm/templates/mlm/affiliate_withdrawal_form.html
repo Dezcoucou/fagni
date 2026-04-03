@@ -80,12 +80,9 @@
             Solde disponible : <strong>{{ wallet_balance }} FCFA</strong><br>
             Montant minimum de retrait : <strong>5 000 FCFA</strong>.
         </p>
-
         <form method="post">
             {% csrf_token %}
-
             {{ form.non_field_errors }}
-
             <label for="{{ form.amount.id_for_label }}">
                 {{ form.amount.label }}
             </label>
@@ -94,7 +91,6 @@
                 <div class="mini">{{ form.amount.help_text }}</div>
             {% endif %}
             {{ form.amount.errors }}
-
             <label for="{{ form.payout_method.id_for_label }}">
                 {{ form.payout_method.label }}
             </label>
@@ -103,7 +99,6 @@
                 <div class="mini">{{ form.payout_method.help_text }}</div>
             {% endif %}
             {{ form.payout_method.errors }}
-
             <button type="submit" class="btn-primary">
                 Envoyer ma demande
             </button>

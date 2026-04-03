@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <title>Liste des commandes - FAGNI</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
     <style>
         body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -130,10 +129,8 @@
     <h1>Commandes FAGNI</h1>
     <p>Vue d’ensemble des commandes enregistrées dans le système.</p>
 </header>
-
 <div class="page">
     <div class="card">
-
         <!-- Bandeau haut : stats + boutons -->
         <div class="top-actions">
             <div style="display:flex;flex-direction:column;gap:4px;">
@@ -147,7 +144,6 @@
                     </span>
                 </div>
             </div>
-
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
                 <a href="{% url 'orders:create' %}" class="btn-link btn-primary">
                     + Nouvelle commande
@@ -160,42 +156,35 @@
                 </a>
             </div>
         </div>
-
         <!-- Filtres par statut -->
         <div style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:6px;font-size:12px;">
             <span style="margin-right:4px;">Filtrer :</span>
-
             <a href="{% url 'orders:list' %}"
                class="btn-link btn-secondary"
                style="padding:4px 10px;{% if current_status == 'all' %}background:#0056b3;color:#fff;border-color:#0056b3;{% endif %}">
                 Toutes ({{ total_count }})
             </a>
-
             <a href="{% url 'orders:list' %}?status=pending"
                class="btn-link btn-secondary"
                style="padding:4px 10px;{% if current_status == 'pending' %}background:#fff3cd;color:#856404;border-color:#856404;{% endif %}">
                 En attente ({{ pending_count }})
             </a>
-
             <a href="{% url 'orders:list' %}?status=in_progress"
                class="btn-link btn-secondary"
                style="padding:4px 10px;{% if current_status == 'in_progress' %}background:#cce5ff;color:#004085;border-color:#004085;{% endif %}">
                 En cours ({{ in_progress_count }})
             </a>
-
             <a href="{% url 'orders:list' %}?status=done"
                class="btn-link btn-secondary"
                style="padding:4px 10px;{% if current_status == 'done' %}background:#d4edda;color:#155724;border-color:#155724;{% endif %}">
                 Terminées ({{ done_count }})
             </a>
-
             <a href="{% url 'orders:list' %}?status=canceled"
                class="btn-link btn-secondary"
                style="padding:4px 10px;{% if current_status == 'canceled' %}background:#f8d7da;color:#721c24;border-color:#721c24;{% endif %}">
                 Annulées ({{ canceled_count }})
             </a>
         </div>
-
         {% if orders %}
             <table>
                 <thead>
@@ -209,22 +198,17 @@
                         <th>Actions</th>
                     </tr>
                 </thead>
-
-
                 <tbody>
                 {% for order in orders %}
                     <tr>
                         <td>{{ order.code }}</td>
                         <td>{{ order.customer.name }}</td>
                         <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
-
                     <td>{{ order.total }} FCFA</td>
-
                     <!-- Nouvelle colonne : Frais de livraison -->
                     <td>
                         {{ order.delivery_fee|default:"0" }} FCFA
                     </td>
-
                     <td>
                         {% if order.status == "pending" %}
                             <span class="badge badge-pending">En attente</span>
@@ -238,7 +222,6 @@
                             <span class="badge">{{ order.status }}</span>
                         {% endif %}
                     </td>
-
                 <td class="actions">
                     <a href="{% url 'orders:detail' order.id %}">Détail</a> |
                     <a href="{% url 'orders:update' order.id %}">Modifier</a>
@@ -246,9 +229,6 @@
             </tr>
         {% endfor %}
         </tbody>
-
-
-
                 <tbody>
                 {% for order in orders %}
                     <tr>
@@ -288,6 +268,5 @@
         {% endif %}
     </div>
 </div>
-
 </body>
 </html>

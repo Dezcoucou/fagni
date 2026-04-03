@@ -71,7 +71,6 @@
         .pill-global span{
             opacity:.85;
         }
-
         .btn-link{
             text-decoration:none;
             display:inline-block;
@@ -95,7 +94,6 @@
         .btn-secondary:hover{
             background:#f3f3f3;
         }
-
         .board{
             display:grid;
             grid-template-columns:repeat(3,1fr);
@@ -137,7 +135,6 @@
             padding:2px 8px;
             font-size:11px;
         }
-
         table{
             width:100%;
             border-collapse:collapse;
@@ -156,7 +153,6 @@
         tr:hover{
             background:#fafafa;
         }
-
         .link-detail{
             font-size:11px;
             text-decoration:none;
@@ -165,7 +161,6 @@
         .link-detail:hover{
             text-decoration:underline;
         }
-
         form{ margin:0; }
         button{
             font-size:11px;
@@ -174,7 +169,6 @@
             padding:3px 8px;
             cursor:pointer;
         }
-
         .subtext{
             display:block;
             font-size:11px;
@@ -195,7 +189,6 @@
             color:#777;
             padding:8px 0;
         }
-
         /* Boutons statut / étapes */
         .btn-step-pickup{
             background:#0056b3;
@@ -217,7 +210,6 @@
             background:#28a745;
             color:#fff;
         }
-
         /* Pastilles statut */
         .badge-status{
             padding:3px 8px;
@@ -237,7 +229,6 @@
             background:#d4edda;
             color:#155724;
         }
-
         .mini-legend{
             font-size:10px;
             color:#777;
@@ -246,18 +237,14 @@
     </style>
 </head>
 <body>
-
 <header>
     <h1>Tableau Ops – Commandes FAGNI</h1>
     <p>Suivi opérationnel : collecte, dépôt blanchisserie, lavage, retour et livraison.</p>
 </header>
-
 <div class="page">
-
     <!-- Carte globale Ops -->
     <div class="card">
         <div class="top-bar">
-
             <!-- Résumé global -->
             <div>
                 <div class="summary">
@@ -275,7 +262,6 @@
                     </span>
                 </div>
             </div>
-
             <!-- Boutons de navigation (dont le bouton livreurs) -->
             <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
                 <a href="{% url 'orders:list' %}" class="btn-link btn-secondary">
@@ -294,10 +280,8 @@
             la timeline et le statut des commandes.
         </div>
     </div>
-
     <!-- Board 3 colonnes -->
     <div class="board">
-
         <!-- Colonne En attente -->
         <div class="col">
             <div class="col-header">
@@ -308,7 +292,6 @@
                     <small>Commandes créées, en attente de collecte.</small>
                 </div>
             </div>
-
             {% if pending_orders %}
                 <table>
                     <thead>
@@ -388,7 +371,6 @@
                 </div>
             {% endif %}
         </div>
-
         <!-- Colonne En cours -->
         <div class="col">
             <div class="col-header">
@@ -399,7 +381,6 @@
                     <small>Commandes en collecte, lavage ou retour livreur.</small>
                 </div>
             </div>
-
             {% if in_progress_orders %}
                 <table>
                     <thead>
@@ -508,7 +489,6 @@
                 </div>
             {% endif %}
         </div>
-
         <!-- Colonne Terminées -->
         <div class="col">
             <div class="col-header">
@@ -519,7 +499,6 @@
                     <small>Commandes livrées au client.</small>
                 </div>
             </div>
-
             {% if done_orders %}
                 <table>
                     <thead>
@@ -587,10 +566,7 @@
                 </div>
             {% endif %}
         </div>
-
     </div>
-
 </div>
-
 </body>
 </html>

@@ -174,3 +174,6 @@ csrf.txt
 
 # local
 cookies.txt
+archive_OLD_templates_*
+backups_*
+*.bak*

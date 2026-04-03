@@ -34,29 +34,24 @@
 </head>
 <body>
 <h1>Commandes</h1>
-
 <!-- 🟢 Barre d’actions -->
 <nav style="margin:8px 0 12px;">
     <a href="{% url 'orders:create' %}">
         + Nouvelle commande
     </a>
-
     <a href="{% url 'orders:dashboard' %}">
         📊 Dashboard commandes
     </a>
-
     <!-- 💰 Bouton vers le dashboard financier FAGNI -->
     <a href="{% url 'mlm:finance_dashboard' %}" style="color:#0a7c2f; font-weight:bold;">
         💰 Finance FAGNI
     </a>
 </nav>
-
 <div class="meta">
   Total commandes : <strong>{{ total }}</strong> —
   Somme : <strong>{{ total_sum|default_if_none:0|floatformat:0|intcomma }}</strong> —
   Moyenne : <strong>{{ total_avg|default_if_none:0|floatformat:0|intcomma }}</strong>
 </div>
-
 <table>
   <thead>
       <tr>
@@ -75,7 +70,6 @@
       <tr>
           <td>{{ order.code }}</td>
           <td>{{ order.customer }}</td>
-
           <td>
               {% if order.laundry_partner %}
                   {{ order.laundry_partner }}
@@ -83,7 +77,6 @@
                   —
               {% endif %}
           </td>
-
           <td>
               {% if order.delivery_partner %}
                   {{ order.delivery_partner }}
@@ -91,15 +84,11 @@
                   —
               {% endif %}
           </td>
-
           <td>
               {{ order.get_status_display }}
           </td>
-
           <td>{{ order.total }} FCFA</td>
-
           <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
-
           <td>
               <a href="{% url 'orders:detail' order.id %}">Détail</a>
           </td>
@@ -107,7 +96,6 @@
   {% endfor %}
   </tbody>
 </table>
-
 <nav>
   {% if page_obj.has_previous %}
     <a href="?page={{ page_obj.previous_page_number }}">← Précédent</a>

@@ -1,13 +1,10 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'mlm/mlm.css' %}">
 {% endblock %}
-
 {% block content %}
 <div class="mlm-page">
-
     <!-- HEADER -->
     <div class="page-header">
         <div class="page-header__left">
@@ -17,7 +14,6 @@
             </p>
         </div>
     </div>
-
     <!-- KPI CARDS -->
     <section class="mlm-section">
         <div class="mlm-kpi-grid">
@@ -31,7 +27,6 @@
                     Somme des commissions affiliés (tous niveaux confondus).
                 </div>
             </div>
-
             <!-- Solde cumulé des wallets -->
             <div class="mlm-kpi-card">
                 <div class="mlm-kpi-label">Solde cumulé des wallets affiliés</div>
@@ -42,7 +37,6 @@
                     Montant actuellement disponible dans tous les wallets.
                 </div>
             </div>
-
             <!-- Retraits demandés -->
             <div class="mlm-kpi-card">
                 <div class="mlm-kpi-label">Montant total des retraits demandés</div>
@@ -55,7 +49,6 @@
             </div>
         </div>
     </section>
-
     <!-- SHORTCUTS / ACTIONS -->
     <section class="mlm-section">
         <div class="mlm-section-header">
@@ -64,7 +57,6 @@
         <p class="mlm-section-subtitle">
             Accès rapide aux autres vues du programme de parrainage.
         </p>
-
         <div class="mlm-actions">
             <a href="{% url 'mlm:global_dashboard' %}" class="btn btn-light">
                 🌍 Dashboard global MLM
@@ -77,6 +69,5 @@
             </a>
         </div>
     </section>
-
 </div>
 {% endblock %}

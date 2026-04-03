@@ -20,7 +20,6 @@
     {% endfor %}
     </tbody>
   </table>
-
   <nav>
     {% if page_obj.has_previous %}
       <a href="?page={{ page_obj.previous_page_number }}">« Précédent</a>
@@ -30,7 +29,6 @@
       <a href="?page={{ page_obj.next_page_number }}">Suivant »</a>
     {% endif %}
   </nav>
-
   <p><a href="/orders/">← Retour à la liste</a></p>
 </body>
 </html>

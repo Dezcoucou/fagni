@@ -35,7 +35,6 @@ img.preview{max-width:80px;border-radius:6px}
   <button type="submit" class="btn">Valider</button>
 </form>
 </div>
-
 <template id="tpl">
   <div class="row line">
     <div>
@@ -64,13 +63,11 @@ img.preview{max-width:80px;border-radius:6px}
     </div>
   </div>
 </template>
-
 <script>
 const items={{ items_data|safe }};
 const lines=document.getElementById('lines');
 const totalEl=document.getElementById('total');
 document.getElementById('add').onclick=()=>addLine();
-
 function fmtMoney(n){
   n=Math.round(n);
   return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g," ")+" FCFA";

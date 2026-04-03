@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block content %}
 <style>
     .driver-history-page {
@@ -8,7 +7,6 @@
         margin: 0 auto 80px;
         padding: 12px 12px 24px;
     }
-
     .driver-brand {
         display: flex;
         align-items: center;
@@ -58,7 +56,6 @@
         font-size: 11px;
         color: #CBD5F5;
     }
-
     .history-header {
         display: flex;
         justify-content: space-between;
@@ -76,7 +73,6 @@
         font-size: 12px;
         color: #64748b;
     }
-
     .card {
         background: #ffffff;
         border-radius: 16px;
@@ -85,49 +81,41 @@
         border: 1px solid #e5e7eb;
         margin-bottom: 12px;
     }
-
     .history-list {
         display: flex;
         flex-direction: column;
         gap: 8px;
     }
-
     .history-item {
         border-radius: 12px;
         border: 1px solid #e5e7eb;
         background: #f9fafb;
         padding: 8px 10px;
     }
-
     .history-top {
         display: flex;
         justify-content: space-between;
         gap: 8px;
         font-size: 12px;
     }
-
     .history-code {
         font-weight: 600;
         color: #0f172a;
     }
-
     .history-date {
         font-size: 11px;
         color: #94a3b8;
     }
-
     .history-client {
         font-size: 12px;
         color: #0f172a;
         margin-top: 2px;
     }
-
     .history-meta {
         font-size: 11px;
         color: #6b7280;
         margin-top: 2px;
     }
-
     .history-footer {
         display: flex;
         justify-content: space-between;
@@ -136,12 +124,10 @@
         margin-top: 6px;
         font-size: 12px;
     }
-
     .history-amount {
         font-weight: 600;
         color: #0f172a;
     }
-
     .btn-history {
         border-radius: 999px;
         border: 1px solid #e2e8f0;
@@ -154,7 +140,6 @@
         align-items: center;
         gap: 4px;
     }
-
     .driver-pagination {
         margin-top: 10px;
         display: flex;
@@ -170,7 +155,6 @@
     .driver-page-current {
         font-weight: 600;
     }
-
     .driver-bottom-nav {
         position: fixed;
         bottom: 0;
@@ -208,9 +192,7 @@
         transform: translateY(-1px);
     }
 </style>
-
 <div class="driver-history-page">
-
     <!-- BRAND FAGNI -->
     <div class="driver-brand">
         <div class="driver-brand__logo">
@@ -223,7 +205,6 @@
             <div class="driver-brand__tagline">App livreur – Historique personnel</div>
         </div>
     </div>
-
     <div class="history-header">
         <div>
             <div class="history-title">Mon historique de courses</div>
@@ -232,7 +213,6 @@
             </div>
         </div>
     </div>
-
     <section class="card">
         {% if page_obj and page_obj.object_list %}
             <div class="history-list">
@@ -257,7 +237,6 @@
                                 </span>
                             </div>
                         </div>
-
                         <div class="history-client">
                             {{ order.customer.name|default:"Client inconnu" }}
                         </div>
@@ -267,7 +246,6 @@
                                 · Distance A/R : {{ order.distance_km|floatformat:"1" }} km
                             {% endif %}
                         </div>
-
                         <div class="history-footer">
                             <div class="history-amount">
                                 {{ order.grand_total|default:order.total|default:0 }} FCFA
@@ -289,7 +267,6 @@
                     </article>
                 {% endfor %}
             </div>
-
             <div class="driver-pagination">
                 {% if page_obj.has_previous %}
                     <a href="?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode }}"
@@ -297,11 +274,9 @@
                         ← Précédent
                     </a>
                 {% endif %}
-
                 <span class="driver-page-current">
                     Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
                 </span>
-
                 {% if page_obj.has_next %}
                     <a href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode }}"
                        class="driver-page-link">
@@ -316,7 +291,6 @@
         {% endif %}
     </section>
 </div>
-
 <nav class="driver-bottom-nav">
     <a href="{% url 'orders:driver_hub' %}" class="driver-bottom-nav__item">
         <span class="driver-bottom-nav__icon">🏠</span>

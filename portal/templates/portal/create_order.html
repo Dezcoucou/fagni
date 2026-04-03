@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <title>Nouvelle commande - FAGNI</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
     <style>
         body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -154,43 +153,35 @@
     <h1>Nouvelle commande FAGNI</h1>
     <p>Création de ta commande de pressing en quelques clics.</p>
 </header>
-
 <div class="page">
     <div class="card">
         {% if error %}
             <div class="error">{{ error }}</div>
         {% endif %}
-
         <form id="orderForm" method="post" enctype="multipart/form-data">
             {% csrf_token %}
-
             <h2 style="font-size:16px;margin-top:0;">Client</h2>
-
             <div class="field-group">
                 <label for="client_phone">Téléphone *</label>
                 <input type="text" id="client_phone" name="client_phone"
                        value="{{ client_phone }}"
                        placeholder="Ex : 0700000000">
             </div>
-
             <div class="field-group">
                 <label for="client_name">Nom & prénoms *</label>
                 <input type="text" id="client_name" name="client_name"
                        value="{{ client_name }}"
                        placeholder="Ex : KOFFI Jean">
             </div>
-
             <div class="field-group">
                 <label for="client_address">Adresse (quartier, repère)</label>
                 <input type="text" id="client_address" name="client_address"
                        value="{{ client_address }}"
                        placeholder="Ex : Cocody Angré 8ème tranche, près de...">
             </div>
-
             <!-- Coordonnées cachées (si plus tard GPS / Maps) -->
             <input type="hidden" id="client_lat" name="client_lat" value="{{ client_lat }}">
             <input type="hidden" id="client_lng" name="client_lng" value="{{ client_lng }}">
-
             <div class="field-group">
                 <label for="affiliate_code">Code affilié (facultatif)</label>
                 <input type="text" id="affiliate_code" name="affiliate_code"
@@ -200,14 +191,11 @@
                     Si tu utilises le lien d’un ambassadeur FAGNI, son code est déjà pré-rempli.
                 </p>
             </div>
-
             <hr style="margin:14px 0; border:none; border-top:1px solid #eee;">
-
             <h2 style="font-size:16px;">Prestations</h2>
             <p class="note">
                 Sélectionne le type d’article, précise la quantité et le prix unitaire (si défini).
             </p>
-
             <div class="field-group">
                 <label for="service_select">Prestation</label>
                 <select id="service_select">
@@ -220,12 +208,10 @@
                     {% endfor %}
                 </select>
             </div>
-
             <div class="field-group">
                 <label for="designation">Désignation (modif. possible)</label>
                 <input type="text" id="designation" placeholder="Ex : Chemise homme, Robe soirée, etc.">
             </div>
-
             <div class="field-group" style="display:flex;gap:8px;">
                 <div style="flex:1;">
                     <label for="quantity">Quantité</label>
@@ -236,11 +222,9 @@
                     <input type="number" id="unit_price" min="0" value="0">
                 </div>
             </div>
-
             <button type="button" id="addItemBtn" class="btn-small" style="margin-top:4px;">
                 ➕ Ajouter la ligne
             </button>
-
             <table id="itemsTable">
                 <thead>
                     <tr>
@@ -255,7 +239,6 @@
                     <!-- lignes ajoutées en JS -->
                 </tbody>
             </table>
-
             <div class="totals">
                 <p><span class="label">Total prestations :</span>
                    <span id="total_prest" class="value">0 FCFA</span></p>
@@ -271,14 +254,12 @@
                     et la distance exacte avec la blanchisserie partenaire.
                 </p>
             </div>
-
             <div class="btn-row">
                 <button type="submit" class="btn-primary">Envoyer ma commande</button>
             </div>
         </form>
     </div>
 </div>
-
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const serviceSelect = document.getElementById("service_select");
@@ -287,18 +268,14 @@ document.addEventListener("DOMContentLoaded", function () {
     const unitPriceInput = document.getElementById("unit_price");
     const addItemBtn = document.getElementById("addItemBtn");
     const itemsTableBody = document.querySelector("#itemsTable tbody");
-
     const totalPrestEl = document.getElementById("total_prest");
     const serviceFeeEl = document.getElementById("service_fee");
     const deliveryFeeEl = document.getElementById("delivery_fee");
     const grandTotalEl = document.getElementById("grand_total");
-
     const form = document.getElementById("orderForm");
     const phoneInput = document.getElementById("client_phone");
     const nameInput = document.getElementById("client_name");
-
     const DELIVERY_MIN_FEE = {{ delivery_min_fee|default:0 }};
-
     function recalcTotals() {
         let total = 0;
         const rows = itemsTableBody.querySelectorAll("tr");
@@ -308,17 +285,14 @@ document.addEventListener("DOMContentLoaded", function () {
             const v = parseFloat(cell.getAttribute("data-line-total") || "0");
             if (!isNaN(v)) total += v;
         });
-
         let serviceFee = Math.round(total * 0.05);
         if (serviceFee < 500 && total > 0) {
             serviceFee = 500;
         }
-
         let delivery = 0;
         if (total > 0) {
             delivery = DELIVERY_MIN_FEE;
         }
-
         if (totalPrestEl) {
             totalPrestEl.textContent = total.toLocaleString("fr-FR") + " FCFA";
         }
@@ -333,18 +307,15 @@ document.addEventListener("DOMContentLoaded", function () {
             grandTotalEl.textContent = grand.toLocaleString("fr-FR") + " FCFA";
         }
     }
-
     if (addItemBtn && itemsTableBody) {
         addItemBtn.addEventListener("click", function () {
             const serviceId = serviceSelect.value;
             const serviceText = serviceSelect.options[serviceSelect.selectedIndex]
                 ? serviceSelect.options[serviceSelect.selectedIndex].textContent.trim()
                 : "";
-
             let designation = designationInput.value.trim();
             const qty = parseInt(quantityInput.value || "0", 10);
             const price = parseFloat(unitPriceInput.value || "0");
-
             if (!serviceId) {
                 alert("Choisis une prestation.");
                 return;
@@ -360,10 +331,8 @@ document.addEventListener("DOMContentLoaded", function () {
             if (!designation) {
                 designation = serviceText;
             }
-
             const lineTotal = qty * price;
             const rowIndex = itemsTableBody.querySelectorAll("tr").length;
-
             const tr = document.createElement("tr");
             tr.innerHTML = `
                 <td>
@@ -394,15 +363,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 </td>
             `;
             itemsTableBody.appendChild(tr);
-
             // reset champ
             designationInput.value = "";
             quantityInput.value = 1;
             unitPriceInput.value = 0;
-
             recalcTotals();
         });
-
         itemsTableBody.addEventListener("click", function (e) {
             if (e.target.classList.contains("btn-remove")) {
                 const tr = e.target.closest("tr");
@@ -419,7 +385,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
             }
         });
-
         itemsTableBody.addEventListener("change", function (e) {
             if (e.target.matches('input[type="file"]')) {
                 const files = e.target.files;
@@ -427,7 +392,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 const preview = td ? td.querySelector(".photo-preview") : null;
                 if (!preview) return;
                 preview.innerHTML = "";
-
                 if (!files || !files.length) return;
                 Array.from(files).forEach(file => {
                     const img = document.createElement("img");
@@ -438,7 +402,6 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
     }
-
     if (serviceSelect) {
         serviceSelect.addEventListener("change", function () {
             const opt = serviceSelect.options[serviceSelect.selectedIndex];
@@ -451,7 +414,6 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
     }
-
     if (form) {
         form.addEventListener("submit", function (e) {
             if (!phoneInput.value.trim() || !nameInput.value.trim()) {

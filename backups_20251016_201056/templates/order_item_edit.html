@@ -2,7 +2,6 @@
 {% load static %}
 {% block content %}
 <h2>Photos pour {{ oi.item.name }} (commande #{{ oi.order_id }})</h2>
-
 <form method="post" enctype="multipart/form-data">
   {% csrf_token %}
   {{ form.as_p }}
@@ -22,9 +21,7 @@
   </div>
   <button type="submit" class="btn">Enregistrer</button>
 </form>
-
 <p><a href="{% url 'order_detail' oi.order_id %}">← Retour à la commande</a></p>
-
 <script>
 document.querySelectorAll('input[type=file]').forEach(inp=>{
   inp.addEventListener('change', e=>{

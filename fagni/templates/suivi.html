@@ -1,13 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
   <h1>Order tracking</h1>
-
   <form method="get" class="form" style="margin-bottom:1rem;">
     <label for="code">Code de suivi</label>
     <input id="code" name="code" value="{{ code|default:'' }}" placeholder="FAGNI_XXXXXX" />
     <button type="submit">Rechercher</button>
   </form>
-
   {% if commande %}
     <div class="card">
       <h2>{{ commande.code }}</h2>

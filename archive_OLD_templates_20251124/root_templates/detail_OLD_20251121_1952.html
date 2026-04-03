@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <title>Détail commande {{ order.code }} - FAGNI</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
     <style>
         body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -71,7 +70,6 @@
         .badge.in_progress { background:#e3f2fd; color:#004e92; }
         .badge.done { background:#e8f5e9; color:#1b5e20; }
         .badge.canceled { background:#ffebee; color:#b71c1c; }
-
         table {
             width: 100%;
             border-collapse: collapse;
@@ -130,7 +128,6 @@
         }
         .btn-back:hover { background:#f3f3f3; }
         .btn-edit:hover { background:#00408a; }
-
         .photos-grid {
             display: flex;
             flex-wrap: wrap;
@@ -154,7 +151,6 @@
             color:#555;
             margin-top: 2px;
         }
-
         @media (max-width: 800px) {
             .grid {
                 grid-template-columns: 1fr;
@@ -167,27 +163,22 @@
     <h1>Commande {{ order.code }}</h1>
     <p>Détail complet de la commande et informations client.</p>
 </header>
-
 <div class="page">
     <div class="card">
         <div class="actions" style="margin-bottom:10px;">
             <a href="{% url 'orders:list' %}" class="btn btn-back">← Retour à la liste</a>
             <a href="{% url 'orders:update' order_id=order.id %}" class="btn btn-edit">Modifier la commande</a>
         </div>
-
         <div class="grid">
             <!-- Colonne gauche : Commande / Client / Partenaires -->
             <div>
                 <h2>Commande</h2>
-
                 <div class="field-row">
                     <span class="field-label">Code :</span>
                     <span>{{ order.code }}</span>
                 </div>
-
                 <div class="field-row">
                     <span class="field-label">Statut :</span>
-
                     {% if order.status == "pending" %}
                         <span class="badge pending"
                               style="padding:3px 8px;border-radius:999px;background:#fff3cd;color:#856404;font-size:12px;">
@@ -212,7 +203,6 @@
                         <span class="badge">{{ order.status }}</span>
                     {% endif %}
                 </div>
-
                 <form method="post" action="{% url 'orders:change_status' order.id %}" style="margin-top:8px;">
                     {% csrf_token %}
                     <label for="status_select" style="font-size:13px;">Changer le statut :</label>
@@ -223,14 +213,12 @@
                         <option value="done" {% if order.status == "done" %}selected{% endif %}>Terminée</option>
                         <option value="canceled" {% if order.status == "canceled" %}selected{% endif %}>Annulée</option>
                     </select>
-
                     <button type="submit"
                             style="margin-left:6px;padding:4px 10px;border-radius:999px;
                             border:none;font-size:13px;background:#0056b3;color:#fff;cursor:pointer;">
                         Mettre à jour
                     </button>
                 </form>
-
                 <div class="field-row">
                     <span class="field-label">Créée le :</span>
                     <span>{{ order.created_at|date:"d/m/Y H:i" }}</span>
@@ -239,7 +227,6 @@
                     <span class="field-label">Mise à jour :</span>
                     <span>{{ order.updated_at|date:"d/m/Y H:i" }}</span>
                 </div>
-
                 <h2 style="margin-top:14px;">Client</h2>
                 <div class="field-row">
                     <span class="field-label">Nom :</span>
@@ -253,7 +240,6 @@
                     <span class="field-label">Adresse :</span>
                     <span>{{ order.customer.address }}</span>
                 </div>
-
                 <h2 style="margin-top:14px;">Partenaires</h2>
                 <div class="field-row">
                     <span class="field-label">Blanchisserie :</span>
@@ -276,12 +262,10 @@
                     </span>
                 </div>
             </div>
-
             <!-- Colonne droite : Map + Totaux + Timeline -->
             <div>
                 <h2>Localisation</h2>
                 <div id="map"></div>
-
                 <h2 style="margin-top:16px;">Totaux</h2>
                 <div class="totals-box" style="
                     background:#fafafa;
@@ -295,22 +279,18 @@
                         <span>Sous-total (HT)</span>
                         <strong>{{ order.total_ht }} FCFA</strong>
                     </div>
-
                     <div style="display:flex; justify-content:space-between;">
                         <span>TVA</span>
                         <strong>{{ order.tva_amount }} FCFA</strong>
                     </div>
-
                     <div style="display:flex; justify-content:space-between;">
                         <span>Service FAGNI</span>
                         <strong style="color:#ff6a00;">{{ order.service_fee }} FCFA</strong>
                     </div>
-
                     <div style="display:flex; justify-content:space-between;">
                         <span>Frais de livraison</span>
                         <strong>{{ order.delivery_fee|default:"0" }} FCFA</strong>
                     </div>
-
                     <div style="display:flex; justify-content:space-between;">
                         <span>Distance aller-retour</span>
                         <strong>
@@ -321,24 +301,19 @@
                             {% endif %}
                         </strong>
                     </div>
-
                     <div style="display:flex; justify-content:space-between;">
                         <span>Coût logistique livreur</span>
                         <strong>{{ order.driver_logistic_cost|default:"0" }} FCFA</strong>
                     </div>
-
                     <div style="display:flex; justify-content:space-between;">
                         <span>Marge logistique FAGNI</span>
                         <strong>{{ order.logistic_margin|default:"0" }} FCFA</strong>
                     </div>
-
                     <div style="border-top:1px solid #ddd; margin:10px 0;"></div>
-
                     <div style="display:flex; justify-content:space-between;">
                         <span>Total TTC (hors service)</span>
                         <strong>{{ order.total_ttc }} FCFA</strong>
                     </div>
-
                     <div style="margin-top:8px; display:flex; justify-content:space-between; font-size:16px;">
                         <strong>Total général</strong>
                         <strong style="color:#0056b3;">
@@ -346,16 +321,13 @@
                         </strong>
                     </div>
                 </div>
-
                 <!-- Timeline opérationnelle -->
                 <h2 style="margin-top:16px;">Timeline opérationnelle</h2>
                 <div class="totals-box">
-
                     <div>
                         🛒 <strong>Créée :</strong>
                         {{ order.created_at|date:"d/m/Y H:i" }}
                     </div>
-
                     <div>
                         🛵 <strong>Collectée :</strong>
                         {% if order.pickup_time %}
@@ -364,7 +336,6 @@
                             — Non encore collectée
                         {% endif %}
                     </div>
-
                     <div>
                         🧺 <strong>Déposée blanchisserie :</strong>
                         {% if order.dropoff_time %}
@@ -373,7 +344,6 @@
                             — Non encore déposée
                         {% endif %}
                     </div>
-
                     <div>
                         ✅ <strong>Lavage terminé :</strong>
                         {% if order.wash_complete_time %}
@@ -382,7 +352,6 @@
                             — En attente de fin de lavage
                         {% endif %}
                     </div>
-
                     <div>
                         🚚 <strong>Reprise livreur :</strong>
                         {% if order.return_time %}
@@ -391,7 +360,6 @@
                             — Non reprise
                         {% endif %}
                     </div>
-
                     <div>
                         🏠 <strong>Livrée :</strong>
                         {% if order.delivered_time %}
@@ -400,12 +368,10 @@
                             — Non livrée
                         {% endif %}
                     </div>
-
                 </div>
             </div>
         </div>
     </div>
-
     <div class="card">
         <h2>Lignes de commande & photos</h2>
         <table>
@@ -455,10 +421,8 @@
         </table>
     </div>
 </div>
-
 <script>
 let map, clientMarker, laundryMarker, geocoder;
-
 function parseCoord(raw) {
     if (!raw) return null;
     // On remplace une éventuelle virgule par un point
@@ -466,63 +430,51 @@ function parseCoord(raw) {
     const v = parseFloat(raw);
     return isNaN(v) ? null : v;
 }
-
 function initMap() {
     const mapElement = document.getElementById('map');
     if (!mapElement || !window.google || !google.maps) {
         console.log("Google Maps non disponible pour le moment.");
         return;
     }
-
     // On passe tout en chaînes et on parse côté JS
     const clientLatRaw = "{{ order.customer.latitude|default_if_none:'' }}";
     const clientLngRaw = "{{ order.customer.longitude|default_if_none:'' }}";
-
     const laundLatRaw = "{% if order.laundry_partner %}{{ order.laundry_partner.latitude|default_if_none:'' }}{% endif %}";
     const laundLngRaw = "{% if order.laundry_partner %}{{ order.laundry_partner.longitude|default_if_none:'' }}{% endif %}";
-
     const clientLat = parseCoord(clientLatRaw);
     const clientLng = parseCoord(clientLngRaw);
     const laundLat = parseCoord(laundLatRaw);
     const laundLng = parseCoord(laundLngRaw);
-
     const defaultCenter = {lat: 5.347, lng: -4.026}; // Abidjan
     let center = defaultCenter;
-
     if (clientLat !== null && clientLng !== null) {
         center = {lat: clientLat, lng: clientLng};
     }
-
     map = new google.maps.Map(mapElement, {
         zoom: 12,
         center: center,
     });
     geocoder = new google.maps.Geocoder();
-
     // 1) Client + blanchisserie → 2 marqueurs
     if (clientLat !== null && clientLng !== null && laundLat !== null && laundLng !== null) {
         const clientPos = {lat: clientLat, lng: clientLng};
         const laundPos = {lat: laundLat, lng: laundLng};
-
         clientMarker = new google.maps.Marker({
             map: map,
             position: clientPos,
             label: "C",
             title: "Client",
         });
-
         laundryMarker = new google.maps.Marker({
             map: map,
             position: laundPos,
             label: "B",
             title: "Blanchisserie",
         });
-
         const bounds = new google.maps.LatLngBounds();
         bounds.extend(clientPos);
         bounds.extend(laundPos);
         map.fitBounds(bounds);
-
     } else if (clientLat !== null && clientLng !== null) {
         // 2) Seulement le client
         const clientPos = {lat: clientLat, lng: clientLng};
@@ -534,14 +486,12 @@ function initMap() {
         });
         map.setCenter(clientPos);
         map.setZoom(14);
-
     } else {
         // 3) On retombe sur le géocodage de l'adresse
         const marker = new google.maps.Marker({
             map: map,
             position: defaultCenter,
         });
-
         const address = "{{ order.customer.address|escapejs }}";
         if (address) {
             geocoder.geocode(
@@ -561,7 +511,6 @@ function initMap() {
     }
 }
 </script>
-
 <script src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&callback=initMap" async defer></script>
 </body>
 </html>

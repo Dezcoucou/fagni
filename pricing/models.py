@@ -67,3 +67,42 @@ class PriceQuote(TimeStampedModel):
 
     def __str__(self):
         return f"{self.order.code} - {self.quote_type}"
+
+
+
+class BagPricingRule(models.Model):
+    """
+    Règle de pricing pour le mode SAC FAGNI.
+    Tout le pricing business doit être paramétrable via l'admin.
+    """
+
+    BAG_CODE_CHOICES = [
+        ("small", "Petit sac"),
+        ("medium", "Sac moyen"),
+        ("large", "Grand sac"),
+    ]
+
+    code = models.CharField(
+        "Code",
+        max_length=20,
+        choices=BAG_CODE_CHOICES,
+        unique=True,
+        db_index=True,
+    )
+    label = models.CharField("Libellé", max_length=100)
+    price = models.DecimalField("Prix prestation (FCFA)", max_digits=10, decimal_places=2)
+    estimated_items = models.PositiveIntegerField("Nombre estimé de pièces", default=0)
+    is_active = models.BooleanField("Actif", default=True)
+    sort_order = models.PositiveIntegerField("Ordre", default=0)
+    notes = models.TextField("Notes internes", blank=True, default="")
+    created_at = models.DateTimeField("Créé le", auto_now_add=True)
+    updated_at = models.DateTimeField("Mis à jour le", auto_now=True)
+
+    class Meta:
+        verbose_name = "Règle pricing sac"
+        verbose_name_plural = "Règles pricing sac"
+        ordering = ["sort_order", "id"]
+
+    def __str__(self):
+        return f"{self.label} ({self.code}) - {self.price} XOF"
+

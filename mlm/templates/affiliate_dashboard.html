@@ -4,7 +4,6 @@
     <meta charset="utf-8">
     <title>Mon activité d'affilié – FAGNI</title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
-
     <style>
         body{
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -70,12 +69,10 @@
         .btn-secondary:hover{
             background:#f3f3f3;
         }
-
         .mini{
             font-size:11px;
             color:#666;
         }
-
         /* Cartes de stats */
         .cards{
             display:grid;
@@ -106,7 +103,6 @@
             color:#777;
             margin-top:2px;
         }
-
         /* Grilles */
         .grid-two{
             display:grid;
@@ -118,7 +114,6 @@
                 grid-template-columns:1fr;
             }
         }
-
         /* Tables */
         table{
             width:100%;
@@ -139,7 +134,6 @@
             background:#fafafa;
         }
         .t-right{ text-align:right; }
-
         .block-title{
             font-size:14px;
             font-weight:600;
@@ -151,7 +145,6 @@
         .block-title span.emoji{
             font-size:16px;
         }
-
         .pill{
             display:inline-block;
             padding:2px 8px;
@@ -171,16 +164,12 @@
     </style>
 </head>
 <body>
-
 <header>
     <h1>Mon activité d'affilié – FAGNI</h1>
     <p>Suivi de vos commissions, de votre réseau et de votre lien de parrainage.</p>
 </header>
-
 <div class="page">
-
     {% if profile %}
-
     <!-- Carte profil + stats -->
     <div class="card">
         <div class="top-bar">
@@ -200,7 +189,6 @@
                     </span>
                 </div>
             </div>
-
             <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
                 <a href="#" class="btn-link btn-secondary">
                     📄 Contrat & CGU affilié
@@ -210,7 +198,6 @@
                 </a>
             </div>
         </div>
-
         <div class="cards">
             <div class="stat-card">
                 <div class="stat-label">Total commissions cumulées</div>
@@ -241,16 +228,13 @@
             </div>
         </div>
     </div>
-
     <!-- Grille 2 colonnes : commissions + réseau -->
     <div class="grid-two">
-
         <!-- Bloc commissions -->
         <div class="card">
             <div class="block-title">
                 <span class="emoji">💰</span> Mes dernières commissions
             </div>
-
             {% if transactions %}
                 <table>
                     <thead>
@@ -294,13 +278,11 @@
                 </div>
             {% endif %}
         </div>
-
         <!-- Bloc réseau (N1) -->
         <div class="card">
             <div class="block-title">
                 <span class="emoji">👥</span> Mon réseau direct (N1)
             </div>
-
             {% if n1_children %}
                 <table>
                     <thead>
@@ -339,18 +321,15 @@
             {% endif %}
         </div>
     </div>
-
     <!-- Bloc lien de parrainage -->
     <div class="card">
         <div class="block-title">
             <span class="emoji">🔗</span> Mon lien de parrainage
         </div>
-
         <p style="font-size:13px;margin-top:0;">
             Partagez ce lien avec vos contacts. Toute personne qui crée un compte ou passe
             une commande via ce lien sera rattachée à votre réseau (niveau 1).
         </p>
-
         <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
             <div class="pill pill-code" style="font-size:12px;">
                 {{ referral_url|default:"https://fagni.app/invite/"|add:profile.referral_code }}
@@ -359,14 +338,11 @@
                 📋 Copier le lien
             </a>
         </div>
-
         <div class="legend">
             💡 Astuce : envoyez ce lien par WhatsApp, SMS, email ou intégrez-le dans vos réseaux sociaux.
         </div>
     </div>
-
     {% else %}
-
     <!-- Cas où aucun profil affilié n'est encore configuré -->
     <div class="card">
         <div class="block-title">
@@ -377,10 +353,7 @@
             Merci de contacter l'administrateur FAGNI pour activer votre profil d'affilié.
         </p>
     </div>
-
     {% endif %}
-
 </div>
-
 </body>
 </html>

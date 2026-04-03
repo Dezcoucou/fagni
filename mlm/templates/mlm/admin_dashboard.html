@@ -1,13 +1,10 @@
 k{% extends "base.html" %}
 {% load static %}
-
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'mlm/mlm.css' %}">
 {% endblock %}
-
 {% block content %}
 <div class="mlm-page">
-
     <div class="page-header">
         <div class="page-header__left">
             <h1 class="page-title">Dashboard Admin MLM</h1>
@@ -15,7 +12,6 @@ k{% extends "base.html" %}
                 Synthèse globale des affiliés, commissions et retraits.
             </p>
         </div>
-
         <div class="mlm-header-actions">
             <a href="{% url 'mlm:global_dashboard' %}" class="btn btn-light">
                 🌍 Vue globale MLM
@@ -28,7 +24,6 @@ k{% extends "base.html" %}
             </a>
         </div>
     </div>
-
     <!-- STAT CARDS -->
     <div class="mlm-stats-grid">
         <div class="mlm-card">
@@ -40,7 +35,6 @@ k{% extends "base.html" %}
                 Montant cumulé des commissions créditées.
             </div>
         </div>
-
         <div class="mlm-card">
             <div class="mlm-stat-label">Solde cumulé des wallets affiliés</div>
             <div class="mlm-stat-value">
@@ -50,7 +44,6 @@ k{% extends "base.html" %}
                 Somme des soldes portefeuille affiliés (clients).
             </div>
         </div>
-
         <div class="mlm-card">
             <div class="mlm-stat-label">Montant total des retraits demandés</div>
             <div class="mlm-stat-value">
@@ -61,7 +54,6 @@ k{% extends "base.html" %}
             </div>
         </div>
     </div>
-
     <!-- TABLEAU AFFILIÉS -->
     <section class="mlm-section">
         <div class="mlm-section-header">
@@ -70,7 +62,6 @@ k{% extends "base.html" %}
         <p class="mlm-section-subtitle">
             Liste des profils MLM avec leurs filleuls, commissions et solde wallet estimé.
         </p>
-
         {% if affiliate_page and affiliate_page.object_list %}
             <div class="table-responsive">
                 <table class="mlm-table">
@@ -135,7 +126,6 @@ k{% extends "base.html" %}
                     </tbody>
                 </table>
             </div>
-
             <!-- PAGINATION + PER-PAGE -->
             <div class="mlm-pagination-bar">
                 <div class="mlm-pagination-left">
@@ -145,11 +135,9 @@ k{% extends "base.html" %}
                             ← Précédent
                         </a>
                     {% endif %}
-
                     <span class="mlm-pagination-pages">
                         Page {{ affiliate_page.number }} / {{ paginator.num_pages }}
                     </span>
-
                     {% if affiliate_page.has_next %}
                         <a class="btn btn-sm btn-light"
                            href="?page={{ affiliate_page.next_page_number }}&per={{ per }}">
@@ -157,7 +145,6 @@ k{% extends "base.html" %}
                         </a>
                     {% endif %}
                 </div>
-
                 <div class="mlm-pagination-right">
                     <span class="mlm-per-label">Afficher :</span>
                     {% for opt in per_options %}
@@ -174,7 +161,6 @@ k{% extends "base.html" %}
                     <span class="mlm-per-label">lignes / page</span>
                 </div>
             </div>
-
         {% else %}
             <p class="mlm-empty">
                 Aucun affilié trouvé pour le moment.

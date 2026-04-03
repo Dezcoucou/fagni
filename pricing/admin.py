@@ -43,3 +43,16 @@ class PriceQuoteAdmin(UnfoldModelAdmin):
     list_filter = ("quote_type", "is_final", "currency", "generated_at")
     ordering = ("-generated_at",)
     autocomplete_fields = ("order",)
+
+
+
+from .models import BagPricingRule
+
+
+@admin.register(BagPricingRule)
+class BagPricingRuleAdmin(admin.ModelAdmin):
+    list_display = ("sort_order", "code", "label", "price", "estimated_items", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("code", "label")
+    ordering = ("sort_order", "id")
+

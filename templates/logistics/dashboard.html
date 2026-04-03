@@ -136,7 +136,6 @@
         .badge.pending{ background:#fef3c7; color:#92400e; }
         .badge.error,
         .badge.failed-send{ background:#fee2e2; color:#991b1b; }
-
         .pagination{
             display:flex;
             flex-wrap:wrap;
@@ -188,7 +187,6 @@
 </head>
 <body>
     <h1>Tableau de bord logistique FAGNI</h1>
-
     <div class="stats">
         <div class="card">
             <div class="label">Total missions</div>
@@ -215,13 +213,11 @@
             <div class="value">{{ stats.pdf_failed }}</div>
         </div>
     </div>
-
     <form method="get" class="filters">
         <div>
             <label for="q">Recherche code mission</label>
             <input id="q" type="text" name="q" value="{{ filters.q }}" placeholder="Ex: MSN-502">
         </div>
-
         <div>
             <label for="status">Statut</label>
             <select id="status" name="status">
@@ -231,23 +227,19 @@
                 {% endfor %}
             </select>
         </div>
-
         <div>
             <label for="date_from">Date début</label>
             <input id="date_from" type="date" name="date_from" value="{{ filters.date_from }}">
         </div>
-
         <div>
             <label for="date_to">Date fin</label>
             <input id="date_to" type="date" name="date_to" value="{{ filters.date_to }}">
         </div>
-
         <div class="filter-actions">
             <button class="btn" type="submit">Filtrer</button>
             <a class="btn secondaire" href="{% url 'logistics:dashboard' %}">Réinitialiser</a>
         </div>
     </form>
-
     <div class="grid">
         <div class="stack">
             <div>
@@ -293,22 +285,18 @@
                         {% endfor %}
                     </tbody>
                 </table>
-
                 <div class="pagination">
                     {% if page_obj.has_previous %}
                         <a href="?page=1&q={{ filters.q }}&status={{ filters.status }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}">« Première</a>
                         <a href="?page={{ page_obj.previous_page_number }}&q={{ filters.q }}&status={{ filters.status }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}">‹ Précédente</a>
                     {% endif %}
-
                     <span class="current">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-
                     {% if page_obj.has_next %}
                         <a href="?page={{ page_obj.next_page_number }}&q={{ filters.q }}&status={{ filters.status }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}">Suivante ›</a>
                         <a href="?page={{ page_obj.paginator.num_pages }}&q={{ filters.q }}&status={{ filters.status }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}">Dernière »</a>
                     {% endif %}
                 </div>
             </div>
-
             <div>
                 <h2>Derniers envois PDF</h2>
                 <table>
@@ -349,7 +337,6 @@
                 </table>
             </div>
         </div>
-
         <div>
             <h2>Répartition par statut</h2>
             <div class="breakdown-list">

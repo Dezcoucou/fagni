@@ -1,13 +1,11 @@
 <header class="header">
   <img src="{% static 'img/fagni_logo_q4_transparent.png' %}" alt="Logo FAGNI" class="logo">
-
   <nav class="nav">
     <a href="{% url 'accueil' %}">{% trans "Accueil" %}</a>
     <a href="{% url 'commander' %}">{% trans "Commander" %}</a>
     <a href="{% url 'suivi' %}">{% trans "Suivi" %}</a>
     <a href="{% url 'contact' %}">{% trans "Contact" %}</a>
   </nav>
-
   <form action="{% url 'set_language' %}" method="post" class="lang-form">
     {% csrf_token %}
     <input type="hidden" name="next" value="{{ request.get_full_path }}">

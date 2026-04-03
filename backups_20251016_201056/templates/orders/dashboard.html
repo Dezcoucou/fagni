@@ -1,15 +1,12 @@
 {% extends "admin/base_site.html" %}
 {% load i18n %}
-
 {% block breadcrumbs %}
 <div class="breadcrumbs">
   <a href="{% url 'admin:index' %}">{% trans "Accueil" %}</a> › {% trans "Tableau de bord" %}
 </div>
 {% endblock %}
-
 {% block content %}
 <h1>{% trans "Tableau de bord FAGNI" %}</h1>
-
 <div class="module" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
   <div class="panel">
     <h2>{% trans "Chiffre d'affaires (30 j)" %}</h2>
@@ -25,7 +22,6 @@
     <p>{{ best_customer.total }} FCFA</p>
   </div>
 </div>
-
 <h2 style="margin-top:18px;">{% trans "Dernières commandes" %}</h2>
 <div class="module">
   <table class="adminlist">

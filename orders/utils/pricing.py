@@ -14,6 +14,25 @@ from typing import Dict, Any
 from .settings_loader import get_pricing_settings
 
 
+BAG_PRICING = {
+    "small": {
+        "label": "Petit sac",
+        "price": Decimal("7000"),
+        "estimated_items": 15,
+    },
+    "medium": {
+        "label": "Sac moyen",
+        "price": Decimal("10000"),
+        "estimated_items": 25,
+    },
+    "large": {
+        "label": "Grand sac",
+        "price": Decimal("14000"),
+        "estimated_items": 40,
+    },
+}
+
+
 def _to_decimal(value) -> Decimal:
     try:
         return Decimal(str(value))
@@ -83,13 +102,24 @@ def compute_order_amounts(order) -> Dict[str, Any]:
 
     # -------------------------------------------------------
     # 1) Sous-total prestations (HT)
+    #    Support hybride :
+    #    - pricing_mode="bag"  -> valeur forfaitaire sac
+    #    - pricing_mode="item" -> somme des lignes
     # -------------------------------------------------------
-    items_manager = getattr(order, "items", None)
-    if items_manager is None:
-        subtotal = Decimal("0")
+    pricing_mode = (getattr(order, "pricing_mode", None) or "bag").strip().lower()
+
+    if pricing_mode == "bag":
+        bag_size = (getattr(order, "bag_size", None) or "medium").strip().lower()
+        bag_cfg = BAG_PRICING.get(bag_size, BAG_PRICING["medium"])
+        subtotal = _to_decimal(bag_cfg.get("price", 0))
     else:
-        items = list(items_manager.all())
-        subtotal = sum((_get_item_total(it) for it in items), Decimal("0"))
+        items_manager = getattr(order, "items", None)
+        if items_manager is None:
+            subtotal = Decimal("0")
+        else:
+            items = list(items_manager.all())
+            subtotal = sum((_get_item_total(it) for it in items), Decimal("0"))
+
     subtotal = _q1(subtotal)
 
     # -------------------------------------------------------
@@ -159,29 +189,47 @@ def compute_order_amounts(order) -> Dict[str, Any]:
     logistic_margin = _q1(logistic_margin)
 
     # -------------------------------------------------------
-    # 5) Part blanchisserie + routage du supplément express
+    # 5) Blanchisserie : base partenaire, commission FAGNI, net partenaire
     # -------------------------------------------------------
-    laundry_amount = subtotal
+    laundry_base = _q1(subtotal)
 
+    laundry_commission_rate = _to_decimal(getattr(cfg, "laundry_commission_percent", 0))
+    if laundry_commission_rate < 0:
+        laundry_commission_rate = Decimal("0")
+    if laundry_commission_rate > Decimal("100"):
+        laundry_commission_rate = Decimal("100")
+
+    laundry_commission_ht = _q1(laundry_base * laundry_commission_rate / Decimal("100"))
+    amount_laundry_partner = _q1(laundry_base - laundry_commission_ht)
+
+    # -------------------------------------------------------
+    # Routage du supplément express
+    # NOTE:
+    # - la part express blanchisserie n'est PAS incluse ici;
+    #   elle sera gérée plus finement dans finance.py selon SLA.
+    # - si l'express cible DRIVER/FAGNI/SPLIT, on ajuste ici la logistique.
+    # -------------------------------------------------------
     target = (cfg.express_extra_target or "LAUNDRY").upper()
     if express_surcharge > 0:
-        if target == "LAUNDRY":
-            laundry_amount += express_surcharge
-        elif target == "DRIVER":
+        if target == "DRIVER":
             driver_amount += express_surcharge
         elif target == "FAGNI":
             logistic_margin += express_surcharge
         elif target == "SPLIT":
             half = (express_surcharge / Decimal("2")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-            laundry_amount += half
+            driver_amount += half
             logistic_margin += express_surcharge - half
+        elif target == "LAUNDRY":
+            # géré dans finance.py via express_laundry_share
+            pass
 
-    laundry_amount = _q1(laundry_amount)
+    amount_laundry_partner = _q1(amount_laundry_partner)
+    laundry_commission_ht = _q1(laundry_commission_ht)
     driver_amount = _q1(driver_amount)
     logistic_margin = _q1(logistic_margin)
 
     # -------------------------------------------------------
-    # 6) Service FAGNI HT (5% + minimum + arrondi + option livraison)
+    # 6) Service FAGNI HT (% + minimum + arrondi + option livraison)
     # -------------------------------------------------------
     service_base = subtotal
     if cfg.apply_service_on_delivery:
@@ -197,7 +245,7 @@ def compute_order_amounts(order) -> Dict[str, Any]:
     # -------------------------------------------------------
     # 7) Revenu FAGNI HT
     # -------------------------------------------------------
-    fagni_revenue_ht = _q1(logistic_margin + service_fee_ht)
+    fagni_revenue_ht = _q1(laundry_commission_ht + logistic_margin + service_fee_ht)
 
     return {
         "subtotal": subtotal,
@@ -206,8 +254,17 @@ def compute_order_amounts(order) -> Dict[str, Any]:
         "service_fee_ht": service_fee_ht,
         "express_surcharge": express_surcharge,
         "express_for_client": express_for_client,
-        "commission_laundry_ht": laundry_amount,
-        "commission_delivery_ht": driver_amount,
+
+        # Blanchisserie
+        "laundry_base_ht": laundry_base,
+        "commission_laundry_ht": laundry_commission_ht,
+        "amount_laundry_partner": amount_laundry_partner,
+
+        # Livraison
+        "commission_delivery_ht": driver_amount,   # legacy/compat
+        "amount_driver_partner": driver_amount,
         "margin_delivery": logistic_margin,
+
+        # FAGNI
         "fagni_revenue_ht": fagni_revenue_ht,
     }

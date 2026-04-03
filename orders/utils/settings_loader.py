@@ -19,6 +19,7 @@ class PricingConfig:
     # Service FAGNI
     service_fee_percent: Decimal
     service_fee_min: Decimal
+    laundry_commission_percent: Decimal
     rounding_step: int
     apply_service_on_delivery: bool
 
@@ -49,6 +50,7 @@ class PricingConfig:
             # Service FAGNI
             service_fee_percent=Decimal(str(obj.service_fee_percent or 0)),
             service_fee_min=Decimal(str(obj.service_fee_min or 0)),
+            laundry_commission_percent=Decimal(str(getattr(obj, "laundry_commission_percent", 0) or 0)),
             rounding_step=int(obj.rounding_step or 0),
             apply_service_on_delivery=bool(obj.apply_service_on_delivery),
             # Livraison

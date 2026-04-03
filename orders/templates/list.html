@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <title>Liste des commandes - FAGNI</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
     <style>
         body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -131,10 +130,8 @@
     <h1>Commandes FAGNI</h1>
     <p>Vue d’ensemble des commandes enregistrées dans le système.</p>
 </header>
-
 <div class="page">
     <div class="card">
-
         <!-- Barre du haut : stats + boutons -->
         <div class="top-actions">
             <div>
@@ -160,42 +157,35 @@
                 </a>
             </div>
         </div>
-
         <!-- Filtres par statut -->
         <div style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:6px;font-size:12px;">
             <span style="margin-right:4px;">Filtrer :</span>
-
             <a href="{% url 'orders:list' %}"
                class="btn-link btn-secondary"
                style="padding:4px 10px;{% if current_status == 'all' or not current_status %}background:#0056b3;color:#fff;border-color:#0056b3;{% endif %}">
                 Toutes ({{ total_count|default:orders|length }})
             </a>
-
             <a href="{% url 'orders:list' %}?status=pending"
                class="btn-link btn-secondary"
                style="padding:4px 10px;{% if current_status == 'pending' %}background:#fff3cd;color:#856404;border-color:#856404;{% endif %}">
                 En attente ({{ pending_count|default:"0" }})
             </a>
-
             <a href="{% url 'orders:list' %}?status=in_progress"
                class="btn-link btn-secondary"
                style="padding:4px 10px;{% if current_status == 'in_progress' %}background:#cce5ff;color:#004085;border-color:#004085;{% endif %}">
                 En cours ({{ in_progress_count|default:"0" }})
             </a>
-
             <a href="{% url 'orders:list' %}?status=done"
                class="btn-link btn-secondary"
                style="padding:4px 10px;{% if current_status == 'done' %}background:#d4edda;color:#155724;border-color:#155724;{% endif %}">
                 Terminées ({{ done_count|default:"0" }})
             </a>
-
             <a href="{% url 'orders:list' %}?status=canceled"
                class="btn-link btn-secondary"
                style="padding:4px 10px;{% if current_status == 'canceled' %}background:#f8d7da;color:#721c24;border-color:#721c24;{% endif %}">
                 Annulées ({{ canceled_count|default:"0" }})
             </a>
         </div>
-
         {% if orders %}
             <table>
                 <thead>
@@ -247,6 +237,5 @@
         {% endif %}
     </div>
 </div>
-
 </body>
 </html>

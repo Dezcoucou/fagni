@@ -45,6 +45,13 @@ class GlobalPricingSettings(SingletonModel):
         default=500,
         help_text="Montant minimal de service FAGNI si le calcul en % est inférieur."
     )
+    laundry_commission_percent = models.DecimalField(
+        "Commission FAGNI sur prestation (%)",
+        max_digits=5,
+        decimal_places=2,
+        default=20.00,
+        help_text="Pourcentage prélevé par FAGNI sur la prestation blanchisserie."
+    )
     rounding_step = models.PositiveIntegerField(
         "Pas d'arrondi (FCFA)",
         default=25,

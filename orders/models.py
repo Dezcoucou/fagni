@@ -306,6 +306,16 @@ def sync_delivery_legs_for_order(order):
             leg.save(update_fields=["status"])
 
 
+    def _get_order_upsell_total(order) -> Decimal:
+        try:
+            upsell = getattr(order, "upsell", None)
+            if upsell:
+                return upsell.total
+        except Exception:
+            pass
+        return Decimal("0.00")
+
+
 def _order_status_to_leg_status(order_status: str) -> str:
     """
     Mapping du statut commande vers le statut des legs.
@@ -1230,6 +1240,32 @@ class Order(models.Model):
         default=0,
     )
 
+    pricing_mode = models.CharField(
+        "Mode de tarification",
+        max_length=10,
+        choices=[
+            ("bag", "Sac"),
+            ("item", "À la pièce"),
+        ],
+        default="bag",
+        db_index=True,
+        help_text="Mode d'entrée client : sac rapide ou détail à la pièce.",
+    )
+
+    bag_size = models.CharField(
+        "Taille de sac",
+        max_length=10,
+        choices=[
+            ("small", "Petit sac"),
+            ("medium", "Sac moyen"),
+            ("large", "Grand sac"),
+        ],
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Utilisé uniquement si pricing_mode='bag'.",
+    )
+
     amount_laundry_partner = models.DecimalField(
         "Montant blanchisseur (FCFA)",
         max_digits=10,
@@ -1379,7 +1415,14 @@ class Order(models.Model):
         # 1) Prestations
         self.prestation_total = data.get("prestation_total", Decimal("0"))
 
-        # 2) Livraison (transport facturé au client, hors express)
+        # 2) Service FAGNI
+        self.service_fee = data.get("service_fee_ht", Decimal("0"))
+
+        # 3) Reversement blanchisseur (source métier)
+        self.amount_laundry_partner = data.get("amount_laundry", data.get("commission_laundry_ht", Decimal("0")))
+        self.commission_laundry_ht = data.get("commission_laundry_ht", Decimal("0"))
+
+        # 4) Livraison (transport facturé au client, hors express)
         # ------------------------------------------------------------
         # ✅ LOCK POOL (Option A)
         # Si delivery_fee == amount_driver_partner + logistic_margin et amount_driver_partner>0,
@@ -1395,31 +1438,25 @@ class Order(models.Model):
             lock_pool = False
 
         if lock_pool:
-            # Pool verrouillé: on garde driver/margin et on recolle delivery_fee
             try:
                 self.delivery_fee = Decimal(str(getattr(self, 'amount_driver_partner', 0) or 0)) + Decimal(str(getattr(self, 'logistic_margin', 0) or 0))
-                # mirror legacy (utile si du code lit encore driver_logistic_cost)
                 self.driver_logistic_cost = Decimal(str(getattr(self, 'amount_driver_partner', 0) or 0))
             except Exception:
                 pass
         else:
-            # Calcul normal (auto)
             self.delivery_fee = data.get('delivery_fee_client', Decimal('0'))
             self.driver_logistic_cost = data.get('delivery_cost_driver', Decimal('0'))
-            # conserve la logique existante si data fournit amount_driver_partner
-            try:
-                if data.get('amount_driver_partner', None) is not None:
-                    self.amount_driver_partner = data.get('amount_driver_partner')
-                else:
-                    self.amount_driver_partner = data.get('delivery_cost_driver', Decimal('0'))
-            except Exception:
-                self.amount_driver_partner = data.get('delivery_cost_driver', Decimal('0'))
-        
+            self.amount_driver_partner = data.get('amount_driver', data.get('delivery_cost_driver', Decimal('0')))
             try:
                 margin_delivery = data.get('margin_delivery', 0)
                 self.logistic_margin = int(margin_delivery)
             except Exception:
                 self.logistic_margin = 0
+
+        # Compat legacy / lecture admin
+        self.commission_delivery_ht = data.get("commission_delivery_ht", self.amount_driver_partner)
+
+        # 5) FAGNI
         self.fagni_revenue_ht = data.get("fagni_revenue_ht", Decimal("0"))
         self.vat_fagni = data.get("vat_fagni", Decimal("0"))
 
@@ -1427,11 +1464,10 @@ class Order(models.Model):
             self.fagni_revenue_ht + self.vat_fagni
         ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
-        # 7) Total TTC client (OFFICIEL)
+        # 6) Total TTC client (OFFICIEL)
         self.total_client_ttc = data.get("total_client_ttc", data.get("total_ttc_client", Decimal("0")))
 
         # ✅ Compat : ancien champ total = total client TTC
-        # (sinon certaines pages peuvent afficher un total incomplet)
         self.total = self.total_client_ttc
 
         # 8) Facture (si payé)
@@ -3785,3 +3821,96 @@ class PaymentEvent(models.Model):
 
     def __str__(self):
         return f"{self.order.code} - {self.provider} - {self.event_type}"
+
+
+from decimal import Decimal, ROUND_HALF_UP
+from django.db import models
+
+
+class OrderUpsell(models.Model):
+    """
+    Options monétisables ajoutées à une commande FAGNI.
+    Modèle séparé pour éviter d'alourdir directement Order.
+    """
+
+    order = models.OneToOneField(
+        "orders.Order",
+        on_delete=models.CASCADE,
+        related_name="upsell",
+        verbose_name="Commande",
+    )
+
+    express_24h = models.BooleanField("Express 24h", default=False)
+    premium_ironing = models.BooleanField("Repassage premium", default=False)
+    fragrance = models.BooleanField("Parfum linge", default=False)
+    delicate_care = models.BooleanField("Soin délicat", default=False)
+
+    express_24h_fee = models.DecimalField(
+        "Frais express 24h",
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("2000.00"),
+    )
+    premium_ironing_fee = models.DecimalField(
+        "Frais repassage premium",
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("500.00"),
+    )
+    fragrance_fee = models.DecimalField(
+        "Frais parfum linge",
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("300.00"),
+    )
+    delicate_care_fee = models.DecimalField(
+        "Frais soin délicat",
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("1000.00"),
+    )
+
+    created_at = models.DateTimeField("Créé le", auto_now_add=True)
+    updated_at = models.DateTimeField("Mis à jour le", auto_now=True)
+
+    class Meta:
+        verbose_name = "Upsell commande"
+        verbose_name_plural = "Upsells commande"
+
+    def _money(self, value) -> Decimal:
+        if not isinstance(value, Decimal):
+            value = Decimal(str(value or "0"))
+        return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def total(self) -> Decimal:
+        total = Decimal("0.00")
+
+        if self.express_24h:
+            total += self._money(self.express_24h_fee)
+
+        if self.premium_ironing:
+            total += self._money(self.premium_ironing_fee)
+
+        if self.fragrance:
+            total += self._money(self.fragrance_fee)
+
+        if self.delicate_care:
+            total += self._money(self.delicate_care_fee)
+
+        return self._money(total)
+
+    def active_labels(self):
+        rows = []
+        if self.express_24h:
+            rows.append(("Express 24h", self._money(self.express_24h_fee)))
+        if self.premium_ironing:
+            rows.append(("Repassage premium", self._money(self.premium_ironing_fee)))
+        if self.fragrance:
+            rows.append(("Parfum linge", self._money(self.fragrance_fee)))
+        if self.delicate_care:
+            rows.append(("Soin délicat", self._money(self.delicate_care_fee)))
+        return rows
+
+    def __str__(self):
+        return f"Upsell commande #{getattr(self.order, 'id', '—')} — {self.total} XOF"

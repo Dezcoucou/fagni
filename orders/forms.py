@@ -4,6 +4,16 @@ from .models import Customer, Order, OrderItem, Payment, Delivery
 
 # === Formulaire client ===
 class CustomerForm(forms.ModelForm):
+    address = forms.CharField(
+        required=True,
+        error_messages={
+            "required": "Veuillez indiquer votre adresse de collecte pour que le livreur puisse vous trouver."
+        },
+        widget=forms.TextInput(attrs={
+            "placeholder": "Ex: Cocody Riviera 3, près du carrefour Shell"
+        }),
+    )
+
     class Meta:
         model = Customer
         fields = ["name", "phone", "email", "address"]

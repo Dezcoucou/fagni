@@ -1,7 +1,5 @@
 {% extends "base.html" %}
-
 {% block content %}
-
 <style>
     .auth-wrapper {
         min-height: calc(100vh - 80px);
@@ -13,7 +11,6 @@
                     radial-gradient(circle at bottom right, #dbeafe 0, transparent 55%),
                     #f5f5f7;
     }
-
     .auth-card {
         width: 100%;
         max-width: 420px;
@@ -23,14 +20,12 @@
         box-shadow: 0 14px 40px rgba(15, 23, 42, 0.14);
         border: 1px solid #e5e7eb;
     }
-
     .auth-logo {
         display: flex;
         align-items: center;
         gap: 10px;
         margin-bottom: 8px;
     }
-
     .auth-logo-icon {
         width: 32px;
         height: 32px;
@@ -43,7 +38,6 @@
         font-weight: 700;
         font-size: 18px;
     }
-
     .auth-logo-text {
         font-size: 20px;
         font-weight: 700;
@@ -51,30 +45,25 @@
         text-transform: uppercase;
         color: #0056b3;
     }
-
     .auth-subtitle {
         font-size: 13px;
         color: #6b7280;
         margin-bottom: 16px;
     }
-
     .auth-title {
         font-size: 16px;
         font-weight: 600;
         margin-bottom: 4px;
         color: #111827;
     }
-
     .auth-description {
         font-size: 12px;
         color: #9ca3af;
         margin-bottom: 16px;
     }
-
     .auth-form-group {
         margin-bottom: 12px;
     }
-
     .auth-form-group label {
         display: block;
         font-size: 13px;
@@ -82,7 +71,6 @@
         margin-bottom: 4px;
         font-weight: 500;
     }
-
     .auth-form-group input {
         width: 100%;
         padding: 8px 10px;
@@ -93,13 +81,11 @@
         transition: border-color 0.15s ease, box-shadow 0.15s ease;
         background-color: #f9fafb;
     }
-
     .auth-form-group input:focus {
         border-color: #0056b3;
         box-shadow: 0 0 0 1px rgba(0, 86, 179, 0.1);
         background-color: #ffffff;
     }
-
     .auth-errors {
         background: #fef2f2;
         border: 1px solid #fecaca;
@@ -109,7 +95,6 @@
         font-size: 12px;
         margin-bottom: 12px;
     }
-
     .auth-help {
         display: flex;
         justify-content: space-between;
@@ -118,17 +103,14 @@
         font-size: 12px;
         color: #6b7280;
     }
-
     .auth-help a {
         color: #0056b3;
         text-decoration: none;
         font-weight: 500;
     }
-
     .auth-help a:hover {
         text-decoration: underline;
     }
-
     .auth-submit-btn {
         width: 100%;
         border: none;
@@ -145,18 +127,15 @@
         gap: 6px;
         box-shadow: 0 8px 25px rgba(251, 146, 60, 0.4);
     }
-
     .auth-submit-btn:hover {
         filter: brightness(1.03);
     }
-
     .auth-footer {
         margin-top: 12px;
         font-size: 11px;
         color: #9ca3af;
         text-align: center;
     }
-
     .auth-badge {
         display: inline-flex;
         align-items: center;
@@ -169,12 +148,10 @@
         border-radius: 999px;
         font-size: 11px;
     }
-
     .auth-badge span {
         font-weight: 600;
     }
 </style>
-
 <div class="auth-wrapper">
     <div class="auth-card">
         <div class="auth-logo">
@@ -184,28 +161,23 @@
         <div class="auth-subtitle">
             Plateforme digitale de pressing & services
         </div>
-
         <h1 class="auth-title">Connexion à l’espace FAGNI</h1>
         <p class="auth-description">
             Connecte-toi avec ton compte (staff ou livreur) pour accéder au dashboard ou à l’app livreur.
         </p>
-
         {% if form.errors %}
             <div class="auth-errors">
                 Vérifie ton email / identifiant et ton mot de passe.<br>
                 Les informations de connexion semblent incorrectes.
             </div>
         {% endif %}
-
         {% if next and user.is_authenticated %}
             <div class="auth-errors">
                 Ton compte n’a pas les permissions nécessaires pour accéder à cette page.
             </div>
         {% endif %}
-
         <form method="post" action="{% url 'login' %}">
             {% csrf_token %}
-
             <div class="auth-form-group">
                 <label for="id_username">Email ou identifiant</label>
                 <input type="text"
@@ -215,7 +187,6 @@
                        required
                        value="{{ form.username.value|default_if_none:'' }}">
             </div>
-
             <div class="auth-form-group">
                 <label for="id_password">Mot de passe</label>
                 <input type="password"
@@ -223,11 +194,9 @@
                        id="id_password"
                        required>
             </div>
-
             {% if next %}
                 <input type="hidden" name="next" value="{{ next }}">
             {% endif %}
-
             <div class="auth-help">
                 <div>
                     <input type="checkbox" name="remember_me" id="id_remember_me" style="margin-right:4px;">
@@ -237,13 +206,11 @@
                     Mot de passe oublié ?
                 </a>
             </div>
-
             <button type="submit" class="auth-submit-btn">
                 Se connecter
                 <span>➡️</span>
             </button>
         </form>
-
         <div class="auth-footer">
             <div>FAGNI – Côte d’Ivoire • {{ now|date:"Y" }}</div>
             <div class="auth-badge">
@@ -252,5 +219,4 @@
         </div>
     </div>
 </div>
-
 {% endblock %}

@@ -1,9 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load money_filters %}
-
 {% block title %}Dashboard global MLM – FAGNI{% endblock %}
-
 {% block extra_head %}
 <style>
     .page {
@@ -11,7 +9,6 @@
         margin: 0 auto 32px;
         padding: 12px 10px 24px;
     }
-
     .page-header {
         display:flex;
         justify-content:space-between;
@@ -19,20 +16,17 @@
         gap:12px;
         margin-bottom:18px;
     }
-
     .page-title {
         font-size:20px;
         font-weight:700;
         color:#0f172a;
         margin:0;
     }
-
     .page-subtitle {
         font-size:13px;
         color:#64748b;
         margin:4px 0 0;
     }
-
     .card {
         background:#ffffff;
         border-radius:16px;
@@ -41,7 +35,6 @@
         border:1px solid #e5e7eb;
         box-shadow:0 2px 6px rgba(15,23,42,0.08);
     }
-
     .card-title {
         font-size:15px;
         font-weight:600;
@@ -51,76 +44,64 @@
         align-items:center;
         gap:6px;
     }
-
     .card-title .emoji {
         font-size:18px;
     }
-
     .grid-2 {
         display:grid;
         grid-template-columns: 1.1fr 0.9fr;
         gap:14px;
     }
-
     .stats-grid {
         display:grid;
         grid-template-columns: repeat(4, minmax(0,1fr));
         gap:10px;
     }
-
     .stat-pill {
         background:#f9fafb;
         border-radius:12px;
         padding:10px 10px;
         border:1px solid #e5e7eb;
     }
-
     .stat-label {
         font-size:11px;
         color:#9ca3af;
         text-transform:uppercase;
         letter-spacing:.04em;
     }
-
     .stat-value {
         font-size:16px;
         font-weight:600;
         color:#111827;
         margin-top:2px;
     }
-
     .stat-helper {
         font-size:11px;
         color:#6b7280;
         margin-top:2px;
     }
-
     table.table {
         width:100%;
         border-collapse:collapse;
         font-size:13px;
         margin-top:6px;
     }
-
     table.table th,
     table.table td {
         padding:7px 6px;
         border-bottom:1px solid #e5e7eb;
         vertical-align:top;
     }
-
     table.table thead th {
         background:#f9fafb;
         font-weight:600;
         color:#6b7280;
         font-size:12px;
     }
-
     td.num {
         text-align:right;
         white-space:nowrap;
     }
-
     .badge-soft {
         padding:3px 8px;
         border-radius:999px;
@@ -131,31 +112,26 @@
         align-items:center;
         gap:4px;
     }
-
     .badge-soft--success {
         background:#ecfdf3;
         color:#166534;
     }
-
     .badge-soft--warning {
         background:#fffbeb;
         color:#92400e;
     }
-
     .filters-grid {
         display:grid;
         grid-template-columns: repeat(4, minmax(0,1fr));
         gap:8px;
         margin-bottom:10px;
     }
-
     .filter-item label {
         font-size:12px;
         color:#6b7280;
         display:block;
         margin-bottom:2px;
     }
-
     .filter-item input,
     .filter-item select {
         width:100%;
@@ -164,7 +140,6 @@
         border:1px solid #d1d5db;
         font-size:13px;
     }
-
     .btn {
         display:inline-flex;
         align-items:center;
@@ -177,28 +152,23 @@
         text-decoration:none;
         white-space:nowrap;
     }
-
     .btn-light {
         background:#fff;
         border-color:#e5e7eb;
         color:#374151;
     }
-
     .btn-light:hover {
         background:#f9fafb;
     }
-
     .btn-primary {
         background:linear-gradient(90deg,#ff7a00,#0056b3);
         color:#fff;
         border:none;
     }
-
     .field-value-muted {
         font-size:12px;
         color:#6b7280;
     }
-
     @media (max-width: 1050px) {
         .stats-grid {
             grid-template-columns: repeat(2, minmax(0,1fr));
@@ -210,7 +180,6 @@
             grid-template-columns: 1fr;
         }
     }
-
     @media (max-width: 640px) {
         .stats-grid,
         .filters-grid {
@@ -219,10 +188,8 @@
     }
 </style>
 {% endblock %}
-
 {% block content %}
 <div class="page">
-
     <!-- HEADER -->
     <div class="page-header">
         <div>
@@ -235,13 +202,11 @@
             <a href="{% url 'mlm:admin_withdrawals' %}" class="btn btn-light">💼 Gestion des retraits</a>
         </div>
     </div>
-
     <!-- STATS GLOBALES -->
     <section class="card">
         <h2 class="card-title">
             <span class="emoji">📊</span> KPIs globaux
         </h2>
-
         <div class="stats-grid">
             <div class="stat-pill">
                 <div class="stat-label">Affiliés actifs</div>
@@ -252,7 +217,6 @@
                     Total des comptes affiliés avec au moins une activité.
                 </div>
             </div>
-
             <div class="stat-pill">
                 <div class="stat-label">Filleuls enregistrés</div>
                 <div class="stat-value">
@@ -262,7 +226,6 @@
                     Ensemble des filleuls (directs & indirects).
                 </div>
             </div>
-
             <div class="stat-pill">
                 <div class="stat-label">Commissions versées (cumul)</div>
                 <div class="stat-value">
@@ -272,7 +235,6 @@
                     Commissions effectivement payées aux affiliés.
                 </div>
             </div>
-
             <div class="stat-pill">
                 <div class="stat-label">Commissions en attente</div>
                 <div class="stat-value">
@@ -284,16 +246,13 @@
             </div>
         </div>
     </section>
-
     <div class="grid-2">
-
         <!-- COLONNE GAUCHE : CLASSEMENT AFFILIÉS -->
         <div>
             <section class="card">
                 <h2 class="card-title">
                     <span class="emoji">🏅</span> Top affiliés
                 </h2>
-
                 <form method="get" class="filters-grid" style="margin-bottom:10px;">
                     <div class="filter-item">
                         <label for="period">Période</label>
@@ -319,7 +278,6 @@
                         </a>
                     </div>
                 </form>
-
                 <table class="table">
                     <thead>
                     <tr>
@@ -366,14 +324,12 @@
                 </table>
             </section>
         </div>
-
         <!-- COLONNE DROITE : DERNIÈRES ACTIVITÉS & RETRAITS -->
         <div>
             <section class="card">
                 <h2 class="card-title">
                     <span class="emoji">📌</span> Dernières activités MLM
                 </h2>
-
                 {% if last_events %}
                     <table class="table">
                         <thead>
@@ -413,12 +369,10 @@
                     </p>
                 {% endif %}
             </section>
-
             <section class="card">
                 <h2 class="card-title">
                     <span class="emoji">🏦</span> Dernières demandes de retrait
                 </h2>
-
                 {% if last_withdrawals %}
                     <table class="table">
                         <thead>

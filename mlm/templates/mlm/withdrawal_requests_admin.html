@@ -97,12 +97,10 @@
     </style>
 </head>
 <body>
-
 <header>
     <h1>Demandes de retrait – MLM FAGNI</h1>
     <p>Validation et suivi des retraits d'affiliés.</p>
 </header>
-
 <div class="page">
     <div class="card">
         <form method="get" class="filter-bar">
@@ -115,7 +113,6 @@
                 <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejetés</option>
             </select>
         </form>
-
         {% if withdrawals %}
             <table>
                 <thead>
@@ -203,6 +200,5 @@
         {% endif %}
     </div>
 </div>
-
 </body>
 </html>

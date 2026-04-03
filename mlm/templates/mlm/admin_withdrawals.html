@@ -1,13 +1,10 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'mlm/mlm.css' %}">
 {% endblock %}
-
 {% block content %}
 <div class="mlm-page">
-
     <div class="page-header">
         <div class="page-header__left">
             <h1 class="page-title">Demandes de retrait – Affiliés</h1>
@@ -15,7 +12,6 @@
                 Suivi et traitement des retraits du programme de parrainage FAGNI.
             </p>
         </div>
-
         <div class="mlm-header-actions">
             <a href="{% url 'mlm:admin_dashboard' %}" class="btn btn-light">
                 📊 Dashboard Admin MLM
@@ -28,7 +24,6 @@
             </a>
         </div>
     </div>
-
     <!-- STAT CARDS RETRAITS -->
     <div class="mlm-stats-grid">
         <div class="mlm-card">
@@ -40,7 +35,6 @@
                 Somme de toutes les demandes de retrait.
             </div>
         </div>
-
         <div class="mlm-card">
             <div class="mlm-stat-label">Retraits en attente</div>
             <div class="mlm-stat-value">
@@ -50,7 +44,6 @@
                 À traiter par l’équipe FAGNI.
             </div>
         </div>
-
         <div class="mlm-card">
             <div class="mlm-stat-label">Retraits approuvés</div>
             <div class="mlm-stat-value">
@@ -60,7 +53,6 @@
                 À payer prochainement.
             </div>
         </div>
-
         <div class="mlm-card">
             <div class="mlm-stat-label">Retraits payés</div>
             <div class="mlm-stat-value">
@@ -71,7 +63,6 @@
             </div>
         </div>
     </div>
-
     <!-- TABLEAU DES DEMANDES -->
     <section class="mlm-section">
         <div class="mlm-section-header">
@@ -80,7 +71,6 @@
         <p class="mlm-section-subtitle">
             Gérer les demandes de retrait des affiliés (approbation, rejet, paiement).
         </p>
-
         {% if withdrawals %}
             <div class="table-responsive">
                 <table class="mlm-table">
@@ -175,7 +165,6 @@
                     </tbody>
                 </table>
             </div>
-
             <!-- PAGINATION -->
             <div class="mlm-pagination-bar">
                 <div class="mlm-pagination-left">
@@ -185,11 +174,9 @@
                             ← Précédent
                         </a>
                     {% endif %}
-
                     <span class="mlm-pagination-pages">
                         Page {{ page_obj.number }} / {{ paginator.num_pages }}
                     </span>
-
                     {% if page_obj.has_next %}
                         <a class="btn btn-sm btn-light"
                            href="?page={{ page_obj.next_page_number }}">
@@ -198,7 +185,6 @@
                     {% endif %}
                 </div>
             </div>
-
         {% else %}
             <p class="mlm-empty">
                 Aucune demande de retrait enregistrée pour le moment.

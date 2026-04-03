@@ -1,8 +1,6 @@
 {% extends "base.html" %}
-
 {% block content %}
 <div class="wallet-page">
-
     <!-- HEADER -->
     <div class="page-header">
         <div class="page-header__left">
@@ -15,15 +13,12 @@
             <a href="{% url 'orders:list' %}" class="btn btn-light">
                 📋 Liste des commandes
             </a>
-
             <a href="{% url 'orders:finance_dashboard' %}" class="btn btn-light">
                 💰 Dashboard finance
             </a>
-
             <a href="{% url 'mlm:global_dashboard' %}" class="btn btn-light btn-sm">
                 🌍 Dashboard MLM
             </a>
-
             {% if customer and customer.referral_profiles.first %}
                 {% with profile=customer.referral_profiles.first %}
                     <a href="{% url 'mlm:affiliate_detail' profile.referral_code %}" class="btn btn-primary">
@@ -31,12 +26,10 @@
                     </a>
                 {% endwith %}
             {% endif %}
-
             <a href="{% url 'mlm:affiliate_dashboard' %}" class="btn btn-light">
                 👤 Mon espace affilié
             </a>
         </div>
-
     <!-- INFO CLIENT + SOLDE -->
     <section class="card" style="margin-bottom: 20px;">
         <div style="display:flex; justify-content:space-between; gap:24px; flex-wrap:wrap;">
@@ -54,7 +47,6 @@
                     {% endif %}
                 </p>
             </div>
-
             <div style="text-align:right;">
                 <div style="font-size:0.9rem; color:#6b7280;">Solde portefeuille</div>
                 <div style="font-size:1.8rem; font-weight:700;">
@@ -68,7 +60,6 @@
             </div>
         </div>
     </section>
-
     <!-- HISTORIQUE DES MOUVEMENTS -->
     <section class="card">
         <div class="finance-table-header" style="margin-bottom: 12px;">
@@ -77,7 +68,6 @@
                 Tous les mouvements crédit / débit du portefeuille FAGNI.
             </p>
         </div>
-
         {% if transactions_page.object_list %}
             <div class="finance-table-wrapper">
                 <table class="finance-table">
@@ -124,7 +114,6 @@
                     </tbody>
                 </table>
             </div>
-
             <!-- PAGINATION -->
             <div class="pagination" style="margin-top:16px; display:flex; justify-content:flex-end; gap:8px; align-items:center;">
                 {% if transactions_page.has_previous %}
@@ -137,11 +126,9 @@
                         ← Précédent
                     </span>
                 {% endif %}
-
                 <span style="font-size:0.9rem; color:#6b7280;">
                     Page {{ transactions_page.number }} / {{ transactions_page.paginator.num_pages }}
                 </span>
-
                 {% if transactions_page.has_next %}
                     <a class="btn btn-light btn-sm"
                        href="?page={{ transactions_page.next_page_number }}">

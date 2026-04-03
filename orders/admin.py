@@ -495,6 +495,8 @@ class OrderAdmin(UnfoldModelAdmin):
     list_display = (
         "code",
         "customer",
+        "pricing_mode_badge",
+        "bag_size_display",
         "status",
         "payment_badge",
         "invoice_badge",
@@ -513,6 +515,7 @@ class OrderAdmin(UnfoldModelAdmin):
     list_filter = (
         PaymentBucketFilter,
         "payment_status",
+        "pricing_mode",
         "status",
         "payment_method",
         InvoiceBucketFilter,
@@ -861,6 +864,8 @@ class OrderAdmin(UnfoldModelAdmin):
                 "fields": (
                     "code",
                     "status",
+                    "pricing_mode",
+                    "bag_size",
                     "customer",
                     "notes",
                     "created_at",
@@ -975,6 +980,30 @@ class OrderAdmin(UnfoldModelAdmin):
         )
 
     wallets_distributed_display.short_description = "Wallets distribués"
+
+    def pricing_mode_badge(self, obj):
+        mode = (getattr(obj, "pricing_mode", "") or "").lower()
+        if mode == "bag":
+            return format_html("<b style='color:#E87722'>🧺 Sac</b>")
+        if mode == "item":
+            return format_html("<b style='color:#1E3A5F'>🧾 À la pièce</b>")
+        return format_html("<span style='color:#6b7280'>—</span>")
+
+    pricing_mode_badge.short_description = "Mode"
+
+    def bag_size_display(self, obj):
+        if (getattr(obj, "pricing_mode", "") or "").lower() != "bag":
+            return "—"
+        size = (getattr(obj, "bag_size", "") or "").lower()
+        if size == "small":
+            return "Petit sac"
+        if size == "large":
+            return "Grand sac"
+        if size == "medium":
+            return "Sac moyen"
+        return "—"
+
+    bag_size_display.short_description = "Taille sac"
 
     def front_detail_link(self, obj):
         try:

@@ -1,9 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load money_filters %}
-
 {% block title %}Mon espace affilié – FAGNI{% endblock %}
-
 {% block extra_head %}
 <style>
     .page {
@@ -11,7 +9,6 @@
         margin: 0 auto 32px;
         padding: 12px 10px 24px;
     }
-
     .page-header {
         display:flex;
         justify-content:space-between;
@@ -19,20 +16,17 @@
         gap:12px;
         margin-bottom:18px;
     }
-
     .page-title {
         font-size:20px;
         font-weight:700;
         color:#0f172a;
         margin:0;
     }
-
     .page-subtitle {
         font-size:13px;
         color:#64748b;
         margin:4px 0 0;
     }
-
     .tag-code {
         font-size:12px;
         background:#eff6ff;
@@ -44,7 +38,6 @@
         align-items:center;
         gap:6px;
     }
-
     .card {
         background:#ffffff;
         border-radius:16px;
@@ -53,7 +46,6 @@
         border:1px solid #e5e7eb;
         box-shadow:0 2px 6px rgba(15,23,42,0.08);
     }
-
     .card-title {
         font-size:15px;
         font-weight:600;
@@ -63,50 +55,42 @@
         align-items:center;
         gap:6px;
     }
-
     .card-title .emoji {
         font-size:18px;
     }
-
     .grid-2 {
         display:grid;
         grid-template-columns: 1.05fr 0.95fr;
         gap:14px;
     }
-
     .stats-grid {
         display:grid;
         grid-template-columns: repeat(4, minmax(0,1fr));
         gap:10px;
     }
-
     .stat-pill {
         background:#f9fafb;
         border-radius:12px;
         padding:10px 10px;
         border:1px solid #e5e7eb;
     }
-
     .stat-label {
         font-size:11px;
         color:#9ca3af;
         text-transform:uppercase;
         letter-spacing:.04em;
     }
-
     .stat-value {
         font-size:16px;
         font-weight:600;
         color:#111827;
         margin-top:2px;
     }
-
     .stat-helper {
         font-size:11px;
         color:#6b7280;
         margin-top:2px;
     }
-
     .label-small {
         font-size:12px;
         color:#6b7280;
@@ -114,7 +98,6 @@
         margin-bottom:2px;
         margin-top:6px;
     }
-
     .input-link {
         width:100%;
         padding:7px 9px;
@@ -123,38 +106,32 @@
         font-size:13px;
         background:#f9fafb;
     }
-
     .field-value-muted {
         font-size:12px;
         color:#6b7280;
     }
-
     table.table {
         width:100%;
         border-collapse:collapse;
         font-size:13px;
         margin-top:6px;
     }
-
     table.table th,
     table.table td {
         padding:7px 6px;
         border-bottom:1px solid #e5e7eb;
         vertical-align:top;
     }
-
     table.table thead th {
         background:#f9fafb;
         font-weight:600;
         color:#6b7280;
         font-size:12px;
     }
-
     td.num {
         text-align:right;
         white-space:nowrap;
     }
-
     .badge-soft {
         padding:3px 8px;
         border-radius:999px;
@@ -165,36 +142,30 @@
         align-items:center;
         gap:4px;
     }
-
     .badge-soft--success {
         background:#ecfdf3;
         color:#166534;
     }
-
     .badge-soft--warning {
         background:#fffbeb;
         color:#92400e;
     }
-
     .badge-soft--info {
         background:#e0f2fe;
         color:#0369a1;
     }
-
     .filters-grid {
         display:grid;
         grid-template-columns: repeat(3, minmax(0,1fr));
         gap:8px;
         margin-bottom:10px;
     }
-
     .filter-item label {
         font-size:12px;
         color:#6b7280;
         display:block;
         margin-bottom:2px;
     }
-
     .filter-item input,
     .filter-item select {
         width:100%;
@@ -203,7 +174,6 @@
         border:1px solid #d1d5db;
         font-size:13px;
     }
-
     .btn {
         display:inline-flex;
         align-items:center;
@@ -216,27 +186,22 @@
         text-decoration:none;
         white-space:nowrap;
     }
-
     .btn-light {
         background:#fff;
         border-color:#e5e7eb;
         color:#374151;
     }
-
     .btn-light:hover {
         background:#f9fafb;
     }
-
     .btn-primary {
         background:linear-gradient(90deg,#ff7a00,#0056b3);
         color:#fff;
         border:none;
     }
-
     .btn-primary:hover {
         opacity:0.95;
     }
-
     @media (max-width: 1050px) {
         .stats-grid {
             grid-template-columns: repeat(2, minmax(0,1fr));
@@ -245,22 +210,18 @@
             grid-template-columns: 1fr;
         }
     }
-
     @media (max-width: 640px) {
         .stats-grid {
             grid-template-columns: 1fr;
         }
     }
 </style>
-
 <script>
     function copyRefLink() {
         const input = document.getElementById("ref-link");
         if (!input) return;
-
         input.select();
         input.setSelectionRange(0, 99999); // mobile friendly
-
         try {
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(input.value);
@@ -274,10 +235,8 @@
     }
 </script>
 {% endblock %}
-
 {% block content %}
 <div class="page">
-
     <!-- HEADER -->
     <div class="page-header">
         <div>
@@ -292,7 +251,6 @@
                     🔗 Code parrain : <strong>{{ profile.referral_code }}</strong>
                 </div>
             {% endif %}
-
             <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
                 <a href="{% url 'mlm:affiliate_withdrawal_request' %}" class="btn btn-primary">
                     💸 Demander un retrait
@@ -309,13 +267,11 @@
             </div>
         </div>
     </div>
-
     <!-- KPIs AFFILIÉ -->
     <section class="card">
         <h2 class="card-title">
             <span class="emoji">📊</span> Mes indicateurs clés
         </h2>
-
         {# on sécurise n1_children au cas où #}
         {% with children_list=n1_children|default_if_none:'' %}
         {% with direct_referrals_count=children_list|length %}
@@ -329,7 +285,6 @@
                     Montant que vous pouvez demander en retrait.
                 </div>
             </div>
-
             <div class="stat-pill">
                 <div class="stat-label">Commissions cumulées</div>
                 <div class="stat-value">
@@ -339,7 +294,6 @@
                     Ensemble des commissions générées depuis le début.
                 </div>
             </div>
-
             <div class="stat-pill">
                 <div class="stat-label">Filleuls directs</div>
                 <div class="stat-value">
@@ -349,7 +303,6 @@
                     Nombre de comptes rattachés directement à votre code.
                 </div>
             </div>
-
             <div class="stat-pill">
                 <div class="stat-label">Commandes générées</div>
                 <div class="stat-value">
@@ -363,41 +316,33 @@
         {% endwith %}
         {% endwith %}
     </section>
-
     <div class="grid-2">
-
         <!-- COLONNE GAUCHE : LIEN & RÉSEAU -->
         <div>
-
             <!-- LIEN DE PARRAINAGE -->
             <section class="card">
                 <h2 class="card-title">
                     <span class="emoji">🔗</span> Mon lien de parrainage
                 </h2>
-
                 <p class="field-value-muted">
                     Partagez ce lien à vos proches. Chaque nouvelle inscription via ce lien
                     sera rattachée à votre compte affilié.
                 </p>
-
                 <label class="label-small" for="ref-link">Lien de parrainage</label>
                 <input id="ref-link"
                        class="input-link"
                        type="text"
                        readonly
                        value="{{ referral_url|default:'https://fagni.app' }}">
-
                 {% if profile and profile.referral_code %}
                     <p class="field-value-muted" style="margin-top:6px;">
                         Code parrain à partager : <strong>{{ profile.referral_code }}</strong>
                     </p>
                 {% endif %}
-
                 <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;">
                     <button type="button" class="btn btn-light" onclick="copyRefLink()">
                         📋 Copier le lien
                     </button>
-
                     <a href="https://wa.me/?text={{ referral_url|default:'https://fagni.app'|urlencode }}"
                        target="_blank"
                        class="btn btn-light">
@@ -405,13 +350,11 @@
                     </a>
                 </div>
             </section>
-
             <!-- RÉSEAU DE FILLEULS DIRECTS -->
             <section class="card">
                 <h2 class="card-title">
                     <span class="emoji">👥</span> Mes filleuls directs
                 </h2>
-
                 {% if n1_children %}
                     <table class="table">
                         <thead>
@@ -457,16 +400,13 @@
                 {% endif %}
             </section>
         </div>
-
         <!-- COLONNE DROITE : COMMANDES & TRANSACTIONS -->
         <div>
-
             <!-- COMMANDES GÉNÉRÉES PAR MON RÉSEAU -->
             <section class="card">
                 <h2 class="card-title">
                     <span class="emoji">🧺</span> Commandes générées par mon réseau
                 </h2>
-
                 {% if orders_mlm %}
                     <table class="table">
                         <thead>
@@ -523,13 +463,11 @@
                     </p>
                 {% endif %}
             </section>
-
             <!-- MOUVEMENTS DU PORTEFEUILLE -->
             <section class="card">
                 <h2 class="card-title">
                     <span class="emoji">💳</span> Derniers mouvements de mon portefeuille
                 </h2>
-
                 {% if transactions %}
                     <table class="table">
                         <thead>

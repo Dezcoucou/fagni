@@ -22,22 +22,18 @@
             --shadow:0 10px 25px rgba(15,23,42,.08);
             --radius:20px;
         }
-
         *{box-sizing:border-box}
-
         body{
             margin:0;
             font-family:Arial, sans-serif;
             background:linear-gradient(180deg,#f8fbff 0%, var(--bg) 100%);
             color:var(--text);
         }
-
         .page{
             max-width:1180px;
             margin:0 auto;
             padding:18px 14px 28px;
         }
-
         .topbar{
             display:flex;
             align-items:center;
@@ -45,7 +41,6 @@
             gap:12px;
             margin-bottom:14px;
         }
-
         .back-link{
             display:inline-flex;
             align-items:center;
@@ -54,7 +49,6 @@
             text-decoration:none;
             font-weight:700;
         }
-
         .hero{
             background:
                 radial-gradient(circle at top right, rgba(37,99,235,.18), transparent 28%),
@@ -65,7 +59,6 @@
             box-shadow:var(--shadow);
             margin-bottom:16px;
         }
-
         .hero-top{
             display:flex;
             flex-wrap:wrap;
@@ -73,26 +66,22 @@
             justify-content:space-between;
             gap:16px;
         }
-
         .hero-title{
             margin:0;
             font-size:26px;
             font-weight:800;
             letter-spacing:.2px;
         }
-
         .hero-subtitle{
             margin-top:8px;
             color:rgba(255,255,255,.78);
             font-size:14px;
         }
-
         .hero-badges{
             display:flex;
             flex-wrap:wrap;
             gap:8px;
         }
-
         .chip{
             display:inline-flex;
             align-items:center;
@@ -105,42 +94,35 @@
             color:#fff;
             backdrop-filter:blur(8px);
         }
-
         .otp-chip-ok{
             background:#16a34a !important;
             color:#fff !important;
         }
-
         .otp-chip-wait{
             background:#f59e0b !important;
             color:#fff !important;
         }
-
         .otp-chip-ko{
             background:#dc2626 !important;
             color:#fff !important;
         }
-
         .hero-grid{
             display:grid;
             grid-template-columns:1fr;
             gap:12px;
             margin-top:18px;
         }
-
         @media (min-width: 860px){
             .hero-grid{
                 grid-template-columns:repeat(4,1fr);
             }
         }
-
         .hero-stat{
             background:rgba(255,255,255,.08);
             border:1px solid rgba(255,255,255,.12);
             border-radius:18px;
             padding:14px;
         }
-
         .hero-stat-label{
             font-size:11px;
             text-transform:uppercase;
@@ -148,13 +130,11 @@
             color:rgba(255,255,255,.68);
             margin-bottom:6px;
         }
-
         .hero-stat-value{
             font-size:16px;
             font-weight:800;
             line-height:1.35;
         }
-
         .flash{
             padding:12px 14px;
             border-radius:14px;
@@ -162,42 +142,35 @@
             font-weight:700;
             border:1px solid transparent;
         }
-
         .flash.success{
             background:var(--success-soft);
             color:#166534;
             border-color:#86efac;
         }
-
         .flash.error{
             background:var(--danger-soft);
             color:#991b1b;
             border-color:#fca5a5;
         }
-
         .flash.warning{
             background:var(--warning-soft);
             color:#92400e;
             border-color:#fcd34d;
         }
-
         .layout{
             display:grid;
             grid-template-columns:1fr;
             gap:16px;
         }
-
         @media (min-width: 980px){
             .layout{
                 grid-template-columns:1.15fr .85fr;
             }
         }
-
         .stack{
             display:grid;
             gap:16px;
         }
-
         .card{
             background:var(--card);
             border:1px solid var(--line);
@@ -205,46 +178,38 @@
             box-shadow:var(--shadow);
             overflow:hidden;
         }
-
         .card-head{
             padding:16px 18px 0;
         }
-
         .card-title{
             margin:0;
             font-size:18px;
             font-weight:800;
         }
-
         .card-subtitle{
             margin-top:6px;
             color:var(--muted);
             font-size:13px;
         }
-
         .card-body{
             padding:16px 18px 18px;
         }
-
         .info-grid{
             display:grid;
             grid-template-columns:1fr;
             gap:12px;
         }
-
         @media (min-width: 640px){
             .info-grid{
                 grid-template-columns:repeat(2,1fr);
             }
         }
-
         .info-box{
             border:1px solid var(--line);
             background:#f9fbff;
             border-radius:16px;
             padding:14px;
         }
-
         .label{
             font-size:11px;
             text-transform:uppercase;
@@ -253,35 +218,29 @@
             margin-bottom:6px;
             font-weight:700;
         }
-
         .value{
             font-size:15px;
             font-weight:800;
             line-height:1.45;
         }
-
         .value-muted{
             color:var(--muted);
             font-weight:600;
         }
-
         .actions{
             display:grid;
             grid-template-columns:1fr;
             gap:10px;
             margin-top:12px;
         }
-
         @media (min-width: 640px){
             .actions{
                 grid-template-columns:repeat(2,1fr);
             }
         }
-
         .actions form{
             margin:0;
         }
-
         .btn{
             width:100%;
             border:none;
@@ -292,10 +251,8 @@
             cursor:pointer;
             transition:transform .08s ease, opacity .2s ease;
         }
-
         .btn:hover{ transform:translateY(-1px); }
         .btn:active{ transform:translateY(0); }
-
         .btn-primary{ background:var(--primary); color:#fff; }
         .btn-warning{ background:#f59e0b; color:#fff; }
         .btn-success{ background:var(--success); color:#fff; }
@@ -306,7 +263,6 @@
             cursor:not-allowed;
             transform:none;
         }
-
         .status-pill{
             display:inline-flex;
             align-items:center;
@@ -316,7 +272,6 @@
             font-size:13px;
             font-weight:800;
         }
-
         .status-assigned{ background:#e0e7ff; color:#3730a3; }
         .status-accepted{ background:#e0f2fe; color:#075985; }
         .status-en_route{ background:#dbeafe; color:#1d4ed8; }
@@ -325,18 +280,15 @@
         .status-awaiting_validation{ background:#ffe4e6; color:#be123c; }
         .status-completed{ background:#dcfce7; color:#166534; }
         .status-failed, .status-issue_reported{ background:#fee2e2; color:#991b1b; }
-
         .timeline{
             display:grid;
             gap:12px;
         }
-
         .timeline-item{
             display:grid;
             grid-template-columns:18px 1fr;
             gap:12px;
         }
-
         .timeline-dot{
             width:14px;
             height:14px;
@@ -345,48 +297,40 @@
             background:var(--primary);
             box-shadow:0 0 0 4px rgba(37,99,235,.12);
         }
-
         .timeline-content{
             border:1px solid var(--line);
             background:#fbfdff;
             border-radius:16px;
             padding:12px 14px;
         }
-
         .timeline-title{
             font-size:14px;
             font-weight:800;
             margin-bottom:4px;
         }
-
         .timeline-meta{
             font-size:12px;
             color:var(--muted);
             margin-bottom:6px;
         }
-
         .list{
             display:grid;
             gap:10px;
         }
-
         .list-item{
             border:1px solid var(--line);
             border-radius:16px;
             padding:12px 14px;
             background:#fcfdff;
         }
-
         .list-title{
             font-weight:800;
             margin-bottom:4px;
         }
-
         .list-meta{
             font-size:12px;
             color:var(--muted);
         }
-
         .empty{
             border:1px dashed #cbd5e1;
             border-radius:16px;
@@ -394,26 +338,22 @@
             color:var(--muted);
             background:#fafcff;
         }
-
         .kpi-row{
             display:grid;
             grid-template-columns:1fr 1fr;
             gap:10px;
         }
-
         .kpi{
             border:1px solid var(--line);
             border-radius:16px;
             padding:14px;
             background:#f9fbff;
         }
-
         .kpi-number{
             font-size:22px;
             font-weight:900;
             line-height:1;
         }
-
         .kpi-label{
             margin-top:6px;
             font-size:12px;
@@ -421,7 +361,6 @@
             font-weight:700;
             text-transform:uppercase;
         }
-
         .note-box{
             border-left:4px solid var(--primary);
             background:#eff6ff;
@@ -430,7 +369,6 @@
             color:#1e3a8a;
             font-weight:700;
         }
-
         .progress-bar{
             display:flex;
             justify-content:space-between;
@@ -438,7 +376,6 @@
             margin:14px 0 20px;
             position:relative;
         }
-
         .progress-line{
             position:absolute;
             top:14px;
@@ -448,7 +385,6 @@
             background:#e5e7eb;
             z-index:1;
         }
-
         .step{
             position:relative;
             z-index:2;
@@ -457,7 +393,6 @@
             align-items:center;
             flex:1;
         }
-
         .step-circle{
             width:28px;
             height:28px;
@@ -469,7 +404,6 @@
             font-size:13px;
             font-weight:800;
         }
-
         .step-label{
             margin-top:6px;
             font-size:11px;
@@ -477,38 +411,31 @@
             font-weight:700;
             color:#6b7280;
         }
-
         .step.done .step-circle{
             background:#16a34a;
             color:#fff;
         }
-
         .step.active .step-circle{
             background:#2563eb;
             color:#fff;
         }
-
         .step.done .step-label{
             color:#16a34a;
         }
-
         .step.active .step-label{
             color:#2563eb;
         }
-
         .quick-tools{
             display:grid;
             grid-template-columns:1fr 1fr;
             gap:10px;
             margin-top:14px;
         }
-
         @media (min-width: 640px){
             .quick-tools{
                 grid-template-columns:repeat(4,1fr);
             }
         }
-
         .tool-link{
             display:flex;
             align-items:center;
@@ -523,51 +450,43 @@
             color:var(--text);
             box-shadow:var(--shadow);
         }
-
         .tool-link.primary{
             background:#eff6ff;
             color:#1d4ed8;
             border-color:#bfdbfe;
         }
-
         .tool-link.success{
             background:#f0fdf4;
             color:#166534;
             border-color:#bbf7d0;
         }
-
         .tool-link.warning{
             background:#fff7ed;
             color:#9a3412;
             border-color:#fdba74;
         }
-
         .tool-link.muted{
             background:#f8fafc;
             color:#475569;
             border-color:#e2e8f0;
         }
-
         .eta-box{
             display:grid;
             grid-template-columns:1fr 1fr;
             gap:10px;
             margin-top:14px;
         }
-
         .eta-card{
             border:1px solid var(--line);
             border-radius:16px;
             padding:14px;
             background:#fcfdff;
         }
-
         .eta-number{
             font-size:22px;
             font-weight:900;
             line-height:1;
         }
-
         .eta-label{
             margin-top:6px;
             font-size:12px;
@@ -575,19 +494,16 @@
             font-weight:700;
             text-transform:uppercase;
         }
-
         .proof-grid{
             display:grid;
             grid-template-columns:1fr;
             gap:12px;
         }
-
         @media (min-width: 640px){
             .proof-grid{
                 grid-template-columns:1fr 1fr;
             }
         }
-
         .form-input,
         .form-textarea{
             width:100%;
@@ -597,12 +513,10 @@
             font:inherit;
             background:#fff;
         }
-
         .form-textarea{
             min-height:110px;
             resize:vertical;
         }
-
         .proof-photo{
             display:block;
             width:100%;
@@ -611,7 +525,6 @@
             border:1px solid var(--line);
             margin-top:10px;
         }
-
         .proof-badge{
             display:inline-flex;
             align-items:center;
@@ -623,24 +536,20 @@
             background:#eef2ff;
             color:#3730a3;
         }
-
         .proof-badge.ok{
             background:#dcfce7;
             color:#166534;
         }
-
         .proof-badge.ko{
             background:#fee2e2;
             color:#991b1b;
         }
-
         .signature-wrap{
             border:1px solid var(--line);
             border-radius:16px;
             background:#fff;
             padding:12px;
         }
-
         .signature-canvas{
             width:100%;
             height:220px;
@@ -652,14 +561,12 @@
             display:block;
             cursor:crosshair;
         }
-
         .signature-actions{
             display:flex;
             gap:10px;
             flex-wrap:wrap;
             margin-top:12px;
         }
-
         .signature-img{
             display:block;
             width:100%;
@@ -677,20 +584,16 @@
             {% for message in messages %}
                 <div class="flash {% if message.tags %}{{ message.tags }}{% endif %}">
                     {{ message }}
-                
 <form method="post" action="{% url 'logistics:resend_mission_client_pdf' mission.id %}">
     {% csrf_token %}
     <button class="btn btn-outline-primary" type="submit">📤 Renvoyer la preuve client</button>
 </form>
-
 </div>
             {% endfor %}
         {% endif %}
-
         <div class="topbar">
             <a href="javascript:history.back()" class="back-link">← Retour</a>
         </div>
-
         <section class="hero">
             <div class="hero-top">
                 <div>
@@ -699,12 +602,10 @@
                         Commande #{{ order.id }} · {{ mission.get_mission_type_display }}
                     </div>
                 </div>
-
                 <div class="hero-badges">
                     <span class="chip">📦 {{ mission.get_mission_type_display }}</span>
                     <span class="chip">🧾 Order #{{ order.id }}</span>
                     <span class="chip">⚡ {{ mission.get_priority_display }}</span>
-
                     {% if latest_otp_active and latest_otp_active.status == "approved" %}
                         <span class="chip otp-chip-ok">🟢 OTP validé</span>
                     {% elif latest_otp and latest_otp.status == "sent" %}
@@ -714,7 +615,6 @@
                     {% endif %}
                 </div>
             </div>
-
             <div class="hero-grid">
                 <div class="hero-stat">
                     <div class="hero-stat-label">Statut mission</div>
@@ -736,7 +636,6 @@
                 </div>
             </div>
         </section>
-
         <section class="card">
             <div class="card-head">
                 <h2 class="card-title">Outils terrain</h2>
@@ -749,28 +648,23 @@
                     {% else %}
                         <span class="tool-link muted">📞 Pas de numéro</span>
                     {% endif %}
-
                     {% if mission.destination_address and mission.destination_address.full_address %}
                         <a class="tool-link primary" target="_blank" href="https://www.google.com/maps/search/?api=1&query={{ mission.destination_address.full_address|urlencode }}">🧭 GPS destination</a>
                     {% else %}
                         <span class="tool-link muted">🧭 Destination absente</span>
                     {% endif %}
-
                     {% if mission.source_address and mission.source_address.full_address %}
                         <a class="tool-link warning" target="_blank" href="https://www.google.com/maps/search/?api=1&query={{ mission.source_address.full_address|urlencode }}">📍 Voir source</a>
                     {% else %}
                         <span class="tool-link muted">📍 Source absente</span>
                     {% endif %}
-
                     {% if order %}
                         <a class="tool-link" href="/admin/orders/order/{{ order.id }}/change/" target="_blank">🧾 Ouvrir commande</a>
                     {% else %}
                         <span class="tool-link muted">🧾 Pas de commande</span>
                     {% endif %}
-
                     <a class="tool-link primary" href="{% url 'logistics:mission_client_pdf' mission.id %}" target="_blank">📄 PDF client</a>
                 </div>
-
                 <div class="eta-box">
                     <div class="eta-card">
                         <div class="eta-number">
@@ -787,7 +681,6 @@
                 </div>
             </div>
         </section>
-
         <div class="card">
             <div class="card-head">
                 <h3 class="card-title">Progression mission</h3>
@@ -796,22 +689,18 @@
                 {% with st=mission.status %}
                 <div class="progress-bar">
                     <div class="progress-line"></div>
-
                     <div class="step {% if st == 'assigned' or st == 'accepted' %}active{% endif %}{% if st == 'en_route' or st == 'arrived' or st == 'in_progress' or st == 'awaiting_validation' or st == 'completed' %} done{% endif %}">
                         <div class="step-circle">1</div>
                         <div class="step-label">Assignée</div>
                     </div>
-
                     <div class="step {% if st == 'en_route' %}active{% endif %}{% if st == 'arrived' or st == 'in_progress' or st == 'awaiting_validation' or st == 'completed' %} done{% endif %}">
                         <div class="step-circle">2</div>
                         <div class="step-label">En route</div>
                     </div>
-
                     <div class="step {% if st == 'arrived' or st == 'in_progress' or st == 'awaiting_validation' %}active{% endif %}{% if st == 'completed' %} done{% endif %}">
                         <div class="step-circle">3</div>
                         <div class="step-label">Arrivé</div>
                     </div>
-
                     <div class="step {% if st == 'completed' %}done active{% endif %}">
                         <div class="step-circle">4</div>
                         <div class="step-label">Terminé</div>
@@ -820,7 +709,6 @@
                 {% endwith %}
             </div>
         </div>
-
         <div class="layout">
             <div class="stack">
                 <section class="card">
@@ -842,7 +730,6 @@
                                     {% else %}
                                         <br><br>⚠️ Impossible de terminer sans au moins une preuve validée.
                                     {% endif %}
-
                                     {% if latest_otp_active and latest_otp_active.status == "approved" %}
                                         <br><br>✅ OTP WhatsApp validé.
                                     {% elif latest_otp_active %}
@@ -850,7 +737,6 @@
                                     {% else %}
                                         <br><br>ℹ️ Aucun OTP WhatsApp exigé pour cette mission.
                                     {% endif %}
-
                                     {% if signatures %}
                                         <br><br>✅ Signature enregistrée : {{ signatures|length }}
                                     {% else %}
@@ -865,7 +751,6 @@
                                 <div class="note-box">Vérifie le statut courant avant d’agir.</div>
                             {% endif %}
                         </div>
-
                         <div class="actions">
                             {% if mission.status == "assigned" or mission.status == "accepted" %}
                                 <form method="post" action="{% url 'logistics:driver_mission_v2_start' mission.id %}">
@@ -873,14 +758,12 @@
                                     <button class="btn btn-primary" type="submit">Démarrer</button>
                                 </form>
                             {% endif %}
-
                             {% if mission.status == "en_route" or mission.status == "accepted" %}
                                 <form method="post" action="{% url 'logistics:driver_mission_v2_arrive' mission.id %}">
                                     {% csrf_token %}
                                     <button class="btn btn-warning" type="submit">Marquer arrivée</button>
                                 </form>
                             {% endif %}
-
                             {% if mission.status == "assigned" or mission.status == "accepted" or mission.status == "en_route" or mission.status == "arrived" or mission.status == "in_progress" or mission.status == "awaiting_validation" %}
                                 <form method="post" action="{% url 'logistics:driver_mission_v2_complete' mission.id %}">
                                     {% csrf_token %}
@@ -901,35 +784,29 @@
                                     </button>
                                 </form>
                             {% endif %}
-
                             {% if mission.status != "completed" and mission.status != "failed" %}
                                 <form method="post" action="{% url 'logistics:driver_mission_v2_create_incident' mission.id %}">
                                     {% csrf_token %}
                                     <button class="btn btn-danger" type="submit">Créer incident</button>
                                 </form>
-
                                 <form method="post" action="{% url 'logistics:resend_mission_client_pdf' mission.id %}">
                                     {% csrf_token %}
                                     <button class="btn btn-primary" type="submit">📤 Renvoyer la preuve client</button>
                                 </form>
-
                                 <form method="post" action="{% url 'logistics:retry_mission_client_pdf' mission.id %}">
                                     {% csrf_token %}
                                     <button class="btn btn-warning" type="submit">🔁 Relancer le dernier envoi</button>
                                 </form>
                             {% endif %}
-
                             {% if mission.status == "completed" %}
                                 <button class="btn btn-muted" type="button" disabled>Mission terminée</button>
                             {% endif %}
-
                             {% if mission.status == "failed" %}
                                 <button class="btn btn-muted" type="button" disabled>Mission échouée</button>
                             {% endif %}
                         </div>
                     </div>
                 </section>
-
                 <section class="card">
                     <div class="card-head">
                         <h2 class="card-title">Preuve de livraison</h2>
@@ -938,48 +815,39 @@
                     <div class="card-body">
                         <form method="post" action="{% url 'logistics:create_proof_v2' mission.id %}" enctype="multipart/form-data">
                             {% csrf_token %}
-
                             <div class="proof-grid">
                                 <div class="info-box">
                                     <div class="label">Photo</div>
                                     <input class="form-input" type="file" name="photo" accept="image/*" capture="environment">
                                 </div>
-
                                 <div class="info-box">
                                     <div class="label">Photo requise</div>
                                     <div class="value-muted">Le code OTP est désormais géré uniquement dans le bloc OTP WhatsApp.</div>
                                 </div>
-
                                 <div class="info-box" style="grid-column: 1 / -1;">
                                     <div class="label">Note terrain</div>
                                     <textarea class="form-textarea" name="notes" rows="4" placeholder="Ex: Client présent, colis remis en main propre..."></textarea>
                                 </div>
                             </div>
-
                             <div style="margin-top:12px;">
                                 <button class="btn btn-primary" type="submit">Valider la preuve</button>
                             </div>
                         </form>
-
                         <div style="height:16px;"></div>
-
                         {% if delivery_proofs %}
                             <div class="list">
                                 {% for proof in delivery_proofs %}
                                     <div class="list-item">
                                         <div class="list-title">Preuve #{{ proof.id }}</div>
                                         <div class="list-meta">{{ proof.created_at|date:"d/m/Y H:i" }}</div>
-
                                         <div style="margin-top:10px;">
                                             <span class="proof-badge {% if proof.status == 'validated' %}ok{% else %}ko{% endif %}">
                                                 Statut : {{ proof.get_status_display }}
                                             </span>
                                         </div>
-
                                         {% if proof.notes %}
                                             <div style="margin-top:10px;"><strong>Note :</strong> {{ proof.notes }}</div>
                                         {% endif %}
-
                                         {% if proof.photo %}
                                             <img class="proof-photo" src="{{ proof.photo.url }}" alt="Preuve photo {{ proof.id }}">
                                         {% endif %}
@@ -991,7 +859,6 @@
                         {% endif %}
                     </div>
                 </section>
-
                 <section class="card">
                     <div class="card-head">
                         <h2 class="card-title">OTP WhatsApp</h2>
@@ -1004,7 +871,6 @@
                                     <div class="label">Téléphone mission</div>
                                     <div class="value">{{ mission.contact_phone|default:"Non renseigné" }}</div>
                                 </div>
-
                                 <div class="info-box">
                                     <div class="label">Dernier statut OTP</div>
                                     <div class="value">
@@ -1018,15 +884,12 @@
                                     </div>
                                 </div>
                             </div>
-
                             {% if quota_reached %}
                                 <div class="note-box" style="margin-top:12px; border-left-color:#d97706; background:#fff7ed; color:#9a3412;">
                                     Quota Twilio atteint : les nouveaux OTP WhatsApp de test sont temporairement bloqués.
                                 </div>
                             {% endif %}
-
                             <div style="height:12px;"></div>
-
                             <div class="actions">
                                 <form method="post" action="{% url 'logistics:mission_send_otp_whatsapp' mission.id %}">
                                     {% csrf_token %}
@@ -1035,9 +898,7 @@
                                     </button>
                                 </form>
                             </div>
-
                             <div style="height:12px;"></div>
-
                             <form method="post" action="{% url 'logistics:mission_check_otp_whatsapp' mission.id %}">
                                 {% csrf_token %}
                                 <div class="proof-grid">
@@ -1050,7 +911,6 @@
                                     <button class="btn btn-success" type="submit">Vérifier OTP</button>
                                 </div>
                             </form>
-
                             {% if otp_records %}
                                 <div style="height:16px;"></div>
                                 <div class="list">
@@ -1075,7 +935,6 @@
                         {% endif %}
                     </div>
                 </section>
-
                 <section class="card">
                     <div class="card-head">
                         <h2 class="card-title">Signature client</h2>
@@ -1089,15 +948,12 @@
                                     <div class="label">Nom du signataire</div>
                                     <input class="form-input" type="text" name="signer_name" placeholder="Ex: Désiré Tongbé">
                                 </div>
-
                                 <div class="info-box">
                                     <div class="label">Note</div>
                                     <input class="form-input" type="text" name="signature_notes" placeholder="Ex: Colis remis en main propre">
                                 </div>
                             </div>
-
                             <div style="height:12px;"></div>
-
                             <div class="signature-wrap">
                                 <canvas id="signatureCanvas" class="signature-canvas"></canvas>
                                 <input type="hidden" name="signature_data" id="signatureData">
@@ -1107,9 +963,7 @@
                                 </div>
                             </div>
                         </form>
-
                         <div style="height:16px;"></div>
-
                         {% if signatures %}
                             <div class="list">
                                 {% for sig in signatures %}
@@ -1130,7 +984,6 @@
                         {% endif %}
                     </div>
                 </section>
-
                 <section class="card">
                     <div class="card-head">
                         <h2 class="card-title">Résumé mission</h2>
@@ -1187,15 +1040,12 @@
                                 </div>
                             </div>
                         </div>
-
                         <div style="height:14px"></div>
-
                         <div class="note-box">
                             {{ mission.instructions|default:"Aucune instruction particulière." }}
                         </div>
                     </div>
                 </section>
-
                 <section class="card">
                     <div class="card-head">
                         <h2 class="card-title">Adresses opérationnelles</h2>
@@ -1213,7 +1063,6 @@
                                     <div class="value-muted">Aucune adresse source.</div>
                                 {% endif %}
                             </div>
-
                             <div class="info-box">
                                 <div class="label">Adresse destination</div>
                                 {% if mission.destination_address %}
@@ -1227,7 +1076,6 @@
                         </div>
                     </div>
                 </section>
-
                 <section class="card">
                     <div class="card-head">
                         <h2 class="card-title">Timeline opérationnelle</h2>
@@ -1255,7 +1103,6 @@
                     </div>
                 </section>
             </div>
-
             <div class="stack">
                 <section class="card">
                     <div class="card-head">
@@ -1291,8 +1138,6 @@
                         {% endif %}
                     </div>
                 </section>
-
-
                 <section class="card">
                     <div class="card-head">
                         <h2 class="card-title">Vue rapide</h2>
@@ -1319,7 +1164,6 @@
                         </div>
                     </div>
                 </section>
-
                 <section class="card">
                     <div class="card-head">
                         <h2 class="card-title">Partner jobs liés</h2>
@@ -1340,7 +1184,6 @@
                         {% endif %}
                     </div>
                 </section>
-
                 <section class="card">
                     <div class="card-head">
                         <h2 class="card-title">Pesées</h2>
@@ -1362,7 +1205,6 @@
                         {% endif %}
                     </div>
                 </section>
-
                 <section class="card">
                     <div class="card-head">
                         <h2 class="card-title">Incidents</h2>
@@ -1387,7 +1229,6 @@
             </div>
         </div>
     </div>
-
     <script>
     document.addEventListener("DOMContentLoaded", function () {
         document.querySelectorAll("form").forEach(function(form){
@@ -1402,30 +1243,23 @@
         });
     });
     </script>
-
     <script>
     (function () {
         const canvas = document.getElementById("signatureCanvas");
         const hidden = document.getElementById("signatureData");
         const clearBtn = document.getElementById("clearSignatureBtn");
         const saveBtn = document.getElementById("saveSignatureBtn");
-
         if (!canvas || !hidden || !clearBtn || !saveBtn) return;
-
         const ctx = canvas.getContext("2d");
         let drawing = false;
         let hasDrawn = false;
-
         function setupCanvas() {
             const rect = canvas.getBoundingClientRect();
             const ratio = Math.max(window.devicePixelRatio || 1, 1);
-
             canvas.width = Math.max(rect.width, 320) * ratio;
             canvas.height = 220 * ratio;
-
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.scale(ratio, ratio);
-
             ctx.lineWidth = 2.5;
             ctx.lineCap = "round";
             ctx.lineJoin = "round";
@@ -1433,7 +1267,6 @@
             ctx.fillStyle = "#ffffff";
             ctx.fillRect(0, 0, canvas.width / ratio, canvas.height / ratio);
         }
-
         function getPoint(e) {
             const rect = canvas.getBoundingClientRect();
             return {
@@ -1441,7 +1274,6 @@
                 y: e.clientY - rect.top,
             };
         }
-
         function startDraw(e) {
             e.preventDefault();
             drawing = true;
@@ -1453,7 +1285,6 @@
                 try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
             }
         }
-
         function moveDraw(e) {
             if (!drawing) return;
             e.preventDefault();
@@ -1461,7 +1292,6 @@
             ctx.lineTo(p.x, p.y);
             ctx.stroke();
         }
-
         function endDraw(e) {
             if (!drawing) return;
             e.preventDefault();
@@ -1470,13 +1300,11 @@
                 try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
             }
         }
-
         clearBtn.addEventListener("click", function () {
             hasDrawn = false;
             hidden.value = "";
             setupCanvas();
         });
-
         saveBtn.form.addEventListener("submit", function (e) {
             if (!hasDrawn) {
                 e.preventDefault();
@@ -1485,18 +1313,15 @@
             }
             hidden.value = canvas.toDataURL("image/png");
         });
-
         canvas.addEventListener("pointerdown", startDraw);
         canvas.addEventListener("pointermove", moveDraw);
         canvas.addEventListener("pointerup", endDraw);
         canvas.addEventListener("pointercancel", endDraw);
         canvas.addEventListener("pointerleave", endDraw);
-
         setupCanvas();
         window.addEventListener("resize", setupCanvas);
     })();
     </script>
-
 <script>
 document.addEventListener("DOMContentLoaded", function(){
     document.querySelectorAll("form").forEach(f=>{
@@ -1510,6 +1335,5 @@ document.addEventListener("DOMContentLoaded", function(){
     });
 });
 </script>
-
 </body>
 </html>

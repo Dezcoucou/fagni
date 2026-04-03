@@ -8,7 +8,6 @@
             {% endif %}
             <span>Prestation ID #{{ item.service.id|default:"—" }}</span>
         </div>
-
         <!-- Champs cachés pour la soumission -->
         <div class="hidden-inputs">
             {# index de la ligne #}
@@ -19,36 +18,29 @@
             <input type="hidden" name="unit_price[]" value="{{ item.unit_price }}">
         </div>
     </td>
-
     <td class="px-2 py-2 text-right whitespace-nowrap">
         {{ item.quantity }}
     </td>
-
     <td class="px-2 py-2 text-right whitespace-nowrap">
         {{ item.unit_price|floatformat:0 }} FCFA
     </td>
-
     <td class="px-2 py-2 text-right whitespace-nowrap font-semibold"
         data-line-total="{{ item.total }}">
         {{ item.total|floatformat:0 }} FCFA
     </td>
-
     <td class="px-2 py-2 whitespace-nowrap">
         <div class="flex gap-2 items-center">
-
             <!-- Bouton ouverture photos -->
             <button type="button"
                     class="btn-photo px-2 py-1 bg-white border border-gray-300 text-gray-700 rounded-full text-xs hover:bg-gray-100">
                 📷 Photos
             </button>
-
             {# 🔑 Le name est basé sur l’index de la ligne #}
             <input type="file"
                    name="photos_{{ forloop.counter0 }}"
                    accept="image/*"
                    multiple
                    style="display:none;">
-
             <!-- (Optionnel) bouton supprimer si tu veux le gérer en JS plus tard -->
             <button type="button"
                     class="p-1 text-red-600 hover:text-red-900 transition rounded-full"

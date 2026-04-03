@@ -1,6 +1,5 @@
 {% extends "orders/client_base.html" %}
 {% load money_filters %}
-
 {% block title %}Ligne commande – Client FAGNI{% endblock %}
 {% block extra_head %}
 {{ block.super }}
@@ -8,27 +7,20 @@
   :root{
     --fagni-orange:#ff7a00;
     --fagni-blue:#0056b3;
-
     --bg:#ffffff;
     --text:#0f172a;
     --muted:#64748b;
-
     --line:#e5e7eb;
     --shadow: 0 1px 4px rgba(15,23,42,0.06);
     --shadow2: 0 12px 34px rgba(15,23,42,0.12);
   }
-
   .page{ max-width:820px;margin:0 auto 28px;padding:14px 10px 24px; }
-
   .page-header{ display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px; }
   @media (max-width:860px){ .page-header{ flex-direction:column;align-items:stretch; } }
-
   .page-title{ font-size:20px;font-weight:950;color:var(--text);margin:0;letter-spacing:-0.2px; }
   .page-subtitle{ margin:4px 0 0;font-size:13px;color:var(--muted);line-height:1.35; }
-
   .actions{ display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end; }
   @media (max-width:860px){ .actions{ justify-content:flex-start; } }
-
   .btn{
     display:inline-flex;align-items:center;justify-content:center;padding:9px 14px;border-radius:999px;
     font-size:13px;font-weight:950;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap;
@@ -37,35 +29,28 @@
   .btn:active{ transform: translateY(1px); }
   .btn-ghost{ background:#fff;color:#334155;border:1px solid var(--line); }
   .btn-ghost:hover{ background:#f9fafb; }
-
   .btn-primary{
     background:linear-gradient(90deg,var(--fagni-orange),var(--fagni-blue));
     color:#fff;border:none;
     padding:11px 16px;
   }
   .btn-primary:hover{ opacity:.95; }
-
   .btn-danger{
     background:#991b1b;color:#fff;border:none;
     padding:11px 16px;
   }
   .btn-danger:hover{ opacity:.95; }
-
   .card{ background:var(--bg);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow); }
   .panel{ padding:14px; }
-
   .section-title{ margin:0;font-size:14px;font-weight:950;color:#111827; }
-
   .alert{
     padding:10px 12px;border-radius:12px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;
     font-weight:900;font-size:13px;
     margin-top:12px;
   }
-
   .form{ margin-top:12px; }
   .label{ display:block;font-weight:950;margin:12px 0 6px;color:#111827;font-size:13px; }
   .hint{ color:var(--muted); font-size:12px; margin-top:4px; line-height:1.35; }
-
   .input{
     width:100%;
     padding:12px 12px;
@@ -81,10 +66,8 @@
     border-color:rgba(0,86,179,0.35);
     box-shadow:0 0 0 4px rgba(0,86,179,0.10);
   }
-
   .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   @media (max-width:860px){ .grid2{ grid-template-columns:1fr; } }
-
   .confirm{
     padding:12px;
     border-radius:14px;
@@ -95,7 +78,6 @@
     font-size:13px;
     line-height:1.35;
   }
-
   .kv{
     display:flex;
     justify-content:space-between;
@@ -106,21 +88,17 @@
   .kv:last-child{ border-bottom:none; }
   .k{ color:var(--muted); font-size:12px; font-weight:800; }
   .v{ color:#0f172a; font-weight:950; }
-
   .footer-actions{
     display:flex;
     gap:10px;
     flex-wrap:wrap;
     margin-top:14px;
   }
-
   .spacer{ height:8px; }
-
 </style>
 {% endblock %}
 {% block content %}
 <div class="page">
-
   <div class="page-header">
     <div>
       {% if mode == "new" %}
@@ -134,22 +112,17 @@
         <p class="page-subtitle">Commande {{ order.code|default:order.id }} • Ligne #{{ item.id }}</p>
       {% endif %}
     </div>
-
     <div class="actions">
       <a class="btn btn-ghost" href="{% url 'orders:client_order_detail' order.id %}">← Retour commande</a>
       <a class="btn btn-ghost" href="{% url 'orders:client_home' %}">Mes commandes</a>
     </div>
   </div>
-
   <div class="card panel">
-
     {% if error %}
       <div class="alert">{{ error }}</div>
     {% endif %}
-
     {% if mode == "delete" %}
       <div class="section-title">Confirmation</div>
-
       <div class="confirm">
         Tu es sur le point de supprimer :
         <b>{{ item.designation }}</b>
@@ -157,14 +130,12 @@
         <div class="spacer"></div>
         Cette action est irréversible.
       </div>
-
       <div style="margin-top:12px; border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff;">
         <div class="kv"><div class="k">Désignation</div><div class="v">{{ item.designation|default:"—" }}</div></div>
         <div class="kv"><div class="k">Quantité</div><div class="v">{{ item.quantity }}</div></div>
         <div class="kv"><div class="k">Prix unitaire</div><div class="v">{{ item.unit_price|fcfa }}</div></div>
         <div class="kv"><div class="k">Total ligne</div><div class="v">{{ item.total|fcfa }}</div></div>
       </div>
-
       <form method="post" class="form">
         {% csrf_token %}
         <div class="footer-actions">
@@ -172,13 +143,10 @@
           <button class="btn btn-danger" type="submit">Supprimer définitivement</button>
         </div>
       </form>
-
     {% else %}
       <div class="section-title">Informations</div>
-
       <form method="post" class="form" autocomplete="off">
         {% csrf_token %}
-
         <label class="label" for="designation">Désignation</label>
         <input
           class="input"
@@ -190,7 +158,6 @@
           autofocus
         />
         <div class="hint">Sois précis : ça aide la laverie et évite les erreurs.</div>
-
         <div class="grid2" style="margin-top:10px;">
           <div>
             <label class="label" for="quantity">Quantité</label>
@@ -207,7 +174,6 @@
             />
             <div class="hint">Tu peux utiliser les décimales si besoin (ex : 2.5).</div>
           </div>
-
           <div>
             <label class="label" for="unit_price">Prix unitaire (FCFA)</label>
             <input
@@ -224,7 +190,6 @@
             <div class="hint">Met 0 si tu veux juste décrire une ligne (estimation).</div>
           </div>
         </div>
-
         <div class="footer-actions">
           <button class="btn btn-primary" type="submit">
             {% if mode == "edit" %}Enregistrer{% else %}Ajouter{% endif %}
@@ -233,7 +198,6 @@
         </div>
       </form>
     {% endif %}
-
   </div>
 </div>
 {% endblock %}

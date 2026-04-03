@@ -29,41 +29,32 @@
     <link rel="stylesheet" href="/static/css/fagni_design_system.css">
 </head>
 <body class="bg-gray-50 text-gray-800">
-
 <header class="bg-gradient-to-r from-fagni-orange to-fagni-blue text-white p-4 shadow-lg">
     <h1 class="text-xl font-semibold">Modifier la commande {{ order.code }}</h1>
     <p class="text-sm opacity-90">Mise à jour client, prestations du catalogue, localisation & montants.</p>
 </header>
-
 <div class="page mx-auto mt-5 px-3 pb-8">
     <form id="orderForm" method="post" enctype="multipart/form-data" hx-encoding="multipart/form-data">
         {% csrf_token %}
-
         {% if error %}
             <div class="bg-red-100 text-red-700 p-3 rounded-lg text-sm mb-4">{{ error }}</div>
         {% endif %}
-
         <div class="lg:grid lg:grid-cols-2 lg:gap-6">
             <div>
-                
                 <div class="card">
                     <h2 class="text-lg font-semibold border-l-4 border-fagni-orange pl-2 mb-4">Client</h2>
                     {% include 'orders/_form_client.html' with order=order %}
                 </div>
-
                 <div class="card">
                     <h2 class="text-lg font-semibold border-l-4 border-fagni-orange pl-2 mb-4">Localisation</h2>
                     <div id="map" class="w-full h-64 rounded-lg border border-gray-300"></div>
                 </div>
             </div>
-
             <div>
-                
                 <div class="card">
                     <h2 class="text-lg font-semibold border-l-4 border-fagni-orange pl-2 mb-4">Prestations FAGNI (Catalogue)</h2>
                     {% include 'orders/_form_add_item.html' with service_categories=service_categories service_items=service_items %}
                 </div>
-
                 <div class="card">
                     <h2 class="text-lg font-semibold border-l-4 border-fagni-orange pl-2 mb-4">Lignes de commande</h2>
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
@@ -80,12 +71,10 @@
                             {% include 'orders/_table_rows.html' with items=order.items.all %}
                         </tbody>
                     </table>
-
                     <div id="totalsBlock" class="mt-4">
                         {% include 'orders/_totals_block.html' with order=order %}
                     </div>
                 </div>
-
                 <div class="flex gap-3 mt-4">
                     <button type="button" id="previewBtn" class="px-4 py-2 border border-fagni-orange text-fagni-orange rounded-full text-sm font-medium hover:bg-orange-50 transition">Voir le résumé</button>
                     <button type="submit" id="submitBtn" class="px-4 py-2 bg-fagni-blue text-white rounded-full text-sm font-medium hover:bg-blue-800 transition">Enregistrer les modifications</button>
@@ -94,7 +83,6 @@
         </div>
     </form>
 </div>
-
 <script
   async
   defer

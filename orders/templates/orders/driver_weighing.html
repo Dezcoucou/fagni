@@ -1,9 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Collecte express – Livreur{% endblock %}
-
 {% block content %}
 <div style="max-width:520px;margin:0 auto;padding:14px 12px 28px;">
-
   <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
     <div>
       <div style="font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#64748b;">FAGNI • Collecte express</div>
@@ -11,33 +9,27 @@
         📦 {{ order.code|default:order.id }}
       </h1>
     </div>
-
     {% if back_url %}
       <a href="{{ back_url }}" class="btn btn-light" style="min-height:40px;">← Retour</a>
     {% endif %}
   </div>
-
   <div style="padding:16px;border-radius:22px;background:linear-gradient(135deg,#0f172a,#1d4ed8);color:#fff;box-shadow:0 14px 34px rgba(15,23,42,.16);">
     <div style="font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.76);">
       Mission collecte
     </div>
-
     <div style="margin-top:8px;font-size:18px;font-weight:1000;line-height:1.3;">
       👤 {% if order.customer %}{{ order.customer.name|default:"Client" }}{% else %}Client{% endif %}
     </div>
-
     {% if order.customer and order.customer.phone %}
       <div style="margin-top:8px;font-size:15px;font-weight:800;">
         📞 {{ order.customer.phone }}
       </div>
     {% endif %}
-
     <div style="margin-top:10px;display:inline-flex;align-items:center;min-height:34px;padding:0 14px;border-radius:999px;background:rgba(255,255,255,.12);font-size:13px;font-weight:900;">
       {% if weighing.status %}{{ weighing.status }}{% else %}brouillon{% endif %}
       {% if weighing.weight_kg %} • {{ weighing.weight_kg }} kg{% endif %}
     </div>
   </div>
-
   {% if weighing.status == "disputed" %}
     <div style="margin-top:12px;padding:12px 14px;border:1px solid #fed7aa;background:#fff7ed;border-radius:16px;font-weight:900;color:#9a3412;">
       ⚠️ Pesée contestée
@@ -47,24 +39,20 @@
       {% endif %}
     </div>
   {% endif %}
-
   {% if is_locked %}
     <div style="margin-top:12px;padding:12px 14px;border:1px solid #fde68a;background:#fffbeb;border-radius:16px;font-weight:800;color:#92400e;">
       🔒 Pesée confirmée : modification désactivée.
     </div>
   {% endif %}
-
   <div style="margin-top:12px;padding:16px;border-radius:20px;background:#fff;border:1px solid #e5e7eb;box-shadow:0 8px 22px rgba(15,23,42,.05);">
     <div style="font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;margin-bottom:10px;">
       Action principale
     </div>
-
     <form method="post" enctype="multipart/form-data" style="display:grid;gap:12px;">
       {% csrf_token %}
       <input type="hidden" name="driver_id" value="{{ driver_id }}">
       <input type="hidden" name="leg_id" value="{{ request.GET.leg_id|default:'' }}">
       <input type="hidden" name="back" value="{{ back_url|default:'' }}">
-
       <label style="display:block;">
         <div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:6px;">Poids (kg)</div>
         <input name="weight_kg" type="number" step="0.01" min="0" required {% if is_locked %}disabled{% endif %}
@@ -72,13 +60,11 @@
                placeholder="Ex: 3.50"
                style="width:100%;padding:16px 14px;border:1px solid #e5e7eb;border-radius:18px;font-size:22px;font-weight:1000;color:#0f172a;background:#fff;">
       </label>
-
       <label style="display:block;">
         <div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:6px;">Photo balance / sac (optionnel)</div>
         <input name="scale_photo" type="file" accept="image/*" {% if is_locked %}disabled{% endif %}
                style="width:100%;padding:12px;border:1px solid #e5e7eb;border-radius:18px;background:#fff;">
       </label>
-
       <label style="display:block;">
         <div style="font-size:14px;font-weight:900;color:#0f172a;margin-bottom:6px;">Note courte (optionnel)</div>
         <input name="notes" type="text" maxlength="250" {% if is_locked %}disabled{% endif %}
@@ -86,14 +72,12 @@
                placeholder="Ex: sac fermé"
                style="width:100%;padding:14px 12px;border:1px solid #e5e7eb;border-radius:18px;background:#fff;">
       </label>
-
       <button {% if is_locked %}disabled{% endif %}
               style="width:100%;min-height:82px;border:0;border-radius:24px;background:linear-gradient(90deg,#ff7a00,#0056b3);color:#fff;font-size:22px;font-weight:1000;box-shadow:0 12px 28px rgba(15,23,42,.14);{% if is_locked %}opacity:.6;cursor:not-allowed;{% endif %}">
         ✅ Enregistrer et revenir
       </button>
     </form>
   </div>
-
   <div style="margin-top:12px;padding:16px;border-radius:20px;background:#fff;border:1px solid #e5e7eb;box-shadow:0 8px 22px rgba(15,23,42,.05);">
     <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
       <div style="font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;">
@@ -103,13 +87,11 @@
         {{ evidence|length }} photo(s)
       </div>
     </div>
-
     <form method="post" action="{% url 'orders:driver_evidence_upload' order.id %}" enctype="multipart/form-data" style="display:grid;gap:10px;">
       {% csrf_token %}
       <input type="hidden" name="driver_id" value="{{ driver_id }}">
       <input type="hidden" name="leg_id" value="{{ request.GET.leg_id|default:'' }}">
       <input type="hidden" name="back" value="{{ back_url|default:'' }}">
-
       <select name="kind" style="width:100%;padding:14px 12px;border:1px solid #e5e7eb;border-radius:16px;background:#fff;font-weight:700;">
         <option value="pickup_items">Articles au départ</option>
         <option value="bag_before_seal">Sac avant scellage</option>
@@ -117,19 +99,15 @@
         <option value="weighing_scale">Photo balance</option>
         <option value="issue">Litige / anomalie</option>
       </select>
-
       <input name="image" type="file" accept="image/*" required
              style="width:100%;padding:12px;border:1px solid #e5e7eb;border-radius:16px;background:#fff;">
-
       <input name="caption" type="text" maxlength="200"
              placeholder="Description optionnelle"
              style="width:100%;padding:14px 12px;border:1px solid #e5e7eb;border-radius:16px;">
-
       <button style="width:100%;min-height:58px;border:0;border-radius:18px;background:#0f172a;color:#fff;font-size:18px;font-weight:1000;">
         📸 Ajouter preuve
       </button>
     </form>
-
     {% if evidence %}
       <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px;">
         {% for p in evidence %}
@@ -153,6 +131,5 @@
       </div>
     {% endif %}
   </div>
-
 </div>
 {% endblock %}

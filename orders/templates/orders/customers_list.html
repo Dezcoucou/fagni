@@ -1,10 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block title %}Clients FAGNI{% endblock %}
-
 {% block content %}
-
 <style>
 /* ========= GLOBAL LAYOUT ========= */
 .fagni-page {
@@ -13,7 +10,6 @@
     padding: 16px 16px 32px;
     font-size: 14px;
 }
-
 /* ========= HEADER ========= */
 .fagni-header {
     display: flex;
@@ -40,7 +36,6 @@
     gap: 8px;
     justify-content: flex-end;
 }
-
 /* ========= BUTTONS (reuse style proches de base) ========= */
 .fg-btn {
     display: inline-flex;
@@ -92,7 +87,6 @@
 .fg-btn-link:hover {
     text-decoration: underline;
 }
-
 /* ========= KPIs ========= */
 .kpi-grid {
     display: grid;
@@ -132,7 +126,6 @@
     border-color: #ff7a00;
     box-shadow: 0 1px 4px rgba(255, 122, 0, 0.18);
 }
-
 /* ========= FILTERS ========= */
 .filters-card {
     background: #ffffff;
@@ -176,7 +169,6 @@
     border-color: #ff7a00;
     box-shadow: 0 0 0 1px rgba(255, 122, 0, 0.25);
 }
-
 /* ========= TABLE ========= */
 .table-card {
     background: #ffffff;
@@ -233,7 +225,6 @@
     font-size: 0.9rem;
     color: #6b7280;
 }
-
 /* ========= CELLS ========= */
 .cell-main {
     display: flex;
@@ -251,7 +242,6 @@
 .cell-actions {
     text-align: right;
 }
-
 /* ========= BADGES + ROW STATES ========= */
 .fg-badge {
     display: inline-flex;
@@ -271,7 +261,6 @@
 .row-inactive .cell-title {
     color: #6b7280;
 }
-
 /* ========= RESPONSIVE ========= */
 @media (max-width: 900px) {
     .kpi-grid {
@@ -299,9 +288,7 @@
     }
 }
 </style>
-
 <div class="fagni-page">
-
     <!-- HEADER -->
     <div class="fagni-header">
         <div class="fagni-header-left">
@@ -323,7 +310,6 @@
             </a>
         </div>
     </div>
-
     <!-- KPIs -->
     <div class="kpi-grid">
         <div class="kpi-card">
@@ -359,7 +345,6 @@
             </div>
         </div>
     </div>
-
     <!-- FILTERS -->
     <div class="filters-card">
         <form method="get" class="filters-form">
@@ -396,7 +381,6 @@
             </div>
         </form>
     </div>
-
     <!-- TABLE -->
     <div class="table-card">
         <div class="table-header">
@@ -407,7 +391,6 @@
                 dont {{ total_with_orders }} avec au moins une commande.
             </p>
         </div>
-
         <div class="table-wrapper">
             <table class="fg-table">
                 <thead>
@@ -436,7 +419,6 @@
                                     {% endif %}
                                 </div>
                             </td>
-
                             <!-- Contact -->
                             <td>
                                 {% if c.phone %}
@@ -449,7 +431,6 @@
                                     <span class="fg-badge fg-badge-muted">Non renseigné</span>
                                 {% endif %}
                             </td>
-
                             <!-- Commandes -->
                             <td>
                                 {% if c.total_orders %}
@@ -469,7 +450,6 @@
                                     <span class="fg-badge fg-badge-muted">0 commande</span>
                                 {% endif %}
                             </td>
-
                             <!-- Montants -->
                             <td>
                                 <div class="cell-main">
@@ -482,7 +462,6 @@
                                     </div>
                                 </div>
                             </td>
-
                             <!-- Dernière commande -->
                             <td>
                                 {% if c.last_order_date %}
@@ -491,7 +470,6 @@
                                     <span class="fg-badge fg-badge-muted">Aucune commande</span>
                                 {% endif %}
                             </td>
-
                             <!-- Actions -->
                             <td class="cell-actions">
                                 <a href="{% url 'orders:orders_by_customer' c.id %}" class="fg-btn-link">
@@ -511,7 +489,5 @@
             </table>
         </div>
     </div>
-
 </div>
-
 {% endblock %}

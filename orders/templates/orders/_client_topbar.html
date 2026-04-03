@@ -1,5 +1,4 @@
 {% load static %}
-
 <header class="fagni-topbar client-topbar">
   <div class="fagni-topbar-left">
     <a href="{% url 'orders:client_home' %}" class="fagni-logo" aria-label="Accueil client">
@@ -13,10 +12,8 @@
     </a>
     <span class="fagni-topbar-tag">👤 Client</span>
   </div>
-
   <div class="fagni-topbar-right">
     <a class="fagni-topbar-tag" href="{% url 'orders:client_new_order' %}" style="text-decoration:none;">➕ Créer</a>
-
     {% if phone %}
       <span class="fagni-topbar-user">
         <span class="fagni-topbar-tag">📞 {{ phone }}</span>

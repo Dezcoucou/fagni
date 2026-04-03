@@ -1,9 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load money_filters %}
-
 {% block title %}OPS – Carte des livreurs | FAGNI{% endblock %}
-
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}?v=20260215a">
 <style>
@@ -16,9 +14,7 @@
     --shadow:0 2px 10px rgba(15,23,42,0.06);
     --shadow2:0 10px 28px rgba(15,23,42,0.10);
   }
-
   .page{ max-width:1150px; margin:0 auto 32px; padding:12px 10px 24px; }
-
   .hero{
     border-radius:18px;
     padding:14px 16px;
@@ -27,11 +23,9 @@
     border:1px solid rgba(229,231,235,0.95);
     box-shadow:var(--shadow);
   }
-
   .hero-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
   .title{ margin:0; font-size:20px; font-weight:800; color:var(--text); letter-spacing:-0.01em; }
   .subtitle{ margin:4px 0 0; font-size:13px; color:#475569; }
-
   .hero-actions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .btn{
     display:inline-flex; align-items:center; justify-content:center;
@@ -45,7 +39,6 @@
     color:#fff; border:none; box-shadow:0 2px 8px rgba(0,0,0,0.10);
   }
   .btn-primary:hover{ opacity:0.96; }
-
   .layout{
     display:grid;
     grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.3fr);
@@ -53,7 +46,6 @@
     align-items:start;
   }
   @media (max-width: 980px){ .layout{ grid-template-columns:1fr; } }
-
   .card{
     background:#fff;
     border-radius:16px;
@@ -71,7 +63,6 @@
     padding:4px 10px; border-radius:999px;
     background:#fff;
   }
-
   /* Map */
   #map-shell{
     position:relative;
@@ -84,7 +75,6 @@
     box-shadow:var(--shadow2);
   }
   #driver-map{ width:100%; height:100%; }
-
   #overlay{
     position:absolute; inset:0;
     background: linear-gradient(135deg, rgba(15,23,42,0.86), rgba(15,23,42,0.72));
@@ -95,7 +85,6 @@
   }
   #overlay .box{ max-width:360px; font-size:13px; line-height:1.45; }
   #overlay .box strong{ display:block; font-size:14px; margin-bottom:6px; }
-
   .statusbar{
     display:flex; gap:8px; align-items:center; flex-wrap:wrap;
     margin-top:10px;
@@ -113,7 +102,6 @@
   .dot{ width:8px; height:8px; border-radius:999px; background:#22c55e; display:inline-block; }
   .dot.warn{ background:#f59e0b; }
   .dot.err{ background:#ef4444; }
-
   /* Right column */
   .controls{
     display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;
@@ -126,7 +114,6 @@
     font-size:13px;
     outline:none;
   }
-
   .driver-list{
     max-height:520px;
     overflow:auto;
@@ -142,16 +129,13 @@
     transition:transform .05s ease, background .1s ease;
   }
   .driver-card:hover{ background:#f9fafb; transform:translateY(-1px); }
-
   .row-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
   .name{ font-size:13px; font-weight:800; color:#111827; }
   .city{ font-size:11px; color:#6b7280; margin-top:2px; }
-
   .mini{
     font-size:11px; color:#475569; display:flex; justify-content:space-between; gap:10px; margin-top:8px;
   }
   .mini strong{ color:#0f172a; font-weight:800; }
-
   .actions{
     display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:center;
   }
@@ -171,7 +155,6 @@
     color:#fff;
   }
   .btn-xs-primary:hover{ opacity:0.96; }
-
   .empty{
     font-size:12px;
     color:#94a3b8;
@@ -179,7 +162,6 @@
   }
 </style>
 {% endblock %}
-
 {% block content %}
 <div class="page">
   <div class="hero">
@@ -188,34 +170,27 @@
         <h1 class="title">🧭 OPS — Carte des livreurs</h1>
         <p class="subtitle">Vue temps réel : positions GPS + performances semaine. Clique un livreur pour le focaliser.</p>
       </div>
-
       <div class="hero-actions">
         <a class="btn btn-light" href="{% url 'orders:ops_dashboard' %}">← Retour OPS</a>
         <button class="btn btn-primary" id="btnRefresh">🔄 Rafraîchir</button>
       </div>
     </div>
-
     <div class="statusbar">
       <span class="status-pill" id="livePill"><span class="dot warn" id="liveDot"></span><span id="liveText">Chargement…</span></span>
-
       <span class="pill">Visibles : <strong id="driversCount">0</strong></span>
       <span class="pill">Actifs : <strong id="countActive">0</strong></span>
       <span class="pill">Idle : <strong id="countIdle">0</strong></span>
       <span class="pill">Offline : <strong id="countOffline">0</strong></span>
-
       <span class="pill" id="focusPill" style="display:none;">🎯 Focus : <strong id="focusName">—</strong></span>
-
       <span class="pill">Auto-refresh : <strong id="refreshEvery">15s</strong></span>
     </div>
   </div>
-
   <div class="layout">
     <div class="card">
       <div class="card-title">
         <span>🗺️ Carte</span>
         <span class="pill" id="mapHint">Clique un point pour détails</span>
       </div>
-
       <div id="map-shell">
         <div id="driver-map"></div>
         <div id="overlay">
@@ -226,17 +201,14 @@
         </div>
       </div>
     </div>
-
     <div class="card">
       <div class="card-title">
         <span>🚴 Livreurs</span>
         <span class="pill">Semaine en cours</span>
       </div>
-
       <div class="controls">
         <input type="text" id="q" class="search" placeholder="Rechercher (nom, ville)…">
       </div>
-
       <div class="driver-list" id="driverList">
         {% if drivers %}
           {% for d in drivers %}
@@ -253,12 +225,10 @@
                 </div>
                 <span class="pill">ID #{{ d.id }}</span>
               </div>
-
               <div class="mini">
                 <span>Cmds : <strong>{{ d.week_orders }}</strong></span>
                 <span>Gain : <strong>{{ d.week_earnings|money }}</strong> FCFA</span>
               </div>
-
               <div class="actions">
                 <button class="btn-xs" data-focus="{{ d.id }}">🎯 Focus</button>
               </div>
@@ -268,29 +238,23 @@
           <div class="empty">Aucun livreur avec coordonnées GPS pour le moment.</div>
         {% endif %}
       </div>
-
       <script id="drivers-json" type="application/json">{{ drivers_json|safe }}</script>
     </div>
   </div>
 </div>
 {% endblock %}
-
 {% block extra_js %}
 <script src="{% static 'vendor/leaflet/leaflet.js' %}?v=20260215a"></script>
-
 <script>
 (function(){
   if (!window.L || !L.Icon || !L.Icon.Default) return;
-
   const ABS = {
     iconUrl: "{% static 'vendor/leaflet/images/marker-icon.png' %}",
     iconRetinaUrl: "{% static 'vendor/leaflet/images/marker-icon-2x.png' %}",
     shadowUrl: "{% static 'vendor/leaflet/images/marker-shadow.png' %}",
   };
-
   L.Icon.Default.mergeOptions(ABS);
   try { Object.assign(L.Icon.Default.prototype.options, ABS); } catch (e) {}
-
   L.Icon.Default.prototype._getIconUrl = function(name){
     if (name === "icon") return this.options.iconUrl;
     if (name === "iconRetina") return this.options.iconRetinaUrl;
@@ -299,20 +263,16 @@
   };
 })();
 </script>
-
 <script>
 (function(){
   "use strict";
-
   // ----------------------------
   // Config
   // ----------------------------
   var REFRESH_MS = 15000;
-
   // seuils en secondes (pour classer Actif/Idle/Offline)
   var ACTIVE_SEC = 10 * 60;   // <= 10 min
   var IDLE_SEC   = 30 * 60;   // <= 30 min
-
   // ----------------------------
   // DOM
   // ----------------------------
@@ -324,31 +284,24 @@
   var liveText = document.getElementById("liveText");
   var driversCountEl = document.getElementById("driversCount");
   var refreshEveryEl = document.getElementById("refreshEvery");
-
   var countActiveEl = document.getElementById("countActive");
   var countIdleEl = document.getElementById("countIdle");
   var countOfflineEl = document.getElementById("countOffline");
-
   var focusPill = document.getElementById("focusPill");
   var focusNameEl = document.getElementById("focusName");
-
   var focusedDriverId = null;
-
   if (refreshEveryEl) refreshEveryEl.textContent = Math.round(REFRESH_MS/1000) + "s";
-
   function setLive(state, text){
     if (!liveDot || !liveText) return;
     liveDot.className = "dot " + (state === "ok" ? "" : (state === "err" ? "err" : "warn"));
     liveText.textContent = text || "";
   }
-
   function setCounts(visible, active, idle, offline){
     if (driversCountEl) driversCountEl.textContent = String(visible || 0);
     if (countActiveEl) countActiveEl.textContent = String(active || 0);
     if (countIdleEl) countIdleEl.textContent = String(idle || 0);
     if (countOfflineEl) countOfflineEl.textContent = String(offline || 0);
   }
-
   function setFocus(driver){
     if (!focusPill || !focusNameEl) return;
     if (!driver){
@@ -361,7 +314,6 @@
     focusNameEl.textContent = driver.name || ("ID #" + driver.id);
     focusPill.style.display = "inline-flex";
   }
-
   // ----------------------------
   // Parse initial JSON
   // ----------------------------
@@ -371,7 +323,6 @@
     try { return JSON.parse(el.textContent || "[]"); }
     catch(e){ return []; }
   }
-
   // ----------------------------
   // Leaflet init
   // ----------------------------
@@ -380,15 +331,12 @@
     maxZoom: 19,
     attribution: "&copy; OpenStreetMap"
   }).addTo(map);
-
   var markersById = {};
   var layerGroup = L.layerGroup().addTo(map);
-
   function clearMarkers(){
     layerGroup.clearLayers();
     markersById = {};
   }
-
   function fitDrivers(drivers){
     if (!drivers || drivers.length === 0) {
       map.setView([5.35, -4.02], 12);
@@ -399,19 +347,15 @@
     try { map.fitBounds(b, { padding:[20,20] }); }
     catch(e){ map.setView([drivers[0].latitude, drivers[0].longitude], 13); }
   }
-
   function popupHtml(d){
     var perfBaseUrl = "{% url 'orders:driver_performance' 99999 %}";
     var perfUrl = perfBaseUrl.replace("/99999/", "/" + d.id + "/");
-
     var statusLabel = (d.status === "busy") ? "🟠 En course" : (d.status === "stale" ? "🔴 Hors ligne" : "🟢 Dispo");
-
     var gpsInfo = "GPS : —";
     if (typeof d.age_seconds === "number") {
       gpsInfo = (d.age_seconds <= 900) ? "GPS : ✅ récent" : "GPS : ⚠️ ancien";
     }
     var gpsLine = "<div style='margin-top:6px;font-size:12px;'><strong>" + gpsInfo + "</strong></div>";
-
     var orderLine = d.active_order_id
       ? ("<div style='margin-top:8px;font-size:12px;'>" +
          "<strong>Commande active :</strong> " +
@@ -420,12 +364,10 @@
          "</a>" +
          "</div>")
       : "<div style='margin-top:8px;font-size:12px;color:#64748b;'>Aucune commande active</div>";
-
     var updated = "<div style='margin-top:8px;font-size:11px;color:#64748b;'>" +
       "MAJ : " + (d.age_label || "—") +
       (d.updated_at ? (" <span style='opacity:.7'>(" + d.updated_at + ")</span>") : "") +
       "</div>";
-
     var links =
       "<div style='margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;'>" +
         "<a href='" + perfUrl + "' " +
@@ -435,7 +377,6 @@
           "style='display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid #e5e7eb;text-decoration:none;font-size:11px;color:#374151;background:#fff;'>" +
           "📍 Ouvrir Maps</a>" +
       "</div>";
-
     return (
       "<div style='font-size:13px;line-height:1.35;min-width:240px;'>" +
         "<div style='font-weight:800;color:#0f172a;'>" + (d.name || "Livreur") + "</div>" +
@@ -454,7 +395,6 @@
       "</div>"
     );
   }
-
   function classifyDriver(d){
     // priorité au "stale" si présent
     if (d && d.status === "stale") return "offline";
@@ -468,7 +408,6 @@
     if (s <= IDLE_SEC) return "idle";
     return "offline";
   }
-
   function updateCounts(drivers){
     var active = 0, idle = 0, offline = 0;
     (drivers || []).forEach(function(d){
@@ -479,11 +418,9 @@
     });
     setCounts((drivers || []).length, active, idle, offline);
   }
-
   function renderDrivers(drivers){
     clearMarkers();
     updateCounts(drivers);
-
     if (!drivers || drivers.length === 0){
       if (overlay) overlay.style.display = "flex";
       setLive("warn", "Aucun livreur GPS");
@@ -491,19 +428,14 @@
       setFocus(null);
       return;
     }
-
     if (overlay) overlay.style.display = "none";
-
     drivers.forEach(function(d){
       var pos = [d.latitude, d.longitude];
-
       var m = L.marker(pos).addTo(layerGroup);
       m.bindPopup(popupHtml(d));
-
       var fill = "#22c55e";
       if (d.status === "busy") fill = "#f59e0b";
       if (d.status === "stale") fill = "#ef4444";
-
       var c = L.circleMarker(pos, {
         radius: 14,
         weight: 2,
@@ -512,22 +444,17 @@
         color: fill,
         fillColor: fill,
       }).addTo(layerGroup);
-
       c.on("click", function(){
         m.openPopup();
         setFocus(d);
       });
-
       m.on("popupopen", function(){
         setFocus(d);
       });
-
       markersById[String(d.id)] = { marker: m, circle: c, data: d };
     });
-
     fitDrivers(drivers);
     setLive("ok", "OK — " + drivers.length + " livreur(s)");
-
     // Si un focus existait, on le restaure si possible
     if (focusedDriverId && markersById[focusedDriverId]){
       setFocus(markersById[focusedDriverId].data);
@@ -535,7 +462,6 @@
       setFocus(null);
     }
   }
-
   function focusDriver(driverId){
     var key = String(driverId);
     var obj = markersById[key];
@@ -545,14 +471,12 @@
     obj.marker.openPopup();
     setFocus(d);
   }
-
   // ----------------------------
   // List filter + focus buttons
   // ----------------------------
   function applyFilter(){
     var q = (qEl ? qEl.value : "").toLowerCase().trim();
     if (!listEl) return;
-
     var cards = listEl.querySelectorAll(".driver-card");
     cards.forEach(function(card){
       var name = (card.dataset.name || "").toLowerCase();
@@ -561,9 +485,7 @@
       card.style.display = ok ? "" : "none";
     });
   }
-
   if (qEl) qEl.addEventListener("input", applyFilter);
-
   if (listEl){
     listEl.addEventListener("click", function(e){
       var btn = e.target.closest("[data-focus]");
@@ -578,7 +500,6 @@
       }
     });
   }
-
   // ----------------------------
   // Auto refresh (fetch JSON)
   // ----------------------------
@@ -599,18 +520,15 @@
         setLive("err", "Erreur refresh");
       });
   }
-
   if (btnRefresh) btnRefresh.addEventListener("click", function(){
     fetchDrivers();
   });
-
   // ----------------------------
   // Boot
   // ----------------------------
   renderDrivers(getInitialDrivers());
   applyFilter();
   setInterval(fetchDrivers, REFRESH_MS);
-
 })();
 </script>
 {% endblock %}

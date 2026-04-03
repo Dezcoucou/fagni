@@ -4,79 +4,63 @@
           <span>Sous-total prestations (HT)</span>
           <strong>{{ finance.prestation_total|floatformat:0 }} FCFA</strong>
       </div>
-
       <div class="totals-row">
           <span>Service FAGNI (HT)</span>
           <strong>{{ finance.service_fee_ht|floatformat:0 }} FCFA</strong>
       </div>
-
       <div class="totals-row">
           <span>Frais de livraison facturés au client</span>
           <strong>{{ finance.delivery_fee_client|floatformat:0 }} FCFA</strong>
       </div>
-
       {% if express_client and express_client|floatformat:0 != '0' %}
           <div class="totals-row highlight-express">
               <span>⚡ Express</span>
               <strong>{{ express_client|floatformat:0 }} FCFA</strong>
           </div>
       {% endif %}
-
       <div class="totals-row">
           <span>TVA sur revenus FAGNI (18%)</span>
           <strong>{{ finance.vat_fagni|floatformat:0 }} FCFA</strong>
       </div>
-
       <div class="totals-row total-grand">
           <span><strong>Total TTC facturé au client</strong></span>
           <strong>{{ finance.total_client_ttc|default:finance.total_ttc_client|floatformat:0 }} FCFA</strong>
       </div>
-
       <div class="divider"></div>
-
       <div class="totals-row">
           <span>Montant dû à la blanchisserie</span>
           <strong>{{ finance.amount_laundry|floatformat:0 }} FCFA</strong>
       </div>
-
       <div class="totals-row">
           <span>Montant dû au livreur</span>
           <strong>{{ finance.amount_driver|floatformat:0 }} FCFA</strong>
       </div>
-
       <div class="totals-row">
           <span>Total partenaires</span>
           <strong>{{ finance.partners_total|floatformat:0 }} FCFA</strong>
       </div>
-
       <div class="divider"></div>
-
       <div class="totals-row">
           <span>Revenu FAGNI (HT)</span>
           <strong>{{ finance.fagni_revenue_ht|floatformat:0 }} FCFA</strong>
       </div>
-
       <div class="totals-row">
           <span>Marge logistique / livraison FAGNI</span>
           <strong>{{ finance.margin_delivery|floatformat:0 }} FCFA</strong>
       </div>
-
   {% else %}
       <div class="totals-row">
           <span>Prestations</span>
           <strong>{{ order.prestation_total|floatformat:0 }} FCFA</strong>
       </div>
-
       <div class="totals-row">
           <span>Livraison</span>
           <strong>{{ order.delivery_fee|floatformat:0 }} FCFA</strong>
       </div>
-
       <div class="totals-row">
           <span>Service FAGNI</span>
           <strong>{{ order.service_fee|floatformat:0 }} FCFA</strong>
       </div>
-
       {% if amounts.express_extra_fee and amounts.express_extra_fee|floatformat:0 != '0' %}
           <div class="totals-row highlight-express">
               <span>⚡ Express</span>
@@ -88,33 +72,27 @@
               <strong>{{ express_client|floatformat:0 }} FCFA</strong>
           </div>
       {% endif %}
-
       {% if order.vat_fagni and order.vat_fagni > 0 %}
           <div class="totals-row">
               <span>TVA FAGNI</span>
               <strong>{{ order.vat_fagni|floatformat:0 }} FCFA</strong>
           </div>
       {% endif %}
-
       <div class="divider"></div>
-
       <div class="totals-row total-grand">
           <span><strong>Total client (TTC)</strong></span>
           <strong>{{ order.total_client_ttc|floatformat:0 }} FCFA</strong>
       </div>
-
       <div class="note">
           Total officiel = prestations + livraison + service + express + TVA FAGNI.
       </div>
   {% endif %}
 </div>
-
 <!-- ===================================================== -->
 <!--  PAIEMENTS (Back-office) -->
 <!-- ===================================================== -->
 <div class="card" style="margin-top:12px;">
   <h2 class="card-title"><span class="emoji">💳</span> Paiements</h2>
-
   <div class="grid" style="margin-top:8px;">
     <div>
       <div class="label">Statut</div>
@@ -126,27 +104,21 @@
         {% endif %}
       </div>
     </div>
-
     <div>
       <div class="label">Total payé</div>
       <div class="value"><strong>{{ order.amount_paid|default:0|floatformat:0 }} FCFA</strong></div>
     </div>
-
     <div>
       <div class="label">Reste à payer</div>
       <div class="value"><strong>{{ remaining|default:0|floatformat:0 }} FCFA</strong></div>
     </div>
   </div>
-
   {% if request.user.is_staff %}
     <div class="divider"></div>
-
     <h3 class="card-subtitle">Ajouter un paiement</h3>
-
     <form method="post" style="margin-top:8px;">
       {% csrf_token %}
       <input type="hidden" name="action" value="add_payment">
-
       {% if remaining|default:0|floatformat:0 == '0' %}
         <div class="note" style="margin:8px 0 10px;">
           ✅ Commande soldée — aucun paiement supplémentaire requis.
@@ -156,7 +128,6 @@
           💡 Suggestion : reste à payer = <strong>{{ remaining|default:0|floatformat:0 }} FCFA</strong>
         </div>
       {% endif %}
-
       <div class="grid" style="align-items:end; opacity:{% if remaining|default:0|floatformat:0 == '0' %}0.55{% else %}1{% endif %};">
         <div>
           <div class="label">Montant (FCFA)</div>
@@ -172,7 +143,6 @@
             value="{% if remaining|default:0|floatformat:0 != '0' %}{{ remaining|default:0 }}{% endif %}"
           >
         </div>
-
         <div>
           <div class="label">Canal</div>
           <select
@@ -189,7 +159,6 @@
             <option value="bank">bank</option>
           </select>
         </div>
-
         <div>
           <div class="label">Référence (optionnel)</div>
           <input
@@ -204,7 +173,6 @@
             Astuce : si tu mets une référence identique, l’idempotence évite les doublons.
           </div>
         </div>
-
         <div style="display:flex;gap:8px;justify-content:flex-end;">
           <button
             class="btn btn-primary"
@@ -217,11 +185,8 @@
       </div>
     </form>
   {% endif %}
-
   <div class="divider"></div>
-
   <h3 class="card-subtitle">Historique des paiements</h3>
-
   {% if payments %}
     <div style="overflow:auto;">
       <table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;">

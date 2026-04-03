@@ -1,9 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load humanize money_filters %}
-
 {% block title %}Profil livreur – FAGNI{% endblock %}
-
 {% block content %}
 <style>
   body{background:#f5f7fb;}
@@ -42,7 +40,6 @@
     font-weight:900;
     white-space:nowrap;
   }
-
   .section{
     background:#fff;
     border:1px solid #e5e7eb;
@@ -53,7 +50,6 @@
   }
   .section-title{font-size:18px;font-weight:900;color:#0f172a;margin:0;}
   .section-sub{font-size:12px;color:#64748b;margin-top:4px;line-height:1.45;}
-
   .identity{
     display:flex;
     gap:12px;
@@ -78,7 +74,6 @@
     background:#ecfdf3;color:#166534;border:1px solid #bbf7d0;
     font-size:11px;font-weight:900;
   }
-
   .meta-grid,.kpi-grid,.action-grid{
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
@@ -106,7 +101,6 @@
   }
   .kpi-v.big{font-size:22px;line-height:1.05;}
   .kpi-sub{margin-top:6px;font-size:12px;color:#64748b;line-height:1.45;}
-
   .action-card{
     text-decoration:none;
     color:inherit;
@@ -124,7 +118,6 @@
   .action-title{font-size:14px;font-weight:900;}
   .action-text{font-size:12px;line-height:1.45;color:#64748b;margin-top:3px;}
   .action-card.primary .action-text{color:rgba(255,255,255,.85);}
-
   .bottom-nav{
     position:fixed;
     left:0; right:0; bottom:0;
@@ -162,12 +155,10 @@
     background:#fff7ed;
     color:#dd6400;
   }
-
   @media (max-width:760px){
     .meta-grid,.kpi-grid,.action-grid{grid-template-columns:1fr;}
   }
 </style>
-
 <div class="driver-page">
   <section class="brand">
     <div class="brand-logo">
@@ -180,16 +171,13 @@
     </div>
     <div class="brand-pill">Connecté</div>
   </section>
-
   <section class="section">
     <h2 class="section-title">Mon profil</h2>
     <div class="section-sub">Identité utilisée pour les courses, le wallet et le suivi.</div>
-
     <div class="identity">
       <div class="avatar">
         {% if driver and driver.name %}{{ driver.name|slice:":1"|upper }}{% else %}F{% endif %}
       </div>
-
       <div class="identity-main">
         <div class="name">
           {% if driver and driver.name %}{{ driver.name }}{% else %}Livreur FAGNI{% endif %}
@@ -202,51 +190,42 @@
           {% if driver and driver.email %}✉️ {{ driver.email }}{% endif %}
         </div>
       </div>
-
       <div class="pill">
         {% if driver and driver.is_active %}Actif{% else %}Compte livreur{% endif %}
       </div>
     </div>
   </section>
-
   <section class="section">
     <h2 class="section-title">Mes informations</h2>
     <div class="section-sub">Résumé du profil opérationnel.</div>
-
     <div class="meta-grid" style="margin-top:12px;">
       <div class="meta-card">
         <div class="meta-k">ID livreur</div>
         <div class="meta-v">{% if driver and driver.id %}#{{ driver.id }}{% else %}—{% endif %}</div>
       </div>
-
       <div class="meta-card">
         <div class="meta-k">Statut</div>
         <div class="meta-v">{% if driver and driver.is_active %}Actif{% else %}Inactif{% endif %}</div>
       </div>
-
       <div class="meta-card">
         <div class="meta-k">Véhicule</div>
         <div class="meta-v">{% if driver and driver.vehicle_type %}{{ driver.vehicle_type }}{% else %}Non renseigné{% endif %}</div>
       </div>
-
       <div class="meta-card">
         <div class="meta-k">Immatriculation</div>
         <div class="meta-v">{% if driver and driver.license_plate %}{{ driver.license_plate }}{% else %}—{% endif %}</div>
       </div>
     </div>
   </section>
-
   <section class="section">
     <h2 class="section-title">Mes stats</h2>
     <div class="section-sub">Indicateurs simples pour le pilote.</div>
-
     <div class="kpi-grid" style="margin-top:12px;">
       <div class="kpi-card">
         <div class="kpi-k">Courses totales</div>
         <div class="kpi-v big">{{ stats.total_orders|default:0|intcomma }}</div>
         <div class="kpi-sub">Ce mois : <strong>{{ stats.month_orders|default:0|intcomma }}</strong></div>
       </div>
-
       <div class="kpi-card">
         <div class="kpi-k">Courses actives</div>
         <div class="kpi-v big">{{ stats.pending_orders|default:0|add:stats.in_progress_orders|default:0|intcomma }}</div>
@@ -255,13 +234,11 @@
           En cours : <strong>{{ stats.in_progress_orders|default:0|intcomma }}</strong>
         </div>
       </div>
-
       <div class="kpi-card">
         <div class="kpi-k">Distance totale</div>
         <div class="kpi-v big">{{ stats.total_distance_km|default:0|floatformat:"1" }} km</div>
         <div class="kpi-sub">Moyenne : <strong>{{ stats.avg_distance_km|default:0|floatformat:"1" }} km</strong></div>
       </div>
-
       <div class="kpi-card">
         <div class="kpi-k">Revenus logistiques</div>
         <div class="kpi-v big">{{ stats.total_driver_income|default:0|fcfa }}</div>
@@ -272,11 +249,9 @@
       </div>
     </div>
   </section>
-
   <section class="section">
     <h2 class="section-title">Actions rapides</h2>
     <div class="section-sub">Accès direct aux écrans utiles.</div>
-
     <div class="action-grid" style="margin-top:12px;">
       <a href="{% url 'orders:driver_hub' %}" class="action-card primary">
         <div class="action-ico">🏠</div>
@@ -285,7 +260,6 @@
           <div class="action-text">Retour au tableau de bord mobile.</div>
         </div>
       </a>
-
       <a href="{% url 'orders:driver_app' %}" class="action-card">
         <div class="action-ico">📋</div>
         <div>
@@ -293,7 +267,6 @@
           <div class="action-text">Voir les missions et ouvrir une course.</div>
         </div>
       </a>
-
       <a href="{% url 'orders:driver_wallet' %}" class="action-card">
         <div class="action-ico">💼</div>
         <div>
@@ -301,7 +274,6 @@
           <div class="action-text">Consulter le solde et les mouvements.</div>
         </div>
       </a>
-
       <a href="{% url 'orders:driver_history_me' %}" class="action-card">
         <div class="action-ico">📜</div>
         <div>
@@ -312,7 +284,6 @@
     </div>
   </section>
 </div>
-
 <nav class="bottom-nav" aria-label="Navigation livreur">
   <div class="bottom-wrap">
     <a class="nav-item" href="{% url 'orders:driver_hub' %}">

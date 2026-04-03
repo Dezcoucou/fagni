@@ -1,7 +1,5 @@
 {% extends "base.html" %}
 {% block title %}App Blanchisseur – FAGNI{% endblock %}
-
-
 {% block content %}
 <style>
   .one-button-mode .kiosk-hide,
@@ -21,19 +19,15 @@
   .one-button-mode [data-filter-card]{
     display:none !important;
   }
-
   .one-button-mode #laundry-app-root{
     max-width:760px !important;
   }
-
   .one-button-mode .laundry-order-card{
     display:none !important;
   }
-
   .one-button-mode .laundry-order-card.one-button-active{
     display:block !important;
   }
-
   .one-button-stage{
     margin-top:14px;
     padding:18px;
@@ -42,21 +36,18 @@
     border:1px solid #e2e8f0;
     box-shadow:0 10px 30px rgba(15,23,42,.06);
   }
-
   .one-button-stage-title{
     font-size:28px;
     font-weight:1000;
     color:#0f172a;
     line-height:1.05;
   }
-
   .one-button-stage-sub{
     margin-top:8px;
     font-size:16px;
     font-weight:800;
     color:#475569;
   }
-
   .one-button-main{
     margin-top:16px;
     width:100%;
@@ -67,43 +58,35 @@
     font-weight:1000;
     color:#fff;
   }
-
   .one-button-main.todo{
     background:#ea580c;
   }
-
   .one-button-main.doing{
     background:#2563eb;
   }
-
   .one-button-main.ready{
     background:#16a34a;
   }
-
   .one-button-main.done{
     background:#0f172a;
   }
-
   .one-button-toolbar{
     margin-top:12px;
     display:grid;
     grid-template-columns:1fr 1fr;
     gap:10px;
   }
-
   .one-button-toolbar .btn{
     min-height:56px !important;
     font-size:18px !important;
     font-weight:1000 !important;
   }
 </style>
-
 <style>
   .visual-mode-card{
     position:relative;
     overflow:hidden;
   }
-
   .visual-status-pill{
     min-height:56px;
     padding:0 18px;
@@ -115,7 +98,6 @@
     font-weight:1000;
     line-height:1;
   }
-
   .visual-big-icon{
     width:72px;
     height:72px;
@@ -127,11 +109,9 @@
     font-weight:1000;
     flex:0 0 72px;
   }
-
   .visual-mode-card .small-muted{
     display:none;
   }
-
   .visual-mode-card .article-count-big{
     margin-top:12px;
     font-size:22px;
@@ -139,107 +119,88 @@
     color:#0f172a;
     line-height:1.15;
   }
-
   .visual-mode-card .action-grid-big{
     margin-top:14px;
     display:grid;
     grid-template-columns:1fr 1fr;
     gap:10px;
   }
-
   .visual-mode-card .action-grid-big .btn{
     min-height:58px !important;
     font-size:18px !important;
     font-weight:1000 !important;
     border-radius:16px !important;
   }
-
   .visual-mode-card .card-main-top{
     display:flex;
     align-items:center;
     gap:14px;
     flex-wrap:nowrap;
   }
-
   .visual-mode-card .card-main-text{
     min-width:0;
     flex:1;
   }
-
   .visual-mode-card .order-id-big{
     font-size:24px;
     font-weight:1000;
     color:#0f172a;
     line-height:1.05;
   }
-
   .visual-mode-card .order-sub-big{
     margin-top:6px;
     font-size:13px;
     color:#64748b;
     font-weight:800;
   }
-
   .visual-toggle-btn.active{
     background:#0f172a !important;
     color:#fff !important;
     border-color:#0f172a !important;
   }
-
   .visual-minimal [data-detail-lines="1"]{
     display:none !important;
   }
-
   .visual-minimal .visual-big-icon{
     width:82px;
     height:82px;
     font-size:42px;
   }
-
   .visual-minimal .order-id-big{
     font-size:26px;
   }
-
   .visual-minimal .article-count-big{
     font-size:24px;
   }
 </style>
-
 <style>
   .kiosk-mode{
     background:#f8fafc;
   }
-
   .kiosk-mode .kiosk-hide{
     display:none !important;
   }
-
   .kiosk-mode #laundry-app-root{
     max-width:100% !important;
     padding:10px !important;
   }
-
   .kiosk-mode #orders-list{
     grid-template-columns:1fr !important;
     gap:10px !important;
   }
-
   .kiosk-mode .laundry-order-card > div{
     padding:18px !important;
     border-radius:20px !important;
   }
-
   .kiosk-mode [data-filter-card]{
     min-height:110px !important;
     font-size:18px;
   }
-
   .kiosk-mode .btn{
     min-height:56px !important;
     font-size:18px !important;
     font-weight:1000 !important;
   }
-
   .kiosk-mode .kiosk-top-actions{
     position:sticky;
     top:0;
@@ -247,12 +208,10 @@
     background:#f8fafc;
     padding-bottom:10px;
   }
-
   .kiosk-mode .kiosk-focus{
     outline:4px solid rgba(37,99,235,.16);
     box-shadow:0 14px 32px rgba(37,99,235,.10) !important;
   }
-
   .kiosk-badge{
     display:inline-flex;
     align-items:center;
@@ -266,17 +225,14 @@
     font-weight:1000;
   }
 </style>
-
 <div style="max-width:980px;margin:0 auto;padding:14px;" id="laundry-app-root">
   <div class="kiosk-top-actions" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;">
-
     <div>
       <h1 style="margin:0;font-size:26px;line-height:1.1;font-weight:1000;color:#0f172a;">🧺 App Blanchisseur</h1>
       <div style="margin-top:6px;color:#64748b;font-size:14px;font-weight:700;">
         {% if laundry %}{{ laundry.name|default:"Blanchisserie" }}{% else %}Blanchisserie non détectée{% endif %}
       </div>
     </div>
-
     <div class="kiosk-hide" style="display:flex;gap:8px;flex-wrap:wrap;">
       {% if laundry %}
         <a class="btn btn-light btn-sm" href="{% url 'wallets:laundry_wallet_dashboard' %}?laundry_id={{ laundry.id }}">💳 Wallet</a>
@@ -287,47 +243,38 @@
       <a class="btn btn-light btn-sm" href="/accounts/logout/">🚪 Déconnexion</a>
     </div>
   </div>
-
   {% if error %}
     <div class="alert alert-warning" style="margin-top:12px;">{{ error }}</div>
   {% endif %}
-
   <div style="margin-top:14px;padding:14px;border-radius:18px;border:1px solid #e2e8f0;background:#f8fafc;">
     <div style="font-size:14px;font-weight:900;color:#334155;">Aujourd’hui</div>
-
     <div style="margin-top:10px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;">
       <button type="button" data-filter-card="todo" style="min-height:92px;border:none;border-radius:18px;background:#fff7ed;border:1px solid #fed7aa;">
         <div style="font-size:13px;font-weight:900;color:#9a3412;"><span data-i18n="todo">📥 À traiter</span></div>
         <div style="margin-top:8px;font-size:34px;line-height:1;font-weight:1000;color:#0f172a;">{{ stats_todo|default:0 }}</div>
       </button>
-
       <button type="button" data-filter-card="doing" style="min-height:92px;border:none;border-radius:18px;background:#eff6ff;border:1px solid #bfdbfe;">
         <div style="font-size:13px;font-weight:900;color:#1d4ed8;"><span data-i18n="doing">🧺 En cours</span></div>
         <div style="margin-top:8px;font-size:34px;line-height:1;font-weight:1000;color:#0f172a;">{{ stats_doing|default:0 }}</div>
       </button>
-
       <button type="button" data-filter-card="ready" style="min-height:92px;border:none;border-radius:18px;background:#f0fdf4;border:1px solid #bbf7d0;">
         <div style="font-size:13px;font-weight:900;color:#166534;"><span data-i18n="ready">✅ Prêtes</span></div>
         <div style="margin-top:8px;font-size:34px;line-height:1;font-weight:1000;color:#0f172a;">{{ stats_ready|default:0 }}</div>
       </button>
     </div>
   </div>
-
   <div style="margin-top:12px;">
     <select id="language-select" style="width:100%;min-height:50px;border-radius:14px;border:1px solid #dbe3ee;background:#fff;padding:0 14px;font-size:15px;font-weight:900;color:#0f172a;">
       <option value="fr">Français</option>
       <option value="dioula">Dioula</option>
     </select>
   </div>
-
   <div id="simple-summary" style="margin-top:12px;padding:12px 14px;border-radius:14px;background:#ffffff;border:1px solid #e2e8f0;font-size:14px;font-weight:900;color:#334155;">
     📋 Choisis un groupe de commandes.
   </div>
-
   <div id="voice-command-feedback" style="margin-top:10px;padding:12px 14px;border-radius:14px;background:#eff6ff;border:1px solid #bfdbfe;font-size:14px;font-weight:900;color:#1d4ed8;min-height:22px;">
     🎙️ Commande vocale prête.
   </div>
-
   <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
     <button class="btn btn-dark btn-sm" type="button" id="btn-one-button-mode">⚡ Mode ultra simple</button>
     <button class="btn btn-light btn-sm" type="button" id="btn-exit-one-button-mode">↩ Quitter mode simple</button>
@@ -337,7 +284,6 @@
     <button class="btn btn-light btn-sm visual-toggle-btn" type="button" id="btn-visual-max">🔶 Vue pictos</button>
     <button class="btn btn-light btn-sm" type="button" id="btn-supervisor-toggle">🛠️ Superviseur</button>
   </div>
-
   <div id="supervisor-panel" style="display:none;margin-top:12px;padding:14px;border-radius:16px;background:#f8fafc;border:1px solid #e2e8f0;">
     <div style="font-size:14px;font-weight:1000;color:#0f172a;">Mode superviseur</div>
     <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
@@ -346,7 +292,6 @@
       <button class="btn btn-light btn-sm" type="button" id="btn-supervisor-reset">♻️ Réinitialiser vue</button>
     </div>
   </div>
-
   <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
     <button class="btn btn-light btn-sm" type="button" data-filter="todo"><span data-i18n="todo">📥 À traiter</span></button>
     <button class="btn btn-light btn-sm" type="button" data-filter="doing"><span data-i18n="doing">🧺 En cours</span></button>
@@ -358,30 +303,23 @@
     <button class="btn btn-light btn-sm" type="button" id="btn-voice-command-start">🎤 Commander</button>
     <button class="btn btn-light btn-sm" type="button" id="btn-voice-command-stop">⏹️ Stop micro</button>
   </div>
-
   <div id="one-button-stage" class="one-button-stage" style="display:none;">
     <div class="one-button-stage-title" id="one-button-title">Commande</div>
     <div class="one-button-stage-sub" id="one-button-sub">Choisis une commande.</div>
-
-    
 <div id="auto-log-panel" style="margin-top:10px;padding:10px;border-radius:14px;background:#0f172a;color:#fff;font-size:12px;max-height:120px;overflow:auto;">
   <div style="font-weight:900;margin-bottom:6px;">📜 Journal</div>
   <div id="auto-log-list"></div>
 </div>
-
 <div id="auto-assist-status" style="margin-top:10px;padding:12px 14px;border-radius:14px;background:#eff6ff;border:1px solid #bfdbfe;font-size:14px;font-weight:900;color:#1d4ed8;">
       🤖 Auto-assist actif
     </div>
-
     <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <button type="button" class="btn btn-light" id="btn-auto-assist-toggle">🤖 Auto ON</button>
       <button type="button" class="btn btn-light" id="btn-auto-assist-cancel">🛑 Annuler auto</button>
     </div>
-
     <button type="button" id="one-button-main" class="one-button-main todo">
       OUVRIR
     </button>
-
     <div class="one-button-toolbar">
       <button type="button" class="btn btn-light" id="one-button-prev">⬅️ Précédente</button>
       <button type="button" class="btn btn-light" id="one-button-next">➡️ Suivante</button>
@@ -389,19 +327,39 @@
       <button type="button" class="btn btn-light" id="one-button-speak">🔊 Lire</button>
     </div>
   </div>
-
   <section class="card" style="margin-top:12px;padding:14px;">
     <div style="font-weight:900;font-size:18px;color:#0f172a;">Mes commandes</div>
-
     {% if orders and laundry %}
       <div id="orders-list" style="display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px;">
         {% for o in orders %}
           <div class="laundry-order-card"
                data-order-id="{{ o.id }}"
                data-status="{{ o.status|default:'' }}"
+               data-pricing-mode="{{ o.pricing_mode|default:'' }}"
+               data-bag-size="{{ o.bag_size|default:'' }}"
                data-wash-ready="{% if o.wash_complete_time %}1{% else %}0{% endif %}"
                data-open-url="{% url 'orders:laundry_order_detail' o.id %}{% if laundry %}?laundry_id={{ laundry.id }}{% endif %}">
             <div class="visual-mode-card" style="padding:16px;border:1px solid #e2e8f0;border-radius:18px;background:#fff;box-shadow:0 8px 22px rgba(15,23,42,.04);cursor:pointer;transition:.16s ease;">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+                {% if o.pricing_mode == "bag" %}
+                  <span style="display:inline-flex;align-items:center;min-height:28px;padding:0 10px;border-radius:999px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-size:11px;font-weight:1000;">
+                    🧺 Commande en sac
+                  </span>
+                  <span style="display:inline-flex;align-items:center;min-height:28px;padding:0 10px;border-radius:999px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:11px;font-weight:1000;">
+                    {% if o.bag_size == "small" %}
+                      Petit sac
+                    {% elif o.bag_size == "large" %}
+                      Grand sac
+                    {% else %}
+                      Sac moyen
+                    {% endif %}
+                  </span>
+                {% else %}
+                  <span style="display:inline-flex;align-items:center;min-height:28px;padding:0 10px;border-radius:999px;background:#f8fafc;border:1px solid #e2e8f0;color:#334155;font-size:11px;font-weight:1000;">
+                    🧾 À la pièce
+                  </span>
+                {% endif %}
+              </div>
               <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;">
                 <div>
                   <div style="font-size:22px;font-weight:1000;color:#0f172a;">Commande #{{ o.id }}</div>
@@ -409,7 +367,6 @@
                     {{ o.items.all|length }} article(s)
                   </div>
                 </div>
-
                 <div>
                   {% if o.status == "done" %}
                     <div style="min-height:40px;padding:0 16px;border-radius:999px;background:#f8fafc;border:1px solid #cbd5e1;display:inline-flex;align-items:center;justify-content:center;font-size:16px;font-weight:1000;color:#0f172a;">
@@ -430,22 +387,18 @@
                   {% endif %}
                 </div>
               </div>
-
               <div style="margin-top:12px;font-size:18px;font-weight:1000;color:#0f172a;">
                 🧺 {{ o.items.all|length }} article(s)
               </div>
-
               <div class="action-grid-big">
                 <a class="btn btn-primary btn-sm" href="{% url 'orders:laundry_order_detail' o.id %}{% if laundry %}?laundry_id={{ laundry.id }}{% endif %}" style="min-height:50px;font-size:16px;font-weight:1000;">
                   <span data-i18n="open">📄 Ouvrir</span>
                 </a>
-
                 <button class="btn btn-light btn-sm" type="button" style="min-height:50px;font-size:16px;font-weight:1000;"
                         onclick="window.FAGNI_SPEAK && window.FAGNI_SPEAK('Commande {{ o.id }}. {% if o.status == "done" %}Terminée.{% elif o.wash_complete_time %}Prête.{% elif o.status == "in_progress" %}En cours.{% else %}À traiter.{% endif %} {% for it in o.items.all %} {{ it.designation }} fois {{ it.quantity|default:1 }}.{% endfor %}')">
                   <span data-i18n="read">🔊 Lire</span>
                 </button>
               </div>
-
               <div data-detail-lines="1" style="margin-top:10px;color:#94a3b8;font-size:11px;font-weight:700;">
                 👆 Appuie sur la carte ou sur Ouvrir.
               </div>
@@ -456,20 +409,17 @@
     {% else %}
       <p style="margin-top:10px;color:#64748b;">Aucune commande attribuée.</p>
     {% endif %}
-
     <div id="orders-pagination-bar" style="margin-top:14px;display:flex;justify-content:center;">
       <button type="button" class="btn btn-light btn-sm" id="btn-load-more">➕ Voir plus</button>
     </div>
   </section>
 </div>
-
 <script>
 (function(){
   function getLang(){
     var el = document.getElementById("language-select");
     return el ? el.value : "fr";
   }
-
   var I18N = {
     fr: {
       todo: "📥 À traiter",
@@ -504,7 +454,6 @@
       read: "🔊 Kalan"
     }
   };
-
   function refreshLanguageUI(){
     var lang = getLang();
     document.querySelectorAll("[data-i18n]").forEach(function(el){
@@ -513,12 +462,10 @@
         el.textContent = I18N[lang][key];
       }
     });
-
     try{
       localStorage.setItem("fagni_laundry_lang", lang);
     }catch(e){}
   }
-
   function speak(text){
     try{
       if(!('speechSynthesis' in window)) return;
@@ -529,42 +476,34 @@
     }catch(e){}
   }
   window.FAGNI_SPEAK = speak;
-
   function statusToBucket(el){
     var washReady = el.getAttribute("data-wash-ready") === "1";
     var st = (el.getAttribute("data-status") || "").toLowerCase();
-
     if(st === "done") return "done";
     if(washReady) return "ready";
     if(st.indexOf("progress") >= 0) return "doing";
     return "todo";
   }
-
   function getAllCards(){
     return Array.from(document.querySelectorAll("#orders-list > .laundry-order-card"));
   }
-
   function getVisibleCards(){
     return getAllCards().filter(function(card){
       return card.style.display !== "none";
     });
   }
-
   function resetVisibleLimit(){
     laundryVisibleLimit = LAUNDRY_PAGE_SIZE;
   }
-
   function updateLoadMoreButton(){
     var btn = document.getElementById("btn-load-more");
     if(!btn) return;
-
     var eligible = 0;
     getAllCards().forEach(function(card){
       if(card.dataset.baseHidden !== "1"){
         eligible += 1;
       }
     });
-
     if(eligible > laundryVisibleLimit){
       btn.style.display = "";
       btn.textContent = "➕ Voir plus (" + (eligible - laundryVisibleLimit) + ")";
@@ -572,7 +511,6 @@
       btn.style.display = "none";
     }
   }
-
   function applyVisibleLimit(){
     var shown = 0;
     getAllCards().forEach(function(card){
@@ -580,7 +518,6 @@
         card.style.display = "none";
         return;
       }
-
       if(shown < laundryVisibleLimit){
         card.style.display = "";
         shown += 1;
@@ -588,10 +525,8 @@
         card.style.display = "none";
       }
     });
-
     updateLoadMoreButton();
   }
-
   function bucketRank(bucket){
     if(bucket === "todo") return 0;
     if(bucket === "doing") return 1;
@@ -599,66 +534,51 @@
     if(bucket === "done") return 3;
     return 9;
   }
-
   function sortOrdersSmart(){
     var list = document.getElementById("orders-list");
     if(!list) return;
-
     var cards = Array.from(list.querySelectorAll(":scope > .laundry-order-card"));
     cards.sort(function(a, b){
       var aBucket = statusToBucket(a);
       var bBucket = statusToBucket(b);
       var aRank = bucketRank(aBucket);
       var bRank = bucketRank(bBucket);
-
       if(aRank !== bRank) return aRank - bRank;
-
       var aId = parseInt(a.getAttribute("data-order-id") || "0", 10);
       var bId = parseInt(b.getAttribute("data-order-id") || "0", 10);
       return bId - aId;
     });
-
     cards.forEach(function(card){
       list.appendChild(card);
     });
   }
-
   var assistantVoiceEnabled = false;
-
   var voiceRecognition = null;
   var voiceRecognitionRunning = false;
   var LAUNDRY_PAGE_SIZE = 8;
   var laundryVisibleLimit = 8;
-
   function focusFirstCard(){
     var cards = Array.from(document.querySelectorAll("#orders-list > .laundry-order-card"))
       .filter(function(card){ return card.style.display !== "none"; });
-
     if(!cards.length) return;
-
     var first = cards[0];
     highlightCard(first);
-
     try{
       first.scrollIntoView({behavior:"smooth", block:"center"});
     }catch(e){}
   }
-
   function setSummary(text){
     var box = document.getElementById("simple-summary");
     if(box) box.textContent = text;
   }
-
   function setVoiceCommandFeedback(text){
     var box = document.getElementById("voice-command-feedback");
     if(box) box.textContent = text;
   }
-
   function assistantSpeak(text){
     if(!assistantVoiceEnabled) return;
     speak(text);
   }
-
   function normalizeVoiceText(value){
     return String(value || "")
       .toLowerCase()
@@ -666,7 +586,6 @@
       .replace(/[\u0300-\u036f]/g, "")
       .trim();
   }
-
   function openFirstVisibleCard(){
     var cards = getVisibleCards();
     if(!cards.length){
@@ -679,10 +598,8 @@
       window.location.href = url;
     }
   }
-
   function runVoiceListCommand(rawText){
     var t = normalizeVoiceText(rawText);
-
     if(
       t.includes("ouvre la premiere") ||
       t.includes("ouvrir la premiere") ||
@@ -696,7 +613,6 @@
       openFirstVisibleCard();
       return true;
     }
-
     if(
       t.includes("commande suivante") ||
       t.includes("suivante") ||
@@ -707,7 +623,6 @@
       goNextVisibleCard();
       return true;
     }
-
     if(
       t.includes("a traiter") ||
       t.includes("traiter") ||
@@ -719,7 +634,6 @@
       setTimeout(function(){ focusFirstVisibleCardAfterCommand(); }, 250);
       return true;
     }
-
     if(
       t.includes("en cours") ||
       t.includes("cours") ||
@@ -730,7 +644,6 @@
       setTimeout(function(){ focusFirstVisibleCardAfterCommand(); }, 250);
       return true;
     }
-
     if(
       t.includes("prete") ||
       t.includes("pretes") ||
@@ -742,7 +655,6 @@
       setTimeout(function(){ focusFirstVisibleCardAfterCommand(); }, 250);
       return true;
     }
-
     if(
       t.includes("tout afficher") ||
       t.includes("tout") ||
@@ -755,12 +667,10 @@
       setTimeout(function(){ focusFirstVisibleCardAfterCommand(); }, 250);
       return true;
     }
-
     setVoiceCommandFeedback("❌ Commande non reconnue.");
     speak(getLang() === "dioula" ? "N ma kuma famu." : "Commande non reconnue.");
     return false;
   }
-
   function focusFirstVisibleCardAfterCommand(){
     var cards = getVisibleCards();
     if(!cards.length) return;
@@ -769,7 +679,6 @@
       cards[0].scrollIntoView({behavior:"smooth", block:"center"});
     }catch(e){}
   }
-
   function announceCurrentGroup(filter, count){
     if(filter === "todo"){
       assistantSpeak("Vous avez " + count + " commande à traiter.");
@@ -781,22 +690,18 @@
       assistantSpeak("Toutes les commandes sont affichées.");
     }
   }
-
   var currentFilter = "all";
   var voiceCursor = 0;
-
   function getVisibleCards(){
     return Array.from(document.querySelectorAll("#orders-list > .laundry-order-card")).filter(function(card){
       return card.style.display !== "none";
     });
   }
-
   function readCard(card){
     if(!card) return;
     var orderId = card.getAttribute("data-order-id") || "";
     var bucket = statusToBucket(card);
     var label = "commande " + orderId + ". ";
-
     if(getLang() === "dioula"){
       if(bucket === "todo") label += "Ka daminɛ. ";
       else if(bucket === "doing") label += "Bɛ baara la. ";
@@ -808,7 +713,6 @@
       else if(bucket === "ready") label += "Prête. ";
       else label += "Terminée. ";
     }
-
     var articlesText = "";
     var titleCandidates = card.querySelectorAll("div");
     titleCandidates.forEach(function(el){
@@ -817,21 +721,17 @@
         articlesText = t;
       }
     });
-
     if(articlesText){
       label += articlesText + ". ";
     }
-
     label += "Appuie sur ouvrir.";
     speak(label);
   }
-
   function highlightCard(card){
     document.querySelectorAll("#orders-list > .laundry-order-card > div").forEach(function(box){
       box.style.outline = "none"; box.classList.remove("kiosk-focus");
       box.style.transform = "";
     });
-
     if(card){
       var box = card.querySelector(":scope > div");
       if(box){
@@ -840,18 +740,15 @@
       }
     }
   }
-
   function goNextVisibleCard(){
     var cards = getVisibleCards();
     if(!cards.length){
       speak("Aucune commande affichée.");
       return;
     }
-
     if(voiceCursor >= cards.length){
       voiceCursor = 0;
     }
-
     var card = cards[voiceCursor];
     highlightCard(card);
     readCard(card);
@@ -860,24 +757,19 @@
     }catch(e){}
     voiceCursor += 1;
   }
-
   function applyFilter(filter){
     currentFilter = filter;
     voiceCursor = 0;
     resetVisibleLimit();
-
     var count = 0;
-
     document.querySelectorAll("#orders-list > .laundry-order-card").forEach(function(card){
       var bucket = statusToBucket(card);
       var show = (filter === "all") ? true : bucket === filter;
       card.dataset.baseHidden = show ? "0" : "1";
       if(show) count += 1;
     });
-
     applyVisibleLimit();
     highlightCard(null);
-
     if(filter === "todo"){
       if(getLang() === "dioula"){
         setSummary("📥 " + count + " commande ka daminɛ.");
@@ -911,10 +803,8 @@
         speak("Toutes les commandes sont affichées.");
       }
     }
-
     announceCurrentGroup(filter, count);
   }
-
   document.addEventListener("DOMContentLoaded", function(){
     var langSelect = document.getElementById("language-select");
     if(langSelect){
@@ -924,24 +814,20 @@
       refreshLanguageUI();
       langSelect.addEventListener("change", function(){
         refreshLanguageUI();
-
         var btnAssistant = document.getElementById("btn-voice-assistant");
         if(btnAssistant && !assistantVoiceEnabled){
           btnAssistant.textContent = getLang() === "dioula" ? "🗣️ Dɛmɛbaa" : "🗣️ Assistant";
         }
-
         var startBtn = document.getElementById("btn-voice-command-start");
         if(startBtn){
           startBtn.textContent = getLang() === "dioula" ? "🎤 Kuma fɔ" : "🎤 Commander";
         }
-
         var stopBtn = document.getElementById("btn-voice-command-stop");
         if(stopBtn){
           stopBtn.textContent = getLang() === "dioula" ? "⏹️ Micro da" : "⏹️ Stop micro";
         }
       });
     }
-
     var btnHelp = document.getElementById("btn-voice-help");
     if(btnHelp){
       btnHelp.addEventListener("click", function(){
@@ -952,14 +838,12 @@
         }
       });
     }
-
     document.querySelectorAll("[data-filter]").forEach(function(btn){
       btn.addEventListener("click", function(){
         applyFilter(btn.getAttribute("data-filter"));
         setTimeout(function(){ focusFirstCard(); }, 300);
       });
     });
-
     document.querySelectorAll("[data-filter-card]").forEach(function(btn){
       btn.addEventListener("click", function(){
         var filter = btn.getAttribute("data-filter-card");
@@ -967,7 +851,6 @@
         setTimeout(function(){ focusFirstCard(); }, 300);
       });
     });
-
     document.querySelectorAll("#orders-list > .laundry-order-card").forEach(function(card){
       card.addEventListener("click", function(e){
         var target = e.target;
@@ -980,14 +863,12 @@
         }
       });
     });
-
     var btnNext = document.getElementById("btn-voice-next");
     if(btnNext){
       btnNext.addEventListener("click", function(){
         goNextVisibleCard();
       });
     }
-
     var btnAssistant = document.getElementById("btn-voice-assistant");
     if(btnAssistant){
       btnAssistant.addEventListener("click", function(){
@@ -1003,17 +884,13 @@
         }
       });
     }
-
     function setKioskMode(enabled){
       var body = document.body;
       if(!body) return;
-
       body.classList.toggle("kiosk-mode", enabled);
-
       try{
         localStorage.setItem("fagni_laundry_kiosk_mode", enabled ? "1" : "0");
       }catch(e){}
-
       if(enabled){
         setSummary(getLang() === "dioula"
           ? "🖥️ Kioski mode dali. Fini ka groupe sugu ani i ka commande yelema."
@@ -1025,57 +902,47 @@
         speak(getLang() === "dioula" ? "Kioski mode datuguni." : "Mode kiosque désactivé.");
       }
     }
-
     var btnKiosk = document.getElementById("btn-kiosk-mode");
     if(btnKiosk){
       btnKiosk.addEventListener("click", function(){
         setKioskMode(true);
       });
     }
-
     var btnExitKiosk = document.getElementById("btn-exit-kiosk");
     if(btnExitKiosk){
       btnExitKiosk.addEventListener("click", function(){
         setKioskMode(false);
       });
     }
-
     function setVisualMode(mode){
       var root = document.getElementById("laundry-app-root");
       var btnNormal = document.getElementById("btn-visual-normal");
       var btnMax = document.getElementById("btn-visual-max");
       if(!root) return;
-
       root.classList.toggle("visual-minimal", mode === "max");
-
       if(btnNormal) btnNormal.classList.toggle("active", mode !== "max");
       if(btnMax) btnMax.classList.toggle("active", mode === "max");
-
       try{
         localStorage.setItem("fagni_laundry_visual_mode", mode);
       }catch(e){}
     }
-
     var btnVisualNormal = document.getElementById("btn-visual-normal");
     if(btnVisualNormal){
       btnVisualNormal.addEventListener("click", function(){
         setVisualMode("normal");
       });
     }
-
     var btnVisualMax = document.getElementById("btn-visual-max");
     if(btnVisualMax){
       btnVisualMax.addEventListener("click", function(){
         setVisualMode("max");
       });
     }
-
     var savedVisual = "normal";
     try{
       savedVisual = localStorage.getItem("fagni_laundry_visual_mode") || "normal";
     }catch(e){}
     setVisualMode(savedVisual);
-
     var savedKiosk = "0";
     try{
       savedKiosk = localStorage.getItem("fagni_laundry_kiosk_mode") || "0";
@@ -1083,14 +950,11 @@
     if(savedKiosk === "1"){
       setKioskMode(true);
     }
-
-
     // ================================
     // FIX ROBUSTE BOUTON COMMANDER
     // ================================
     window.startVoiceListRecognition = function(){
       var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-
       if(!SR){
         setVoiceCommandFeedback("❌ Reconnaissance vocale non disponible sur cet appareil.");
         speak(getLang() === "dioula"
@@ -1098,23 +962,19 @@
           : "Reconnaissance vocale non disponible.");
         return;
       }
-
       try{
         if(voiceRecognition){
           try{ voiceRecognition.stop(); }catch(e){}
         }
-
         voiceRecognition = new SR();
         voiceRecognition.lang = "fr-FR";
         voiceRecognition.continuous = false;
         voiceRecognition.interimResults = false;
         voiceRecognition.maxAlternatives = 1;
-
         voiceRecognition.onstart = function(){
           voiceRecognitionRunning = true;
           setVoiceCommandFeedback("🎤 J’écoute... Dis : à traiter, en cours, prêtes, tout afficher, ouvre la première.");
         };
-
         voiceRecognition.onresult = function(event){
           var text = "";
           try{
@@ -1123,22 +983,18 @@
           setVoiceCommandFeedback("🎤 Entendu : " + text);
           runVoiceListCommand(text);
         };
-
         voiceRecognition.onerror = function(event){
           var err = (event && event.error) ? event.error : "inconnue";
           setVoiceCommandFeedback("❌ Erreur micro : " + err);
         };
-
         voiceRecognition.onend = function(){
           voiceRecognitionRunning = false;
         };
-
         voiceRecognition.start();
       }catch(e){
         setVoiceCommandFeedback("❌ Impossible de démarrer le micro.");
       }
     };
-
     window.stopVoiceListRecognition = function(){
       try{
         if(voiceRecognition){
@@ -1148,21 +1004,18 @@
       voiceRecognitionRunning = false;
       setVoiceCommandFeedback("⏹️ Micro arrêté.");
     };
-
     var btnVoiceCmdStart = document.getElementById("btn-voice-command-start");
     if(btnVoiceCmdStart){
       btnVoiceCmdStart.onclick = function(){
         window.startVoiceListRecognition();
       };
     }
-
     var btnVoiceCmdStop = document.getElementById("btn-voice-command-stop");
     if(btnVoiceCmdStop){
       btnVoiceCmdStop.onclick = function(){
         window.stopVoiceListRecognition();
       };
     }
-
     var btnLoadMore = document.getElementById("btn-load-more");
     if(btnLoadMore){
       btnLoadMore.addEventListener("click", function(){
@@ -1170,11 +1023,9 @@
         applyVisibleLimit();
       });
     }
-
     var supervisorMode = false;
     var btnSupervisorToggle = document.getElementById("btn-supervisor-toggle");
     var supervisorPanel = document.getElementById("supervisor-panel");
-
     if(btnSupervisorToggle && supervisorPanel){
       btnSupervisorToggle.addEventListener("click", function(){
         supervisorMode = !supervisorMode;
@@ -1182,7 +1033,6 @@
         setSummary(supervisorMode ? "🛠️ Mode superviseur activé." : "📋 Mode simple actif.");
       });
     }
-
     var btnSupervisorShowDone = document.getElementById("btn-supervisor-show-done");
     if(btnSupervisorShowDone){
       btnSupervisorShowDone.addEventListener("click", function(){
@@ -1196,7 +1046,6 @@
         setSummary("🏁 Affichage des commandes terminées.");
       });
     }
-
     var btnSupervisorShowAll = document.getElementById("btn-supervisor-show-all");
     if(btnSupervisorShowAll){
       btnSupervisorShowAll.addEventListener("click", function(){
@@ -1208,17 +1057,14 @@
         setSummary("📋 Toutes les commandes sont affichées.");
       });
     }
-
     var btnSupervisorReset = document.getElementById("btn-supervisor-reset");
     if(btnSupervisorReset){
       btnSupervisorReset.addEventListener("click", function(){
         supervisorMode = false;
         if(supervisorPanel) supervisorPanel.style.display = "none";
-
         var todo = {{ stats_todo|default:0 }};
         var doing = {{ stats_doing|default:0 }};
         var ready = {{ stats_ready|default:0 }};
-
         if(todo > 0){
           applyFilter("todo");
         } else if(doing > 0){
@@ -1237,25 +1083,18 @@
         }
       });
     }
-
     function focusFirstCard(){
       var cards = Array.from(document.querySelectorAll("#orders-list > .laundry-order-card"))
         .filter(function(c){ return c.style.display !== "none"; });
-
       if(!cards.length) return;
-
       var first = cards[0];
-
       try{
         first.scrollIntoView({behavior:"smooth", block:"center"});
       }catch(e){}
-
       highlightCard(first);
-
       setTimeout(function(){
         readCard(first);
       }, 400);
-
       if(cards.length === 1){
         setTimeout(function(){
           var url = first.getAttribute("data-open-url");
@@ -1266,17 +1105,13 @@
         }, 1200);
       }
     }
-
     var todo = {{ stats_todo|default:0 }};
     var doing = {{ stats_doing|default:0 }};
     var ready = {{ stats_ready|default:0 }};
-
     sortOrdersSmart();
-
     document.querySelectorAll("#orders-list > .laundry-order-card").forEach(function(card){
       card.dataset.baseHidden = "0";
     });
-
     if(todo > 0){
       applyFilter("todo");
     } else if(doing > 0){
@@ -1292,24 +1127,20 @@
         }
       });
       applyVisibleLimit();
-
       var visible = getVisibleCards().length;
       if(visible === 0){
         setSummary("🏁 Les commandes terminées sont masquées. Appuie sur “Tout afficher” pour les voir.");
       }
     }
-
     setTimeout(function(){
       focusFirstCard();
     }, 500);
   });
 })();
-
 // ==========================================
 // LOT 89 — IA VOCALE AVANCÉE (FINAL SAFE)
 // ==========================================
 (function(){
-
   function normalize(t){
     return String(t || "")
       .toLowerCase()
@@ -1317,16 +1148,13 @@
       .replace(/[\u0300-\u036f]/g, "")
       .trim();
   }
-
   function getCards(){
     return Array.from(document.querySelectorAll("#orders-list > .laundry-order-card"))
       .filter(function(c){ return c.style.display !== "none"; });
   }
-
   function openFirst(){
     var list = getCards();
     if(!list.length) return false;
-
     var url = list[0].getAttribute("data-open-url");
     if(url){
       speak("Ouverture de la première commande");
@@ -1335,67 +1163,52 @@
     }
     return false;
   }
-
   function nextCard(){
     var list = getCards();
     if(!list.length) return false;
-
     window.voiceCursor = (window.voiceCursor || 0) + 1;
     if(window.voiceCursor >= list.length){
       window.voiceCursor = 0;
     }
-
     var c = list[window.voiceCursor];
-
     try{ c.scrollIntoView({behavior:"smooth", block:"center"}); }catch(e){}
     if(typeof highlightCard === "function"){ highlightCard(c); }
-
     speak("Commande suivante");
     return true;
   }
-
   function applyVoice(text){
     var t = normalize(text);
-
     // Navigation
     if(t.includes("premiere") && t.includes("ouvre")){
       return openFirst();
     }
-
     if(t.includes("suivante") || t.includes("prochaine")){
       return nextCard();
     }
-
     // Filtres
     if(t.includes("traiter")){
       applyFilter("todo");
       speak("Filtre à traiter");
       return true;
     }
-
     if(t.includes("cours")){
       applyFilter("doing");
       speak("Filtre en cours");
       return true;
     }
-
     if(t.includes("pret")){
       applyFilter("ready");
       speak("Filtre prêt");
       return true;
     }
-
     if(t.includes("tout")){
       applyFilter("all");
       speak("Affichage complet");
       return true;
     }
-
     return false;
   }
-
   var old = window.runVoiceListCommand;
-
   window.runVoiceListCommand = function(text){
     if(applyVoice(text)){
       return true;
@@ -1405,21 +1218,16 @@
     }
     return false;
   };
-
 })();
-
-
 (function(){
   var oneButtonMode = false;
   var oneButtonIndex = 0;
-
   function oneButtonCards(){
     return Array.from(document.querySelectorAll("#orders-list > .laundry-order-card"))
       .filter(function(card){
         return card.style.display !== "none" || document.body.classList.contains("one-button-mode");
       });
   }
-
   function oneButtonLabelFor(card){
     if(!card) return "OUVRIR";
     var bucket = (typeof statusToBucket === "function") ? statusToBucket(card) : "todo";
@@ -1428,13 +1236,11 @@
     if(bucket === "ready") return "✅ PRÊTE";
     return "🏁 TERMINÉE";
   }
-
   function oneButtonClassFor(card){
     if(!card) return "todo";
     var bucket = (typeof statusToBucket === "function") ? statusToBucket(card) : "todo";
     return bucket;
   }
-
   function oneButtonRead(card){
     if(!card) return;
     if(typeof readCard === "function"){
@@ -1446,7 +1252,6 @@
       speak("Commande " + id);
     }
   }
-
   function oneButtonOpen(card){
     if(!card) return;
     var url = card.getAttribute("data-open-url");
@@ -1454,20 +1259,16 @@
       window.location.href = url;
     }
   }
-
   function refreshOneButtonStage(){
     var cards = oneButtonCards();
     var stage = document.getElementById("one-button-stage");
     var title = document.getElementById("one-button-title");
     var sub = document.getElementById("one-button-sub");
     var main = document.getElementById("one-button-main");
-
     if(!stage || !title || !sub || !main) return;
-
     document.querySelectorAll("#orders-list > .laundry-order-card").forEach(function(c){
       c.classList.remove("one-button-active");
     });
-
     if(!cards.length){
       stage.style.display = "";
       title.textContent = "Aucune commande";
@@ -1477,13 +1278,10 @@
       main.disabled = true;
       return;
     }
-
     if(oneButtonIndex < 0) oneButtonIndex = 0;
     if(oneButtonIndex >= cards.length) oneButtonIndex = 0;
-
     var card = cards[oneButtonIndex];
     card.classList.add("one-button-active");
-
     var orderId = card.getAttribute("data-order-id") || "";
     var articleText = "";
     card.querySelectorAll("div").forEach(function(el){
@@ -1492,27 +1290,22 @@
         articleText = t;
       }
     });
-
     title.textContent = "Commande #" + orderId;
     sub.textContent = articleText || "Commande à traiter";
     main.textContent = oneButtonLabelFor(card);
     main.className = "one-button-main " + oneButtonClassFor(card);
     main.disabled = false;
-
     if(typeof highlightCard === "function"){
       highlightCard(card);
     }
   }
-
   function setOneButtonMode(enabled){
     oneButtonMode = enabled;
     document.body.classList.toggle("one-button-mode", enabled);
-
     var stage = document.getElementById("one-button-stage");
     if(stage){
       stage.style.display = enabled ? "" : "none";
     }
-
     if(enabled){
       try{
         localStorage.setItem("fagni_one_button_mode", "1");
@@ -1535,7 +1328,6 @@
       }
     }
   }
-
   document.addEventListener("DOMContentLoaded", function(){
     var btnEnable = document.getElementById("btn-one-button-mode");
     var btnDisable = document.getElementById("btn-exit-one-button-mode");
@@ -1544,19 +1336,16 @@
     var btnOpen = document.getElementById("one-button-open");
     var btnSpeak = document.getElementById("one-button-speak");
     var btnMain = document.getElementById("one-button-main");
-
     if(btnEnable){
       btnEnable.addEventListener("click", function(){
         setOneButtonMode(true);
       });
     }
-
     if(btnDisable){
       btnDisable.addEventListener("click", function(){
         setOneButtonMode(false);
       });
     }
-
     if(btnPrev){
       btnPrev.addEventListener("click", function(){
         var cards = oneButtonCards();
@@ -1565,7 +1354,6 @@
         refreshOneButtonStage();
       });
     }
-
     if(btnNext){
       btnNext.addEventListener("click", function(){
         var cards = oneButtonCards();
@@ -1574,28 +1362,24 @@
         refreshOneButtonStage();
       });
     }
-
     if(btnOpen){
       btnOpen.addEventListener("click", function(){
         var cards = oneButtonCards();
         if(cards.length) oneButtonOpen(cards[oneButtonIndex]);
       });
     }
-
     if(btnSpeak){
       btnSpeak.addEventListener("click", function(){
         var cards = oneButtonCards();
         if(cards.length) oneButtonRead(cards[oneButtonIndex]);
       });
     }
-
     if(btnMain){
       btnMain.addEventListener("click", function(){
         var cards = oneButtonCards();
         if(cards.length) oneButtonOpen(cards[oneButtonIndex]);
       });
     }
-
     try{
       if(localStorage.getItem("fagni_one_button_mode") === "1"){
         setTimeout(function(){ setOneButtonMode(true); }, 300);
@@ -1603,8 +1387,6 @@
     }catch(e){}
   });
 })();
-
-
 (function(){
   function normalizeOneButtonVoice(t){
     return String(t || "")
@@ -1613,20 +1395,16 @@
       .replace(/[\u0300-\u036f]/g, "")
       .trim();
   }
-
   window.runOneButtonVoiceCommand = function(rawText){
     if(!document.body.classList.contains("one-button-mode")){
       return false;
     }
-
     var t = normalizeOneButtonVoice(rawText);
-
     var btnPrev = document.getElementById("one-button-prev");
     var btnNext = document.getElementById("one-button-next");
     var btnOpen = document.getElementById("one-button-open");
     var btnSpeak = document.getElementById("one-button-speak");
     var btnExit = document.getElementById("btn-exit-one-button-mode");
-
     if(
       t.includes("suivante") ||
       t.includes("prochaine") ||
@@ -1639,7 +1417,6 @@
       }
       return true;
     }
-
     if(
       t.includes("precedente") ||
       t.includes("precedent") ||
@@ -1652,7 +1429,6 @@
       }
       return true;
     }
-
     if(
       t.includes("ouvrir") ||
       t.includes("ouvre") ||
@@ -1665,7 +1441,6 @@
       }
       return true;
     }
-
     if(
       t.includes("lire") ||
       t.includes("ecouter") ||
@@ -1679,7 +1454,6 @@
       }
       return true;
     }
-
     if(
       t.includes("quitter") ||
       t.includes("sortir") ||
@@ -1693,10 +1467,8 @@
       }
       return true;
     }
-
     return false;
   };
-
   // Surcouche du moteur vocal existant
   var _oldRunVoiceListCommand = window.runVoiceListCommand;
   window.runVoiceListCommand = function(text){
@@ -1709,34 +1481,24 @@
     return false;
   };
 })();
-
-
 // ==========================================
 // LOT 92 — AUTO GUIDAGE VOCAL
 // ==========================================
 (function(){
-
   var oneButtonGuideTimer = null;
-
   function getActiveCard(){
     return document.querySelector(".laundry-order-card.one-button-active");
   }
-
   function speakGuide(){
     if(!document.body.classList.contains("one-button-mode")) return;
-
     var card = getActiveCard();
     if(!card) return;
-
     var id = card.getAttribute("data-order-id") || "";
-
     var bucket = "todo";
     if(typeof statusToBucket === "function"){
       bucket = statusToBucket(card);
     }
-
     var text = "";
-
     if(bucket === "todo"){
       text = "Commande " + id + ". Appuie pour démarrer.";
     } else if(bucket === "doing"){
@@ -1746,7 +1508,6 @@
     } else {
       text = "Commande " + id + ". Terminée.";
     }
-
     try{
       if(typeof window.getOneButtonSmartActionLabel === "function"){
         var nextAction = window.getOneButtonSmartActionLabel();
@@ -1755,25 +1516,20 @@
         }
       }
     }catch(e){}
-
     if(typeof speak === "function"){
       speak(text);
     }
   }
-
   function scheduleGuide(){
     clearTimeout(oneButtonGuideTimer);
     oneButtonGuideTimer = setTimeout(function(){
       speakGuide();
     }, 1200);
   }
-
   function installAutoGuide(){
     document.addEventListener("click", function(e){
       if(!document.body.classList.contains("one-button-mode")) return;
-
       var target = e.target;
-
       if(
         target.closest("#one-button-prev") ||
         target.closest("#one-button-next") ||
@@ -1783,22 +1539,18 @@
         scheduleGuide();
       }
     });
-
     // quand on change de carte automatiquement
     var observer = new MutationObserver(function(){
       if(!document.body.classList.contains("one-button-mode")) return;
       scheduleGuide();
     });
-
     observer.observe(document.body, {
       subtree: true,
       attributes: true,
       attributeFilter: ["class"]
     });
   }
-
   document.addEventListener("DOMContentLoaded", function(){
-
     // lancement initial
     setTimeout(function(){
       if(document.body.classList.contains("one-button-mode")){
@@ -1806,23 +1558,16 @@
         scheduleGuide();
       }
     }, 800);
-
     installAutoGuide();
-
   });
-
 })();
-
-
 // ==========================================
 // LOT 93 — AUTO ACTION INTELLIGENTE
 // ==========================================
 (function(){
-
   function oneButtonCurrentCard(){
     return document.querySelector(".laundry-order-card.one-button-active");
   }
-
   function oneButtonBucket(card){
     if(!card) return "todo";
     if(typeof statusToBucket === "function"){
@@ -1830,10 +1575,8 @@
     }
     return "todo";
   }
-
   function oneButtonSmartAction(card){
     var bucket = oneButtonBucket(card);
-
     if(bucket === "todo"){
       return {
         label: "🧺 DÉMARRER",
@@ -1842,7 +1585,6 @@
         help: "Appuie pour démarrer le traitement."
       };
     }
-
     if(bucket === "doing"){
       return {
         label: "✅ MARQUER PRÊT",
@@ -1851,7 +1593,6 @@
         help: "Appuie quand le linge est prêt."
       };
     }
-
     if(bucket === "ready"){
       return {
         label: "🏁 TERMINER",
@@ -1860,7 +1601,6 @@
         help: "Appuie pour finaliser la commande."
       };
     }
-
     return {
       label: "📄 OUVRIR",
       action: "open",
@@ -1868,15 +1608,12 @@
       help: "Commande terminée. Tu peux ouvrir le détail."
     };
   }
-
   function oneButtonFindActionButton(card, action){
     if(!card) return null;
-
     var buttons = Array.from(card.querySelectorAll("button, a"));
     for(var i = 0; i < buttons.length; i++){
       var el = buttons[i];
       var txt = String(el.textContent || "").toLowerCase();
-
       if(action === "open" && txt.indexOf("ouvrir") >= 0) return el;
       if(action === "start" && (txt.indexOf("en cours") >= 0 || txt.indexOf("demarrer") >= 0 || txt.indexOf("démarrer") >= 0)) return el;
       if(action === "ready" && txt.indexOf("prêt") >= 0) return el;
@@ -1884,45 +1621,34 @@
     }
     return null;
   }
-
   function refreshOneButtonSmartAction(){
     if(!document.body.classList.contains("one-button-mode")) return;
-
     var card = oneButtonCurrentCard();
     var btn = document.getElementById("one-button-main");
     var sub = document.getElementById("one-button-sub");
-
     if(!btn || !card) return;
-
     var info = oneButtonSmartAction(card);
-
     btn.textContent = info.label;
     btn.className = "one-button-main " + info.css;
     btn.setAttribute("data-smart-action", info.action);
-
     if(sub){
       var base = String(sub.textContent || "").trim();
       var parts = base.split(" • ");
       sub.textContent = parts[0] + " • " + info.help;
     }
   }
-
   function triggerOneButtonSmartAction(){
     var card = oneButtonCurrentCard();
     var btn = document.getElementById("one-button-main");
     if(!card || !btn) return false;
-
     var action = btn.getAttribute("data-smart-action") || "open";
     var target = oneButtonFindActionButton(card, action);
-
     if(target){
       target.click();
       return true;
     }
-
     return false;
   }
-
   document.addEventListener("DOMContentLoaded", function(){
     var oldRefresh = window.refreshOneButtonStage;
     if(typeof oldRefresh === "function" && !window._lot93WrappedRefresh){
@@ -1934,7 +1660,6 @@
       };
       window._lot93WrappedRefresh = true;
     }
-
     var btnMain = document.getElementById("one-button-main");
     if(btnMain && !btnMain.dataset.lot93Bound){
       btnMain.addEventListener("click", function(e){
@@ -1945,47 +1670,37 @@
       });
       btnMain.dataset.lot93Bound = "1";
     }
-
     setTimeout(function(){
       refreshOneButtonSmartAction();
     }, 600);
   });
-
   // expose pour le guidage vocal
   window.getOneButtonSmartActionLabel = function(){
     var card = oneButtonCurrentCard();
     return oneButtonSmartAction(card).label;
   };
-
 })();
-
-
 // ==========================================
 // LOT 94 — MODE AUTO ASSISTÉ
 // ==========================================
 (function(){
-
   var autoAssistEnabled = true;
   var autoAssistTimer = null;
   var AUTO_DELAY = 3000; // 3 secondes
-
   function getActiveCard(){
     return document.querySelector(".laundry-order-card.one-button-active");
   }
-
   function getSmartAction(){
     if(typeof window.getOneButtonSmartActionLabel !== "function") return null;
     var btn = document.getElementById("one-button-main");
     if(!btn) return null;
     return btn.getAttribute("data-smart-action");
   }
-
   function speakAuto(text){
     if(typeof speak === "function"){
       speak(text);
     }
   }
-
   function triggerAutoAction(){
     var btn = document.getElementById("one-button-main");
     if(btn){
@@ -1993,18 +1708,13 @@
       btn.click();
     }
   }
-
   function startAutoAssist(){
     clearTimeout(autoAssistTimer);
-
     if(!autoAssistEnabled) return;
     if(!document.body.classList.contains("one-button-mode")) return;
-
     var action = getSmartAction();
     if(!action) return;
-
     var message = "";
-
     if(action === "start"){
       message = "Je démarre la commande dans 3 secondes.";
     } else if(action === "ready"){
@@ -2014,9 +1724,7 @@
     } else {
       return;
     }
-
     speakAuto(message);
-
     autoAssistTimer = setTimeout(function(){
       if(window.fagniLog){ fagniLog('Action automatique exécutée', 'auto'); }
       triggerAutoAction();
@@ -2025,41 +1733,33 @@
       }, 800);
     }, AUTO_DELAY);
   }
-
   function goNextAfterAuto(){
     if(typeof window.runOneButtonVoiceCommand === "function"){
       window.runOneButtonVoiceCommand("suivante");
     }
   }
-
   function cancelAutoAssist(){
     clearTimeout(autoAssistTimer);
   }
-
   // écoute interaction utilisateur
   document.addEventListener("click", function(){
     cancelAutoAssist();
   });
-
   document.addEventListener("keydown", function(){
     cancelAutoAssist();
   });
-
   // déclenchement automatique après changement de carte
   var observer = new MutationObserver(function(){
     if(!document.body.classList.contains("one-button-mode")) return;
-
     setTimeout(function(){
       startAutoAssist();
     }, 600);
   });
-
   observer.observe(document.body, {
     subtree: true,
     attributes: true,
     attributeFilter: ["class"]
   });
-
   document.addEventListener("DOMContentLoaded", function(){
     setTimeout(function(){
       if(document.body.classList.contains("one-button-mode")){
@@ -2067,50 +1767,35 @@
       }
     }, 1200);
   });
-
 })();
-
-
 // ==========================================
 // LOT 95 — SÉCURITÉ + CONTRÔLE HUMAIN
-
 // ==========================================
 // LOT 96 — JOURNAL VISUEL DES ACTIONS
 // ==========================================
 (function(){
-
   var MAX_LOGS = 12;
-
   function getLogList(){
     return document.getElementById("auto-log-list");
   }
-
   function logAction(text, type){
     var list = getLogList();
     if(!list) return;
-
     var item = document.createElement("div");
-
     var color = "#94a3b8";
     if(type === "auto") color = "#22c55e";
     if(type === "manual") color = "#38bdf8";
     if(type === "error") color = "#ef4444";
-
     var time = new Date().toLocaleTimeString();
-
     item.innerHTML = "<span style='color:"+color+"'>●</span> ["+time+"] " + text;
-
     list.prepend(item);
-
     while(list.children.length > MAX_LOGS){
       list.removeChild(list.lastChild);
     }
-
     try{
       localStorage.setItem("fagni_auto_logs", list.innerHTML);
     }catch(e){}
   }
-
   function restoreLogs(){
     try{
       var saved = localStorage.getItem("fagni_auto_logs");
@@ -2122,26 +1807,20 @@
       }
     }catch(e){}
   }
-
   // expose global
   window.fagniLog = logAction;
-
   document.addEventListener("DOMContentLoaded", function(){
     restoreLogs();
     logAction("Système prêt", "manual");
   });
-
 })();
-
 // ==========================================
 (function(){
   if (window.__lot95_installed) return;
   window.__lot95_installed = true;
-
   function getAutoStatusBox(){
     return document.getElementById("auto-assist-status");
   }
-
   function setAutoAssistUI(enabled, pendingText){
     var box = getAutoStatusBox();
     var btn = document.getElementById("btn-auto-assist-toggle");
@@ -2165,7 +1844,6 @@
       localStorage.setItem("fagni_auto_assist_enabled", enabled ? "1" : "0");
     }catch(e){}
   }
-
   function restoreAutoAssistPreference(){
     try{
       var v = localStorage.getItem("fagni_auto_assist_enabled");
@@ -2178,7 +1856,6 @@
     if(window.fagniLog){ fagniLog('Auto annulée', 'manual'); }
     setAutoAssistUI(!!window.autoAssistEnabled);
   }
-
   function cancelAutoAssistSafe(reason){
     try{
       if (typeof window.cancelAutoAssist === "function"){
@@ -2192,10 +1869,8 @@
     setAutoAssistUI(!!window.autoAssistEnabled);
     }
   }
-
   document.addEventListener("DOMContentLoaded", function(){
     restoreAutoAssistPreference();
-
     var toggleBtn = document.getElementById("btn-auto-assist-toggle");
     if(toggleBtn){
       toggleBtn.addEventListener("click", function(){
@@ -2212,7 +1887,6 @@
         }
       });
     }
-
     var cancelBtn = document.getElementById("btn-auto-assist-cancel");
     if(cancelBtn){
       cancelBtn.addEventListener("click", function(){
@@ -2225,7 +1899,6 @@
       });
     }
   });
-
   // Expose helpers pour LOT 94
   var _oldStart = window.startAutoAssist;
   if(typeof _oldStart === "function"){
@@ -2234,20 +1907,16 @@
         setAutoAssistUI(false);
         return;
       }
-
       var btn = document.getElementById("one-button-main");
       var action = btn ? (btn.getAttribute("data-smart-action") || "") : "";
       var text = "🤖 Auto-assist actif";
-
       if(action === "start") text = "⏳ Démarrage auto dans 3 sec";
       else if(action === "ready") text = "⏳ Marquage prêt dans 3 sec";
       else if(action === "done") text = "⏳ Fin auto dans 3 sec";
-
       setAutoAssistUI(true, text);
       return _oldStart.apply(this, arguments);
     };
   }
-
   var _oldCancel = window.cancelAutoAssist;
   window.cancelAutoAssist = function(){
     if(typeof _oldCancel === "function"){
@@ -2257,6 +1926,5 @@
     setAutoAssistUI(!!window.autoAssistEnabled);
   };
 })();
-
 </script>
 {% endblock %}

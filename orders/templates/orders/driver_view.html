@@ -1,26 +1,20 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block title %}Course {{ order.code }} – Livreur{% endblock %}
-
 {% block content %}
 <div class="page">
-
     <h2>📦 Course – Commande {{ order.code }}</h2>
-
     <!-- Infos client -->
     <section class="card">
         <h3>👤 Client</h3>
         <p><strong>{{ order.customer.name }}</strong></p>
         <p>{{ order.customer.phone }}</p>
         <p>{{ order.customer.address }}</p>
-
         {% if order.customer.latitude and order.customer.longitude %}
             <a class="btn" href="https://www.google.com/maps?q={{ order.customer.latitude }},{{ order.customer.longitude }}"
                target="_blank">📍 Ouvrir dans Google Maps</a>
         {% endif %}
     </section>
-
     <!-- Articles -->
     <section class="card">
         <h3>🧺 Articles à récupérer</h3>
@@ -32,14 +26,11 @@
                 </li>
             {% endfor %}
         </ul>
-
         <p><strong>Total :</strong> {{ order.grand_total }} FCFA</p>
     </section>
-
     <!-- Photos globales -->
     <section class="card">
         <h3>📸 Photos liées à la commande</h3>
-
         {% with photos=order.items.all|map:"photos" %}
             {% if photos %}
                 <div style="display:flex;flex-wrap:wrap;gap:8px;">
@@ -57,25 +48,20 @@
             {% endif %}
         {% endwith %}
     </section>
-
     <!-- Actions -->
     <section class="card">
         <h3>⚙️ Actions livreur</h3>
-
         <div style="display:flex;flex-direction:column;gap:8px;">
             <a class="btn btn-primary" href="{% url 'orders:driver_mark_collected' order.id %}">
                 ✔️ Confirmer la collecte
             </a>
-
             <a class="btn btn-light" href="{% url 'orders:driver_report_issue' order.id %}">
                 ⚠️ Déclarer un problème
             </a>
-
             <a class="btn btn-light" href="{% url 'orders:driver_mark_delivered' order.id %}">
                 📦 Livraison effectuée
             </a>
         </div>
     </section>
-
 </div>
 {% endblock %}

@@ -1,19 +1,15 @@
 {% extends "base.html" %}
 {% load static %}
 {% load money_filters %}
-
 {% block title %}Commandes{% endblock %}
-
 {% block content %}
 <div class="container">
-
     <div class="page-header">
         <div class="page-header__left">
             <h1 class="page-title">Commandes</h1>
             <p class="page-subtitle">Liste des commandes.</p>
         </div>
     </div>
-
     <div class="card">
         <table class="command-items">
             <thead>
@@ -43,13 +39,11 @@
                             <span class="status-badge status-badge--{{ order.status }}">
                                 {{ order.get_status_display }}
                             </span>
-
                             {% if order.payment_status %}
                                 <div style="margin-top:6px;">
                                     <span class="field-value-muted">💳 {{ order.get_payment_status_display|default:order.payment_status }}</span>
                                 </div>
                             {% endif %}
-
                             {% if order.payment_status == "paid" %}
                                 <div style="margin-top:6px;">
                                     <span class="field-value-muted">🧾 Facture : {{ order.invoice_number|default:"—" }}</span>
@@ -64,7 +58,6 @@
                                 <a href="{% url 'orders:detail' order.id %}" class="btn btn-light">
                                     Détail
                                 </a>
-
                                 {% if order.payment_status != "paid" %}
                                     <a href="{% url 'orders:update' order.id %}" class="btn btn-light">
                                         Modifier
@@ -74,15 +67,12 @@
                                         🔒 Verrouillée
                                     </span>
                                 {% endif %}
-
                                 <a href="{% url 'orders:order_ticket_pdf' order.id %}" target="_blank" class="btn btn-light">
                                     🧾 Ticket client (A4)
                                 </a>
-
                                 <a href="{% url 'orders:order_ticket_thermal_pdf' order.id %}" target="_blank" class="btn btn-light">
                                     🧾 Ticket thermique (80mm)
                                 </a>
-
                                 {% if order.payment_status == "paid" %}
                                     <a href="{% url 'orders:order_invoice_pdf' order.id %}" target="_blank" class="btn btn-light">
                                         ✅ Facture fiscale (A4)
@@ -103,17 +93,14 @@
                 {% endfor %}
             </tbody>
         </table>
-
         {% if page_obj %}
             <div class="pagination">
                 {% if page_obj.has_previous %}
                     <a class="page-link" href="?page={{ page_obj.previous_page_number }}&status={{ current_status }}&q={{ q }}&date_from={{ date_from }}&date_to={{ date_to }}">Précédent</a>
                 {% endif %}
-
                 <span class="page-current">
                     Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
                 </span>
-
                 {% if page_obj.has_next %}
                     <a class="page-link" href="?page={{ page_obj.next_page_number }}&status={{ current_status }}&q={{ q }}&date_from={{ date_from }}&date_to={{ date_to }}">Suivant</a>
                 {% endif %}

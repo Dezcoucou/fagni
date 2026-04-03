@@ -1,8 +1,6 @@
 {% extends "base.html" %}
-
 {% block content %}
 <div class="portal-page">
-
     <!-- HEADER PORTAL -->
     <div class="page-header">
         <div class="page-header__left">
@@ -22,7 +20,6 @@
             </div>
         </div>
     </div>
-
     <!-- BANNIÈRE OVERVIEW -->
     <section class="card portal-hero">
         <div class="portal-hero-main">
@@ -39,7 +36,6 @@
             <span class="portal-tag">Clients</span>
         </div>
     </section>
-
     <!-- KPI GRID SIMPLIFIÉE -->
     <section class="portal-kpi-grid">
         <article class="kpi-card kpi-card--primary">
@@ -51,7 +47,6 @@
                 Toutes périodes confondues (placeholder – à alimenter plus tard).
             </div>
         </article>
-
         <article class="kpi-card kpi-card--orange">
             <div class="kpi-card__label">CA cumulé</div>
             <div class="kpi-card__value">
@@ -62,7 +57,6 @@
                 Chiffre d’affaires global estimé.
             </div>
         </article>
-
         <article class="kpi-card kpi-card--blue">
             <div class="kpi-card__label">Livreurs actifs</div>
             <div class="kpi-card__value">
@@ -72,7 +66,6 @@
                 Comptes livreurs avec au moins une course.
             </div>
         </article>
-
         <article class="kpi-card kpi-card--green">
             <div class="kpi-card__label">Clients servis</div>
             <div class="kpi-card__value">
@@ -83,10 +76,8 @@
             </div>
         </article>
     </section>
-
     <!-- RACCOURCIS PORTAL EN CARTES -->
     <section class="portal-sections-grid">
-
         <!-- Colonne 1 : Commandes & OPS -->
         <article class="card portal-section">
             <header class="portal-section-header">
@@ -119,7 +110,6 @@
                 </a>
             </div>
         </article>
-
         <!-- Colonne 2 : Finance & Performance -->
         <article class="card portal-section">
             <header class="portal-section-header">
@@ -152,7 +142,6 @@
                 </a>
             </div>
         </article>
-
         <!-- Colonne 3 : Livreurs & Clients -->
         <article class="card portal-section">
             <header class="portal-section-header">
@@ -186,16 +175,13 @@
             </div>
         </article>
     </section>
-
 </div>
-
 <style>
 .portal-page {
     max-width: 1100px;
     margin: 0 auto;
     padding: 8px 12px 32px;
 }
-
 /* Pill user */
 .portal-user-pill {
     background: #0f172a;
@@ -214,7 +200,6 @@
     font-size: 11px;
     color: #9ca3af;
 }
-
 /* Hero */
 .portal-hero {
     display: flex;
@@ -250,7 +235,6 @@
     border: 1px solid rgba(248,250,252,0.28);
     background: rgba(15,23,42,0.35);
 }
-
 /* KPI GRID */
 .portal-kpi-grid {
     margin-top: 12px;
@@ -258,7 +242,6 @@
     grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
     gap: 10px;
 }
-
 /* Sections grid */
 .portal-sections-grid {
     margin-top: 14px;
@@ -266,7 +249,6 @@
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 12px;
 }
-
 .portal-section-header {
     margin-bottom: 8px;
 }
@@ -281,14 +263,12 @@
     color: #6b7280;
     margin: 0;
 }
-
 /* Links list */
 .portal-links-list {
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
-
 .portal-link-row {
     display: flex;
     justify-content: space-between;
@@ -326,7 +306,6 @@
     opacity: 0.7;
     white-space: nowrap;
 }
-
 /* Responsive */
 @media (max-width: 768px) {
     .portal-hero {

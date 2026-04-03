@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% load money_filters %}
-
 {% block title %}Mes missions – Historique{% endblock %}
-
 {% block page_css %}
 <style>
   body{
@@ -11,33 +9,28 @@
       radial-gradient(circle at top left, rgba(249,115,22,.06), transparent 24%),
       #f8fafc;
   }
-
   .missions-page{
     max-width:1180px;
     margin:0 auto;
     padding:10px 6px 24px;
   }
-
   .hero{
     display:grid;
     grid-template-columns:minmax(0,1.35fr) minmax(280px,.9fr);
     gap:14px;
     margin-bottom:16px;
   }
-
   .hero-main,
   .hero-side{
     border-radius:24px;
     padding:20px 18px;
     box-shadow:0 14px 30px rgba(15,23,42,.10);
   }
-
   .hero-main{
     background:linear-gradient(135deg,#0f172a 0%, #172554 48%, #1d4ed8 100%);
     color:#fff;
     border:1px solid rgba(255,255,255,.08);
   }
-
   .hero-side{
     background:linear-gradient(180deg,#ffffff 0%, #fbfcfe 100%);
     border:1px solid #e8eef5;
@@ -46,7 +39,6 @@
     justify-content:space-between;
     gap:12px;
   }
-
   .hero-eyebrow{
     font-size:11px;
     font-weight:900;
@@ -55,7 +47,6 @@
     color:rgba(255,255,255,.72);
     margin-bottom:8px;
   }
-
   .hero-title{
     margin:0;
     font-size:28px;
@@ -63,7 +54,6 @@
     font-weight:900;
     color:#fff;
   }
-
   .hero-subtitle{
     margin:10px 0 0;
     font-size:14px;
@@ -71,14 +61,12 @@
     color:rgba(255,255,255,.84);
     max-width:700px;
   }
-
   .hero-badges{
     display:flex;
     flex-wrap:wrap;
     gap:10px;
     margin-top:16px;
   }
-
   .hero-badge{
     display:inline-flex;
     align-items:center;
@@ -91,7 +79,6 @@
     background:rgba(255,255,255,.10);
     color:#fff;
   }
-
   .hero-dot{
     width:8px;
     height:8px;
@@ -100,7 +87,6 @@
     display:inline-block;
     box-shadow:0 0 0 4px rgba(34,197,94,.18);
   }
-
   .hero-side-title{
     font-size:12px;
     font-weight:900;
@@ -108,20 +94,17 @@
     letter-spacing:.07em;
     color:#64748b;
   }
-
   .hero-side-driver{
     font-size:22px;
     line-height:1.15;
     font-weight:900;
     color:#0f172a;
   }
-
   .hero-actions{
     display:flex;
     flex-wrap:wrap;
     gap:10px;
   }
-
   .btn-ui{
     display:inline-flex;
     align-items:center;
@@ -135,18 +118,15 @@
     border:1px solid transparent;
     box-shadow:0 4px 12px rgba(15,23,42,.06);
   }
-
   .btn-ui-light{
     background:#fff;
     border-color:#e5e7eb;
     color:#334155;
   }
-
   .btn-ui-primary{
     background:linear-gradient(90deg,#f97316,#2563eb);
     color:#fff;
   }
-
   .panel{
     background:linear-gradient(180deg,#ffffff 0%, #fbfcfe 100%);
     border:1px solid #e8eef5;
@@ -155,26 +135,22 @@
     box-shadow:0 10px 24px rgba(15,23,42,.05);
     margin-bottom:14px;
   }
-
   .filters-grid{
     display:grid;
     grid-template-columns:repeat(12,minmax(0,1fr));
     gap:10px;
     align-items:end;
   }
-
   .field{
     display:flex;
     flex-direction:column;
     gap:6px;
   }
-
   .field label{
     font-size:11px;
     color:#64748b;
     font-weight:900;
   }
-
   .field input,
   .field select{
     width:100%;
@@ -185,21 +161,18 @@
     font-size:13px;
     color:#111827;
   }
-
   .filters-actions{
     display:flex;
     gap:8px;
     flex-wrap:wrap;
     justify-content:flex-end;
   }
-
   .kpi-grid{
     display:grid;
     grid-template-columns:repeat(5,minmax(0,1fr));
     gap:10px;
     margin-bottom:14px;
   }
-
   .kpi{
     background:linear-gradient(180deg,#ffffff 0%, #fbfcfe 100%);
     border:1px solid #e8eef5;
@@ -207,7 +180,6 @@
     padding:12px 14px;
     box-shadow:0 8px 20px rgba(15,23,42,.05);
   }
-
   .kpi-label{
     font-size:11px;
     color:#64748b;
@@ -215,17 +187,14 @@
     text-transform:uppercase;
     letter-spacing:.06em;
   }
-
   .kpi-value{
     margin-top:6px;
     font-size:18px;
     font-weight:950;
     color:#111827;
   }
-
   .kpi-value.green{ color:#166534; }
   .kpi-value.orange{ color:#9a3412; }
-
   .mission-card{
     background:#fff;
     border:1px solid #e5e7eb;
@@ -234,7 +203,6 @@
     margin-bottom:10px;
     box-shadow:0 6px 16px rgba(15,23,42,.04);
   }
-
   .mission-head{
     display:flex;
     justify-content:space-between;
@@ -242,26 +210,22 @@
     gap:10px;
     flex-wrap:wrap;
   }
-
   .mission-code{
     font-weight:900;
     font-size:13px;
     color:#111827;
   }
-
   .mission-date{
     font-size:11px;
     color:#94a3b8;
     margin-top:2px;
   }
-
   .mission-head-right{
     display:flex;
     gap:8px;
     align-items:center;
     flex-wrap:wrap;
   }
-
   .pill{
     display:inline-flex;
     align-items:center;
@@ -274,60 +238,50 @@
     border:1px solid transparent;
     white-space:nowrap;
   }
-
   .pill.pending{
     background:#fffbeb;
     color:#92400e;
     border-color:#fde68a;
   }
-
   .pill.progress{
     background:#dbeafe;
     color:#1d4ed8;
     border-color:#bfdbfe;
   }
-
   .pill.done{
     background:#ecfdf3;
     color:#166534;
     border-color:#bbf7d0;
   }
-
   .pill.default{
     background:#f3f4f6;
     color:#374151;
     border-color:#e5e7eb;
   }
-
   .mission-stats{
     margin-top:10px;
     display:grid;
     grid-template-columns:repeat(4,minmax(0,1fr));
     gap:10px;
   }
-
   .stat-box{
     border:1px solid #eef2f7;
     border-radius:14px;
     padding:10px 12px;
     background:#fff;
   }
-
   .stat-label{
     font-size:11px;
     color:#64748b;
   }
-
   .stat-value{
     margin-top:4px;
     font-weight:950;
     color:#111827;
     font-size:15px;
   }
-
   .stat-value.green{ color:#166534; }
   .stat-value.orange{ color:#9a3412; }
-
   .legs-title{
     margin-top:10px;
     margin-bottom:6px;
@@ -335,39 +289,33 @@
     font-weight:900;
     color:#111827;
   }
-
   .legs-list{
     display:flex;
     flex-direction:column;
     gap:6px;
   }
-
   .leg-card{
     border:1px solid #eef2f7;
     border-radius:12px;
     padding:8px 10px;
     background:#fff;
   }
-
   .leg-head{
     display:flex;
     justify-content:space-between;
     gap:10px;
     flex-wrap:wrap;
   }
-
   .leg-title{
     font-weight:900;
     font-size:12px;
     color:#111827;
   }
-
   .leg-meta{
     font-size:11px;
     color:#64748b;
     margin-top:2px;
   }
-
   .empty-state{
     border:1px dashed #e5e7eb;
     border-radius:16px;
@@ -375,7 +323,6 @@
     color:#94a3b8;
     background:#fff;
   }
-
   .pagination-wrap{
     display:flex;
     justify-content:center;
@@ -383,7 +330,6 @@
     margin-top:14px;
     flex-wrap:wrap;
   }
-
   .page-chip{
     padding:8px 12px;
     border:1px solid #e5e7eb;
@@ -392,51 +338,41 @@
     font-weight:900;
     font-size:12px;
   }
-
   @media (max-width:1100px){
     .hero{
       grid-template-columns:1fr;
     }
-
     .kpi-grid{
       grid-template-columns:repeat(2,minmax(0,1fr));
     }
-
     .mission-stats{
       grid-template-columns:repeat(2,minmax(0,1fr));
     }
   }
-
   @media (max-width:760px){
     .filters-grid{
       grid-template-columns:1fr;
     }
-
     .kpi-grid,
     .mission-stats{
       grid-template-columns:1fr;
     }
-
     .filters-actions,
     .hero-actions{
       justify-content:stretch;
     }
-
     .filters-actions .btn-ui,
     .hero-actions .btn-ui{
       flex:1 1 160px;
     }
-
     .hero-title{
       font-size:24px;
     }
   }
 </style>
 {% endblock %}
-
 {% block content %}
 <div class="missions-page">
-
   <section class="hero">
     <div class="hero-main">
       <div class="hero-eyebrow">FAGNI • Historique livreur</div>
@@ -444,7 +380,6 @@
       <p class="hero-subtitle">
         Historique lecture seule de tes missions, avec potentiel, payé, reste à gagner et détail des tronçons.
       </p>
-
       <div class="hero-badges">
         <span class="hero-badge">
           <span class="hero-dot"></span>
@@ -455,7 +390,6 @@
         {% endif %}
       </div>
     </div>
-
     <div class="hero-side">
       <div>
         <div class="hero-side-title">Livreur actif</div>
@@ -463,25 +397,21 @@
           {% if driver %}{{ driver.name|default:"Livreur" }}{% else %}Profil non défini{% endif %}
         </div>
       </div>
-
       <div class="hero-actions">
         <a class="btn-ui btn-ui-light" href="{% url 'orders:driver_app' %}{% if selected_driver_id %}?driver_id={{ selected_driver_id }}{% endif %}">
           ← Retour App livreur
         </a>
-
         <a class="btn-ui btn-ui-light" href="{% url 'wallets:driver_wallet_dashboard' %}{% if selected_driver_id %}?driver_id={{ selected_driver_id }}{% endif %}">
           💼 Wallet
         </a>
       </div>
     </div>
   </section>
-
   <div class="panel">
     <form method="get" class="filters-grid">
       {% if selected_driver_id %}
         <input type="hidden" name="driver_id" value="{{ selected_driver_id }}">
       {% endif %}
-
       <div class="field" style="grid-column:span 3;">
         <label>Statut</label>
         <select name="status">
@@ -492,7 +422,6 @@
           <option value="canceled" {% if status_filter == "canceled" %}selected{% endif %}>Annulées</option>
         </select>
       </div>
-
       <div class="field" style="grid-column:span 5;">
         <label>Recherche</label>
         <input
@@ -502,17 +431,14 @@
           placeholder="Code, nom, téléphone, adresse…"
         >
       </div>
-
       <div class="field" style="grid-column:span 2;">
         <label>Du</label>
         <input type="date" name="from" value="{{ date_from|default:'' }}">
       </div>
-
       <div class="field" style="grid-column:span 2;">
         <label>Au</label>
         <input type="date" name="to" value="{{ date_to|default:'' }}">
       </div>
-
       <div class="field" style="grid-column:span 4;">
         <label>Tri</label>
         <select name="sort">
@@ -522,22 +448,18 @@
           <option value="paid_desc" {% if sort == "paid_desc" %}selected{% endif %}>Payé ↓</option>
         </select>
       </div>
-
       <div style="grid-column:span 4;display:flex;align-items:center;gap:10px;padding:10px 0;">
         <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:900;color:#111827;">
           <input type="checkbox" name="min_remaining" value="1" {% if min_remaining %}checked{% endif %}>
           Reste &gt; 0 uniquement
         </label>
       </div>
-
       <div class="filters-actions" style="grid-column:span 4;">
         <button class="btn-ui btn-ui-primary" type="submit">Filtrer</button>
-
         <a class="btn-ui btn-ui-light"
            href="{% url 'orders:driver_missions_history' %}{% if selected_driver_id %}?driver_id={{ selected_driver_id }}{% endif %}">
           Réinitialiser
         </a>
-
         {% if qs_params %}
           <a class="btn-ui btn-ui-light" href="?{{ qs_params }}&export=csv">Export CSV</a>
           <a class="btn-ui btn-ui-light" href="?{{ qs_params }}&export=xlsx">Export XLSX</a>
@@ -548,7 +470,6 @@
       </div>
     </form>
   </div>
-
   <div class="kpi-grid">
     <div class="kpi">
       <div class="kpi-label">Missions</div>
@@ -571,7 +492,6 @@
       <div class="kpi-value">{{ kpi_km|floatformat:2 }} km</div>
     </div>
   </div>
-
   {% for it in page_obj.object_list %}
     <div class="mission-card">
       <div class="mission-head">
@@ -579,7 +499,6 @@
           <div class="mission-code">Course {{ it.code }}</div>
           <div class="mission-date">Créée le {{ it.created_at }}</div>
         </div>
-
         <div class="mission-head-right">
           {% if it.mission_status == "pending" %}
             <span class="pill pending">⏳ En attente</span>
@@ -590,14 +509,12 @@
           {% else %}
             <span class="pill default">{{ it.mission_status }}</span>
           {% endif %}
-
           <a class="btn-ui btn-ui-primary"
              href="{% url 'orders:driver_order_detail' order_id=it.order.id %}{% if qs_params %}?{{ qs_params }}{% elif selected_driver_id %}?driver_id={{ selected_driver_id }}{% endif %}">
             Ouvrir →
           </a>
         </div>
       </div>
-
       <div class="mission-stats">
         <div class="stat-box">
           <div class="stat-label">Potentiel (legs)</div>
@@ -616,9 +533,7 @@
           <div class="stat-value">{{ it.total_km|floatformat:2 }} km</div>
         </div>
       </div>
-
       <div class="legs-title">Tronçons (legs)</div>
-
       {% if it.legs %}
         <div class="legs-list">
           {% for l in it.legs %}
@@ -645,7 +560,6 @@
   {% empty %}
     <div class="empty-state">Aucune mission pour ce livreur.</div>
   {% endfor %}
-
   {% if page_obj.paginator.num_pages > 1 %}
     <div class="pagination-wrap">
       {% if page_obj.has_previous %}
@@ -657,6 +571,5 @@
       {% endif %}
     </div>
   {% endif %}
-
 </div>
 {% endblock %}

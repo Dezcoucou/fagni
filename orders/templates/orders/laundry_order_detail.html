@@ -452,21 +452,55 @@ En cours
           <div class="status-v" id="ready-text">{% if order.wash_complete_time %}Oui{% else %}Non{% endif %}</div>
         </div>
       </div>
-      <ul class="items-list">
-        {% if items %}
-          {% for it in items %}
+      {% if order.pricing_mode == "bag" %}
+        <ul class="items-list">
+          <li class="item-row">
+            <div>
+              <div class="item-name">
+                {% if order.bag_size == "small" %}
+                  Petit sac
+                {% elif order.bag_size == "large" %}
+                  Grand sac
+                {% else %}
+                  Sac moyen
+                {% endif %}
+              </div>
+              <div class="item-meta">
+                Commande en sac FAGNI • Vêtements du quotidien uniquement
+              </div>
+              <div class="item-meta" style="margin-top:6px;">
+                Draps, serviettes, couettes, articles volumineux ou spéciaux exclus
+              </div>
+            </div>
+            <div class="item-qty">🧺 Sac</div>
+          </li>
+        </ul>
+      {% else %}
+        <ul class="items-list">
+          {% for item in items %}
             <li class="item-row">
               <div>
-                <div class="item-name">{{ it.label|default:"Article" }}</div>
-                <div class="item-meta">Article à traiter</div>
+                <div class="item-name">{{ item.designation }}</div>
+                <div class="item-meta">
+                  {% if item.unit_price_fcfa %}
+                    {{ item.unit_price_fcfa|floatformat:0 }} FCFA / unité
+                  {% endif %}
+                </div>
               </div>
-              <div class="item-qty">x {{ it.qty|default:1 }}</div>
+              <div class="item-qty">× {{ item.quantity }}</div>
+            </li>
+          {% empty %}
+            <li class="item-row">
+              <div>
+                <div class="item-name">Aucune ligne enregistrée</div>
+                <div class="item-meta">Cette commande ne contient pas encore d’articles détaillés.</div>
+              </div>
+              <div class="item-qty">—</div>
             </li>
           {% endfor %}
-        {% else %}
-          <li class="empty-box">Aucun article.</li>
-        {% endif %}
-      </ul>
+        </ul>
+      {% endif %}
+
     </section>
     <section class="audio-card terrain-advanced-source">
       <div class="audio-title">🔊 Aide vocale</div>

@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <title>Tableau livreurs – FAGNI</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
     <style>
         body{
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -71,7 +70,6 @@
         .btn-primary:hover{
             background:#00408a;
         }
-
         /* Filtres */
         .filters{
             display:flex;
@@ -120,7 +118,6 @@
         .btn-reset:hover{
             background:#f3f3f3;
         }
-
         /* Stats globales */
         .cards{
             display:grid;
@@ -157,7 +154,6 @@
             color:#777;
             margin-top:2px;
         }
-
         /* Tableau livreurs */
         table{
             width:100%;
@@ -211,14 +207,11 @@
     <link rel="stylesheet" href="/static/css/fagni_design_system.css">
 </head>
 <body>
-
 <header>
     <h1>Tableau livreurs – FAGNI</h1>
     <p>Suivi des courses, distances, livraisons facturées, coûts et marges logistiques.</p>
 </header>
-
 <div class="page">
-
     <!-- Barre du haut -->
     <div class="card">
         <div class="top-bar">
@@ -245,7 +238,6 @@
                 </a>
             </div>
         </div>
-
         <!-- Filtres période & tri -->
         <form method="get" class="filters">
             <div class="field">
@@ -284,7 +276,6 @@
                 <a href="{% url 'orders:driver_dashboard' %}" class="btn-reset btn-link">Réinitialiser</a>
             </div>
         </form>
-
         <!-- Cartes de synthèse -->
         <div class="cards">
             <div class="stat-card">
@@ -325,7 +316,6 @@
             </div>
         </div>
     </div>
-
     <!-- Tableau par livreur -->
     <div class="card">
         <h2 style="margin:0 0 8px;font-size:16px;border-left:4px solid #ff7a00;padding-left:8px;">
@@ -334,7 +324,6 @@
         <p class="mini" style="margin:0 0 8px;">
             Chaque ligne correspond à un partenaire livraison FAGNI sur la période filtrée.
         </p>
-
         {% if driver_stats %}
             <table>
                 <thead>
@@ -410,7 +399,6 @@
                 {% endfor %}
                 </tbody>
             </table>
-
             <div class="legend">
                 💡 <strong>Lecture rapide :</strong><br>
                 – Un livreur avec <em>marge négative</em> (badge jaune) doit être analysé (tarif, distance, paramétrage).<br>
@@ -422,8 +410,6 @@
             </div>
         {% endif %}
     </div>
-
 </div>
-
 </body>
 </html>

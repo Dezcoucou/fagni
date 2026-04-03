@@ -1,22 +1,16 @@
 {% extends "orders/client_base.html" %}
 {% load money_filters %}
-
 {% block title %}Paiement Wave – Commande {{ order.code|default:order.id }}{% endblock %}
-
 {% block content %}
 <!-- CLIENT_PAY_WAVE_TEMPLATE_CLEAN_REPLACE_20260226 -->
 <div class="co-page paywave">
-
   <div class="co-head">
     <div>
       <h1 class="co-title">Paiement Wave</h1>
-
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
         <a class="co-btn co-btn--ghost" href="{% url 'orders:client_order_detail' order.id %}">← Retour commande</a>
-
         <form method="post" style="margin:0;">
           {% csrf_token %}
-
           {% if remain > 0 and order.payment_status != "paid" %}
             {% if wave_declared %}
               <div class="co-notice co-notice--warn" style="margin-top:12px;">
@@ -40,22 +34,48 @@
           {% endif %}
         </form>
       </div>
-
       <p class="co-sub">Commande <strong>{{ order.code|default:order.id }}</strong></p>
+
+      <div class="co-mini-summary" style="margin-top:14px;">
+        <div class="co-mini-summary__card">
+          <div class="co-mini-summary__title">
+            {% if pricing_mode == "bag" %}
+              Commande en sac — {{ bag_label }}
+            {% else %}
+              Commande à la pièce
+            {% endif %}
+          </div>
+          <div class="co-mini-summary__rows">
+            <div class="co-mini-summary__row">
+              <span>Prestations</span>
+              <strong>{{ finance_breakdown.prestation_total|floatformat:0 }} FCFA</strong>
+            </div>
+            <div class="co-mini-summary__row">
+              <span>Livraison</span>
+              <strong>{{ finance_breakdown.delivery_fee_client|floatformat:0 }} FCFA</strong>
+            </div>
+            <div class="co-mini-summary__row">
+              <span>Frais FAGNI</span>
+              <strong>{{ service_fee_client_ttc|floatformat:0 }} FCFA</strong>
+            </div>
+            <div class="co-mini-summary__row co-mini-summary__row--total">
+              <span>Total TTC</span>
+              <strong>{{ finance_breakdown.total_client_ttc|floatformat:0 }} FCFA</strong>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div class="co-chips" aria-label="Actions rapides">
         <a class="co-chip" href="{% url 'orders:client_order_detail' order.id %}">← Retour commande</a>
         <a class="wave-return-strong" href="{% url 'orders:client_home' %}#mes-commandes">← Mes commandes</a>
       </div>
     </div>
-
     <div class="paywave-badge">
       <span class="co-pill">💳 Wave</span>
     </div>
   </div>
-
   <div class="co-card paywave-card">
-
     {% if remain <= 0 %}
       <div class="paywave-state paywave-state--paid">
         <div class="paywave-state__left">
@@ -66,17 +86,13 @@
           <a class="co-btn co-btn--primary" href="{% url 'orders:client_order_detail' order.id %}">Voir la commande</a>
         </div>
       </div>
-
       <div class="paywave-kpis">
         <div class="paywave-kpi"><div class="k">Total</div><div class="v">{{ total|fcfa }}</div></div>
         <div class="paywave-kpi"><div class="k">Déjà payé</div><div class="v">{{ paid|fcfa }}</div></div>
         <div class="paywave-kpi paywave-kpi--ok"><div class="k">Reste</div><div class="v">{{ remain|fcfa }}</div></div>
       </div>
-
       <div class="co-note co-note--ok">Si tu veux vérifier le détail, retourne sur la commande.</div>
-
     {% else %}
-
       <div class="paywave-state">
         <div class="paywave-state__left">
           <div class="paywave-state__title">À payer maintenant</div>
@@ -84,7 +100,6 @@
             Reste : <strong class="paywave-amount">{{ remain|fcfa }}</strong>
           </div>
         </div>
-
         <div class="paywave-state__right">
           {% if pay_link %}
             <a class="co-btn co-btn--primary" href="{{ pay_link }}" target="_blank" rel="noopener">Payer via Wave</a>
@@ -94,14 +109,11 @@
           {% endif %}
         </div>
       </div>
-
       <div class="paywave-grid">
-
         <div class="paywave-qrbox">
           <div class="paywave-qr">
             <!-- QR Wave: doit encoder pay_link (ou fallback URL Wave) -->
             <img src="{{ qr_data_uri }}" alt="QR Wave">
-
             {% if pay_link %}
               <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">
                 <a class="co-btn co-btn--primary" href="{{ pay_link }}" target="_blank" rel="noopener">Ouvrir dans Wave</a>
@@ -114,19 +126,16 @@
               </div>
             {% endif %}
           </div>
-
           <div class="paywave-meta">
             <div class="paywave-meta__row">
               <span class="k">Numéro Wave</span>
               <code id="wavePhone" class="v">{{ wave_phone }}</code>
             </div>
-
             {% if pay_link %}
               <div class="paywave-meta__row">
                 <span class="k">Lien</span>
                 <button class="co-btn co-btn--sm co-btn--ghost" type="button" id="waveLinkToggleBtn">Afficher</button>
               </div>
-
               <div class="paywave-linkbox" id="waveLinkBox" hidden>
                 <div class="paywave-linkbox__inner">
                   <code id="wavePayLinkVisible">{{ pay_link }}</code>
@@ -135,7 +144,6 @@
               </div>
             {% endif %}
           </div>
-
           <div class="co-note co-note--warn">
             Ouvre <strong>Wave</strong> → <strong>Scanner</strong> → scanne le QR → vérifie le numéro → saisis
             <strong>{{ remain|fcfa }}</strong>.
@@ -144,16 +152,13 @@
             {% endif %}
           </div>
         </div>
-
         <div class="paywave-side">
           <div class="paywave-kpis">
             <div class="paywave-kpi"><div class="k">Total</div><div class="v">{{ total|fcfa }}</div></div>
             <div class="paywave-kpi"><div class="k">Déjà payé</div><div class="v">{{ paid|fcfa }}</div></div>
             <div class="paywave-kpi paywave-kpi--focus"><div class="k">Reste</div><div class="v">{{ remain|fcfa }}</div></div>
           </div>
-
           <div class="co-note co-note--soft">Après paiement, reviens sur la commande pour voir le statut “Payé”.</div>
-
           <div class="paywave-actions">
             {% if pay_link %}
               <a class="co-btn co-btn--primary co-btn--full" href="{{ pay_link }}" target="_blank" rel="noopener">
@@ -165,9 +170,7 @@
             </a>
           </div>
         </div>
-
       </div>
-
       <script>
       (function(){
         const toggleBtn = document.getElementById("waveLinkToggleBtn");
@@ -184,13 +187,11 @@
             }
           });
         }
-
         async function copyText(txt){
           if(!txt) return false;
           try{ await navigator.clipboard.writeText(txt); return true; }
           catch(e){ return false; }
         }
-
         document.addEventListener("click", async function(e){
           const btn = e.target.closest("[data-copy]");
           if(!btn) return;
@@ -204,32 +205,63 @@
         });
       })();
       </script>
-
     {% endif %}
   </div>
 </div>
+<style>
+  .co-mini-summary__card{
+    background:#fff;
+    border:1px solid #E8EDF5;
+    border-radius:18px;
+    padding:14px 16px;
+  }
+  .co-mini-summary__title{
+    font-size:14px;
+    font-weight:900;
+    color:#1E3A5F;
+    margin-bottom:10px;
+  }
+  .co-mini-summary__rows{
+    display:grid;
+    gap:8px;
+  }
+  .co-mini-summary__row{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    font-size:13px;
+    color:#6B7280;
+  }
+  .co-mini-summary__row strong{
+    color:#1E3A5F;
+  }
+  .co-mini-summary__row--total{
+    padding-top:8px;
+    border-top:1px dashed #E8EDF5;
+    font-size:14px;
+  }
+  .co-mini-summary__row--total strong{
+    color:#E87722;
+  }
+</style>
 
 <!-- WAVE_PAID_BTN_GUARD_OK -->
 <script>
 document.addEventListener("DOMContentLoaded", function() {
   const forms = Array.from(document.querySelectorAll("form"));
   let paidForm = null;
-
   for (const f of forms) {
     const hasCsrf = !!f.querySelector('input[name="csrfmiddlewaretoken"]');
     const hasSubmit = !!f.querySelector('button[type="submit"], input[type="submit"]');
     if (hasCsrf && hasSubmit) { paidForm = f; break; }
   }
   if (!paidForm) return;
-
   const btn = paidForm.querySelector('button[type="submit"], input[type="submit"]');
   if (!btn) return;
-
   let locked = false;
   paidForm.addEventListener("submit", function(e) {
     if (locked) { e.preventDefault(); return false; }
     locked = true;
-
     if (btn.tagName.toLowerCase() === "button") {
       btn.disabled = true;
       btn.textContent = "Vérification en cours…";

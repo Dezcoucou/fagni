@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block content %}
 <style>
     .ticket-wrapper {
@@ -47,7 +46,6 @@
         color:#6b7280;
         white-space:nowrap;
     }
-
     .ticket-section-title {
         font-weight: 600;
         font-size: 13px;
@@ -105,12 +103,10 @@
         color: #9ca3af;
     }
 </style>
-
 <div class="ticket-wrapper">
     <div class="ticket-header">
         <h1>Ticket FAGNI</h1>
         <p>Commande {{ order.code|default:order.id }} – {{ order.created_at|date:"d/m/Y H:i" }}</p>
-
         <div class="ticket-meta">
             <div class="item">
                 <span class="label">Statut</span>
@@ -120,7 +116,6 @@
                 <span class="label">Paiement</span>
                 <span>{{ order.get_payment_status_display|default:order.payment_status }}</span>
             </div>
-
             {% if order.invoice_number %}
             <div class="item" style="grid-column: 1 / -1;">
                 <span class="label">Facture</span>
@@ -129,7 +124,6 @@
             {% endif %}
         </div>
     </div>
-
     <div>
         <div class="ticket-section-title">Client</div>
         <div class="ticket-line">
@@ -144,7 +138,6 @@
             <span class="label">Adresse :</span>
             <span>{{ order.customer.address|default:"—" }}</span>
         </div>
-
         <div class="ticket-line">
             <span class="label">Collecte :</span>
             <span>{{ order.pickup_address|default:order.customer.address|default:"—" }}</span>
@@ -153,7 +146,6 @@
             <span class="label">Livraison :</span>
             <span>{{ order.delivery_address|default:order.pickup_address|default:order.customer.address|default:"—" }}</span>
         </div>
-
         {% if order.referral_code %}
         <div class="ticket-line">
             <span class="label">Code parrain :</span>
@@ -161,7 +153,6 @@
         </div>
         {% endif %}
     </div>
-
     <div>
         <div class="ticket-section-title">Prestations</div>
         <table class="ticket-items">
@@ -189,7 +180,6 @@
             </tbody>
         </table>
     </div>
-
     <div class="ticket-totals">
         <div class="line">
             <span>Prestations :</span>
@@ -199,28 +189,23 @@
             <span>Livraison :</span>
             <span>{{ order.delivery_fee|default:0|floatformat:0 }} FCFA</span>
         </div>
-
         {% if order.express_extra_fee and order.express_extra_fee > 0 %}
         <div class="line">
             <span>Supplément express :</span>
             <span>{{ order.express_extra_fee|floatformat:0 }} FCFA</span>
         </div>
         {% endif %}
-
         <div class="line grand">
             <span>Total TTC :</span>
             <span>{{ order.total_client_ttc|default:0|floatformat:0 }} FCFA</span>
         </div>
-        
     </div>
-
     {% if order.notes %}
         <div class="ticket-section-title">Notes</div>
         <div style="font-size:12px;white-space:pre-line;">
             {{ order.notes }}
         </div>
     {% endif %}
-
     <div class="ticket-footer">
         Merci d'avoir utilisé FAGNI.
     </div>

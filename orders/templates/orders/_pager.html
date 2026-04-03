@@ -3,25 +3,20 @@
 {% else %}
   <span class="muted">←</span>
 {% endif %}
-
 {# page 1 #}
 <a class="{% if page_obj.number == 1 %}current{% endif %}" href="?{{ qs }}page=1#mes-commandes">1</a>
-
 {% if show_left_ellipsis %}
   <span class="muted">…</span>
 {% endif %}
-
 {# pages intermédiaires #}
 {% for p in pages %}
   {% if p != 1 and p != page_obj.paginator.num_pages %}
     <a class="{% if page_obj.number == p %}current{% endif %}" href="?{{ qs }}page={{ p }}#mes-commandes">{{ p }}</a>
   {% endif %}
 {% endfor %}
-
 {% if show_right_ellipsis %}
   <span class="muted">…</span>
 {% endif %}
-
 {# last #}
 {% if page_obj.paginator.num_pages > 1 %}
   <a class="{% if page_obj.number == page_obj.paginator.num_pages %}current{% endif %}"
@@ -29,7 +24,6 @@
      {{ page_obj.paginator.num_pages }}
   </a>
 {% endif %}
-
 {% if page_obj.has_next %}
   <a href="?{{ qs }}page={{ page_obj.next_page_number }}#mes-commandes">→</a>
 {% else %}

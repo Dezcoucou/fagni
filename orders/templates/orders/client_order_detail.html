@@ -141,17 +141,17 @@
       <div class="amount-grid">
         <div class="amount-box">
           <div class="amount-label">Total TTC</div>
-          <div class="amount-value">{{ total_amount|floatformat:0 }} <span style="font-size:13px;color:var(--muted)">FCFA</span></div>
+          <div class="amount-value">{{ finance_summary.total_client_ttc|floatformat:0 }} <span style="font-size:13px;color:var(--muted)">FCFA</span></div>
         </div>
         <div class="amount-box highlight">
           <div class="amount-label">Reste à payer</div>
-          <div class="amount-value orange">{{ remain_amount|floatformat:0 }} <span style="font-size:13px;">FCFA</span></div>
+          <div class="amount-value orange">{{ finance_summary.amount_remaining|floatformat:0 }} <span style="font-size:13px;">FCFA</span></div>
         </div>
       </div>
 
       {% if payment_ui == "paid" %}
       <div class="paid-badge">✅ Commande payée</div>
-      {% elif remain_amount > 0 %}
+      {% elif finance_summary.amount_remaining > 0 %}
       <a href="{% url 'orders:client_order_pay_wave_page' order.id %}" class="pay-btn">
         💳 Payer maintenant via Wave
       </a>
@@ -188,6 +188,28 @@
         <div class="address-text">{{ display_address }}</div>
       </div>
     </div>
+
+    <!-- COMMANDE EN SAC -->
+    {% if display_summary.is_bag %}
+    <div class="section card">
+      <div class="card-title">Commande en sac</div>
+
+      <div class="item-row" style="align-items:flex-start;">
+        <div>
+          <div class="item-name">{{ display_summary.bag_label }}</div>
+          <div class="item-qty">{{ display_summary.content_label }}</div>
+        </div>
+        <div class="item-price">
+          {{ finance_summary.prestation_total|floatformat:0 }} FCFA
+        </div>
+      </div>
+
+      <div style="margin-top:12px;padding:12px 14px;border-radius:14px;background:#F8FAFD;border:1px solid var(--border);font-size:13px;line-height:1.5;color:var(--muted);font-weight:700;">
+        ✅ Le sac FAGNI contient uniquement des {{ display_summary.content_label|lower }}.  
+        {{ display_summary.exclusions_label }}.
+      </div>
+    </div>
+    {% endif %}
 
     <!-- ARTICLES -->
     {% if items %}

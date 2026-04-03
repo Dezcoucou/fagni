@@ -2,57 +2,45 @@
 let map, geocoder;
 let pickupMarker, deliveryMarker;
 let autocompletePickup, autocompleteDelivery;
-
 // Champ actif (pour clic carte)
 let activeMapTarget = "pickup";
-
 // Helper safe
 function safeRecalcTotals(){
     if (typeof recalcTotals === "function") {
         recalcTotals();
     }
 }
-
 function initMap() {
     const mapElement = document.getElementById('map');
     if (!mapElement || !window.google || !google.maps) {
         console.log("Google Maps non disponible pour le moment.");
         return;
     }
-
     const latInput = document.getElementById('client_lat');
     const lngInput = document.getElementById('client_lng');
     const addressInput = document.getElementById('client_address');
-
     const deliveryAddressInput = document.getElementById('delivery_address');
     const deliveryLatInput = document.getElementById('delivery_lat');
     const deliveryLngInput = document.getElementById('delivery_lng');
-
     // Active field tracking
     if (addressInput) addressInput.addEventListener("focus", () => activeMapTarget = "pickup");
     if (deliveryAddressInput) deliveryAddressInput.addEventListener("focus", () => activeMapTarget = "delivery");
-
     const latVal = parseFloat(latInput && latInput.value ? latInput.value : '0');
     const lngVal = parseFloat(lngInput && lngInput.value ? lngInput.value : '0');
-
     const dLatVal = parseFloat(deliveryLatInput && deliveryLatInput.value ? deliveryLatInput.value : '0');
     const dLngVal = parseFloat(deliveryLngInput && deliveryLngInput.value ? deliveryLngInput.value : '0');
-
     let center;
     if (!isNaN(latVal) && !isNaN(lngVal) && latVal !== 0 && lngVal !== 0) {
         center = {lat: latVal, lng: lngVal};
     } else {
         center = {lat: 5.347, lng: -4.026}; // Abidjan
     }
-
     map = new google.maps.Map(mapElement, {
         zoom: (latVal && lngVal) ? 14 : 12,
         center: center,
         clickableIcons: false,
     });
-
     geocoder = new google.maps.Geocoder();
-
     // --- Marqueur Collecte (draggable) ---
     pickupMarker = new google.maps.Marker({
         map: map,
@@ -60,18 +48,14 @@ function initMap() {
         draggable: true,
         title: "Collecte (client)",
     });
-
     pickupMarker.addListener("dragend", () => {
         const pos = pickupMarker.getPosition();
         if (!pos) return;
-
         if (latInput) latInput.value = pos.lat();
         if (lngInput) lngInput.value = pos.lng();
-
         reverseGeocodeToInput(pos, addressInput);
         safeRecalcTotals();
     });
-
     // --- Marqueur Livraison ---
     deliveryMarker = new google.maps.Marker({
         map: map,
@@ -80,12 +64,10 @@ function initMap() {
         title: "Livraison",
         visible: false,
     });
-
     // --- Clic carte ---
     map.addListener("click", (e) => {
         if (!e || !e.latLng) return;
         const loc = e.latLng;
-
         if (activeMapTarget === "delivery") {
             if (deliveryLatInput) deliveryLatInput.value = loc.lat();
             if (deliveryLngInput) deliveryLngInput.value = loc.lng();
@@ -98,11 +80,9 @@ function initMap() {
             pickupMarker.setPosition(loc);
             reverseGeocodeToInput(loc, addressInput);
         }
-
         map.panTo(loc);
         safeRecalcTotals();
     });
-
     function reverseGeocodeToInput(latLng, inputEl) {
         if (!geocoder || !inputEl) return;
         geocoder.geocode({ location: latLng }, (results, status) => {
@@ -112,59 +92,47 @@ function initMap() {
             }
         });
     }
-
     // --- Autocomplete collecte ---
     if (addressInput && google.maps.places) {
         autocompletePickup = new google.maps.places.Autocomplete(addressInput, {
             componentRestrictions: { country: "ci" },
             fields: ["geometry", "formatted_address"]
         });
-
         autocompletePickup.addListener("place_changed", function () {
             const place = autocompletePickup.getPlace();
             if (!place.geometry || !place.geometry.location) return;
-
             const loc = place.geometry.location;
             map.setCenter(loc);
             map.setZoom(14);
             pickupMarker.setPosition(loc);
-
             if (latInput && lngInput) {
                 latInput.value = loc.lat();
                 lngInput.value = loc.lng();
             }
-
             safeRecalcTotals();
         });
     }
-
     // --- Autocomplete livraison ---
     if (deliveryAddressInput && google.maps.places) {
         autocompleteDelivery = new google.maps.places.Autocomplete(deliveryAddressInput, {
             componentRestrictions: { country: "ci" },
             fields: ["geometry", "formatted_address"]
         });
-
         autocompleteDelivery.addListener("place_changed", function () {
             const place = autocompleteDelivery.getPlace();
             if (!place.geometry || !place.geometry.location) return;
-
             const loc = place.geometry.location;
             map.setZoom(13);
             map.setCenter(loc);
-
             if (deliveryLatInput && deliveryLngInput) {
                 deliveryLatInput.value = loc.lat();
                 deliveryLngInput.value = loc.lng();
             }
-
             deliveryMarker.setPosition(loc);
             deliveryMarker.setVisible(true);
-
             safeRecalcTotals();
         });
     }
-
     // Affichage marqueur livraison existant
     if (!isNaN(dLatVal) && !isNaN(dLngVal) && dLatVal !== 0 && dLngVal !== 0) {
         deliveryMarker.setPosition({lat: dLatVal, lng: dLngVal});
@@ -172,7 +140,6 @@ function initMap() {
     }
 }
 </script>
-
 {% if GOOGLE_MAPS_API_KEY %}
 <script
   async

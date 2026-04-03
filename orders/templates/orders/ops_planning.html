@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% load money_filters %}
 {% block title %}OPS – Planning | FAGNI{% endblock %}
-
 {% block content %}
 <div class="page" style="max-width:1150px;margin:0 auto;padding:16px">
   <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">
@@ -14,7 +13,6 @@
       <a class="btn btn-light" href="{% url 'orders:driver_map' %}">🗺️ Carte livreurs</a>
     </div>
   </div>
-
   <div style="margin-top:14px;padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#fff">
     <form method="get" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
       <div>
@@ -41,7 +39,6 @@
       </div>
     </form>
   </div>
-
   <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
     <div style="padding:10px 12px;border:1px solid #e5e7eb;border-radius:999px;background:#fff">
       En retard : <strong>{{ overdue_count }}</strong>
@@ -50,7 +47,6 @@
       Tâches : <strong>{{ tasks|length }}</strong>
     </div>
   </div>
-
   {% if by_date %}
     <div style="margin-top:14px;display:grid;gap:12px">
       {% for day, items in by_date %}

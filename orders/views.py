@@ -3236,7 +3236,7 @@ def export_orders_csv(request):
                 customer_name,
                 customer_phone,
                 customer_address,
-                order.total if hasattr(order, "total") else "",
+                getattr(order, "total_client_display", None) or getattr(order, "total_client_ttc", None) or "",
                 total_ht,
                 tva_amount,
                 total_ttc,
@@ -4528,13 +4528,11 @@ def create(request):
 
 def build_order_finance_context(order):
     """
-    Contexte financier "source de vérité" pour l'écran détail commande.
-    Aligne detail.html, tickets, et dashboard sur compute_order_amounts().
+    Contexte financier normalisé alimenté par le pricing engine.
+    Garde les clés legacy utiles aux templates/PDFs, mais la source de vérité
+    est désormais compute_order_pricing / build_order_finance_summary.
     """
-    cfg = get_pricing_settings()
-    amounts = compute_order_amounts(order)
-
-    vat_rate = _get_vat_rate_percent(cfg)
+    finance_summary = build_order_finance_summary(order)
 
     def q(x):
         try:
@@ -4545,57 +4543,44 @@ def build_order_finance_context(order):
             except Exception:
                 return Decimal("0")
 
-    prestation_total = q(amounts.get("subtotal", 0))
-    service_fee_ht = q(amounts.get("service_fee_ht", 0))
-    delivery_fee_client = q(amounts.get("delivery_fee_client", 0))
-
+    prestation_total = q(finance_summary.get("prestation_total", 0))
+    service_fee_ht = q(finance_summary.get("service_fee_ht", 0))
+    delivery_fee_client = q(finance_summary.get("delivery_fee_client", 0))
     express_surcharge = q(
-        amounts.get("express_for_client", 0)
-        or amounts.get("express_extra_fee_client", 0)
-        or amounts.get("express_fee_client", 0)
-        or getattr(order, "express_extra_fee", 0)
+        finance_summary.get("express_extra_fee_client", 0)
+        or finance_summary.get("express_for_client", 0)
+        or finance_summary.get("express_surcharge", 0)
         or 0
     )
+    vat_fagni = q(finance_summary.get("vat_fagni", 0))
+    total_ttc_client = q(finance_summary.get("total_client_ttc", 0))
 
-    fagni_revenue_ht = q(amounts.get("fagni_revenue_ht", 0))
-    vat_fagni = q((fagni_revenue_ht * q(vat_rate)) / Decimal("100"))
-
-    total_ht_client = q(prestation_total + service_fee_ht + delivery_fee_client + express_surcharge)
-    total_ttc_client = q(total_ht_client + vat_fagni)
-
-    amount_laundry = q(
-        amounts.get("amount_laundry_partner", 0)
-        or getattr(order, "amount_laundry_partner", 0)
-        or 0
-    )
-    amount_driver = q(
-        amounts.get("amount_driver_partner", 0)
-        or getattr(order, "amount_driver_partner", 0)
-        or amounts.get("driver_income", 0)
-        or getattr(order, "driver_logistic_cost", 0)
-        or 0
+    total_ht_client = q(
+        prestation_total
+        + service_fee_ht
+        + delivery_fee_client
+        + express_surcharge
     )
 
+    amount_laundry = q(finance_summary.get("amount_laundry", 0))
+    amount_driver = q(finance_summary.get("amount_driver", 0))
     partners_total = q(amount_laundry + amount_driver)
 
-    margin_delivery = q(
-        amounts.get("logistic_margin", 0)
-        or getattr(order, "logistic_margin", 0)
-        or 0
-    )
+    fagni_revenue_ht = q(finance_summary.get("fagni_revenue_ht", 0))
+    margin_delivery = q(finance_summary.get("margin_delivery", 0))
 
     return {
         "order": order,
 
-        # Montants client
+        # client
         "prestation_total": prestation_total,
-        "service_fee_ht": finance_summary.get("service_fee_ht", service_fee_ht),
-        "delivery_fee_client": finance_summary.get("delivery_fee_client", delivery_fee_client),
+        "service_fee_ht": service_fee_ht,
+        "delivery_fee_client": delivery_fee_client,
         "express_surcharge": express_surcharge,
         "vat_fagni": vat_fagni,
         "total_ttc_client": total_ttc_client,
 
-        # Partenaires
+        # partenaires
         "amount_laundry": amount_laundry,
         "amount_driver": amount_driver,
         "partners_total": partners_total,
@@ -4603,6 +4588,10 @@ def build_order_finance_context(order):
         # FAGNI
         "fagni_revenue_ht": fagni_revenue_ht,
         "margin_delivery": margin_delivery,
+
+        # compat
+        "total_ht_client": total_ht_client,
+        "finance_summary": finance_summary,
     }
 
 
@@ -12238,6 +12227,9 @@ def client_new_order_step2(request, order_id: int):
     if not order:
         return redirect("orders:client_new_order")
 
+    display_summary = build_order_display_summary(order)
+    finance_summary = build_order_finance_summary(order)
+
     categories = ServiceCategory.objects.all().order_by("name")
     error = None
 
@@ -12315,6 +12307,9 @@ def client_new_order_step3(request, order_id: int):
     )
     if not order:
         return redirect("orders:client_new_order")
+
+    display_summary = build_order_display_summary(order)
+    finance_summary = build_order_finance_summary(order)
 
     pricing_mode = getattr(order, "pricing_mode", None) or request.session.get("client_wizard_pricing_mode") or "bag"
 

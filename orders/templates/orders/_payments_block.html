@@ -24,7 +24,7 @@
       </div>
       <div class="totals-row total-grand">
           <span><strong>Total TTC facturé au client</strong></span>
-          <strong>{{ finance.total_client_ttc|default:finance.total_ttc_client|floatformat:0 }} FCFA</strong>
+          <strong>{{ finance.total_client_ttc|floatformat:0 }} FCFA</strong>
       </div>
       <div class="divider"></div>
       <div class="totals-row">
@@ -81,7 +81,7 @@
       <div class="divider"></div>
       <div class="totals-row total-grand">
           <span><strong>Total client (TTC)</strong></span>
-          <strong>{{ order.total_client_ttc|floatformat:0 }} FCFA</strong>
+          <strong>{{ order.total_client_display|default:order.total_client_ttc|floatformat:0 }} FCFA</strong>
       </div>
       <div class="note">
           Total officiel = prestations + livraison + service + express + TVA FAGNI.

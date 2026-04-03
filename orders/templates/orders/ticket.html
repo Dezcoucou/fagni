@@ -197,7 +197,7 @@
         {% endif %}
         <div class="line grand">
             <span>Total TTC :</span>
-            <span>{{ order.total_client_ttc|default:0|floatformat:0 }} FCFA</span>
+            <span>{{ order.total_client_display|default:order.total_client_ttc|default:0|floatformat:0 }} FCFA</span>
         </div>
     </div>
     {% if order.notes %}

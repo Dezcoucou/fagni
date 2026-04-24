@@ -25,6 +25,14 @@
         {{ finance.vat_fagni|default:0|floatformat:0 }} FCFA
       </span>
     </div>
+    {% if finance.child_referral_discount|default:0 %}
+    <div class="flex justify-between mt-1 text-green-700">
+      <span class="font-medium">Remise parrainage :</span>
+      <span>
+        - {{ finance.child_referral_discount|default:0|floatformat:0 }} FCFA
+      </span>
+    </div>
+    {% endif %}
     <div class="flex justify-between mt-2">
       <span class="font-semibold text-orange-600">Total TTC client :</span>
       <span id="total_global_display" class="font-semibold text-orange-600">
@@ -56,6 +64,14 @@
         {{ order.delivery_fee|default:0|floatformat:0 }} FCFA
       </span>
     </div>
+    {% if order.child_referral_discount|default:0 %}
+    <div class="flex justify-between mt-1 text-green-700">
+      <span class="font-medium">Remise parrainage :</span>
+      <span>
+        - {{ order.child_referral_discount|default:0|floatformat:0 }} FCFA
+      </span>
+    </div>
+    {% endif %}
     <div class="flex justify-between mt-2">
       <span class="font-semibold text-orange-600">Total TTC client :</span>
       <span id="total_global_display" class="font-semibold text-orange-600">

@@ -97,7 +97,19 @@
     <div>
       <div class="label">Statut</div>
       <div class="value">
-        {% if order.payment_status %}
+        {% if order.payment_status == "paid" %}
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#ECFDF5;color:#166534;font-weight:800;">
+            ✅ Payée
+          </span>
+        {% elif order.payment_status == "declared" or order.payment_verification_status == "pending_review" %}
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#FFF7ED;color:#9A3412;font-weight:800;">
+            ⏳ Paiement déclaré · vérification en cours
+          </span>
+        {% elif order.payment_verification_status == "rejected" %}
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#FEF2F2;color:#991B1B;font-weight:800;">
+            ❌ Déclaration rejetée
+          </span>
+        {% elif order.payment_status %}
           {{ order.get_payment_status_display|default:order.payment_status }}
         {% else %}
           —
@@ -113,12 +125,78 @@
       <div class="value"><strong>{{ remaining|default:0|floatformat:0 }} FCFA</strong></div>
     </div>
   </div>
+
+  {% if order.payment_status == "declared" or order.payment_verification_status == "pending_review" %}
+    <div class="note" style="margin-top:12px;padding:12px 14px;border-radius:14px;background:#FFF8F2;border:1px solid #F4D4B6;color:#9A3412;">
+      <strong>⏳ Paiement déclaré</strong><br>
+      Le client affirme avoir payé. La commande attend maintenant une validation manuelle par l’équipe.
+      {% if order.payment_declared_at %}
+        <div style="margin-top:6px;font-size:12px;opacity:.9;">
+          Déclaré le {{ order.payment_declared_at|date:"d/m/Y H:i" }}
+        </div>
+      {% endif %}
+      {% if order.payment_reference %}
+        <div style="margin-top:6px;font-size:12px;opacity:.9;">
+          Référence déclarée : <strong>{{ order.payment_reference }}</strong>
+        </div>
+      {% endif %}
+      {% if order.payment_method %}
+        <div style="margin-top:6px;font-size:12px;opacity:.9;">
+          Canal déclaré : <strong>{{ order.payment_method }}</strong>
+        </div>
+      {% endif %}
+    </div>
+
+    {% if request.user.is_staff %}
+      <div class="divider"></div>
+      <h3 class="card-subtitle">Validation OPS / Admin</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
+        <form method="post" action="/orders/admin/orders/{{ order.id }}/payment/confirm-declared/" style="display:inline-flex;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary"
+                  onclick="return confirm('Confirmer ce paiement déclaré ? Cette action validera le règlement et soldera la commande.');">
+            ✅ Confirmer le paiement
+          </button>
+        </form>
+
+        <form method="post" action="/orders/admin/orders/{{ order.id }}/payment/reject-declared/" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          {% csrf_token %}
+          <input type="text" name="reason" maxlength="200" placeholder="Motif du rejet"
+                 style="min-width:240px;padding:10px;border-radius:12px;border:1px solid #e5e7eb;">
+          <button type="submit" class="btn btn-light"
+                  onclick="return confirm('Rejeter cette déclaration de paiement ? La commande repassera en attente de paiement.');">
+            ❌ Rejeter
+          </button>
+        </form>
+      </div>
+    {% endif %}
+
+  {% elif order.payment_verification_status == "rejected" %}
+    <div class="note" style="margin-top:12px;padding:12px 14px;border-radius:14px;background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;">
+      <strong>❌ Dernière déclaration rejetée</strong><br>
+      Cette commande est revenue en attente de paiement.
+      {% if order.payment_verification_reason %}
+        <div style="margin-top:6px;font-size:12px;">
+          Motif : <strong>{{ order.payment_verification_reason }}</strong>
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
   {% if request.user.is_staff %}
     <div class="divider"></div>
-    <h3 class="card-subtitle">Ajouter un paiement</h3>
-    <form method="post" style="margin-top:8px;">
+    {% if order.payment_status == "declared" or order.payment_verification_status == "pending_review" %}
+      <h3 class="card-subtitle">Paiement manuel désactivé pendant la vérification</h3>
+    {% else %}
+      <h3 class="card-subtitle">Ajouter un paiement</h3>
+    {% endif %}
+    <form method="post" style="margin-top:8px;{% if order.payment_status == "declared" or order.payment_verification_status == "pending_review" %}pointer-events:none;opacity:.55;{% endif %}">
       {% csrf_token %}
       <input type="hidden" name="action" value="add_payment">
+      {% if order.payment_status == "declared" or order.payment_verification_status == "pending_review" %}
+        <div class="note" style="margin:8px 0 10px;">
+          ⛔ Un paiement déclaré est déjà en cours de contrôle. Confirme ou rejette d’abord cette déclaration avant de saisir un nouveau règlement manuel.
+        </div>
+      {% endif %}
       {% if remaining|default:0|floatformat:0 == '0' %}
         <div class="note" style="margin:8px 0 10px;">
           ✅ Commande soldée — aucun paiement supplémentaire requis.
@@ -137,7 +215,7 @@
             min="1"
             step="1"
             required
-            {% if remaining|default:0|floatformat:0 == '0' %}disabled{% endif %}
+            {% if remaining|default:0|floatformat:0 == '0' or order.payment_status == "declared" or order.payment_verification_status == "pending_review" %}disabled{% endif %}
             style="width:100%;padding:10px;border-radius:12px;border:1px solid #e5e7eb;"
             placeholder="ex: 1000"
             value="{% if remaining|default:0|floatformat:0 != '0' %}{{ remaining|default:0 }}{% endif %}"
@@ -148,7 +226,7 @@
           <select
             name="channel"
             required
-            {% if remaining|default:0|floatformat:0 == '0' %}disabled{% endif %}
+            {% if remaining|default:0|floatformat:0 == '0' or order.payment_status == "declared" or order.payment_verification_status == "pending_review" %}disabled{% endif %}
             style="width:100%;padding:10px;border-radius:12px;border:1px solid #e5e7eb;background:#fff;"
           >
             <option value="cash">cash</option>
@@ -165,7 +243,7 @@
             type="text"
             name="reference"
             maxlength="120"
-            {% if remaining|default:0|floatformat:0 == '0' %}disabled{% endif %}
+            {% if remaining|default:0|floatformat:0 == '0' or order.payment_status == "declared" or order.payment_verification_status == "pending_review" %}disabled{% endif %}
             style="width:100%;padding:10px;border-radius:12px;border:1px solid #e5e7eb;"
             placeholder="ex: OM-2026-0001"
           >
@@ -177,7 +255,7 @@
           <button
             class="btn btn-primary"
             type="submit"
-            {% if remaining|default:0|floatformat:0 == '0' %}disabled style="opacity:.6;cursor:not-allowed;"{% endif %}
+            {% if remaining|default:0|floatformat:0 == '0' or order.payment_status == "declared" or order.payment_verification_status == "pending_review" %}disabled style="opacity:.6;cursor:not-allowed;"{% endif %}
           >
             Enregistrer
           </button>

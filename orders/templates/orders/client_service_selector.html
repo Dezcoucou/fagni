@@ -1,0 +1,67 @@
+{% extends "orders/client_base.html" %}
+{% load static %}
+{% block title %}Nouveau service – FAGNI{% endblock %}
+
+{% block content %}
+<div class="fs-page">
+  <div class="fs-shell">
+    <div class="fs-hero">
+      <div class="fs-badge">FAGNI</div>
+      <h1>Choisis ton service</h1>
+      <p>Pressing, lavage, retouche ou cordonnerie. Enlèvement et livraison à domicile.</p>
+    </div>
+
+    <form method="post" class="fs-grid">
+      {% csrf_token %}
+
+      <button class="fs-card" type="submit" name="service_type" value="pressing">
+        <div class="fs-icon">👔</div>
+        <div class="fs-title">Pressing</div>
+        <div class="fs-text">Articles traités à la pièce. Idéal pour chemises, pantalons, robes.</div>
+        <div class="fs-meta">À partir de 500 FCFA · 48h</div>
+      </button>
+
+      <button class="fs-card" type="submit" name="service_type" value="laundry">
+        <div class="fs-icon">🧺</div>
+        <div class="fs-title">Lavage en sac</div>
+        <div class="fs-text">Formule simple et rapide pour les vêtements du quotidien.</div>
+        <div class="fs-meta">À partir de 7 000 FCFA · 48h</div>
+      </button>
+
+      <button class="fs-card" type="submit" name="service_type" value="retouche">
+        <div class="fs-icon">🧵</div>
+        <div class="fs-title">Retouche</div>
+        <div class="fs-text">Ourlets, ajustements, petites réparations sur vêtements.</div>
+        <div class="fs-meta">Sur devis simplifié</div>
+      </button>
+
+      <button class="fs-card" type="submit" name="service_type" value="cordonnerie">
+        <div class="fs-icon">👞</div>
+        <div class="fs-title">Cordonnerie</div>
+        <div class="fs-text">Réparation, entretien et remise en état de chaussures.</div>
+        <div class="fs-meta">Sur devis simplifié</div>
+      </button>
+    </form>
+  </div>
+</div>
+
+<style>
+  .fs-page{min-height:100vh;background:linear-gradient(180deg,#F4F7FB 0%,#FFF8F2 100%);padding:28px 0 40px}
+  .fs-shell{width:min(1100px,calc(100% - 24px));margin:0 auto}
+  .fs-hero{text-align:center;margin-bottom:24px}
+  .fs-badge{display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:0 14px;border-radius:999px;background:#FFF3E8;color:#E87722;font-weight:800;font-size:12px;margin-bottom:12px}
+  .fs-hero h1{margin:0;color:#1E3A5F;font-size:34px;line-height:1.05}
+  .fs-hero p{margin:10px auto 0;max-width:720px;color:#6B7280;font-size:15px;line-height:1.6}
+  .fs-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+  .fs-card{border:none;text-align:left;background:#fff;border-radius:24px;padding:22px;cursor:pointer;box-shadow:0 10px 30px rgba(30,58,95,.08);border:1px solid #E8EDF5;transition:.2s ease}
+  .fs-card:hover{transform:translateY(-2px);box-shadow:0 16px 40px rgba(30,58,95,.12);border-color:#E87722}
+  .fs-icon{font-size:34px;margin-bottom:12px}
+  .fs-title{font-size:20px;font-weight:900;color:#1E3A5F;margin-bottom:8px}
+  .fs-text{font-size:14px;line-height:1.55;color:#6B7280;margin-bottom:14px}
+  .fs-meta{font-size:13px;font-weight:800;color:#E87722}
+  @media(max-width:760px){
+    .fs-grid{grid-template-columns:1fr}
+    .fs-hero h1{font-size:28px}
+  }
+</style>
+{% endblock %}

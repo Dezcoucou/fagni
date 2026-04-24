@@ -1,22 +1,25 @@
 {% extends "orders/client_base.html" %}
 {% block title %}Nouvelle commande – Étape 2{% endblock %}
+
 {% block content %}
-<!-- CLIENT_NEW_ORDER_STEP2_HYBRID_OK_20260403 -->
 <div class="co-page">
+
   <div class="co-head">
     <div>
       <h1 class="co-title">Nouvelle commande</h1>
-      <p class="co-subtitle">Étape 2/4 — Choisis ton mode de commande, puis ton mode de livraison.</p>
-      <div class="co-steps" aria-label="progression">
+      <p class="co-subtitle">Étape 2/4 — Choisis ton mode de commande et livraison</p>
+
+      <div class="co-steps">
         <span class="co-step">1 • Infos</span>
-        <span class="co-step active">2 • Mode & livraison</span>
-        <span class="co-step">3 • Contenu</span>
+        <span class="co-step active">2 • Mode</span>
+        <span class="co-step">3 • Articles</span>
         <span class="co-step">4 • Récap</span>
       </div>
     </div>
-    <div class="co-actions">
-      <a class="btn btn-outline btn-sm" href="{% url 'orders:client_new_order' %}">← Retour étape 1</a>
-    </div>
+
+    <a class="btn btn-outline btn-sm" href="{% url 'orders:client_new_order' %}">
+      ← Retour
+    </a>
   </div>
 
   {% if error %}
@@ -27,49 +30,62 @@
     <form method="post">
       {% csrf_token %}
 
+      <!-- MODE -->
       <div class="co-section">
-        <div class="co-h3">1) Comment veux-tu commander ?</div>
+        <div class="co-h3">1) Mode de commande</div>
 
-        <div class="co-grid-2 co-grid-2--modes">
-          <label class="co-choice-card {% if selected_pricing_mode == 'bag' or not selected_pricing_mode %}is-selected{% endif %}">
+        <div class="co-grid-2">
+
+          <!-- BAG -->
+          <label class="co-choice-card is-selected">
             <input type="radio" name="pricing_mode" value="bag"
               {% if selected_pricing_mode == "bag" or not selected_pricing_mode %}checked{% endif %}>
+
             <div class="co-choice-card__body">
-              <div class="co-choice-card__badge">Recommandé</div>
-              <div class="co-choice-card__icon">🧺</div>
-              <div class="co-choice-card__title">Sac de vêtements</div>
-              <div class="co-choice-card__text">Simple, rapide, prix fixe selon la taille du sac.</div>
-              <ul class="co-choice-card__list">
-                <li>Vêtements uniquement</li>
-                <li>Sans détail article par article</li>
-                <li>Idéal pour le quotidien</li>
+              <div class="badge">🔥 Recommandé</div>
+
+              <div class="icon">🧺</div>
+              <strong>Sac de vêtements</strong>
+
+              <p>Dépose tout ton linge, on gère.</p>
+
+              <div class="price">À partir de 1500 FCFA</div>
+
+              <ul>
+                <li>Simple et rapide</li>
+                <li>Pas de détail article</li>
+                <li>90% des clients choisissent ça</li>
               </ul>
             </div>
           </label>
 
-          <label class="co-choice-card {% if selected_pricing_mode == 'item' %}is-selected{% endif %}">
+          <!-- ITEM -->
+          <label class="co-choice-card">
             <input type="radio" name="pricing_mode" value="item"
               {% if selected_pricing_mode == "item" %}checked{% endif %}>
+
             <div class="co-choice-card__body">
-              <div class="co-choice-card__icon">🧾</div>
-              <div class="co-choice-card__title">Articles à la pièce</div>
-              <div class="co-choice-card__text">Pour les besoins spécifiques et la tarification détaillée.</div>
-              <ul class="co-choice-card__list">
-                <li>Articles spéciaux ou volumineux</li>
-                <li>Tarification détaillée</li>
-                <li>Plus précis</li>
+              <div class="icon">🧾</div>
+              <strong>Articles à la pièce</strong>
+
+              <p>Pour vêtements spéciaux</p>
+
+              <div class="price">Prix détaillé</div>
+
+              <ul>
+                <li>Costumes / robes</li>
+                <li>Tarification précise</li>
               </ul>
             </div>
           </label>
-        </div>
 
-        <div class="co-help" style="margin-top:10px;">
-          Le sac FAGNI est réservé aux vêtements du quotidien. Les articles spéciaux ou volumineux sont traités à la pièce.
         </div>
       </div>
 
-      <div class="co-section co-section--divider" id="categorySection">
+      <!-- CATEGORIE -->
+      <div id="categorySection" class="co-section">
         <div class="co-h3">2) Catégorie</div>
+
         <select name="category_id" class="co-select" id="categorySelect">
           <option value="">— Sélectionner —</option>
           {% for c in categories %}
@@ -79,18 +95,20 @@
             </option>
           {% endfor %}
         </select>
-        <div class="co-help">Visible uniquement pour le mode “Articles à la pièce”.</div>
       </div>
 
-      <div class="co-section co-section--divider">
-        <div class="co-h3">3) Mode de livraison</div>
+      <!-- LIVRAISON -->
+      <div class="co-section">
+        <div class="co-h3">3) Livraison</div>
+
         <div class="co-grid-2">
+
           <label class="co-radio">
             <input type="radio" name="delivery_mode" value="standard"
               {% if order.delivery_mode == "standard" or not order.delivery_mode %}checked{% endif %}>
             <div>
               <strong>Standard</strong>
-              <small>Collecte + livraison sous 48h</small>
+              <small>48h • meilleur prix</small>
             </div>
           </label>
 
@@ -98,159 +116,67 @@
             <input type="radio" name="delivery_mode" value="express"
               {% if order.delivery_mode == "express" %}checked{% endif %}>
             <div>
-              <strong>Express</strong>
-              <small>Collecte + livraison sous 24h</small>
+              <strong>Express ⚡</strong>
+              <small>24h • +1000 FCFA</small>
             </div>
           </label>
 
-          <label class="co-radio co-radio--wide">
+          <label class="co-radio">
             <input type="radio" name="delivery_mode" value="scheduled"
               {% if order.delivery_mode == "scheduled" %}checked{% endif %}>
-            <div class="co-radio__content">
+            <div>
               <strong>Programmée</strong>
-              <small>Tu choisis une date et une heure</small>
-              <div class="co-scheduled">
-                <input id="scheduledInput"
-                       type="datetime-local"
-                       name="scheduled_delivery_at"
-                       class="co-input"
-                       value="{% if order.scheduled_delivery_at %}{{ order.scheduled_delivery_at|date:'Y-m-d\\TH:i' }}{% endif %}">
-                <div class="co-help">Choisis une date/heure si tu préfères programmer ta livraison.</div>
-              </div>
+              <input type="datetime-local" name="scheduled_delivery_at">
             </div>
           </label>
+
         </div>
       </div>
 
-      <div class="co-footer">
-        <button type="submit" class="btn btn-premium co-cta">Continuer → Étape 3</button>
-        <div class="co-help co-muted" style="margin-top:10px">
-          À l’étape suivante, tu choisiras soit la taille du sac, soit les articles détaillés.
-        </div>
-      </div>
+      <button type="submit" class="btn btn-premium">
+        Continuer → Étape 3
+      </button>
+
     </form>
   </div>
 </div>
 
 <style>
-  .co-grid-2--modes{
-    align-items:stretch;
-  }
-  .co-choice-card{
-    position:relative;
-    display:block;
-    border:1px solid #E8EDF5;
-    border-radius:20px;
-    background:#fff;
-    cursor:pointer;
-    transition:all .2s ease;
-    overflow:hidden;
-  }
-  .co-choice-card input{
-    position:absolute;
-    opacity:0;
-    pointer-events:none;
-  }
-  .co-choice-card__body{
-    padding:18px;
-  }
-  .co-choice-card__icon{
-    font-size:28px;
-    margin-bottom:8px;
-  }
-  .co-choice-card__title{
-    font-weight:800;
-    font-size:18px;
-    color:#1E3A5F;
-    margin-bottom:6px;
-  }
-  .co-choice-card__text{
-    color:#6B7280;
-    font-size:14px;
-    margin-bottom:10px;
-  }
-  .co-choice-card__list{
-    margin:0;
-    padding-left:18px;
-    color:#1E3A5F;
-    font-size:14px;
-  }
-  .co-choice-card__badge{
-    display:inline-block;
-    margin-bottom:10px;
-    background:#FFF3E8;
-    color:#E87722;
-    border:1px solid rgba(232,119,34,.18);
-    border-radius:999px;
-    padding:4px 10px;
-    font-size:12px;
-    font-weight:700;
-  }
-  .co-choice-card.is-selected{
-    border-color:#E87722;
-    box-shadow:0 10px 24px rgba(30,58,95,.08);
-    background:linear-gradient(180deg,#FFFFFF 0%, #FFF8F2 100%);
-  }
-  .co-hidden{
-    display:none;
-  }
-  .co-disabled{
-    opacity:.55;
-    pointer-events:none;
-  }
+.co-choice-card{
+  border:1px solid #E8EDF5;
+  border-radius:20px;
+  padding:16px;
+  cursor:pointer;
+  background:#fff;
+}
+.co-choice-card.is-selected{
+  border-color:#E87722;
+}
+.price{
+  color:#E87722;
+  font-weight:900;
+  margin:8px 0;
+}
 </style>
 
 <script>
-  (function(){
-    const scheduledInput = document.getElementById("scheduledInput");
-    const deliveryRadios = document.querySelectorAll('input[name="delivery_mode"]');
-    const pricingRadios = document.querySelectorAll('input[name="pricing_mode"]');
-    const categorySection = document.getElementById("categorySection");
-    const categorySelect = document.getElementById("categorySelect");
-    const modeCards = document.querySelectorAll('.co-choice-card');
+(function(){
+  const pricingRadios = document.querySelectorAll('input[name="pricing_mode"]');
+  const categorySection = document.getElementById("categorySection");
 
-    function refreshDelivery(){
-      const mode = (document.querySelector('input[name="delivery_mode"]:checked') || {}).value || "standard";
-      const wrap = scheduledInput && scheduledInput.closest(".co-scheduled");
-      if(!scheduledInput) return;
+  function refresh(){
+    const mode = document.querySelector('input[name="pricing_mode"]:checked').value;
 
-      if(mode === "scheduled"){
-        scheduledInput.removeAttribute("disabled");
-        if(wrap) wrap.classList.remove("is-disabled");
-      }else{
-        scheduledInput.setAttribute("disabled","disabled");
-        scheduledInput.value = "";
-        if(wrap) wrap.classList.add("is-disabled");
-      }
+    if(mode === "item"){
+      categorySection.style.display = "block";
+    } else {
+      categorySection.style.display = "none";
     }
+  }
 
-    function refreshPricing(){
-      const pricingMode = (document.querySelector('input[name="pricing_mode"]:checked') || {}).value || "bag";
-
-      modeCards.forEach(card => {
-        const radio = card.querySelector('input[name="pricing_mode"]');
-        if(radio && radio.checked){
-          card.classList.add("is-selected");
-        }else{
-          card.classList.remove("is-selected");
-        }
-      });
-
-      if(pricingMode === "item"){
-        categorySection.classList.remove("co-hidden");
-        categorySelect.setAttribute("required", "required");
-      }else{
-        categorySection.classList.add("co-hidden");
-        categorySelect.removeAttribute("required");
-        categorySelect.value = "";
-      }
-    }
-
-    deliveryRadios.forEach(r => r.addEventListener("change", refreshDelivery));
-    pricingRadios.forEach(r => r.addEventListener("change", refreshPricing));
-
-    refreshDelivery();
-    refreshPricing();
-  })();
+  pricingRadios.forEach(r => r.addEventListener("change", refresh));
+  refresh();
+})();
 </script>
+
 {% endblock %}

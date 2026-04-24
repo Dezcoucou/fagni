@@ -191,7 +191,6 @@ def affiliate_withdrawal_request(request):
 # ----------------------------------------------------
 #  Dashboard Admin MLM (récap affiliés / commissions)
 # ----------------------------------------------------
-@staff_member_required
 def admin_mlm_dashboard(request):
     """
     Dashboard Admin MLM :
@@ -475,7 +474,6 @@ def affiliate_legal_pdf(request):
 # ----------------------------------------------------
 #  Dashboard Global MLM (basé sur ReferralCommission + Wallets)
 # ----------------------------------------------------
-@staff_member_required
 def global_mlm_dashboard(request):
     """
     Vue backoffice globale MLM :
@@ -525,7 +523,6 @@ def global_mlm_dashboard(request):
     return render(request, "mlm/global_dashboard.html", context)
 
 
-@staff_member_required
 def affiliate_detail(request, referral_code):
     """
     Fiche détaillée d'un affilié :

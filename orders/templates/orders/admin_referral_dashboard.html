@@ -1,0 +1,406 @@
+{% load humanize %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Parrainage FAGNI — VFINAL</title>
+  <style>
+    body{
+      margin:0;
+      font-family:Arial, sans-serif;
+      background:linear-gradient(180deg,#f8fafc 0%, #eef6ff 100%);
+      color:#0f172a;
+    }
+    .wrap{
+      max-width:1320px;
+      margin:0 auto;
+      padding:28px 18px 48px;
+    }
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:16px;
+      flex-wrap:wrap;
+      margin-bottom:22px;
+    }
+    .btn{
+      display:inline-block;
+      padding:12px 16px;
+      border-radius:12px;
+      text-decoration:none;
+      font-weight:800;
+      border:1px solid #dbeafe;
+      background:#fff;
+      color:#1d4ed8;
+      box-shadow:0 8px 24px rgba(15,23,42,.06);
+    }
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(5,minmax(0,1fr));
+      gap:14px;
+      margin-bottom:16px;
+    }
+    .grid2{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:14px;
+      margin-bottom:24px;
+    }
+    .main{
+      display:grid;
+      grid-template-columns:1.05fr .95fr;
+      gap:18px;
+      margin-top:18px;
+    }
+    .card{
+      background:#fff;
+      border:1px solid #e2e8f0;
+      border-radius:20px;
+      padding:18px;
+      box-shadow:0 12px 28px rgba(15,23,42,.05);
+    }
+    .hero{
+      background:linear-gradient(135deg,#0f172a 0%, #1e3a8a 50%, #2563eb 100%);
+      color:#fff;
+      border:none;
+    }
+    .hero .k,.hero .sub{color:rgba(255,255,255,.82);}
+    .hero .v{color:#fff;}
+    .k{
+      font-size:12px;
+      color:#64748b;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+    }
+    .v{
+      margin-top:8px;
+      font-size:30px;
+      font-weight:1000;
+      color:#0f172a;
+    }
+    .sub{
+      margin-top:5px;
+      font-size:12px;
+      color:#64748b;
+      font-weight:700;
+      line-height:1.45;
+    }
+    .section-title{
+      margin:0;
+      font-size:18px;
+      font-weight:1000;
+      color:#0f172a;
+    }
+    .row{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:12px;
+      border:1px solid #e2e8f0;
+      border-radius:16px;
+      padding:14px;
+      background:#fff;
+      margin-top:10px;
+    }
+    .alert{
+      padding:14px;
+      border-radius:16px;
+      font-size:13px;
+      font-weight:800;
+      margin-top:10px;
+      line-height:1.55;
+    }
+    .blue{background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;}
+    .gray{background:#f8fafc;border:1px solid #e2e8f0;color:#334155;}
+    .orange{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;}
+    .green{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;}
+    .purple{background:#f5f3ff;border:1px solid #ddd6fe;color:#5b21b6;}
+    .red{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;}
+    .funnel{
+      display:grid;
+      gap:12px;
+      margin-top:16px;
+    }
+    .funnel-step{
+      border:1px solid #e2e8f0;
+      background:#fff;
+      border-radius:16px;
+      padding:14px 16px;
+    }
+    .funnel-label{
+      font-size:12px;
+      font-weight:900;
+      color:#64748b;
+      text-transform:uppercase;
+    }
+    .funnel-value{
+      margin-top:6px;
+      font-size:26px;
+      font-weight:1000;
+      color:#0f172a;
+    }
+    .funnel-arrow{
+      text-align:center;
+      color:#94a3b8;
+      font-size:20px;
+      font-weight:900;
+      margin:-2px 0;
+    }
+    @media (max-width: 1100px){
+      .grid,.grid2{grid-template-columns:1fr 1fr;}
+      .main{grid-template-columns:1fr;}
+    }
+    @media (max-width: 640px){
+      .grid,.grid2{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1 style="margin:0;font-size:34px;line-height:1.05;font-weight:1000;">💥 Dashboard Parrainage FAGNI — VFINAL</h1>
+        <div style="margin-top:8px;color:#64748b;font-size:14px;font-weight:700;">
+          Cockpit décisionnel : volume, conversion, ROI, activation wallet, friction et qualité.
+        </div>
+
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:20px;">
+
+
+<div style="background:#f0f9ff;padding:16px;border-radius:12px;">
+  <div style="font-size:12px;color:#0369a1;">ROI parrainage</div>
+  <div style="font-size:22px;font-weight:900;">x{{ roi }}</div>
+</div>
+
+<div style="background:#fdf4ff;padding:16px;border-radius:12px;">
+  <div style="font-size:12px;color:#86198f;">Activation wallet</div>
+  <div style="font-size:22px;font-weight:900;">
+    {{ wallet_used_users }} / {{ wallet_activated_users }}
+  </div>
+</div>
+
+
+
+  <div style="background:#ecfeff;padding:16px;border-radius:12px;">
+    <div style="font-size:12px;color:#0e7490;">Repeat Boost</div>
+    <div style="font-size:22px;font-weight:900;">{{ repeat_boost_total|intcomma }} FCFA</div>
+    <div style="font-size:11px;color:#64748b;">Utilisateurs : {{ repeat_users_count }}</div>
+  </div>
+
+  <div style="background:#f0fdf4;padding:16px;border-radius:12px;">
+    <div style="font-size:12px;color:#166534;">Crédit actif</div>
+    <div style="font-size:22px;font-weight:900;">{{ active_credit_total|intcomma }} FCFA</div>
+  </div>
+
+  <div style="background:#fef2f2;padding:16px;border-radius:12px;">
+    <div style="font-size:12px;color:#991b1b;">Crédit expiré</div>
+    <div style="font-size:22px;font-weight:900;">{{ expired_credit_total|intcomma }} FCFA</div>
+  </div>
+
+  <div style="background:#fff7ed;padding:16px;border-radius:12px;">
+    <div style="font-size:12px;color:#9a3412;">Parrains actifs</div>
+    <div style="font-size:22px;font-weight:900;">{{ rewarded_users_count }}</div>
+  </div>
+
+</div>
+
+
+      </div>
+      <div>
+        <a class="btn" href="/admin/">← Retour admin</a>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card hero">
+        <div class="k">Commandes parrainées</div>
+        <div class="v">{{ total_orders|intcomma }}</div>
+        <div class="sub">Volume total détecté avec code de parrainage.</div>
+      </div>
+
+      <div class="card">
+        <div class="k">Commandes payées</div>
+        <div class="v">{{ paid_orders|intcomma }}</div>
+        <div class="sub">Commandes réellement converties et encaissées.</div>
+      </div>
+
+      <div class="card">
+        <div class="k">Taux conversion</div>
+        <div class="v">{{ conversion }} %</div>
+        <div class="sub">Indicateur principal de qualité du moteur.</div>
+      </div>
+
+      <div class="card">
+        <div class="k">CA généré</div>
+        <div class="v">{{ total_ca|floatformat:0|intcomma }}</div>
+        <div class="sub">FCFA de chiffre d’affaires généré par parrainage.</div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="k">Commissions versées</div>
+        <div class="v">{{ total_rewards|floatformat:0|intcomma }}</div>
+        <div class="sub">FCFA déjà crédités aux parrains.</div>
+      </div>
+
+      <div class="card green">
+        <div class="k" style="color:#065f46;">ROI parrainage</div>
+        <div class="v" style="color:#065f46;">x{{ roi_ratio }}</div>
+        <div class="sub" style="color:#047857;">CA généré / commissions versées.</div>
+      </div>
+
+      <div class="card purple">
+        <div class="k" style="color:#5b21b6;">Utilisateurs récompensés</div>
+        <div class="v" style="color:#5b21b6;">{{ rewarded_users|intcomma }}</div>
+        <div class="sub" style="color:#6d28d9;">Nombre de parrains crédités.</div>
+      </div>
+
+      <div class="card orange">
+        <div class="k" style="color:#9a3412;">Activation wallet</div>
+        <div class="v" style="color:#9a3412;">{{ wallet_activation_rate }} %</div>
+        <div class="sub" style="color:#c2410c;">{{ activated_wallet_users|intcomma }} / {{ rewarded_users|intcomma }} utilisent déjà leurs gains.</div>
+      </div>
+
+      <div class="card purple">
+        <div class="k" style="color:#5b21b6;">Repeat après reward</div>
+        <div class="v" style="color:#5b21b6;">{{ repeat_after_reward_rate }} %</div>
+        <div class="sub" style="color:#6d28d9;">% des utilisateurs récompensés qui refont une commande.</div>
+      </div>
+    </div>
+
+    <div class="main">
+      <section class="card">
+        <h2 class="section-title">Funnel de conversion</h2>
+        <div style="margin-top:6px;color:#64748b;font-size:13px;font-weight:700;">
+          Le tunnel réel du parrainage, du code utilisé à la récompense.
+        </div>
+
+        <div class="funnel">
+          <div class="funnel-step">
+            <div class="funnel-label">Codes utilisés</div>
+            <div class="funnel-value">{{ codes_used_count|intcomma }}</div>
+          </div>
+
+          <div class="funnel-arrow">↓</div>
+
+          <div class="funnel-step">
+            <div class="funnel-label">Commandes parrainées créées</div>
+            <div class="funnel-value">{{ total_orders|intcomma }}</div>
+          </div>
+
+          <div class="funnel-arrow">↓</div>
+
+          <div class="funnel-step">
+            <div class="funnel-label">Commandes payées</div>
+            <div class="funnel-value">{{ paid_orders|intcomma }}</div>
+          </div>
+
+          <div class="funnel-arrow">↓</div>
+
+          <div class="funnel-step">
+            <div class="funnel-label">Récompenses versées</div>
+            <div class="funnel-value">{{ rewards_paid_count|intcomma }}</div>
+          </div>
+        </div>
+
+        <div class="alert gray">
+          Ticket moyen parrainé :
+          <strong>{{ avg_ca_per_paid_order|floatformat:0|intcomma }} FCFA</strong><br>
+          Commission moyenne par commande payée :
+          <strong>{{ avg_reward_per_paid_order|floatformat:0|intcomma }} FCFA</strong>
+        </div>
+
+        <div class="alert orange">
+          Commandes parrainées encore non payées :
+          <strong>{{ pending_referred_orders|intcomma }}</strong><br>
+          Commandes annulées avec code :
+          <strong>{{ cancelled_referred_orders|intcomma }}</strong>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="section-title">Lecture business VFINAL</h2>
+        <div style="margin-top:6px;color:#64748b;font-size:13px;font-weight:700;">
+          Les signaux à surveiller pour décider vite, sans te raconter d’histoire.
+        </div>
+
+        <div class="alert blue">
+          {% if conversion < 5 %}
+            ⚠️ Conversion faible : le moteur attire du trafic mais le transforme mal.
+          {% elif conversion < 15 %}
+            👀 Conversion correcte mais encore fragile.
+          {% else %}
+            ✅ Conversion solide, mais à confirmer sur un volume plus élevé.
+          {% endif %}
+        </div>
+
+        <div class="alert green">
+          {% if roi_ratio < 2 %}
+            ⚠️ ROI faible : la commission coûte trop cher par rapport au CA généré.
+          {% elif roi_ratio < 5 %}
+            👌 ROI correct : modèle économiquement acceptable.
+          {% else %}
+            🚀 ROI fort : le moteur crée beaucoup plus de CA qu’il ne coûte.
+          {% endif %}
+        </div>
+
+        <div class="alert purple">
+          {% if wallet_activation_rate < 40 %}
+            ⚠️ Activation wallet faible : les gains sont crédités mais peu réutilisés. Le problème est produit/UX.
+          {% elif wallet_activation_rate < 70 %}
+            👀 Activation wallet moyenne : la boucle de réachat commence à exister.
+          {% else %}
+            ✅ Wallet bien activé : les gains reviennent dans l’écosystème FAGNI.
+          {% endif %}
+        </div>
+
+        <div class="alert {% if repeat_after_reward_rate < 30 %}red{% else %}green{% endif %}">
+          {% if repeat_after_reward_rate < 30 %}
+            ⚠️ Rétention faible : les utilisateurs prennent la récompense mais ne reviennent pas.
+          {% else %}
+            🔁 Bonne rétention : le parrainage crée une vraie boucle de croissance.
+          {% endif %}
+        </div>
+
+        <div class="alert {% if total_orders < 20 %}red{% else %}gray{% endif %}">
+          {% if total_orders < 20 %}
+            ⚠️ Volume encore faible : les signaux sont intéressants, mais les décisions de scale doivent rester prudentes.
+          {% else %}
+            ✅ Volume suffisant pour commencer à comparer les tendances.
+          {% endif %}
+        </div>
+
+        <h2 class="section-title" style="margin-top:20px;">Top parrains</h2>
+        <div style="margin-top:6px;color:#64748b;font-size:13px;font-weight:700;">
+          Les utilisateurs qui génèrent réellement de la commission.
+        </div>
+
+        {% for row in top_sponsors %}
+          <div class="row">
+            <div>
+              <div style="font-size:15px;font-weight:900;">
+                {{ row.wallet__customer__name|default:"Client FAGNI" }}
+              </div>
+              <div style="margin-top:4px;font-size:12px;color:#64748b;font-weight:700;">
+                {{ row.wallet__customer__phone|default:"-" }} · {{ row.rewards_count|intcomma }} récompense{{ row.rewards_count|pluralize }}
+              </div>
+            </div>
+            <div style="text-align:right;font-size:15px;font-weight:1000;">
+              {{ row.total_commission|floatformat:0|intcomma }} FCFA
+            </div>
+          </div>
+        {% empty %}
+          <div class="alert gray">
+            Aucune commission de parrainage enregistrée pour le moment.
+          </div>
+        {% endfor %}
+      </section>
+    </div>
+  </div>
+</body>
+</html>

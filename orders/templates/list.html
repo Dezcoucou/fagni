@@ -204,7 +204,7 @@
                         <td>{{ order.code }}</td>
                         <td>{{ order.customer.name }}</td>
                         <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
-                        <td>{{ order.total }} FCFA</td>
+                        <td>{{ order.total_client_display|default:order.total_client_ttc|default:0|floatformat:0 }} FCFA</td>
                         <td>
                             {% if order.status == "pending" %}
                                 <span class="badge badge-pending">En attente</span>

@@ -3,10 +3,23 @@ from django.views.generic import RedirectView
 
 from . import views
 from orders import views as views_ops
+from .views import wave_webhook
 
 app_name = "orders"
 
 urlpatterns = [
+
+    path(
+        "admin/orders/<int:order_id>/payment/confirm-declared/",
+        views.admin_confirm_declared_payment,
+        name="admin_confirm_declared_payment",
+    ),
+    path(
+        "admin/orders/<int:order_id>/payment/reject-declared/",
+        views.admin_reject_declared_payment,
+        name="admin_reject_declared_payment",
+    ),
+
     # --- LOT_2_31_PAYMENT_UI_ROUTE_OK ---
     path("client/orders/<int:order_id>/payment-ui/", views.client_order_payment_ui_json, name="client_order_payment_ui"),
 
@@ -62,6 +75,7 @@ urlpatterns = [
     path("client/home/", views.client_home, name="client_home"),
     path("client/wallet/", views.client_wallet, name="client_wallet"),
     path("client/referrals/", views.client_referrals, name="client_referrals"),
+    path("admin/referrals/", views.admin_referral_dashboard, name="admin_referral_dashboard"),
     path("client/new/", views.client_new_order, name="client_new_order"),
     path("client/new/step-2/<int:order_id>/", views.client_new_order_step2, name="client_new_order_step2"),
     path("client/new/step-3/<int:order_id>/", views.client_new_order_step3, name="client_new_order_step3"),
@@ -188,7 +202,7 @@ urlpatterns = [
     path("laundry/weighing/<int:order_id>/dispute/", views.laundry_weighing_dispute, name="laundry_weighing_dispute"),
     # LOT_2_18_WAVE_OPS_CONFIRM_OK
     path("ops/orders/<int:order_id>/pay/wave/confirm/", views.ops_order_confirm_wave_paid, name="ops_order_confirm_wave_paid"),
-
+    path("webhooks/wave/", wave_webhook, name="wave_webhook"),
 ]
 
 # --- LOT_2_32_PAYMENT_UI_JSON_ROUTE_OK ---

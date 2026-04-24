@@ -296,7 +296,11 @@
     </div>
   </div>
   {% with hid=highlight_id|default:'' %}
-  <div class="ops-board">
+  <div class="ops-alert" style="background:#FFF7ED;border:1px solid #F4D4B6;padding:10px 14px;border-radius:12px;margin-bottom:14px;">
+    Paiements à valider : <strong>{{ pending_payment_count }}</strong>
+</div>
+
+<div class="ops-board">
     <!-- ===== En attente ===== -->
     <div class="ops-col">
       <div class="ops-col-header">
@@ -318,7 +322,7 @@
           </thead>
           <tbody>
             {% for order in pending_page_obj.object_list %}
-              {% with total_disp=order.total_client_display|default:order.total_client_ttc|default:order.total|default:0 delivery_fee_val=order.delivery_fee|default:0 %}
+              {% with total_disp=order.total_client_display|default:order.total_client_ttc|default:0 delivery_fee_val=order.delivery_fee|default:0 %}
               <tr id="order-row-{{ order.id }}" class="{% if hid and hid|stringformat:'s' == order.id|stringformat:'s' %}ops-row-highlight{% endif %}">
                 <td>
                   <strong>{{ order.code }}</strong>
@@ -420,7 +424,7 @@
           </thead>
           <tbody>
             {% for order in progress_page_obj.object_list %}
-              {% with total_disp=order.total_client_display|default:order.total_client_ttc|default:order.total|default:0 delivery_fee_val=order.delivery_fee|default:0 %}
+              {% with total_disp=order.total_client_display|default:order.total_client_ttc|default:0 delivery_fee_val=order.delivery_fee|default:0 %}
               <tr id="order-row-{{ order.id }}" class="{% if hid and hid|stringformat:'s' == order.id|stringformat:'s' %}ops-row-highlight{% endif %}">
                 <td>
                   <strong>{{ order.code }}</strong>
@@ -542,7 +546,7 @@
           </thead>
           <tbody>
             {% for order in done_page_obj.object_list %}
-              {% with total_disp=order.total_client_display|default:order.total_client_ttc|default:order.total|default:0 %}
+              {% with total_disp=order.total_client_display|default:order.total_client_ttc|default:0 %}
               <tr id="order-row-{{ order.id }}" class="{% if hid and hid|stringformat:'s' == order.id|stringformat:'s' %}ops-row-highlight{% endif %}">
                 <td>
                   <strong>{{ order.code }}</strong>

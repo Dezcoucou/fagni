@@ -652,8 +652,7 @@
                     {{ order.total_client_display|fcfa }}
                   {% elif order.total_client_ttc %}
                     {{ order.total_client_ttc|fcfa }}
-                  {% elif order.total %}
-                    {{ order.total|fcfa }}
+                  
                   {% else %}
                     0 FCFA
                   {% endif %}

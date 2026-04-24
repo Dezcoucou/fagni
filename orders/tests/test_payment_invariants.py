@@ -41,7 +41,7 @@ class PaymentInvariantTests(TestCase):
         self.assertEqual(o.amount_paid, expected_total)
         self.assertIsNotNone(o.payment_date)
 
-    def test_unpaid_clears_amount_and_date(self):
+    def test_pending_clears_amount_and_date(self):
         o = Order.objects.create(
             customer=self.c,
             status="pending",
@@ -54,7 +54,7 @@ class PaymentInvariantTests(TestCase):
         o.save()
         o.refresh_from_db()
 
-        self.assertEqual(o.payment_status, "unpaid")
+        self.assertEqual(o.payment_status, "pending")
         self.assertEqual(o.amount_paid, Decimal("0"))
         self.assertIsNone(o.payment_date)
 

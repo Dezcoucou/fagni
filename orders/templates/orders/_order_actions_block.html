@@ -2,23 +2,51 @@
 <!-- ORDER_ACTIONS_OK -->
 <a href="{% url 'orders:list' %}" class="btn btn-secondary">← Retour aux commandes</a>
 {% if order.id %}
-  {% if order.payment_status != "paid" %}
-      <a href="{% url 'orders:update' order.id %}" class="btn btn-primary">✏️ Modifier la commande</a>
-      {% if request.user.is_staff %}
-      <form method="post" action="{% url 'orders:order_mark_paid' order.id %}" style="display:inline-flex; gap:6px; align-items:center;">
-          {% csrf_token %}
-          <input type="text" name="payment_method" placeholder="Moyen (OM, Moov, cash…)"
-                 style="max-width:170px; padding:8px 10px; border-radius:999px; border:1px solid #e5e7eb; font-size:12px;">
-          <input type="text" name="payment_reference" placeholder="Référence (optionnel)"
-                 style="max-width:170px; padding:8px 10px; border-radius:999px; border:1px solid #e5e7eb; font-size:12px;">
-          <button type="submit" class="btn btn-primary"
-                  onclick="return confirm('Confirmer encaissement ? La commande sera verrouillée et les wallets distribués.');">
-              💳 Encaisser
-          </button>
-      </form>
-      {% endif %}
-  {% else %}
+  {% if order.payment_status == "paid" %}
       <span class="chip">🔒 Commande verrouillée (payée)</span>
+  {% else %}
+      <a href="{% url 'orders:update' order.id %}" class="btn btn-primary">✏️ Modifier la commande</a>
+
+      {% if order.payment_status == "declared" or order.payment_verification_status == "pending_review" %}
+          <span class="chip" style="background:#FFF8F2;color:#9A3412;border:1px solid #F4D4B6;">
+            ⏳ Paiement déclaré · en revue
+          </span>
+
+          {% if request.user.is_staff %}
+            <form method="post" action="/orders/admin/orders/{{ order.id }}/payment/confirm-declared/" style="display:inline-flex; gap:6px; align-items:center;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary"
+                        onclick="return confirm('Confirmer ce paiement déclaré ?');">
+                    ✅ Confirmer paiement
+                </button>
+            </form>
+
+            <form method="post" action="/orders/admin/orders/{{ order.id }}/payment/reject-declared/" style="display:inline-flex; gap:6px; align-items:center;">
+                {% csrf_token %}
+                <input type="text" name="reason" placeholder="Motif du rejet"
+                       style="max-width:190px; padding:8px 10px; border-radius:999px; border:1px solid #e5e7eb; font-size:12px;">
+                <button type="submit" class="btn btn-secondary"
+                        onclick="return confirm('Rejeter cette déclaration ?');">
+                    ❌ Rejeter
+                </button>
+            </form>
+          {% endif %}
+
+      {% else %}
+          {% if request.user.is_staff %}
+          <form method="post" action="{% url 'orders:order_mark_paid' order.id %}" style="display:inline-flex; gap:6px; align-items:center;">
+              {% csrf_token %}
+              <input type="text" name="payment_method" placeholder="Moyen (OM, Moov, cash…)"
+                     style="max-width:170px; padding:8px 10px; border-radius:999px; border:1px solid #e5e7eb; font-size:12px;">
+              <input type="text" name="payment_reference" placeholder="Référence (optionnel)"
+                     style="max-width:170px; padding:8px 10px; border-radius:999px; border:1px solid #e5e7eb; font-size:12px;">
+              <button type="submit" class="btn btn-primary"
+                      onclick="return confirm('Confirmer encaissement ? La commande sera verrouillée et les wallets distribués.');">
+                  💳 Encaisser
+              </button>
+          </form>
+          {% endif %}
+      {% endif %}
   {% endif %}
   <a href="{% url 'orders:order_ticket_pdf' order.id %}" class="btn btn-primary" target="_blank">🧾 Ticket client (A4)</a>
   <a href="{% url 'orders:order_ticket_thermal_pdf' order.id %}" class="btn btn-primary" target="_blank">🧾 Ticket thermique (80mm)</a>

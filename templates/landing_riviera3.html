@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>FAGNI — Pressing à domicile · Riviera 3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --navy:   #0D2137;
+  --cream:  #FDF7F0;
+  --orange: #E07A3A;
+  --green:  #1AAD5E;
+  --green2: #158A4B;
+  --gray:   #8A96A3;
+  --light:  #F4EDE3;
+  --border: #E8DDD2;
+  --white:  #FFFFFF;
+  --red:    #D64545;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream);
+  color: var(--navy);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── URGENCY ── */
+.urgency-bar {
+  background: linear-gradient(90deg,#6B3400,#A04E16);
+  color: #FFE0BF;
+  text-align: center;
+  padding: 9px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.urgency-bar::before {
+  content:'';
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:#FFB366;
+  animation:blink 1.4s infinite;
+  flex-shrink:0;
+}
+@keyframes blink {
+  0%,100% { opacity:1; }
+  50% { opacity:.2; }
+}
+
+/* ── HERO ── */
+.hero {
+  background: var(--navy);
+  padding: 30px 22px 52px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::after {
+  content:'';
+  position:absolute;
+  bottom:-2px;
+  left:0;
+  right:0;
+  height:34px;
+  background:var(--cream);
+  border-radius:26px 26px 0 0;
+}
+.hero-tag {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.13);
+  color:rgba(255,255,255,.65);
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:.9px;
+  text-transform:uppercase;
+  padding:5px 13px;
+  border-radius:100px;
+  margin-bottom:16px;
+}
+.hero h1 {
+  font-family:'Playfair Display',serif;
+  font-size:30px;
+  color:#fff;
+  line-height:1.2;
+  margin-bottom:12px;
+}
+.hero h1 em {
+  font-style:normal;
+  color:var(--orange);
+}
+.hero-sub {
+  font-size:13px;
+  color:rgba(255,255,255,.52);
+  line-height:1.65;
+  font-weight:300;
+  margin-bottom:20px;
+}
+.hero-pills {
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+}
+.hero-pill {
+  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.11);
+  color:rgba(255,255,255,.62);
+  font-size:11px;
+  padding:5px 11px;
+  border-radius:100px;
+}
+
+/* ── BODY ── */
+.body-wrap {
+  padding:0 15px 48px;
+  max-width:480px;
+  margin:0 auto;
+}
+
+.section-title {
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:1.3px;
+  text-transform:uppercase;
+  color:var(--gray);
+  margin:24px 0 11px;
+}
+
+/* ── BAG CARDS ── */
+.bag-intro {
+  background:var(--white);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:13px 15px;
+  margin-top:18px;
+  font-size:12px;
+  color:var(--navy);
+  line-height:1.55;
+}
+.bag-intro strong {
+  color:var(--orange);
+}
+
+.bag-cards {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:9px;
+  margin-top:12px;
+}
+.bag-card {
+  background:var(--white);
+  border:1.5px solid var(--border);
+  border-radius:14px;
+  padding:13px 8px;
+  text-align:center;
+  transition:all .2s;
+  position:relative;
+}
+.bag-card.active {
+  border-color:var(--orange);
+  background:#FFF5EC;
+  transform:translateY(-2px);
+  box-shadow:0 6px 18px rgba(224,122,58,.15);
+}
+.bag-card .bag-icon {
+  font-size:22px;
+  display:block;
+  margin-bottom:4px;
+}
+.bag-card .bag-size {
+  font-size:10px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.5px;
+  color:var(--gray);
+  display:block;
+  margin-bottom:2px;
+}
+.bag-card .bag-price {
+  font-size:13px;
+  font-weight:700;
+  color:var(--navy);
+  display:block;
+  margin-bottom:2px;
+}
+.bag-card.active .bag-price {
+  color:var(--orange);
+}
+.bag-card .bag-cap {
+  font-size:9px;
+  color:var(--gray);
+}
+.bag-arrow {
+  position:absolute;
+  bottom:-18px;
+  left:50%;
+  transform:translateX(-50%);
+  font-size:13px;
+  color:var(--orange);
+  display:none;
+}
+.bag-card.active .bag-arrow {
+  display:block;
+}
+
+/* ── FILL BAR ── */
+.fill-wrap {
+  background:var(--white);
+  border:1.5px solid var(--border);
+  border-radius:14px;
+  padding:14px 16px;
+  margin-top:22px;
+  display:none;
+}
+.fill-label {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:11px;
+  font-weight:600;
+  color:var(--navy);
+  margin-bottom:8px;
+}
+.fill-label span:last-child {
+  color:var(--gray);
+  font-weight:400;
+}
+.fill-bar-bg {
+  height:8px;
+  background:var(--light);
+  border-radius:100px;
+  overflow:hidden;
+}
+.fill-bar {
+  height:100%;
+  border-radius:100px;
+  background:var(--green);
+  transition:width .35s ease, background .35s;
+  width:0%;
+}
+.fill-bar.warn { background:var(--orange); }
+.fill-bar.over { background:var(--red); }
+.fill-hint {
+  font-size:10px;
+  color:var(--gray);
+  margin-top:6px;
+  text-align:right;
+}
+
+/* ── SERVICES ── */
+.services {
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:10px;
+}
+.svc {
+  background:var(--white);
+  border:2px solid var(--border);
+  border-radius:16px;
+  padding:14px 10px 10px;
+  text-align:center;
+  transition:border-color .15s, background .15s;
+  position:relative;
+  -webkit-tap-highlight-color:transparent;
+}
+.svc.in-cart {
+  border-color:var(--orange);
+  background:#FFF5EC;
+}
+.svc-icon {
+  font-size:26px;
+  display:block;
+  margin-bottom:5px;
+}
+.svc-name {
+  font-size:12px;
+  font-weight:700;
+  color:var(--navy);
+  display:block;
+  margin-bottom:1px;
+}
+.svc.in-cart .svc-name {
+  color:var(--orange);
+}
+.svc-pts {
+  font-size:10px;
+  color:var(--gray);
+}
+.svc-controls {
+  display:flex;
+  align-items:center;
+  margin-top:10px;
+  background:var(--light);
+  border-radius:10px;
+  overflow:hidden;
+  height:36px;
+}
+.svc.in-cart .svc-controls {
+  background:#FFE5CC;
+}
+.sc-btn {
+  width:36px;
+  height:36px;
+  background:none;
+  border:none;
+  font-size:20px;
+  color:var(--navy);
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:background .1s;
+  flex-shrink:0;
+}
+.sc-btn:active {
+  background:rgba(0,0,0,.07);
+}
+.sc-val {
+  flex:1;
+  text-align:center;
+  font-size:14px;
+  font-weight:700;
+  color:var(--navy);
+}
+
+/* ── CART PANEL ── */
+#cartPanel {
+  background:var(--white);
+  border:1.5px solid var(--border);
+  border-radius:16px;
+  overflow:hidden;
+  margin-top:14px;
+  display:none;
+}
+.cart-head {
+  background:var(--light);
+  padding:11px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border-bottom:1px solid var(--border);
+}
+.cart-head-label {
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  color:var(--gray);
+}
+.cart-badge {
+  background:var(--orange);
+  color:white;
+  font-size:10px;
+  font-weight:700;
+  padding:2px 9px;
+  border-radius:100px;
+}
+.cart-body {
+  padding:12px 16px;
+}
+
+.cart-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:13px;
+  padding:5px 0;
+  border-bottom:1px dashed var(--border);
+}
+.cart-row:last-of-type {
+  border-bottom:none;
+}
+.cart-row-left {
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.cart-row-icon {
+  font-size:16px;
+}
+.cart-row-name {
+  font-weight:500;
+}
+.cart-row-meta {
+  font-size:11px;
+  color:var(--gray);
+}
+
+.bag-summary {
+  margin-top:10px;
+  padding-top:10px;
+  border-top:2px solid var(--border);
+}
+.bsum-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:12px;
+  color:var(--gray);
+  padding:3px 0;
+}
+.bsum-row.total {
+  font-size:16px;
+  font-weight:700;
+  color:var(--navy);
+  padding-top:8px;
+  margin-top:4px;
+  border-top:1px dashed var(--border);
+}
+.bsum-row.total span:last-child {
+  color:var(--orange);
+  font-size:20px;
+}
+
+/* ── FIELDS ── */
+.field {
+  margin-top:13px;
+}
+.field label {
+  display:block;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.6px;
+  text-transform:uppercase;
+  color:var(--navy);
+  margin-bottom:7px;
+}
+.field input,
+.field select {
+  width:100%;
+  padding:13px 15px;
+  border:1.5px solid var(--border);
+  border-radius:12px;
+  font-family:'DM Sans',sans-serif;
+  font-size:14px;
+  color:var(--navy);
+  background:var(--white);
+  outline:none;
+  transition:border-color .18s;
+  -webkit-appearance:none;
+  appearance:none;
+}
+.field input:focus,
+.field select:focus {
+  border-color:var(--orange);
+}
+.field input::placeholder {
+  color:#C0B4A8;
+}
+.field.err input,
+.field.err select {
+  border-color:var(--red);
+}
+.field-error-msg {
+  font-size:11px;
+  color:var(--red);
+  margin-top:5px;
+  display:none;
+}
+.field.err .field-error-msg {
+  display:block;
+}
+
+.select-wrap {
+  position:relative;
+}
+.select-wrap::after {
+  content:'▾';
+  position:absolute;
+  right:15px;
+  top:50%;
+  transform:translateY(-50%);
+  color:var(--gray);
+  pointer-events:none;
+  font-size:13px;
+}
+
+/* ── CRÉNEAU ── */
+.creneau-grid {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  margin-top:4px;
+}
+.cr-pill {
+  border:1.5px solid var(--border);
+  border-radius:11px;
+  padding:10px 6px;
+  text-align:center;
+  cursor:pointer;
+  background:var(--white);
+  transition:all .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.cr-pill:active {
+  transform:scale(.96);
+}
+.cr-pill.active {
+  border-color:var(--orange);
+  background:#FFF5EC;
+}
+.cr-icon {
+  font-size:18px;
+  display:block;
+  margin-bottom:3px;
+}
+.cr-label {
+  font-size:10px;
+  font-weight:700;
+  color:var(--navy);
+  display:block;
+  margin-bottom:1px;
+}
+.cr-time {
+  font-size:9px;
+  color:var(--gray);
+}
+.cr-pill.active .cr-label {
+  color:var(--orange);
+}
+
+/* ── INLINE WARNINGS ── */
+.inline-warn {
+  background:#FFF3E8;
+  border:1px solid #F2CEA8;
+  border-radius:11px;
+  padding:11px 14px;
+  font-size:12px;
+  color:#A05A18;
+  margin-top:10px;
+  text-align:center;
+  display:none;
+}
+.max-warn {
+  background:#FEF2F2;
+  border:1px solid #FCA5A5;
+  border-radius:11px;
+  padding:10px 14px;
+  font-size:12px;
+  color:var(--red);
+  margin-top:10px;
+  display:none;
+}
+
+/* ── CTA ── */
+.cta-btn {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  width:100%;
+  padding:17px 20px;
+  background:var(--green);
+  color:white;
+  font-family:'DM Sans',sans-serif;
+  font-size:15px;
+  font-weight:700;
+  border:none;
+  border-radius:16px;
+  cursor:pointer;
+  text-decoration:none;
+  margin-top:16px;
+  box-shadow:0 8px 28px rgba(26,173,94,.28);
+  transition:all .18s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+.cta-btn:active {
+  transform:scale(.98);
+  background:var(--green2);
+  box-shadow:0 4px 14px rgba(26,173,94,.2);
+}
+.cta-btn:disabled {
+  opacity:.75;
+  cursor:not-allowed;
+}
+.cta-btn svg {
+  width:20px;
+  height:20px;
+  fill:white;
+  flex-shrink:0;
+}
+.cta-hint {
+  text-align:center;
+  font-size:11px;
+  color:var(--gray);
+  margin-top:9px;
+  line-height:1.6;
+}
+
+/* ── TRUST ── */
+.trust-grid {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:9px;
+  margin-top:20px;
+}
+.trust-item {
+  background:var(--white);
+  border-radius:12px;
+  padding:13px 8px;
+  text-align:center;
+  border:1px solid var(--border);
+}
+.trust-item .t-icon {
+  font-size:18px;
+  margin-bottom:5px;
+  display:block;
+}
+.trust-item .t-label {
+  font-size:9px;
+  font-weight:600;
+  color:var(--navy);
+  line-height:1.4;
+}
+
+/* ── FOOTER ── */
+.footer {
+  text-align:center;
+  padding:20px 16px 28px;
+  font-size:11px;
+  color:#B5A898;
+}
+.footer strong {
+  color:var(--orange);
+  font-weight:700;
+}
+
+/* ── ANIMATIONS ── */
+@keyframes slideUp {
+  from { opacity:0; transform:translateY(10px); }
+  to { opacity:1; transform:translateY(0); }
+}
+.body-wrap > * {
+  animation:slideUp .38s ease both;
+}
+.body-wrap > *:nth-child(2) { animation-delay:.06s; }
+.body-wrap > *:nth-child(3) { animation-delay:.12s; }
+.body-wrap > *:nth-child(4) { animation-delay:.16s; }
+</style>
+</head>
+<body>
+
+<div class="urgency-bar">
+  Zone pilote — Les Lauriers 1 &amp; Les Rosiers · Traitement prioritaire
+</div>
+
+<div class="hero">
+  <div class="hero-tag">📍 Riviera 3 · Abidjan</div>
+  <h1>Votre linge,<br>propre et <em>livré.</em></h1>
+  <p class="hero-sub">Remplissez votre sac, on s'occupe du reste.<br>Collecte · Traitement · Livraison à domicile.</p>
+  <div class="hero-pills">
+    <span class="hero-pill">🛵 Collecte à domicile</span>
+    <span class="hero-pill">🔒 Paiement à la livraison</span>
+    <span class="hero-pill">💬 Réponse &lt; 30 min</span>
+  </div>
+</div>
+
+<div class="body-wrap">
+
+  <p class="section-title">Tarifs</p>
+  <div class="bag-intro">
+    Le prix dépend du <strong>volume de votre sac</strong>.<br>
+    Il est calculé <strong>automatiquement</strong> selon ce que vous ajoutez.
+  </div>
+
+  <div class="bag-cards">
+    <div class="bag-card" id="bag-0">
+      <span class="bag-icon">👜</span>
+      <span class="bag-size">Petit</span>
+      <span class="bag-price">3 000 FCFA</span>
+      <span class="bag-cap">jusqu'à 10 pts</span>
+      <span class="bag-arrow">▼</span>
+    </div>
+    <div class="bag-card" id="bag-1">
+      <span class="bag-icon">🛍</span>
+      <span class="bag-size">Moyen</span>
+      <span class="bag-price">5 000 FCFA</span>
+      <span class="bag-cap">jusqu'à 20 pts</span>
+      <span class="bag-arrow">▼</span>
+    </div>
+    <div class="bag-card" id="bag-2">
+      <span class="bag-icon">🧳</span>
+      <span class="bag-size">Grand</span>
+      <span class="bag-price">8 000 FCFA</span>
+      <span class="bag-cap">jusqu'à 30 pts</span>
+      <span class="bag-arrow">▼</span>
+    </div>
+  </div>
+
+  <div class="fill-wrap" id="fillWrap">
+    <div class="fill-label">
+      <span>Remplissage du sac</span>
+      <span id="fillText">0 pts</span>
+    </div>
+    <div class="fill-bar-bg">
+      <div class="fill-bar" id="fillBar"></div>
+    </div>
+    <div class="fill-hint" id="fillHint"></div>
+  </div>
+
+  <div class="max-warn" id="maxWarn">
+    🛑 Capacité maximale atteinte (30 pts). Retirez un article pour continuer.
+  </div>
+
+  <p class="section-title" style="margin-top:24px;">Ajouter des articles</p>
+  <div class="services" id="serviceGrid"></div>
+
+  <div id="cartPanel">
+    <div class="cart-head">
+      <span class="cart-head-label">Votre panier</span>
+      <span class="cart-badge" id="cartBadge">0</span>
+    </div>
+    <div class="cart-body" id="cartBody"></div>
+  </div>
+
+  <div class="field" id="fieldName">
+    <label>Votre prénom</label>
+    <input id="name" type="text" placeholder="Ex : Désiré" oninput="buildWA()"/>
+  </div>
+
+  <div class="field" id="fieldZone">
+    <label>Votre résidence</label>
+    <div class="select-wrap">
+      <select id="zone" onchange="buildWA()">
+        <option value="">Sélectionner votre résidence</option>
+        <option>Les Lauriers 1</option>
+        <option>Les Rosiers</option>
+        <option>Autre (confirmation nécessaire)</option>
+      </select>
+    </div>
+    <div class="field-error-msg">Veuillez sélectionner votre résidence</div>
+  </div>
+
+  <div class="field">
+    <label>Créneau de collecte souhaité</label>
+    <div class="creneau-grid">
+      <div class="cr-pill active" data-cr="Matin (8h–12h)" onclick="pickCr(this)">
+        <span class="cr-icon">🌤</span>
+        <span class="cr-label">Matin</span>
+        <span class="cr-time">8h – 12h</span>
+      </div>
+      <div class="cr-pill" data-cr="Après-midi (12h–17h)" onclick="pickCr(this)">
+        <span class="cr-icon">☀️</span>
+        <span class="cr-label">Après-midi</span>
+        <span class="cr-time">12h – 17h</span>
+      </div>
+      <div class="cr-pill" data-cr="Soir (17h–20h)" onclick="pickCr(this)">
+        <span class="cr-icon">🌆</span>
+        <span class="cr-label">Soir</span>
+        <span class="cr-time">17h – 20h</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="inline-warn" id="emptyWarn">⚠️ Ajoutez au moins un article pour commander.</div>
+
+  <button class="cta-btn" id="waBtn" onclick="send()">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+    </svg>
+    Commander sur WhatsApp
+  </button>
+  <p class="cta-hint">Confirmation avant traitement · Paiement à la livraison</p>
+
+  <div class="trust-grid">
+    <div class="trust-item">
+      <span class="t-icon">🛵</span>
+      <div class="t-label">Collecte à domicile</div>
+    </div>
+    <div class="trust-item">
+      <span class="t-icon">✅</span>
+      <div class="t-label">Paiement à la livraison</div>
+    </div>
+    <div class="trust-item">
+      <span class="t-icon">💬</span>
+      <div class="t-label">Confirmation avant traitement</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <strong>FAGNI</strong> · Services du quotidien · Riviera 3, Abidjan
+</div>
+
+<script>
+const GSHEET_URL = "https://script.google.com/macros/s/AKfycbzFJEGIUAK10CE2JayP9wfknvrsFoSFOSQ2Hfxb37-guYMIJZHrizIJgPkfmWlhkpHrxw/exec";
+const WA_NUMBER  = "2250748643892";
+
+const WEIGHTS = {
+  tshirt: 1,
+  chemise: 1,
+  pantalon: 1.5,
+  drap: 2,
+  robe: 1.5,
+  costume: 3
+};
+
+const CATALOGUE = [
+  { id:"tshirt",   name:"T-shirts",         icon:"👕", pts:"1 pt" },
+  { id:"chemise",  name:"Chemises",         icon:"👔", pts:"1 pt" },
+  { id:"pantalon", name:"Pantalons",        icon:"👖", pts:"1,5 pts" },
+  { id:"drap",     name:"Linge maison",     icon:"🛏", pts:"2 pts" },
+  { id:"robe",     name:"Robes",            icon:"👗", pts:"1,5 pts" },
+  { id:"costume",  name:"Vestes/Costumes",  icon:"🤵", pts:"3 pts" }
+];
+
+const BAGS = [
+  { name:"Petit sac", emoji:"👜", max:10, price:3000 },
+  { name:"Sac moyen", emoji:"🛍", max:20, price:5000 },
+  { name:"Grand sac", emoji:"🧳", max:30, price:8000 }
+];
+
+const MAX_PTS = 30;
+
+const cart = {};
+let creneau = "Matin (8h–12h)";
+let waUrl = "";
+
+const grid = document.getElementById("serviceGrid");
+CATALOGUE.forEach(item => {
+  const div = document.createElement("div");
+  div.className = "svc";
+  div.dataset.id = item.id;
+  div.innerHTML = `
+    <span class="svc-icon">${item.icon}</span>
+    <span class="svc-name">${item.name}</span>
+    <span class="svc-pts">${item.pts} / pièce</span>
+    <div class="svc-controls">
+      <button class="sc-btn" onclick="adj('${item.id}',-1)" type="button">−</button>
+      <span class="sc-val" id="v-${item.id}">0</span>
+      <button class="sc-btn" onclick="adj('${item.id}',1)" type="button">+</button>
+    </div>`;
+  grid.appendChild(div);
+});
+
+function adj(id, delta) {
+  const prev = cart[id] || 0;
+  const next = Math.max(0, prev + delta);
+  const projectedScore = getScore() - ((WEIGHTS[id] || 0) * prev) + ((WEIGHTS[id] || 0) * next);
+
+  if (projectedScore > MAX_PTS) {
+    const maxWarn = document.getElementById("maxWarn");
+    maxWarn.style.display = "block";
+    setTimeout(() => {
+      maxWarn.style.display = "none";
+    }, 2500);
+    return;
+  }
+
+  cart[id] = next;
+  document.getElementById("v-" + id).textContent = next;
+  document.querySelector(`[data-id="${id}"]`).classList.toggle("in-cart", next > 0);
+  refresh();
+}
+
+function getItems() {
+  return CATALOGUE
+    .filter(c => (cart[c.id] || 0) > 0)
+    .map(c => ({ ...c, qty: cart[c.id] }));
+}
+
+function getScore() {
+  return getItems().reduce((s, i) => s + (WEIGHTS[i.id] * i.qty), 0);
+}
+
+function getBag(score) {
+  return BAGS.find(b => score <= b.max) || BAGS[BAGS.length - 1];
+}
+
+function fmt(n) {
+  return n.toLocaleString("fr-FR");
+}
+
+function refresh() {
+  const items = getItems();
+  const hasItems = items.length > 0;
+  const score = getScore();
+  const bag = getBag(score);
+
+  BAGS.forEach((b, i) => {
+    document.getElementById("bag-" + i).classList.toggle("active", hasItems && b.name === bag.name);
+  });
+
+  document.getElementById("fillWrap").style.display = hasItems ? "block" : "none";
+
+  if (hasItems) {
+    const pct = (score / MAX_PTS) * 100;
+    const bar = document.getElementById("fillBar");
+    bar.style.width = pct + "%";
+    bar.className = "fill-bar" + (pct >= 100 ? " over" : pct >= 66 ? " warn" : "");
+    document.getElementById("fillText").textContent = `${score} / ${bag.max} pts`;
+
+    const rem = bag.max - score;
+    document.getElementById("fillHint").textContent = rem > 0
+      ? `Il reste ${rem} pt${rem > 1 ? "s" : ""} dans ce sac`
+      : "Sac plein";
+  }
+
+  document.getElementById("cartPanel").style.display = hasItems ? "block" : "none";
+
+  if (hasItems) {
+    const count = items.reduce((s, i) => s + i.qty, 0);
+    document.getElementById("cartBadge").textContent = count + " article" + (count > 1 ? "s" : "");
+
+    document.getElementById("cartBody").innerHTML =
+      items.map(i => `
+        <div class="cart-row">
+          <div class="cart-row-left">
+            <span class="cart-row-icon">${i.icon}</span>
+            <div>
+              <div class="cart-row-name">${i.name}</div>
+              <div class="cart-row-meta">× ${i.qty} · ${WEIGHTS[i.id] * i.qty} pt${WEIGHTS[i.id] * i.qty > 1 ? "s" : ""}</div>
+            </div>
+          </div>
+        </div>
+      `).join("") +
+      `<div class="bag-summary">
+        <div class="bsum-row"><span>Volume total</span><span>${score} pts</span></div>
+        <div class="bsum-row"><span>Type de sac</span><span>${bag.emoji} ${bag.name}</span></div>
+        <div class="bsum-row total"><span>Prix</span><span>${fmt(bag.price)} FCFA</span></div>
+      </div>`;
+  }
+
+  buildWA();
+}
+
+function buildWA() {
+  const items = getItems();
+  if (!items.length) {
+    waUrl = "";
+    return;
+  }
+
+  const score = getScore();
+  const bag = getBag(score);
+  const name = document.getElementById("name").value.trim();
+  const zone = document.getElementById("zone").value || "Riviera 3";
+
+  const list = items.map(i =>
+    `  - ${i.icon} *${i.name}* × ${i.qty} (${WEIGHTS[i.id] * i.qty} pt${WEIGHTS[i.id] * i.qty > 1 ? "s" : ""})`
+  ).join("\n");
+
+  const msg =
+`${name ? `Bonjour, je suis *${name}* 👋` : "Bonjour 👋"}
+Je suis à *${zone}* (Riviera 3).
+
+🧺 *Ma commande :*
+${list}
+
+📦 *Type de sac :* ${bag.emoji} ${bag.name} (${score} pts)
+💰 *Prix :* *${fmt(bag.price)} FCFA*
+📅 *Créneau souhaité :* ${creneau}
+
+Je suis prêt à confirmer — pouvez-vous me proposer un créneau de collecte ? 🙏`;
+
+  waUrl = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`;
+}
+
+function pickCr(el) {
+  document.querySelectorAll(".cr-pill").forEach(p => p.classList.remove("active"));
+  el.classList.add("active");
+  creneau = el.dataset.cr;
+  buildWA();
+}
+
+async function send() {
+  const items = getItems();
+  const zone = document.getElementById("zone");
+  let valid = true;
+
+  if (!items.length) {
+    const w = document.getElementById("emptyWarn");
+    w.style.display = "block";
+    w.scrollIntoView({ behavior:"smooth", block:"center" });
+    setTimeout(() => {
+      w.style.display = "none";
+    }, 3000);
+    valid = false;
+  }
+
+  if (!zone.value) {
+    document.getElementById("fieldZone").classList.add("err");
+    zone.focus();
+    setTimeout(() => {
+      document.getElementById("fieldZone").classList.remove("err");
+    }, 2000);
+    valid = false;
+  }
+
+  if (!valid) return;
+
+  const btn = document.getElementById("waBtn");
+  const initialHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = "Envoi...";
+
+  const score = getScore();
+  const bag = getBag(score);
+
+  try {
+    await fetch(GSHEET_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ts: new Date().toISOString(),
+        name: document.getElementById("name").value.trim() || "—",
+        zone: zone.value,
+        creneau: creneau,
+        articles: items.map(i => `${i.name}×${i.qty}`).join(", "),
+        score: score,
+        bag: bag.name,
+        total: bag.price,
+        source: "landing_riviera3"
+      })
+    });
+  } catch (e) {
+    console.log("Tracking échoué:", e);
+  }
+
+  buildWA();
+
+  if (waUrl) {
+    window.location.href = waUrl;
+  }
+
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.innerHTML = initialHtml;
+  }, 3000);
+}
+
+refresh();
+</script>
+</body>
+</html>

@@ -1133,3 +1133,348 @@ class PaymentAdmin(UnfoldModelAdmin):
     search_fields = ["order__code", "reference"]
     ordering = ["-created_at"]
     readonly_fields = ["order", "amount", "channel", "reference", "source", "created_at"]
+
+
+
+# === PAYMENT REVIEW / ADMIN BADGES AUTO PATCH ===
+try:
+    from decimal import Decimal
+    from django.utils.html import format_html
+except Exception:
+    Decimal = None
+    def format_html(s, *args, **kwargs):
+        return s.format(*args, **kwargs)
+
+def _fmt_fcfa_admin(value):
+    try:
+        if Decimal is not None:
+            v = Decimal(str(value or 0))
+            return f"{int(v):,}".replace(",", " ") + " FCFA"
+        return f"{int(value or 0):,}".replace(",", " ") + " FCFA"
+    except Exception:
+        return "0 FCFA"
+
+def _order_admin_payment_status_badge(self, obj):
+    status = (getattr(obj, "payment_status", "") or "").strip().lower()
+    labels = {
+        "pending": ("En attente", "#FFF7ED", "#C2410C", "#FED7AA"),
+        "declared": ("Déclaré", "#EFF6FF", "#1D4ED8", "#BFDBFE"),
+        "partial": ("Partiel", "#FEF3C7", "#92400E", "#FDE68A"),
+        "paid": ("Payé", "#ECFDF5", "#065F46", "#BBF7D0"),
+        "unpaid": ("Non payé", "#F8FAFC", "#475569", "#E2E8F0"),
+    }
+    label, bg, fg, bd = labels.get(status, (status or "—", "#F8FAFC", "#475569", "#E2E8F0"))
+    return format_html(
+        '<span style="display:inline-flex;align-items:center;min-height:28px;padding:0 10px;'
+        'border-radius:999px;background:{};color:{};border:1px solid {};font-weight:800;font-size:12px;">'
+        '{}'
+        '</span>',
+        bg, fg, bd, label
+    )
+
+def _order_admin_payment_verification_badge(self, obj):
+    status = (getattr(obj, "payment_verification_status", "") or "").strip().lower()
+    labels = {
+        "none": ("Aucune", "#F8FAFC", "#475569", "#E2E8F0"),
+        "pending_review": ("En revue", "#EFF6FF", "#1D4ED8", "#BFDBFE"),
+        "verified": ("Vérifié", "#ECFDF5", "#065F46", "#BBF7D0"),
+        "rejected": ("Rejeté", "#FEF2F2", "#991B1B", "#FECACA"),
+    }
+    label, bg, fg, bd = labels.get(status, (status or "—", "#F8FAFC", "#475569", "#E2E8F0"))
+    return format_html(
+        '<span style="display:inline-flex;align-items:center;min-height:28px;padding:0 10px;'
+        'border-radius:999px;background:{};color:{};border:1px solid {};font-weight:800;font-size:12px;">'
+        '{}'
+        '</span>',
+        bg, fg, bd, label
+    )
+
+def _order_admin_amount_remaining(self, obj):
+    try:
+        total = Decimal(str(getattr(obj, "total_client_ttc", 0) or 0))
+        paid = Decimal(str(getattr(obj, "amount_paid", 0) or 0))
+        remain = total - paid
+        if remain < 0:
+            remain = Decimal("0")
+        return _fmt_fcfa_admin(remain)
+    except Exception:
+        return "0 FCFA"
+
+def _order_admin_payment_declared_at(self, obj):
+    return getattr(obj, "payment_declared_at", None)
+
+_order_admin_payment_status_badge.short_description = "Statut paiement"
+_order_admin_payment_status_badge.admin_order_field = "payment_status"
+
+_order_admin_payment_verification_badge.short_description = "Revue paiement"
+_order_admin_payment_verification_badge.admin_order_field = "payment_verification_status"
+
+_order_admin_amount_remaining.short_description = "Reste à payer"
+
+_order_admin_payment_declared_at.short_description = "Déclaré le"
+_order_admin_payment_declared_at.admin_order_field = "payment_declared_at"
+
+try:
+    if "payment_status_badge" not in OrderAdmin.__dict__:
+        OrderAdmin.payment_status_badge = _order_admin_payment_status_badge
+
+    if "payment_verification_badge" not in OrderAdmin.__dict__:
+        OrderAdmin.payment_verification_badge = _order_admin_payment_verification_badge
+
+    if "amount_remaining_admin" not in OrderAdmin.__dict__:
+        OrderAdmin.amount_remaining_admin = _order_admin_amount_remaining
+
+    if "payment_declared_at_admin" not in OrderAdmin.__dict__:
+        OrderAdmin.payment_declared_at_admin = _order_admin_payment_declared_at
+
+    # list_display
+    existing = list(getattr(OrderAdmin, "list_display", ()) or ())
+    wanted_front = [
+        "payment_status_badge",
+        "payment_verification_badge",
+    ]
+    wanted_tail = [
+        "amount_remaining_admin",
+        "payment_declared_at_admin",
+    ]
+    new_display = []
+    for x in wanted_front + existing + wanted_tail:
+        if x and x not in new_display:
+            new_display.append(x)
+    OrderAdmin.list_display = tuple(new_display)
+
+    # list_filter
+    existing_filters = list(getattr(OrderAdmin, "list_filter", ()) or ())
+    for x in ["payment_status", "payment_verification_status", "payment_declared_channel"]:
+        if x not in existing_filters:
+            existing_filters.append(x)
+    OrderAdmin.list_filter = tuple(existing_filters)
+
+    # readonly_fields
+    existing_ro = list(getattr(OrderAdmin, "readonly_fields", ()) or ())
+    for x in [
+        "payment_declared_at",
+        "payment_declared_channel",
+        "payment_declared_reference",
+        "payment_verified_at",
+        "payment_verified_by",
+    ]:
+        if x not in existing_ro:
+            existing_ro.append(x)
+    OrderAdmin.readonly_fields = tuple(existing_ro)
+
+    # fieldsets
+    fieldsets = getattr(OrderAdmin, "fieldsets", None)
+    if fieldsets:
+        has_payment_review = False
+        for fs in fieldsets:
+            title = ""
+            try:
+                title = (fs[0] or "").strip().lower()
+            except Exception:
+                title = ""
+            if "paiement" in title or "payment" in title:
+                try:
+                    fields = list(fs[1].get("fields", ()))
+                    for x in (
+                        "payment_status",
+                        "payment_verification_status",
+                        "payment_declared_at",
+                        "payment_declared_channel",
+                        "payment_declared_reference",
+                        "payment_verified_at",
+                        "payment_verified_by",
+                    ):
+                        if x not in fields:
+                            fields.append(x)
+                    fs[1]["fields"] = tuple(fields)
+                    has_payment_review = True
+                    break
+                except Exception:
+                    pass
+
+        if not has_payment_review:
+            fieldsets = list(fieldsets)
+            fieldsets.append((
+                "Revue paiement",
+                {
+                    "fields": (
+                        "payment_status",
+                        "payment_verification_status",
+                        "payment_declared_at",
+                        "payment_declared_channel",
+                        "payment_declared_reference",
+                        "payment_verified_at",
+                        "payment_verified_by",
+                    )
+                }
+            ))
+            OrderAdmin.fieldsets = tuple(fieldsets)
+
+    print("PATCH ADMIN BLOC A OK")
+except NameError:
+    print("OrderAdmin introuvable dans orders/admin.py")
+    raise
+
+
+
+# === PAYMENT REVIEW ACTIONS AUTO PATCH ===
+from django.utils import timezone
+
+def _action_mark_payment_declared(self, request, queryset):
+    updated = 0
+    for obj in queryset:
+        changed = False
+
+        if getattr(obj, "payment_status", None) != "declared":
+            obj.payment_status = "declared"
+            changed = True
+
+        if getattr(obj, "payment_verification_status", None) != "pending_review":
+            obj.payment_verification_status = "pending_review"
+            changed = True
+
+        if not getattr(obj, "payment_declared_at", None):
+            obj.payment_declared_at = timezone.now()
+            changed = True
+
+        if not getattr(obj, "payment_declared_channel", ""):
+            obj.payment_declared_channel = "admin"
+            changed = True
+
+        if changed:
+            fields = [
+                "payment_status",
+                "payment_verification_status",
+                "payment_declared_at",
+                "payment_declared_channel",
+            ]
+            obj.save(update_fields=fields)
+            updated += 1
+
+    self.message_user(request, f"{updated} commande(s) marquée(s) comme paiement déclaré.")
+_action_mark_payment_declared.short_description = "Marquer comme paiement déclaré"
+
+def _action_mark_payment_verified(self, request, queryset):
+    updated = 0
+    for obj in queryset:
+        changed = False
+
+        if getattr(obj, "payment_status", None) != "paid":
+            obj.payment_status = "paid"
+            changed = True
+
+        if getattr(obj, "payment_verification_status", None) != "verified":
+            obj.payment_verification_status = "verified"
+            changed = True
+
+        if not getattr(obj, "payment_declared_at", None):
+            obj.payment_declared_at = timezone.now()
+            changed = True
+
+        if not getattr(obj, "payment_verified_at", None):
+            obj.payment_verified_at = timezone.now()
+            changed = True
+        else:
+            obj.payment_verified_at = timezone.now()
+            changed = True
+
+        if getattr(obj, "payment_verified_by_id", None) != getattr(request.user, "id", None):
+            obj.payment_verified_by = request.user
+            changed = True
+
+        # Cohérence minimale avec ancien moteur
+        try:
+            total = getattr(obj, "total_client_ttc", None) or 0
+            if total and getattr(obj, "amount_paid", 0) != total:
+                obj.amount_paid = total
+                changed = True
+        except Exception:
+            pass
+
+        try:
+            if not getattr(obj, "payment_date", None):
+                obj.payment_date = timezone.now()
+                changed = True
+        except Exception:
+            pass
+
+        if changed:
+            fields = [
+                "payment_status",
+                "payment_verification_status",
+                "payment_declared_at",
+                "payment_verified_at",
+                "payment_verified_by",
+            ]
+            if hasattr(obj, "amount_paid"):
+                fields.append("amount_paid")
+            if hasattr(obj, "payment_date"):
+                fields.append("payment_date")
+
+            obj.save(update_fields=list(dict.fromkeys(fields)))
+            updated += 1
+
+    self.message_user(request, f"{updated} commande(s) marquée(s) comme paiement vérifié.")
+_action_mark_payment_verified.short_description = "Marquer comme paiement vérifié"
+
+def _action_reject_payment_declared(self, request, queryset):
+    updated = 0
+    for obj in queryset:
+        changed = False
+
+        if getattr(obj, "payment_verification_status", None) != "rejected":
+            obj.payment_verification_status = "rejected"
+            changed = True
+
+        # Si pas déjà payé, on revient à pending
+        if getattr(obj, "payment_status", None) != "paid":
+            if getattr(obj, "payment_status", None) != "pending":
+                obj.payment_status = "pending"
+                changed = True
+
+        if getattr(obj, "payment_verified_by_id", None):
+            obj.payment_verified_by = None
+            changed = True
+
+        if getattr(obj, "payment_verified_at", None):
+            obj.payment_verified_at = None
+            changed = True
+
+        if changed:
+            obj.save(update_fields=[
+                "payment_status",
+                "payment_verification_status",
+                "payment_verified_by",
+                "payment_verified_at",
+            ])
+            updated += 1
+
+    self.message_user(request, f"{updated} déclaration(s) de paiement rejetée(s).")
+_action_reject_payment_declared.short_description = "Rejeter la déclaration de paiement"
+
+try:
+    if "mark_payment_declared" not in OrderAdmin.__dict__:
+        OrderAdmin.mark_payment_declared = _action_mark_payment_declared
+
+    if "mark_payment_verified" not in OrderAdmin.__dict__:
+        OrderAdmin.mark_payment_verified = _action_mark_payment_verified
+
+    if "reject_payment_declared" not in OrderAdmin.__dict__:
+        OrderAdmin.reject_payment_declared = _action_reject_payment_declared
+
+    existing_actions = list(getattr(OrderAdmin, "actions", ()) or [])
+    for name in [
+        "mark_payment_declared",
+        "mark_payment_verified",
+        "reject_payment_declared",
+    ]:
+        if name not in existing_actions:
+            existing_actions.append(name)
+    OrderAdmin.actions = tuple(existing_actions)
+
+    print("PATCH ADMIN BLOC B OK")
+except NameError:
+    print("OrderAdmin introuvable dans orders/admin.py")
+    raise
+

@@ -17,17 +17,17 @@
                 💰 Dashboard finance
             </a>
             <a href="{% url 'mlm:global_dashboard' %}" class="btn btn-light btn-sm">
-                🌍 Dashboard MLM
+                🌍 Dashboard Parrainage
             </a>
             {% if customer and customer.referral_profiles.first %}
                 {% with profile=customer.referral_profiles.first %}
                     <a href="{% url 'mlm:affiliate_detail' profile.referral_code %}" class="btn btn-primary">
-                        🌱 Fiche affilié de ce client
+                        🌱 Fiche parrainage de ce client
                     </a>
                 {% endwith %}
             {% endif %}
             <a href="{% url 'mlm:affiliate_dashboard' %}" class="btn btn-light">
-                👤 Mon espace affilié
+                👤 Mon espace parrainage
             </a>
         </div>
     <!-- INFO CLIENT + SOLDE -->

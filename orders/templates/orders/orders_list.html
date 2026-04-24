@@ -44,6 +44,21 @@
                                     <span class="field-value-muted">💳 {{ order.get_payment_status_display|default:order.payment_status }}</span>
                                 </div>
                             {% endif %}
+
+                            {% if order.payment_status == "declared" or order.payment_verification_status == "pending_review" %}
+                                <div style="margin-top:6px;">
+                                    <span style="display:inline-block;padding:4px 8px;border-radius:999px;background:#FFF7ED;color:#9A3412;font-weight:700;font-size:11px;">
+                                        ⏳ Paiement déclaré
+                                    </span>
+                                </div>
+                            {% elif order.payment_verification_status == "rejected" %}
+                                <div style="margin-top:6px;">
+                                    <span style="display:inline-block;padding:4px 8px;border-radius:999px;background:#FEF2F2;color:#991B1B;font-weight:700;font-size:11px;">
+                                        ❌ Déclaration rejetée
+                                    </span>
+                                </div>
+                            {% endif %}
+
                             {% if order.payment_status == "paid" %}
                                 <div style="margin-top:6px;">
                                     <span class="field-value-muted">🧾 Facture : {{ order.invoice_number|default:"—" }}</span>

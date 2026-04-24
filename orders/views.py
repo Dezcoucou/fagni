@@ -13,7 +13,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, JsonResponse, HttpResponseBadRequest, HttpResponseForbidden, Http404
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods
-from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import (
     Count,
@@ -30,8 +30,10 @@ from django.db.models import (
 from django.db import transaction
 from wallets.models import WalletTransaction
 from wallets.services import (
+    get_or_create_wallet_for_customer,
     get_or_create_wallet_for_delivery_partner,
     credit_wallet,
+    debit_wallet,
     distribute_order_revenues,
 )
 from django.db.models.functions import Coalesce, Cast, TruncDate
@@ -91,6 +93,166 @@ DECIMAL_ZERO = Decimal("0")
 
 
 logger = logging.getLogger(__name__)
+
+
+# =========================
+# FAGNI MONETISATION ENGINE
+# =========================
+def apply_fagni_monetization(order):
+    from decimal import Decimal
+    from wallets.services import get_or_create_wallet_for_customer, credit_wallet
+    from mlm.models import ReferralLink
+
+    if not order or not getattr(order, "customer", None):
+        return
+
+    customer = order.customer
+
+    try:
+        total = Decimal(str(getattr(order, "total_client_ttc", 0) or 0))
+    except Exception:
+        total = Decimal("0")
+
+    # ---- CASHBACK 2% ----
+    cashback = (total * Decimal("0.02")).quantize(Decimal("0.01"))
+
+    try:
+        wallet = get_or_create_wallet_for_customer(customer)
+        if cashback > 0:
+            credit_wallet(
+                wallet=wallet,
+                amount=cashback,
+                description=f"Cashback FAGNI commande {order.code}"
+            )
+    except Exception:
+        pass
+
+    # ---- REFERRAL ----
+    try:
+        ref = ReferralLink.objects.filter(referred_customer=customer).first()
+        if ref and ref.referrer:
+            referrer_wallet = get_or_create_wallet_for_customer(ref.referrer)
+
+            credit_wallet(
+                wallet=referrer_wallet,
+                amount=Decimal("500"),
+                description=f"Parrainage FAGNI {customer.name}"
+            )
+
+            credit_wallet(
+                wallet=wallet,
+                amount=Decimal("300"),
+                description="Bonus bienvenue FAGNI"
+            )
+    except Exception:
+        pass
+
+
+
+
+def referral_dashboard_data():
+    """
+    KPI business du moteur de parrainage FAGNI.
+    """
+    from django.db.models import Sum, Q, Count
+    from wallets.models import WalletTransaction
+    from orders.models import Order
+    from decimal import Decimal
+
+    referred_orders = (
+        Order.objects
+        .exclude(referral_code__isnull=True)
+        .exclude(referral_code__exact="")
+    )
+
+    total_orders = referred_orders.count()
+
+    paid_orders_qs = referred_orders.filter(
+        Q(payment_status="paid") | Q(status__in=["paid", "completed", "done"])
+    )
+    paid_orders = paid_orders_qs.count()
+
+    total_ca = paid_orders_qs.aggregate(
+        total=Sum("total_client_ttc")
+    ).get("total") or Decimal("0")
+
+    reward_qs = WalletTransaction.objects.filter(
+        type="mlm_commission",
+        direction="in",
+    )
+
+    total_rewards = reward_qs.aggregate(
+        total=Sum("amount")
+    ).get("total") or Decimal("0")
+
+    rewarded_users = (
+        reward_qs.values("wallet__customer_id")
+        .exclude(wallet__customer_id__isnull=True)
+        .distinct()
+        .count()
+    )
+
+    activated_wallet_users = (
+        WalletTransaction.objects
+        .filter(
+            wallet__owner_type="customer",
+            direction="out",
+            amount__gt=0,
+            wallet__customer_id__in=reward_qs.values("wallet__customer_id"),
+        )
+        .values("wallet__customer_id")
+        .distinct()
+        .count()
+    )
+
+    conversion = Decimal("0")
+    if total_orders > 0:
+        conversion = (Decimal(str(paid_orders)) / Decimal(str(total_orders))) * Decimal("100")
+
+    wallet_activation_rate = Decimal("0")
+    if rewarded_users > 0:
+        wallet_activation_rate = (
+            Decimal(str(activated_wallet_users)) / Decimal(str(rewarded_users))
+        ) * Decimal("100")
+
+    roi_ratio = Decimal("0")
+    if total_rewards > 0:
+        roi_ratio = Decimal(str(total_ca)) / Decimal(str(total_rewards))
+
+    top_sponsors = (
+        reward_qs
+        .filter(wallet__owner_type="customer")
+        .values(
+            "wallet__customer__id",
+            "wallet__customer__name",
+            "wallet__customer__phone",
+        )
+        .annotate(
+            total_commission=Sum("amount"),
+            rewards_count=Count("id"),
+        )
+        .order_by("-total_commission")[:10]
+    )
+
+    return {
+        "total_orders": total_orders,
+        "paid_orders": paid_orders,
+        "conversion": conversion.quantize(Decimal("0.1")) if total_orders else Decimal("0.0"),
+        "total_ca": total_ca,
+        "total_rewards": total_rewards,
+        "rewarded_users": rewarded_users,
+        "activated_wallet_users": activated_wallet_users,
+        "wallet_activation_rate": wallet_activation_rate.quantize(Decimal("0.1")) if rewarded_users else Decimal("0.0"),
+        "roi_ratio": roi_ratio.quantize(Decimal("0.1")) if total_rewards else Decimal("0.0"),
+        "top_sponsors": top_sponsors,
+    }
+
+
+@staff_member_required
+def admin_referral_dashboard(request):
+    ctx = referral_dashboard_data()
+    return render(request, "orders/admin_referral_dashboard.html", ctx)
+
 # =========================
 #  Helpers AJAX / Client auth
 # =========================
@@ -105,8 +267,9 @@ def _build_client_display_items(order):
 
     for it in qs:
         label = (
-            getattr(it, "name", None)
-            or getattr(it, "designation", None)
+            getattr(it, "designation", None)
+            or getattr(getattr(it, "service", None), "name", None)
+            or getattr(it, "service_type", None)
             or "Article"
         )
         qty = getattr(it, "quantity", None) or 1
@@ -346,9 +509,11 @@ def client_referrals(request):
 
         referral_url = f"https://fagni.app/invite/{profile.referral_code}"
         referral_whatsapp_text = (
-            "Je t’invite à utiliser FAGNI pour ton linge 👌\n"
-            "Utilise mon lien de parrainage pour découvrir le service :\n"
-            f"{referral_url}"
+            f"💰 {customer.name if customer and getattr(customer, 'name', None) else 'Je'} viens de découvrir une astuce simple pour gagner de l’argent avec FAGNI\n\n"
+            "Tu peux commander ton linge et gagner des récompenses en invitant 1 proche 👌\n\n"
+            "👉 Teste ici :\n"
+            f"{referral_url}\n\n"
+            "Franchement, ça vaut le coup d’essayer 🔥"
         )
         referral_whatsapp_url = (
             "https://wa.me/?text=" + quote(referral_whatsapp_text)
@@ -361,8 +526,32 @@ def client_referrals(request):
         referral_whatsapp_text = ""
         referral_whatsapp_url = ""
 
-    projected_gain_low = 10000
-    projected_gain_high = 30000
+    gains = compute_referral_gains(profile) if profile else {}
+
+    projected_gain_low = 5000
+    projected_gain_high = 20000
+
+    earning_scenarios = [
+        {"label": "1 proche actif", "amount": 2000},
+        {"label": "3 proches actifs", "amount": 5000},
+        {"label": "5 proches actifs", "amount": 10000},
+    ]
+
+    wallet_activation_message = ""
+    wallet_reminder_text = ""
+    wallet_reminder_whatsapp_url = ""
+    child_referral_discount = 500
+
+    if gains and gains.get("total", 0):
+        wallet_activation_message = (
+            f"Tu as déjà jusqu’à {gains.get('total', 0)} FCFA de gains potentiels dans ton réseau FAGNI."
+        )
+        wallet_reminder_text = (
+            f"Bonjour, j’ai déjà jusqu’à {gains.get('total', 0)} FCFA de gains potentiels dans mon espace FAGNI. "
+            "Je veux activer mes gains sur ma prochaine commande. "
+            "Peux-tu m’aider à finaliser ma commande maintenant ?"
+        )
+        wallet_reminder_whatsapp_url = "https://wa.me/?text=" + quote(wallet_reminder_text)
 
     ctx = {
         "phone": phone,
@@ -376,6 +565,12 @@ def client_referrals(request):
         "referral_whatsapp_url": referral_whatsapp_url,
         "projected_gain_low": projected_gain_low,
         "projected_gain_high": projected_gain_high,
+        "earning_scenarios": earning_scenarios,
+        "gains": gains,
+        "wallet_activation_message": wallet_activation_message,
+        "wallet_reminder_text": wallet_reminder_text,
+        "wallet_reminder_whatsapp_url": wallet_reminder_whatsapp_url,
+        "child_referral_discount": child_referral_discount,
     }
     resp = render(request, "orders/client_referrals.html", ctx)
     resp["Cache-Control"] = "no-store"
@@ -391,7 +586,7 @@ def client_order_live_status(request, order_id: int):
     Endpoint JSON live pour le suivi commande client.
     Règle d'accès: le cookie client_phone doit matcher le customer.phone (ou autre logique).
     """
-    from orders.models import Order
+    from orders.models import OrderItem, Order
     from collections import Counter
 
     phone = _client_phone(request)
@@ -1152,7 +1347,6 @@ def _annotate_totals(qs):
 # ============================================================
 #  LISTE DES COMMANDES
 # ============================================================
-@login_required
 def orders_list(request):
     """
     Liste des commandes FAGNI avec :
@@ -1231,6 +1425,7 @@ def orders_list(request):
         "in_progress_count": stats["in_progress_count"] or 0,
         "done_count": stats["done_count"] or 0,
         "canceled_count": stats["canceled_count"] or 0,
+        "pending_payment_count": Order.objects.filter(payment_status="declared").count(),
         "current_status": current_status or "all",
         # pour que les champs filtres restent pré-remplis
         "q": q,
@@ -1665,6 +1860,7 @@ def ops_dashboard(request):
         "drivers_list": drivers_list,
         "reset_url": reset_url,
         "displayed_total_count": displayed_total_count,
+        "pending_payment_count": Order.objects.filter(payment_status="declared").count(),
     }
     return render(request, "orders/ops_dashboard.html", context)
 
@@ -2912,11 +3108,25 @@ def _compute_order_pricing(order):
     Bridge legacy -> pricing engine canonique.
     """
     result = compute_order_pricing(order)
+
+    child_referral_discount = get_child_referral_discount_amount(order)
+    try:
+        total_client_adjusted = Decimal(str(result.total_client_ttc or 0)) - Decimal(str(child_referral_discount or 0))
+    except Exception:
+        total_client_adjusted = Decimal(str(result.total_client_ttc or 0))
+
+    if total_client_adjusted < 0:
+        total_client_adjusted = Decimal("0")
+
+    total_client_adjusted = total_client_adjusted.quantize(Decimal("1"))
+
     return {
         "items_total": result.prestation_total,
         "service_fee": result.service_fee_ht,
         "delivery_fee": result.delivery_fee_client,
-        "total_client": result.total_client_ttc,
+        "total_client": total_client_adjusted,
+        "total_client_ttc": total_client_adjusted,
+        "child_referral_discount": child_referral_discount,
         "driver_income": result.amount_driver,
         "vat_fagni": result.vat_fagni,
         "express_extra_fee": result.express_extra_fee_client,
@@ -4900,6 +5110,7 @@ def client_home(request):
     orders_count_all = 0
     active_orders_count = 0
     unpaid_orders_count = 0
+    wallet_balance = Decimal("0.00")
 
     if customer:
         items_sum = Coalesce(
@@ -4925,7 +5136,6 @@ def client_home(request):
 
         # KPI globaux (sans filtre)
         # ✅ Pilote: masquer les commandes "vides" (tous montants à 0 / pas d'items)
-        # On garde les vraies commandes (même si estimation en cours), et on cache les brouillons fantômes.
         nonempty_qs = base_qs.filter(
             Q(total_client_ttc__gt=0)
             | Q(prestation_total__gt=0)
@@ -4936,12 +5146,19 @@ def client_home(request):
             | Q(vat_fagni__gt=0)
         )
 
-        # KPI globaux (sans filtre) recalculés sur nonempty_qs
         orders_count_all = nonempty_qs.count()
         active_orders_count = nonempty_qs.filter(status__in=["pending", "in_progress"]).count()
         unpaid_orders_count = nonempty_qs.filter(payment_status__in=["pending", "unpaid", "failed"]).count()
 
         orders_qs = nonempty_qs
+
+        try:
+            wallet_obj = get_or_create_wallet_for_customer(customer)
+            if wallet_obj and getattr(wallet_obj, "balance", None) is not None:
+                wallet_balance = Decimal(str(wallet_obj.balance or 0))
+        except Exception:
+            wallet_balance = Decimal("0.00")
+
     # ---------------------------
     # Filtre statut
     # ---------------------------
@@ -4954,20 +5171,18 @@ def client_home(request):
     if current_status != "all":
         filtered_qs = orders_qs.filter(status=current_status)
 
-    # KPI conditionnel selon filtre sélectionné
     kpi_orders_count = orders_count_all if current_status == "all" else filtered_qs.count()
 
     # ---------------------------
     # Pagination
     # ---------------------------
-    per_page = 8
+    per_page = 4
     page_number = request.GET.get("page") or 1
 
     paginator = Paginator(filtered_qs, per_page)
     page_obj = paginator.get_page(page_number)
     is_paginated = paginator.num_pages > 1
 
-    # Pagination “premium”
     current = page_obj.number
     last = paginator.num_pages
     window = 2
@@ -4984,12 +5199,39 @@ def client_home(request):
         o.total_client_display = pricing["total_client"]
         o.express_extra_fee = pricing.get("express_extra_fee", Decimal("0"))
 
+    # LOT 17B — adresse courte pour affichage home client
+    def _short_client_address(v):
+        raw = str(v or "").strip()
+        if not raw:
+            return "—"
+
+        parts = [x.strip() for x in raw.split(",") if x.strip()]
+
+        if len(parts) >= 4:
+            return ", ".join(parts[-4:-2])
+
+        if len(parts) >= 2:
+            return ", ".join(parts[-2:])
+
+        return raw if raw else "Adresse à confirmer"
+
+    for _o in orders_page:
+        full_addr = (
+            getattr(_o, "pickup_address", None)
+            or getattr(getattr(_o, "customer", None), "address", None)
+            or ""
+        )
+        try:
+            _o.pickup_address_short = _short_client_address(full_addr)
+        except Exception:
+            _o.pickup_address_short = "Adresse à confirmer"
+
     ctx = {
         "phone": phone,
         "customer": customer,
 
         # liste paginée
-        "orders": orders_page,
+        "orders": page_obj,
 
         # pagination
         "page_obj": page_obj,
@@ -5006,44 +5248,13 @@ def client_home(request):
         "kpi_orders_count": kpi_orders_count,
         "active_orders_count": active_orders_count,
         "unpaid_orders_count": unpaid_orders_count,
+
+        # wallet
+        "wallet_balance": wallet_balance,
     }
 
-    # LOT 17B — adresse courte pour affichage home client
-    def _short_client_address(v):
-        raw = str(v or "").strip()
-        if not raw:
-            return "—"
-
-        parts = [x.strip() for x in raw.split(",") if x.strip()]
-
-        # Exemple:
-        # 44, Rue..., Riviera 3, Riviéra 3, Cocody, Abidjan, Côte d’Ivoire
-        # => on préfère une zone utile au client: "Riviéra 3, Cocody"
-        if len(parts) >= 4:
-            return ", ".join(parts[-4:-2])
-
-        if len(parts) >= 2:
-            return ", ".join(parts[-2:])
-
-        return raw if raw else "Adresse à confirmer"
-
-    try:
-        _orders_for_home = list(orders)
-    except Exception:
-        _orders_for_home = []
-
-    for _o in _orders_for_home:
-        full_addr = (
-            getattr(_o, "pickup_address", None)
-            or getattr(getattr(_o, "customer", None), "address", None)
-            or ""
-        )
-        try:
-            _o.pickup_address_short = _short_client_address(full_addr)
-        except Exception:
-            _o.pickup_address_short = "Adresse à confirmer"
-
     return render(request, "orders/client_home.html", ctx)
+
 
 
 # -------------------------------------------------------------------
@@ -5341,16 +5552,29 @@ def _client_order_amounts(order: Order) -> dict:
     Bridge client legacy -> pricing engine canonique.
     """
     finance = build_order_finance_summary(order)
+    pricing = _compute_order_pricing(order)
+    adjusted_total = pricing.get("total_client_ttc", finance.get("total_client_ttc", Decimal("0")))
+    child_referral_discount = pricing.get("child_referral_discount", Decimal("0"))
+
+    try:
+        amount_paid = Decimal(str(finance.get("amount_paid", Decimal("0")) or 0))
+        amount_remaining = Decimal(str(adjusted_total or 0)) - amount_paid
+        if amount_remaining < 0:
+            amount_remaining = Decimal("0")
+    except Exception:
+        amount_remaining = finance.get("amount_remaining", Decimal("0"))
+
     return {
         "prestation_total": finance.get("prestation_total", Decimal("0")),
         "delivery_fee": finance.get("delivery_fee_client", Decimal("0")),
         "delivery_fee_client": finance.get("delivery_fee_client", Decimal("0")),
         "service_fee_ht": finance.get("service_fee_ht", Decimal("0")),
         "vat_fagni": finance.get("vat_fagni", Decimal("0")),
-        "total_ttc": finance.get("total_client_ttc", Decimal("0")),
-        "total_client_ttc": finance.get("total_client_ttc", Decimal("0")),
-        "amount_paid": finance.get("amount_paid", Decimal("0")),
-        "amount_remaining": finance.get("amount_remaining", Decimal("0")),
+        "child_referral_discount": child_referral_discount,
+        "total_ttc": adjusted_total,
+        "total_client_ttc": adjusted_total,
+        "amount_paid": amount_paid,
+        "amount_remaining": amount_remaining,
     }
 
 # --- LOT_2_32_PAYMENT_UI_JSON_VIEW_OK ---
@@ -5619,7 +5843,12 @@ def client_order_detail(request, order_id: int):
     try:
         for it in order.items.all():
             items.append({
-                "label": getattr(it, "label", None) or getattr(it, "name", None) or "Article",
+                "label": (
+                getattr(it, "designation", None)
+                or getattr(getattr(it, "service", None), "name", None)
+                or getattr(it, "service_type", None)
+                or "Article"
+            ),
                 "qty": getattr(it, "quantity", 0) or 0,
                 "price": getattr(it, "unit_price", 0) or 0,
             })
@@ -5714,6 +5943,17 @@ def client_order_detail(request, order_id: int):
         paid = DECIMAL_ZERO
 
     try:
+        total_client_ttc = Decimal(str(snapshot.get("total_client_ttc", 0) or 0))
+    except Exception:
+        total_client_ttc = DECIMAL_ZERO
+
+    wallet_used = paid
+    if wallet_used < DECIMAL_ZERO:
+        wallet_used = DECIMAL_ZERO
+    if total_client_ttc > DECIMAL_ZERO and wallet_used > total_client_ttc:
+        wallet_used = total_client_ttc
+
+    try:
         display_summary
     except NameError:
         display_summary = build_order_display_summary(order)
@@ -5739,6 +5979,7 @@ def client_order_detail(request, order_id: int):
         "payment_label": snapshot.get("payment_label"),
         "pay_pill_class": "pay-ok" if snapshot.get("is_paid") else "pay-wait",
         "paid_amount": paid,
+        "wallet_used": wallet_used,
         "total_amount": snapshot.get("total_client_ttc", DECIMAL_ZERO),
         "remain_amount": snapshot.get("amount_due", DECIMAL_ZERO),
         "timeline": timeline,
@@ -5908,27 +6149,18 @@ def client_order_pay_simulate(request, order_id: int):
         resp["Cache-Control"] = "no-store"
         return resp
 
-    with transaction.atomic():
-        try:
-            order.amount_paid = total
-        except Exception:
-            resp = JsonResponse({"ok": False, "error": "amount_paid_field_missing"}, status=500)
-            resp["Cache-Control"] = "no-store"
-            return resp
+    payment_result = apply_order_payment(
+        order,
+        total,
+        channel="simulate",
+        reference=f"SIM-{order.id}",
+        note="Paiement simulé MVP",
+    )
 
-        if hasattr(order, "payment_status"):
-            order.payment_status = "paid"
-
-        try:
-            order.save(update_fields=["amount_paid", "payment_status"] if hasattr(order, "payment_status") else ["amount_paid"])
-        except Exception:
-            order.save()
-
-        # LOT 22C — déclenchement MLM à la validation du paiement
-        try:
-            generate_mlm_commissions_for_order(order)
-        except Exception:
-            pass
+    try:
+        order.refresh_from_db()
+    except Exception:
+        pass
 
     try:
         order.refresh_from_db()
@@ -6041,46 +6273,24 @@ def client_order_pay_cash(request, order_id: int):
         resp["Cache-Control"] = "no-store"
         return resp
 
-    with transaction.atomic():
-        previous_payment_status = getattr(order, "payment_status", None)
+    payment_result = apply_order_payment(
+        order,
+        add_amount,
+        channel="api",
+        reference=f"API-{order.id}",
+        note=note or "Paiement API",
+    )
 
-        paid = getattr(order, "amount_paid", None) or DECIMAL_ZERO
-        try:
-            paid = Decimal(str(paid))
-        except Exception:
-            paid = DECIMAL_ZERO
-
-        new_paid = paid + add_amount
-        if new_paid > total:
-            new_paid = total
-
-        order.amount_paid = new_paid
-
-        if hasattr(order, "payment_status"):
-            if new_paid <= DECIMAL_ZERO:
-                order.payment_status = "unpaid"
-            elif new_paid >= total:
-                order.payment_status = "paid"
-            else:
-                order.payment_status = "partial"
-
-        if note and hasattr(order, "payment_note"):
-            order.payment_note = note
-
-        try:
-            fields = ["amount_paid"]
-            if hasattr(order, "payment_status"):
-                fields.append("payment_status")
-            if note and hasattr(order, "payment_note"):
-                fields.append("payment_note")
-            order.save(update_fields=fields)
-        except Exception:
-            order.save()
+    try:
+        order.refresh_from_db()
+    except Exception:
+        pass
 
         # LOT 22C — MLM uniquement si la commande vient juste de devenir payée
         try:
             if previous_payment_status != "paid" and getattr(order, "payment_status", None) == "paid":
                 generate_mlm_commissions_for_order(order)
+            apply_fagni_monetization(order)
         except Exception:
             pass
 
@@ -6106,6 +6316,176 @@ def client_order_pay_cash(request, order_id: int):
     resp["Cache-Control"] = "no-store"
     return resp
 
+
+def apply_order_payment(order, add_amount, *, channel="manual", reference="", note=""):
+    """
+    Applique un paiement à une commande de façon centralisée et traçable.
+    Retourne un dict:
+    {
+        "applied": Decimal,
+        "amount_paid": Decimal,
+        "remaining": Decimal,
+        "payment_status": str,
+        "became_paid": bool,
+        "already_settled": bool,
+    }
+    """
+    from decimal import Decimal
+    from django.db import transaction
+    from django.utils import timezone
+    from orders.models import OrderPaymentEvent
+
+    try:
+        add_amount = Decimal(str(add_amount or 0))
+    except Exception:
+        add_amount = DECIMAL_ZERO
+
+    if add_amount <= DECIMAL_ZERO:
+        return {
+            "applied": DECIMAL_ZERO,
+            "amount_paid": DECIMAL_ZERO,
+            "remaining": DECIMAL_ZERO,
+            "payment_status": getattr(order, "payment_status", "") or "",
+            "became_paid": False,
+            "already_settled": False,
+        }
+
+    with transaction.atomic():
+        order = (
+            Order.objects
+            .select_for_update()
+            .select_related("customer")
+            .get(pk=order.pk)
+        )
+
+        try:
+            finance_summary = build_order_finance_summary(order)
+        except Exception:
+            finance_summary = {}
+
+        try:
+            total = Decimal(str(finance_summary.get("total_client_ttc", 0) or 0))
+        except Exception:
+            total = DECIMAL_ZERO
+
+        try:
+            already_paid = Decimal(str(getattr(order, "amount_paid", 0) or 0))
+        except Exception:
+            already_paid = DECIMAL_ZERO
+
+        if total < DECIMAL_ZERO:
+            total = DECIMAL_ZERO
+        if already_paid < DECIMAL_ZERO:
+            already_paid = DECIMAL_ZERO
+
+        remaining = total - already_paid
+        if remaining < DECIMAL_ZERO:
+            remaining = DECIMAL_ZERO
+
+        if remaining <= DECIMAL_ZERO:
+            return {
+                "applied": DECIMAL_ZERO,
+                "amount_paid": already_paid,
+                "remaining": DECIMAL_ZERO,
+                "payment_status": getattr(order, "payment_status", "") or "",
+                "became_paid": False,
+                "already_settled": True,
+            }
+
+        to_apply = add_amount if add_amount <= remaining else remaining
+        if to_apply <= DECIMAL_ZERO:
+            return {
+                "applied": DECIMAL_ZERO,
+                "amount_paid": already_paid,
+                "remaining": remaining,
+                "payment_status": getattr(order, "payment_status", "") or "",
+                "became_paid": False,
+                "already_settled": False,
+            }
+
+        previous_payment_status = getattr(order, "payment_status", None)
+        previous_amount_paid = already_paid
+
+        # 🔒 Débit wallet centralisé pour wallet_auto
+        if channel == "wallet_auto":
+            from wallets.services import get_or_create_wallet_for_customer, debit_wallet
+
+            wallet = get_or_create_wallet_for_customer(order.customer)
+            debit_wallet(
+                wallet,
+                to_apply,
+                description=f"Paiement commande {order.code}",
+                order=order,
+                idempotency_key=f"WALLET-AUTO-{order.id}-{reference or ''}",
+                tx_type="debit",
+            )
+
+        order.amount_paid = already_paid + to_apply
+
+        print("⚠️ WRITE PAYMENT:", order.id, order.amount_paid, getattr(order, "payment_status", None))
+
+        if hasattr(order, "payment_status"):
+            if order.amount_paid <= DECIMAL_ZERO:
+                order.payment_status = "unpaid"
+            elif order.amount_paid >= total:
+                order.payment_status = "paid"
+            else:
+                order.payment_status = "partial"
+
+        update_fields = ["amount_paid"]
+        if hasattr(order, "payment_status"):
+            update_fields.append("payment_status")
+        if hasattr(order, "payment_date") and getattr(order, "payment_status", None) == "paid" and not getattr(order, "payment_date", None):
+            order.payment_date = timezone.now()
+            update_fields.append("payment_date")
+        if channel == "wave_webhook" and hasattr(order, "payment_declared_channel") and getattr(order, "payment_declared_channel", "") != "wave":
+            order.payment_declared_channel = "wave"
+            update_fields.append("payment_declared_channel")
+
+        order.save(update_fields=update_fields)
+
+        OrderPaymentEvent.objects.create(
+            order=order,
+            channel=channel or "manual",
+            reference=reference or "",
+            amount=to_apply,
+            amount_paid_before=previous_amount_paid,
+            amount_paid_after=order.amount_paid,
+            status_before=previous_payment_status or "",
+            status_after=getattr(order, "payment_status", "") or "",
+            note=note or "",
+        )
+
+    became_paid = previous_payment_status != "paid" and getattr(order, "payment_status", None) == "paid"
+
+    try:
+        if became_paid:
+            generate_mlm_commissions_for_order(order)
+        apply_fagni_monetization(order)
+    except Exception:
+        pass
+
+    try:
+        finance_summary = build_order_finance_summary(order)
+        new_remaining = Decimal(str(finance_summary.get("amount_remaining", 0) or 0))
+    except Exception:
+        new_remaining = DECIMAL_ZERO
+
+    if new_remaining < DECIMAL_ZERO:
+        new_remaining = DECIMAL_ZERO
+
+    return {
+        "applied": to_apply,
+        "amount_paid": Decimal(str(getattr(order, "amount_paid", 0) or 0)),
+        "remaining": new_remaining,
+        "payment_status": getattr(order, "payment_status", "") or "",
+        "became_paid": became_paid,
+        "already_settled": False,
+    }
+
+
+@client_login_required
+@ensure_csrf_cookie
 def client_order_pay_wave_page(request, order_id: int):
     """
     Page HTML simple qui affiche un QR code basé sur le numéro Wave (téléphone),
@@ -6150,6 +6530,25 @@ def client_order_pay_wave_page(request, order_id: int):
     if remain < DECIMAL_ZERO:
         remain = DECIMAL_ZERO
 
+    # ✅ HYBRIDE WALLET + WAVE
+    try:
+        wallet_obj = get_or_create_wallet_for_customer(order.customer)
+    except Exception:
+        wallet_obj = None
+
+    try:
+        wallet_balance = Decimal(str(getattr(wallet_obj, "balance", 0) or 0)) if wallet_obj else DECIMAL_ZERO
+    except Exception:
+        wallet_balance = DECIMAL_ZERO
+
+    wallet_usable = wallet_balance if wallet_balance <= remain else remain
+    if wallet_usable < DECIMAL_ZERO:
+        wallet_usable = DECIMAL_ZERO
+
+    wave_remaining = remain - wallet_usable
+    if wave_remaining < DECIMAL_ZERO:
+        wave_remaining = DECIMAL_ZERO
+
     pricing_mode = display_summary.get("pricing_mode", "item")
     bag_label = display_summary.get("bag_label", "")
     finance_breakdown = finance_summary
@@ -6157,18 +6556,121 @@ def client_order_pay_wave_page(request, order_id: int):
 
 
     # ---------------------------------------------------------
-    # ✅ Pilote: déclaration manuelle "J'ai payé" (Wave)
-    # - ne modifie pas amount_paid ni payment_status (évite faux positifs)
-    # - évite double POST via session
-    # - redirige vers détail commande avec flag
+    # ✅ Déclaration manuelle "J'ai payé" (Wave) — persistée en base
+    # - NE crée PAS de Payment
+    # - NE modifie PAS amount_paid
+    # - NE déclenche PAS mark_paid / wallets / payouts
     # ---------------------------------------------------------
     if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        # ✅ Utilisation explicite du wallet avant paiement Wave
+        if action == "use_wallet":
+            try:
+                with transaction.atomic():
+                    order.refresh_from_db()
+                    if wallet_obj:
+                        wallet_obj.refresh_from_db()
+
+                    previous_payment_status = getattr(order, "payment_status", None)
+
+                    paid_now = getattr(order, "amount_paid", DECIMAL_ZERO) or DECIMAL_ZERO
+                    try:
+                        paid_now = Decimal(str(paid_now))
+                    except Exception:
+                        paid_now = DECIMAL_ZERO
+
+                    total_now = total
+                    try:
+                        total_now = Decimal(str(total_now))
+                    except Exception:
+                        total_now = DECIMAL_ZERO
+
+                    remaining_now = total_now - paid_now
+                    if remaining_now < DECIMAL_ZERO:
+                        remaining_now = DECIMAL_ZERO
+
+                    if remaining_now <= DECIMAL_ZERO:
+                        return redirect("orders:client_order_detail", order_id=order.id)
+
+                    fresh_wallet_balance = DECIMAL_ZERO
+                    if wallet_obj:
+                        try:
+                            fresh_wallet_balance = Decimal(str(getattr(wallet_obj, "balance", 0) or 0))
+                        except Exception:
+                            fresh_wallet_balance = DECIMAL_ZERO
+
+                    usable_now = fresh_wallet_balance if fresh_wallet_balance <= remaining_now else remaining_now
+                    if usable_now <= DECIMAL_ZERO:
+                        return redirect(reverse("orders:client_order_pay_wave_page", args=[order.id]))
+
+                    wallet_tx = debit_wallet(
+                        wallet_obj,
+                        usable_now,
+                        description=f"Paiement wallet commande {order.code}",
+                        order=order,
+                        leg=None,
+                        idempotency_key=f"wallet_order_payment_{order.id}",
+                        tx_type="debit",
+                    )
+
+                    if wallet_tx is None:
+                        return redirect(reverse("orders:client_order_pay_wave_page", args=[order.id]) + "?wallet=error")
+
+                    payment_result = apply_order_payment(
+                        order,
+                        usable_now,
+                        channel="wallet",
+                        reference=f"wallet_order_payment_{order.id}",
+                        note=f"Paiement wallet commande {order.code}",
+                    )
+
+                if payment_result["payment_status"] == "paid":
+                    return redirect("orders:client_order_detail", order_id=order.id)
+
+                return redirect(reverse("orders:client_order_pay_wave_page", args=[order.id]) + "?wallet=applied")
+
+            except Exception:
+                return redirect(reverse("orders:client_order_pay_wave_page", args=[order.id]) + "?wallet=error")
+
         key = f"wave_declared_{order.id}"
+
+        update_fields = []
+
+        if getattr(order, "payment_status", None) != "paid":
+            if getattr(order, "payment_status", None) != "declared":
+                order.payment_status = "declared"
+                update_fields.append("payment_status")
+
+            if getattr(order, "payment_verification_status", None) != "pending_review":
+                order.payment_verification_status = "pending_review"
+                update_fields.append("payment_verification_status")
+
+            if not getattr(order, "payment_declared_at", None):
+                order.payment_declared_at = timezone.now()
+                update_fields.append("payment_declared_at")
+
+            if getattr(order, "payment_declared_channel", "") != "wave":
+                order.payment_declared_channel = "wave"
+                update_fields.append("payment_declared_channel")
+
+            current_ref = (getattr(order, "payment_declared_reference", "") or "").strip()
+            if not current_ref:
+                ref_candidate = ""
+                try:
+                    ref_candidate = (request.POST.get("checkout_id") or "").strip()
+                except Exception:
+                    ref_candidate = ""
+                if ref_candidate:
+                    order.payment_declared_reference = ref_candidate
+                    update_fields.append("payment_declared_reference")
+
+            if update_fields:
+                order.save(update_fields=update_fields)
+
         if not request.session.get(key):
             request.session[key] = True
             request.session.modified = True
-
-        from django.urls import reverse
         return redirect(reverse("orders:client_order_detail", args=[order.id]) + "?wave=declared")
     # Numéro Wave: priorise settings.WAVE_RECEIVER_PHONE, sinon fallback sur phone client
     wave_phone = (getattr(settings, "WAVE_RECEIVER_PHONE", "") or "").strip() or phone
@@ -6181,7 +6683,7 @@ def client_order_pay_wave_page(request, order_id: int):
 
     # Montant Wave en XOF (entier, pas de décimales)
     try:
-        amount_xof = str(int(remain))
+        amount_xof = str(int(wave_remaining))
     except Exception:
         amount_xof = "0"
 
@@ -6190,7 +6692,9 @@ def client_order_pay_wave_page(request, order_id: int):
             import json
             import urllib.request
             import urllib.error
-            from django.urls import reverse
+            import hmac
+            import hashlib
+            import time
 
             # Base URL publique (pour success/error)
             base = (getattr(settings, "SITE_BASE_URL", "") or "").rstrip("/")
@@ -6209,13 +6713,28 @@ def client_order_pay_wave_page(request, order_id: int):
                 "client_reference": f"order-{order.id}-{getattr(order,'code',order.id)}",
             }
 
+            body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+
+            signing_secret = (getattr(settings, "WAVE_CHECKOUT_SIGNING_SECRET", "") or "").strip()
+            if signing_secret:
+                timestamp = str(int(time.time()))
+                signature_payload = timestamp.encode("utf-8") + body
+                signature = hmac.new(
+                    signing_secret.encode("utf-8"),
+                    signature_payload,
+                    hashlib.sha256,
+                ).hexdigest()
+                headers["Wave-Signature"] = f"t={timestamp},v1={signature}"
+
             req = urllib.request.Request(
                 "https://api.wave.com/v1/checkout/sessions",
-                data=json.dumps(payload).encode("utf-8"),
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
+                data=body,
+                headers=headers,
                 method="POST",
             )
             with urllib.request.urlopen(req, timeout=8) as resp:
@@ -6223,6 +6742,20 @@ def client_order_pay_wave_page(request, order_id: int):
 
             pay_link = (data.get("wave_launch_url") or "").strip()
             checkout_id = (data.get("id") or "").strip()
+
+            if checkout_id:
+                update_fields = []
+                if getattr(order, "payment_declared_reference", "") != checkout_id:
+                    order.payment_declared_reference = checkout_id
+                    update_fields.append("payment_declared_reference")
+                if getattr(order, "payment_declared_channel", "") != "wave":
+                    order.payment_declared_channel = "wave"
+                    update_fields.append("payment_declared_channel")
+                if update_fields:
+                    try:
+                        order.save(update_fields=update_fields)
+                    except Exception:
+                        order.save()
 
         except Exception:
             # On ne casse pas la page: fallback ci-dessous
@@ -6262,7 +6795,23 @@ def client_order_pay_wave_page(request, order_id: int):
     img.save(buf, format="PNG")
     qr_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
     qr_data_uri = "data:image/png;base64," + qr_b64
+
+    try:
+        wallet_used = Decimal(str(getattr(order, "amount_paid", 0) or 0))
+    except Exception:
+        wallet_used = DECIMAL_ZERO
+
+    if wallet_used > total:
+        wallet_used = total
+
     return render(request, "orders/client_pay_wave.html", {
+
+        "wallet_balance": wallet_balance,
+        "wallet_usable": wallet_usable,
+        "wallet_used": wallet_used,
+        "wave_remaining": wave_remaining,
+        "wallet_applied": request.GET.get("wallet") == "applied",
+
         
           "wave_declared": bool(request.session.get(f"wave_declared_{order.id}")),
           # LOT_2_15_WAVE_DECLARED_CTX_OK
@@ -6282,6 +6831,207 @@ def client_order_pay_wave_page(request, order_id: int):
               "pay_link": pay_link,
           "checkout_id": checkout_id,
 })
+
+def _ops_redirect_back(request, fallback="orders:list"):
+    next_url = (
+        request.POST.get("next")
+        or request.GET.get("next")
+        or request.META.get("HTTP_REFERER")
+        or ""
+    )
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return redirect(next_url)
+    try:
+        return redirect(fallback)
+    except Exception:
+        return redirect("/orders/")
+
+
+def _order_is_declared_or_pending_review(order) -> bool:
+    return (
+        getattr(order, "payment_status", "") == "declared"
+        or getattr(order, "payment_verification_status", "") == "pending_review"
+    )
+
+
+@staff_member_required
+@require_POST
+def admin_confirm_declared_payment(request, order_id: int):
+    """
+    Confirme un paiement déclaré manuellement par le client.
+    Effet recherché :
+    - payment_status -> paid
+    - payment_verification_status -> verified (si champ présent)
+    - amount_paid -> total_client_ttc
+    - payment_date -> now() si vide
+    - payment_method -> wave si vide
+    """
+    order = get_object_or_404(Order, pk=order_id)
+
+    declared_like = _order_is_declared_or_pending_review(order)
+    already_paid = getattr(order, "payment_status", "") == "paid"
+
+    if not declared_like and not already_paid:
+        messages.warning(request, "Cette commande n'est pas en paiement déclaré.")
+        return _ops_redirect_back(request)
+
+    finance_summary = build_order_finance_summary(order)
+    try:
+        total_ttc = Decimal(str(finance_summary.get("total_client_ttc", 0) or 0))
+    except Exception:
+        total_ttc = DECIMAL_ZERO
+
+    if total_ttc <= DECIMAL_ZERO:
+        messages.error(request, "Impossible de confirmer : total TTC nul ou invalide.")
+        return _ops_redirect_back(request)
+
+    now_dt = timezone.now()
+    update_fields = []
+
+    try:
+        current_amount_paid = Decimal(str(getattr(order, "amount_paid", 0) or 0))
+    except Exception:
+        current_amount_paid = DECIMAL_ZERO
+
+    remaining = total_ttc - current_amount_paid
+    if remaining < DECIMAL_ZERO:
+        remaining = DECIMAL_ZERO
+
+    if remaining > DECIMAL_ZERO:
+        apply_order_payment(
+            order,
+            remaining,
+            channel="wave_ops",
+            reference=f"WAVE-OPS-{order.id}",
+            note="Confirmation paiement OPS",
+        )
+        try:
+            order.refresh_from_db()
+        except Exception:
+            pass
+
+    if hasattr(order, "payment_verification_status"):
+        if getattr(order, "payment_verification_status", "") != "verified":
+            order.payment_verification_status = "verified"
+            update_fields.append("payment_verification_status")
+
+    if hasattr(order, "payment_date") and not getattr(order, "payment_date", None):
+        order.payment_date = now_dt
+        update_fields.append("payment_date")
+
+    if hasattr(order, "payment_method") and not getattr(order, "payment_method", None):
+        order.payment_method = "wave"
+        update_fields.append("payment_method")
+
+    if hasattr(order, "payment_declared_at") and not getattr(order, "payment_declared_at", None):
+        order.payment_declared_at = now_dt
+        update_fields.append("payment_declared_at")
+
+    # Champs optionnels si tu les ajoutes plus tard
+    if hasattr(order, "payment_verified_at"):
+        order.payment_verified_at = now_dt
+        update_fields.append("payment_verified_at")
+
+    if hasattr(order, "payment_verified_by"):
+        try:
+            if getattr(request, "user", None) and request.user.is_authenticated:
+                order.payment_verified_by = request.user
+                update_fields.append("payment_verified_by")
+        except Exception:
+            pass
+
+    try:
+        if update_fields:
+            order.save(update_fields=list(dict.fromkeys(update_fields)))
+        else:
+            order.save()
+        messages.success(
+            request,
+            f"Paiement confirmé pour la commande {getattr(order, 'code', order.id)}."
+        )
+    except ValidationError as e:
+        messages.error(request, f"Confirmation refusée : {e}")
+    except Exception as e:
+        messages.error(request, f"Erreur lors de la confirmation : {e}")
+
+    return _ops_redirect_back(request)
+
+
+@staff_member_required
+@require_POST
+def admin_reject_declared_payment(request, order_id: int):
+    """
+    Rejette une déclaration de paiement.
+    Effet recherché :
+    - payment_status -> pending
+    - payment_verification_status -> rejected (si champ présent)
+    - amount_paid -> 0
+    - payment_date -> None
+    Ne doit PAS pouvoir rétrograder une commande déjà paid.
+    """
+    order = get_object_or_404(Order, pk=order_id)
+
+    if getattr(order, "payment_status", "") == "paid":
+        messages.error(request, "Impossible de rejeter : la commande est déjà confirmée payée.")
+        return _ops_redirect_back(request)
+
+    if not _order_is_declared_or_pending_review(order):
+        messages.warning(request, "Cette commande n'est pas en attente de vérification.")
+        return _ops_redirect_back(request)
+
+    reason = (request.POST.get("reason") or "").strip()
+    update_fields = []
+
+    if getattr(order, "payment_status", "") != "pending":
+        order.payment_status = "pending"
+        update_fields.append("payment_status")
+
+    if hasattr(order, "payment_verification_status"):
+        if getattr(order, "payment_verification_status", "") != "rejected":
+            order.payment_verification_status = "rejected"
+            update_fields.append("payment_verification_status")
+
+    # 🔒 Ne jamais effacer amount_paid/payment_date lors d'un rejet.
+    # Le rejet concerne la déclaration, pas l'historique financier.
+
+    if hasattr(order, "payment_rejected_at"):
+        order.payment_rejected_at = timezone.now()
+        update_fields.append("payment_rejected_at")
+
+    if hasattr(order, "payment_rejected_by"):
+        try:
+            if getattr(request, "user", None) and request.user.is_authenticated:
+                order.payment_rejected_by = request.user
+                update_fields.append("payment_rejected_by")
+        except Exception:
+            pass
+
+    if hasattr(order, "payment_rejection_reason") and reason:
+        order.payment_rejection_reason = reason
+        update_fields.append("payment_rejection_reason")
+
+    try:
+        if update_fields:
+            order.save(update_fields=list(dict.fromkeys(update_fields)))
+        else:
+            order.save()
+        messages.success(
+            request,
+            f"Déclaration de paiement rejetée pour la commande {getattr(order, 'code', order.id)}."
+        )
+    except ValidationError as e:
+        messages.error(request, f"Rejet refusé : {e}")
+    except Exception as e:
+        messages.error(request, f"Erreur lors du rejet : {e}")
+
+    return _ops_redirect_back(request)
+
+
+
 def client_order_item_new(request, order_id):
     phone = _client_phone(request)
 
@@ -6323,7 +7073,7 @@ def client_order_item_new(request, order_id):
                 line_total = qty * up
 
                 # service nullable => None OK
-                from orders.models import OrderItem
+
                 OrderItem.objects.create(
                     order=order,
                     service=None,
@@ -6386,7 +7136,6 @@ def client_order_item_edit(request, order_id, item_id):
     if not order:
         return redirect("orders:client_home")
 
-    from orders.models import OrderItem
     item = (
         OrderItem.objects
         .filter(pk=item_id, order=order)
@@ -6459,7 +7208,6 @@ def client_order_item_delete(request, order_id, item_id):
     if not order:
         return redirect("orders:client_home")
 
-    from orders.models import OrderItem
     item = OrderItem.objects.filter(pk=item_id, order=order).first()
     if not item:
         return redirect("orders:client_order_detail", order_id=order.id)
@@ -6688,7 +7436,8 @@ def order_invoice_pdf(request, order_id):
     except Exception:
         pass
 
-    items = _build_client_display_items(order)
+    # 🔒 NE PAS écraser items (déjà filtré + photos)
+    # items = _build_client_display_items(order)
 
     # ✅ Source unique (comme ticket_pdf / ticket_thermal)
     ctx = _build_invoice_context(order)
@@ -12388,6 +13137,42 @@ def client_new_order_step3(request, order_id: int):
             else:
                 changed = False
 
+                current_service_type = (getattr(order, "service_type", None) or "").strip().lower()
+                selected_service_type = ((getattr(category, "slug", None) or getattr(category, "name", "") or "").strip().lower())
+
+                if not current_service_type:
+                    try:
+                        existing_last = (
+                            OrderItem.objects
+                            .filter(order=order)
+                            .select_related("service__category")
+                            .order_by("-id")
+                            .first()
+                        )
+                        if existing_last and getattr(existing_last, "service", None) and getattr(existing_last.service, "category", None):
+                            current_service_type = (
+                                getattr(existing_last.service.category, "slug", None)
+                                or getattr(existing_last.service.category, "name", "")
+                                or ""
+                            ).strip().lower()
+                    except Exception:
+                        current_service_type = ""
+
+                if current_service_type and selected_service_type and current_service_type != selected_service_type:
+                    messages.error(
+                        request,
+                        "Une commande ne peut contenir qu’un seul type de service. Crée une commande séparée pour un autre service."
+                    )
+                    return redirect("orders:client_new_order_step3", order_id=order.id)
+
+                if not current_service_type and selected_service_type:
+                    try:
+                        order.service_type = selected_service_type
+                        order.save(update_fields=["service_type"])
+                        current_service_type = selected_service_type
+                    except Exception:
+                        pass
+
                 for svc in services:
                     raw = (request.POST.get(f"qty_{svc.id}") or "").strip()
                     try:
@@ -12415,7 +13200,7 @@ def client_new_order_step3(request, order_id: int):
                         it.save()
                         changed = True
                     else:
-                        OrderItem.objects.create(
+                        it = OrderItem.objects.create(
                             order=order,
                             service=svc,
                             designation=svc.name,
@@ -12423,6 +13208,21 @@ def client_new_order_step3(request, order_id: int):
                             unit_price=svc.default_price,
                         )
                         changed = True
+
+                    photo_files = request.FILES.getlist(f"photos_{svc.id}")
+                    if photo_files:
+                        try:
+                            it.photos.all().delete()
+                        except Exception:
+                            pass
+                        for photo_file in photo_files:
+                            if not photo_file:
+                                continue
+                            OrderItemPhoto.objects.create(
+                                order_item=it,
+                                image=photo_file,
+                            )
+                            changed = True
 
                 if changed:
                     try:
@@ -12467,6 +13267,7 @@ def client_new_order_step4(request, order_id: int):
         return redirect("orders:client_new_order")
 
     from decimal import Decimal
+    from orders.models import OrderItem
 
     display_summary = build_order_display_summary(order)
     finance_summary = build_order_finance_summary(order)
@@ -12480,6 +13281,33 @@ def client_new_order_step4(request, order_id: int):
         "medium": 10000,
         "large": 14000,
     }
+
+    current_service_type = (getattr(order, "service_type", None) or "").strip().lower()
+
+    items_qs = (
+        OrderItem.objects
+        .filter(order=order)
+        .select_related("service", "service__category")
+        .prefetch_related("photos")
+        .order_by("id")
+    )
+
+    if current_service_type:
+        filtered_items = []
+        for it in items_qs:
+            cat = getattr(getattr(it, "service", None), "category", None)
+            item_service_type = (
+                getattr(cat, "slug", None)
+                or getattr(cat, "name", "")
+                or ""
+            ).strip().lower()
+            if not item_service_type or item_service_type == current_service_type:
+                filtered_items.append(it)
+        items = filtered_items
+    else:
+        items = list(items_qs)
+
+    has_items = len(items) > 0
 
     # 🔒 Si la commande n'est plus draft, on ne repasse pas par confirmation
     if not getattr(order, "is_draft", True):
@@ -12498,7 +13326,6 @@ def client_new_order_step4(request, order_id: int):
         return redirect("orders:client_order_detail", order_id=order.id)
 
     amounts = _client_order_amounts(order)
-    items = _build_client_display_items(order)
 
     finance_breakdown = finance_summary
 
@@ -12507,10 +13334,7 @@ def client_new_order_step4(request, order_id: int):
     except Exception:
         service_fee_client_ttc = Decimal("0")
 
-    try:
-        has_items = items.exists()
-    except Exception:
-        has_items = bool(items)
+    has_items = len(items) > 0
 
     is_bag_mode = bool(display_summary.get("is_bag", pricing_mode == "bag"))
     bag_base_price = finance_summary.get("prestation_total", Decimal("0")) or Decimal("0")
@@ -12689,6 +13513,45 @@ def client_new_order_step4(request, order_id: int):
 
         paid = getattr(order, "amount_paid", Decimal("0")) or Decimal("0")
         remain = total_ttc - paid
+
+        # ✅ AUTOPAIEMENT WALLET si le solde couvre le montant restant
+        try:
+            wallet = get_or_create_wallet_for_customer(order.customer)
+        except Exception:
+            wallet = None
+
+        try:
+            wallet_balance = Decimal(str(getattr(wallet, "balance", 0) or 0)) if wallet else Decimal("0")
+        except Exception:
+            wallet_balance = Decimal("0")
+
+        if remain > Decimal("0") and wallet and wallet_balance >= remain:
+            try:
+                apply_order_payment(
+                    order,
+                    remain,
+                    channel="wallet_auto",
+                    reference=f"WALLET-AUTO-{order.id}",
+                    note="Auto paiement wallet",
+                )
+            except Exception:
+                pass
+
+            update_fields = []
+            try:
+                order.refresh_from_db()
+            except Exception:
+                pass
+
+            try:
+                if update_fields:
+                    order.save(update_fields=update_fields)
+                else:
+                    order.save()
+            except Exception:
+                order.save()
+
+            return redirect("orders:client_order_detail", order_id=order.id)
 
         if remain > Decimal("0"):
             return redirect("orders:client_order_pay_wave_page", order_id=order.id)
@@ -13070,65 +13933,49 @@ def ops_order_confirm_wave_paid(request, order_id: int):
       Côté UI, dès que paid, on n'affiche plus "declared".
     """
     from decimal import Decimal
-    from django.db.models import Sum
 
     order = Order.objects.filter(pk=order_id).first()
     if not order:
         return JsonResponse({"ok": False, "error": "order_not_found"}, status=404)
 
-    # Total TTC depuis DB (champ stable)
     try:
-        total = Decimal(str(getattr(order, "total_client_ttc", 0) or 0))
+        finance_summary = build_order_finance_summary(order)
     except Exception:
-        total = Decimal("0")
+        finance_summary = {}
 
-    if total <= 0:
-        return JsonResponse({"ok": False, "error": "total_is_zero"}, status=400)
-
-    # Source de vérité: somme des Payment
-    from orders.models import Payment
-    paid_sum = Payment.objects.filter(order=order).aggregate(s=Sum("amount")).get("s") or 0
     try:
-        paid_sum = Decimal(str(paid_sum))
+        remaining = Decimal(str(finance_summary.get("amount_remaining", 0) or 0))
     except Exception:
-        paid_sum = Decimal("0")
+        remaining = Decimal("0")
 
-    remaining = total - paid_sum
     if remaining <= 0:
-        # déjà soldée (idempotent)
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
-            return JsonResponse({"ok": True, "order_id": order.id, "total": float(total), "already_paid": True})
+            return JsonResponse({
+                "ok": True,
+                "order_id": order.id,
+                "already_paid": True,
+                "payment_status": getattr(order, "payment_status", ""),
+            })
         return redirect("orders:ops_dashboard")
 
-    # Montant à enregistrer (entier FCFA)
-    amt = int(remaining)
-
-    # Reference idempotente (1 par "solde wave ops")
-    # Si tu as un checkout_id plus tard, tu pourras l'ajouter ici.
     ref = f"WAVE-OPS-{order.id}-SOLDE"
 
-    # Idempotence DB applicative: order+reference
-    pmt, created = Payment.objects.get_or_create(
-        order=order,
+    payment_result = apply_order_payment(
+        order,
+        remaining,
+        channel="wave_ops",
         reference=ref,
-        defaults={
-            "amount": amt,
-            "channel": "wave",
-            "source": "ops",
-            "confirmed_by": getattr(request, "user", None),
-        }
+        note=f"Confirmation OPS Wave par {getattr(request.user, 'username', '')}",
     )
 
-    # Si déjà existant mais montant différent (cas rare: total_client_ttc a changé),
-    # on ne "modifie" pas un Payment existant (ça éviter des boucles / incohérences).
-    # On renvoie juste l'état actuel.
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         return JsonResponse({
             "ok": True,
             "order_id": order.id,
-            "total": float(total),
-            "created": bool(created),
-            "payment_id": pmt.id,
+            "reference": ref,
+            "applied_amount": str(payment_result["applied"]),
+            "payment_status": payment_result["payment_status"],
+            "already_paid": bool(payment_result["already_settled"]),
         })
 
     return redirect("orders:ops_dashboard")
@@ -13552,3 +14399,405 @@ def driver_mission_v3(request, order_id):
 
     ctx = _build_driver_mission_context(request, driver, order=order)
     return render(request, "orders/driver_mission.html", ctx)
+
+
+# ============================
+# MULTI LEVEL REFERRAL ENGINE
+# ============================
+
+def compute_referral_gains(profile):
+    level1 = 500
+    level2 = 200
+    level3 = 100
+
+    gains = {
+        "level1": 0,
+        "level2": 0,
+        "level3": 0,
+        "total": 0,
+    }
+
+    # Niveau 1
+    level1_refs = profile.direct_referrals.all() if hasattr(profile, 'direct_referrals') else []
+    gains["level1"] = len(level1_refs) * level1
+
+    # Niveau 2
+    level2_count = 0
+    for ref in level1_refs:
+        if hasattr(ref, 'direct_referrals'):
+            level2_count += ref.direct_referrals.count()
+
+    gains["level2"] = level2_count * level2
+
+    # Niveau 3 (simplifié)
+    gains["level3"] = int(level2_count * 0.5) * level3
+
+    gains["total"] = gains["level1"] + gains["level2"] + gains["level3"]
+
+    return gains
+
+
+# =========================================
+# REFERRAL ENGINE V1 (SAFE + SIMPLE)
+# =========================================
+
+def handle_referral_reward(order):
+    try:
+        from mlm.models import ReferralLink
+        from wallets.services import credit_wallet
+        from wallets.models import WalletTransaction
+
+        customer = getattr(order, "customer", None)
+        if not customer:
+            return
+
+        referral_code = getattr(order, "referral_code", None)
+        if not referral_code:
+            return
+
+        sponsor_profile = ReferralLink.objects.filter(referral_code=referral_code).first()
+        if not sponsor_profile:
+            return
+
+        sponsor_customer = getattr(sponsor_profile, "customer", None)
+        sponsor_phone = getattr(sponsor_customer, "phone", None)
+        child_phone = getattr(customer, "phone", None)
+        same_phone = bool(sponsor_phone and child_phone and str(sponsor_phone).strip() == str(child_phone).strip())
+        if same_phone:
+            return
+
+        # Paiement valide : status OU payment_status
+        order_status = str(getattr(order, "status", "") or "").lower()
+        payment_status = str(getattr(order, "payment_status", "") or "").lower()
+        if order_status not in ["paid", "completed", "done"] and payment_status not in ["paid"]:
+            return
+
+        # anti-fraude 48h
+        from datetime import timedelta
+        if order.created_at > timezone.now() - timedelta(hours=48):
+            return
+
+        # première commande payée uniquement avec referral_code
+        first_paid_order = (
+            Order.objects
+            .filter(
+                customer=customer,
+                payment_status="paid",
+            )
+            .exclude(referral_code__isnull=True)
+            .exclude(referral_code__exact="")
+            .order_by("created_at", "id")
+            .first()
+        )
+        if not first_paid_order or getattr(first_paid_order, "id", None) != getattr(order, "id", None):
+            return
+
+        reward_amount = 500  # FCFA
+
+        # idempotence réelle : si déjà une tx MLM liée à cette commande -> stop
+        already_rewarded = WalletTransaction.objects.filter(
+            wallet__owner_type="customer",
+            wallet__customer=sponsor_customer,
+            order=order,
+            type="mlm_commission",
+            direction="in",
+        ).exists()
+        if already_rewarded:
+            return
+
+        # crédit wallet parrain
+        sponsor_wallet = get_or_create_wallet_for_customer(sponsor_customer)
+        credit_wallet(
+            wallet=sponsor_wallet,
+            amount=reward_amount,
+            description=f"Parrainage commande {getattr(order, 'code', order.id)}",
+            order=order,
+            tx_type="mlm_commission",
+        )
+
+    except Exception as e:
+        print("Referral error:", e)
+
+
+# =========================================
+# CHILD INCENTIVE ENGINE V1
+# =========================================
+
+def get_child_referral_discount(customer, order=None):
+    try:
+        if not customer or order is None:
+            return 0
+
+        referral_code_used = getattr(order, "referral_code", None)
+        if not referral_code_used:
+            return 0
+
+        first_order = (
+            Order.objects
+            .filter(customer=customer)
+            .order_by("created_at", "id")
+            .first()
+        )
+
+        if not first_order:
+            return 0
+
+        if getattr(first_order, "id", None) != getattr(order, "id", None):
+            return 0
+
+        return 500
+    except Exception:
+        return 0
+
+
+def get_child_referral_discount_amount(order):
+    try:
+        if not order:
+            return Decimal("0")
+
+        customer = getattr(order, "customer", None)
+        if not customer:
+            return Decimal("0")
+
+        amount = get_child_referral_discount(customer, order=order) or 0
+        amount = Decimal(str(amount))
+
+        if amount <= 0:
+            return Decimal("0")
+
+        return amount.quantize(Decimal("1"))
+    except Exception:
+        return Decimal("0")
+
+
+# ==========================
+# WEBHOOK WAVE
+# ==========================
+@csrf_exempt
+def wave_webhook(request):
+    import json
+    import hmac
+    import hashlib
+    import time
+    import urllib.request
+    import urllib.error
+    from decimal import Decimal
+    from django.conf import settings
+    from django.db import transaction
+    from django.http import JsonResponse
+    from django.utils import timezone
+
+    from orders.models import Order, WaveEvent, OrderPaymentEvent
+
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "method_not_allowed"}, status=405)
+
+    raw_body = request.body or b""
+
+    # DEBUG local : on skip la signature et on parse directement
+    if settings.DEBUG:
+        try:
+            event = json.loads(raw_body.decode("utf-8"))
+        except Exception:
+            return JsonResponse({"ok": False, "error": "invalid_json"}, status=400)
+    else:
+        wave_signature = (request.headers.get("Wave-Signature") or "").strip()
+        webhook_secret = (getattr(settings, "WAVE_WEBHOOK_SIGNING_SECRET", "") or "").strip()
+
+        if not webhook_secret:
+            return JsonResponse({"ok": False, "error": "missing_webhook_secret"}, status=500)
+
+        try:
+            parts = {}
+            for part in wave_signature.split(","):
+                if "=" in part:
+                    k, v = part.split("=", 1)
+                    parts[k.strip()] = v.strip()
+
+            timestamp = parts.get("t", "")
+            sig_v1 = parts.get("v1", "")
+
+            if not timestamp or not sig_v1:
+                return JsonResponse({"ok": False, "error": "invalid_signature_header"}, status=401)
+
+            now_ts = int(time.time())
+            req_ts = int(timestamp)
+            if abs(now_ts - req_ts) > 300:
+                return JsonResponse({"ok": False, "error": "stale_signature"}, status=401)
+
+            signed_payload = timestamp.encode("utf-8") + raw_body
+            expected_sig = hmac.new(
+                webhook_secret.encode("utf-8"),
+                signed_payload,
+                hashlib.sha256,
+            ).hexdigest()
+
+            if not hmac.compare_digest(expected_sig, sig_v1):
+                return JsonResponse({"ok": False, "error": "bad_signature"}, status=401)
+
+            event = json.loads(raw_body.decode("utf-8"))
+        except Exception:
+            return JsonResponse({"ok": False, "error": "signature_verification_failed"}, status=401)
+
+    event_id = (event.get("id") or "").strip()
+    event_type = (event.get("type") or "").strip()
+    data = event.get("data") or {}
+
+    if event_type != "checkout.session.completed":
+        return JsonResponse({"ok": True, "ignored": True})
+
+    checkout_id = (data.get("id") or "").strip()
+    payment_status = (data.get("payment_status") or "").strip()
+    checkout_status = (data.get("checkout_status") or "").strip()
+    currency = (data.get("currency") or "").strip()
+    amount_raw = data.get("amount")
+
+    if not checkout_id:
+        return JsonResponse({"ok": False, "error": "missing_checkout_id"}, status=400)
+
+    if payment_status != "succeeded" or checkout_status != "complete":
+        return JsonResponse({"ok": True, "ignored": True})
+
+    order = (
+        Order.objects
+        .select_related("customer")
+        .filter(payment_declared_reference=checkout_id)
+        .first()
+    )
+    if not order:
+        return JsonResponse({"ok": False, "error": "order_not_found"}, status=404)
+
+    # DEBUG local : on accepte checkout_test_xxx sans appel API Wave
+    if settings.DEBUG and checkout_id.startswith("checkout_test_"):
+        remote_id = checkout_id
+        remote_payment_status = payment_status
+        remote_checkout_status = checkout_status
+        remote_currency = currency
+        try:
+            remote_amount = Decimal(str(amount_raw or "0"))
+        except Exception:
+            remote_amount = Decimal("0")
+    else:
+        api_key = (getattr(settings, "WAVE_CHECKOUT_API_KEY", "") or "").strip()
+        if not api_key:
+            return JsonResponse({"ok": False, "error": "missing_api_key"}, status=500)
+
+        try:
+            req = urllib.request.Request(
+                f"https://api.wave.com/v1/checkout/sessions/{checkout_id}",
+                headers={"Authorization": f"Bearer {api_key}"},
+                method="GET",
+            )
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                remote = json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            print("[WAVE ERROR]", e)
+            return JsonResponse({"ok": False, "error": f"checkout_retrieve_failed:{e}"}, status=502)
+
+        remote_id = (remote.get("id") or "").strip()
+        remote_payment_status = (remote.get("payment_status") or "").strip()
+        remote_checkout_status = (remote.get("checkout_status") or "").strip()
+        remote_currency = (remote.get("currency") or "").strip()
+
+        try:
+            remote_amount = Decimal(str(remote.get("amount") or "0"))
+        except Exception:
+            remote_amount = Decimal("0")
+
+    if remote_id != checkout_id:
+        return JsonResponse({"ok": False, "error": "checkout_id_mismatch"}, status=400)
+
+    if remote_payment_status != "succeeded" or remote_checkout_status != "complete":
+        return JsonResponse({"ok": False, "error": "checkout_not_confirmed"}, status=400)
+
+    if remote_currency != "XOF" or currency != "XOF":
+        return JsonResponse({"ok": False, "error": "currency_mismatch"}, status=400)
+
+    try:
+        remote_amount = Decimal(str(remote_amount or "0"))
+    except Exception:
+        remote_amount = Decimal("0")
+
+    if remote_amount <= Decimal("0"):
+        return JsonResponse({"ok": False, "error": "invalid_amount"}, status=400)
+
+    with transaction.atomic():
+        # 🔒 Idempotence STRONG : un event_id ne passe qu'une seule fois
+        if event_id:
+            try:
+                obj, created = WaveEvent.objects.get_or_create(event_id=event_id)
+            except Exception:
+                print(f"[WAVE WEBHOOK] race condition caught event_id={event_id}")
+                return JsonResponse({
+                    "ok": True,
+                    "idempotent": True,
+                    "event_id": event_id
+                })
+
+            if not created:
+                print(f"[WAVE WEBHOOK] idempotent replay ignored event_id={event_id}")
+                return JsonResponse({
+                    "ok": True,
+                    "idempotent": True,
+                    "event_id": event_id
+                })
+
+        # 🔒 Verrou DB sur la commande pour éviter les doubles écritures concurrentes
+        order = (
+            Order.objects
+            .select_for_update()
+            .select_related("customer")
+            .get(pk=order.pk)
+        )
+
+        try:
+            finance_summary = build_order_finance_summary(order)
+        except Exception:
+            finance_summary = {}
+
+        try:
+            total = Decimal(str(finance_summary.get("total_client_ttc", 0) or 0))
+        except Exception:
+            total = Decimal("0")
+
+        try:
+            already_paid = Decimal(str(getattr(order, "amount_paid", 0) or 0))
+        except Exception:
+            already_paid = Decimal("0")
+
+        if already_paid < Decimal("0"):
+            already_paid = Decimal("0")
+
+        remaining = total - already_paid
+        if remaining < Decimal("0"):
+            remaining = Decimal("0")
+
+        if remaining <= Decimal("0"):
+            return JsonResponse({"ok": True, "idempotent": True, "event_id": event_id})
+
+        to_apply = remote_amount if remote_amount <= remaining else remaining
+        if to_apply <= Decimal("0"):
+            return JsonResponse({"ok": True, "idempotent": True, "event_id": event_id})
+
+        payment_result = apply_order_payment(
+            order,
+            to_apply,
+            channel="wave_webhook",
+            reference=checkout_id,
+            note=f"Webhook Wave event_id={event_id}",
+        )
+
+    print(
+        f"[WAVE WEBHOOK] applied event_id={event_id} "
+        f"checkout_id={checkout_id} amount={payment_result['applied']} "
+        f"order_id={order.id} payment_status={payment_result['payment_status']}"
+    )
+
+    return JsonResponse({
+        "ok": True,
+        "event_id": event_id,
+        "checkout_id": checkout_id,
+        "applied_amount": str(payment_result["applied"]),
+        "payment_status": payment_result["payment_status"],
+    })
+

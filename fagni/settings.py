@@ -470,7 +470,7 @@ UNFOLD = {
                 ],
             },
             {
-                "title": "MLM",
+                "title": "Parrainage",
                 "separator": True,
                 "items": [
                     {
@@ -483,3 +483,23 @@ UNFOLD = {
         ],
     },
 }
+
+WAVE_CHECKOUT_SIGNING_SECRET = os.getenv("WAVE_CHECKOUT_SIGNING_SECRET", "")
+WAVE_WEBHOOK_SIGNING_SECRET = os.getenv("WAVE_WEBHOOK_SIGNING_SECRET", "")
+# ============================================================
+# Security loggers — wallet/payment guards
+# ============================================================
+try:
+    LOGGING.setdefault("loggers", {})
+    LOGGING["loggers"].setdefault("wallet_security", {
+        "handlers": ["console"],
+        "level": "ERROR",
+        "propagate": False,
+    })
+    LOGGING["loggers"].setdefault("payment_security", {
+        "handlers": ["console"],
+        "level": "ERROR",
+        "propagate": False,
+    })
+except Exception:
+    pass

@@ -177,6 +177,36 @@ class Wallet(models.Model):
                 f"Incohérence: owner_type='{self.owner_type}' mais champ renseigné='{filled[0]}'."
             )
 
+    def save(self, *args, **kwargs):
+        # 🔒 WALLET BALANCE GUARD — interdit modification directe du solde hors services wallet
+        if self.pk:
+            try:
+                old = Wallet.objects.filter(pk=self.pk).first()
+                if old and old.balance != self.balance:
+                    import inspect
+                    allowed = any(
+                        frame.function in ("credit_wallet", "debit_wallet", "apply_payout")
+                        for frame in inspect.stack()
+                    )
+                    if not allowed:
+                        import logging
+                        logger = logging.getLogger("wallet_security")
+                        logger.error(
+                            "🚨 WALLET_FRAUD_BLOCKED | wallet_id=%s | old=%s | new=%s",
+                            self.pk,
+                            old.balance,
+                            self.balance,
+                        )
+                        raise ValidationError({
+                            "balance": "Modification wallet.balance interdite hors services wallet."
+                        })
+            except ValidationError:
+                raise
+            except Exception:
+                pass
+
+        super().save(*args, **kwargs)
+
     def __str__(self):
         label = f"{self.get_owner_type_display()} - {self.currency}"
         if self.customer:

@@ -799,11 +799,41 @@ class LogisticsConfig(models.Model):
 # =====================
 #  COMMANDE
 # =====================
+PAYMENT_STATUS_PENDING = "pending"
+PAYMENT_STATUS_DECLARED = "declared"
+PAYMENT_STATUS_PARTIAL = "partial"
+PAYMENT_STATUS_PAID = "paid"
+
+PAYMENT_STATUS_CHOICES = [
+    (PAYMENT_STATUS_PENDING, "En attente"),
+    (PAYMENT_STATUS_DECLARED, "Déclaré"),
+    (PAYMENT_STATUS_PARTIAL, "Partiel"),
+    (PAYMENT_STATUS_PAID, "Payé"),
+]
+
+PAYMENT_VERIFICATION_NONE = "none"
+PAYMENT_VERIFICATION_PENDING = "pending_review"
+PAYMENT_VERIFICATION_VERIFIED = "verified"
+PAYMENT_VERIFICATION_REJECTED = "rejected"
+
+PAYMENT_VERIFICATION_STATUS_CHOICES = [
+    (PAYMENT_VERIFICATION_NONE, "Aucune"),
+    (PAYMENT_VERIFICATION_PENDING, "En attente de revue"),
+    (PAYMENT_VERIFICATION_VERIFIED, "Vérifié"),
+    (PAYMENT_VERIFICATION_REJECTED, "Rejeté"),
+]
+
 class Order(models.Model):
     order_number = models.PositiveIntegerField(
         null=True,
         blank=True,
         unique=True,
+    )
+
+    service_type = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
     )
 
 
@@ -1054,10 +1084,47 @@ class Order(models.Model):
 
     # --------- Paiement client ---------
     payment_status = models.CharField(
-        "Statut de paiement",
-        max_length=30,
+        max_length=20,
         choices=PAYMENT_STATUS_CHOICES,
-        default="unpaid",
+        default=PAYMENT_STATUS_PENDING,
+    )
+
+
+    payment_verification_status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_VERIFICATION_STATUS_CHOICES,
+        default=PAYMENT_VERIFICATION_NONE,
+        blank=True,
+    )
+
+    payment_declared_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    payment_declared_channel = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+    )
+
+    payment_verified_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    payment_verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+
+    payment_declared_reference = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
     )
 
     amount_paid = models.DecimalField(
@@ -1544,7 +1611,7 @@ class Order(models.Model):
         if total_ttc <= 0:
             try:
                 self.amount_paid = Decimal("0.00")
-                self.payment_status = "unpaid"
+                self.payment_status = "pending"
                 if save:
                     self.save(update_fields=["amount_paid", "payment_status"])
             except Exception:
@@ -1607,7 +1674,7 @@ class Order(models.Model):
                 self.payment_status = "partial"
                 self.amount_paid = Decimal(str(pay_amount_int))
             else:
-                self.payment_status = "unpaid"
+                self.payment_status = "pending"
                 self.amount_paid = Decimal("0.00")
 
         # 5) Si on devient paid => préparer facture + recalcul finance (génère invoice_number etc.)
@@ -1682,20 +1749,20 @@ class Order(models.Model):
         """
         Met à jour amount_paid + payment_status à partir des paiements (Payments).
         Règles:
-        - total_client_ttc <= 0 => unpaid
+        - total_client_ttc <= 0 => pending
         - amount_paid = min(sum(payments), total_client_ttc)
-        - status: unpaid / partial / paid
+        - status: pending / partial / paid
         Retourne True si la commande vient juste de passer à 'paid'.
         """
         from decimal import Decimal
         from django.utils import timezone
 
         total_ttc = Decimal(str(getattr(self, "total_client_ttc", 0) or 0))
-        old_status = (getattr(self, "payment_status", None) or "unpaid")
+        old_status = (getattr(self, "payment_status", None) or "pending")
 
         if total_ttc <= 0:
             self.amount_paid = Decimal("0.00")
-            self.payment_status = "unpaid"
+            self.payment_status = "pending"
             if save:
                 self.save(update_fields=["amount_paid", "payment_status"])
             return False
@@ -1706,7 +1773,7 @@ class Order(models.Model):
 
         effective_paid = paid_sum if paid_sum <= total_ttc else total_ttc
         if paid_sum <= 0:
-            new_status = "unpaid"
+            new_status = "pending"
         elif paid_sum < total_ttc:
             new_status = "partial"
         else:
@@ -2623,7 +2690,7 @@ class Order(models.Model):
             })
 
         # 1) Paiement client
-        paid = (getattr(self, "payment_status", "unpaid") == "paid")
+        paid = (getattr(self, "payment_status", "pending") == "paid")
         amount_paid = getattr(self, "amount_paid", None)
         total_ttc = getattr(self, "total_client_ttc", None)
         add_event(
@@ -2756,6 +2823,33 @@ class Order(models.Model):
         if self.pk:
             old = Order.objects.filter(pk=self.pk).first()
 
+            # 🔒 PAYMENT GUARD — interdit toute modification directe hors apply_order_payment()
+            try:
+                if old and (
+                    getattr(old, "amount_paid", None) != getattr(self, "amount_paid", None)
+                    or getattr(old, "payment_status", None) != getattr(self, "payment_status", None)
+                ):
+                    import inspect
+                    allowed = any(frame.function == "apply_order_payment" for frame in inspect.stack())
+                    if not allowed:
+                        import logging
+                        logger = logging.getLogger("payment_security")
+                        logger.error(
+                            "🚨 PAYMENT_FRAUD_BLOCKED | order_id=%s | old_paid=%s | new_paid=%s | old_status=%s | new_status=%s",
+                            self.pk,
+                            getattr(old, "amount_paid", None),
+                            getattr(self, "amount_paid", None),
+                            getattr(old, "payment_status", None),
+                            getattr(self, "payment_status", None),
+                        )
+                        raise ValidationError({
+                            "payment": "Modification paiement interdite hors apply_order_payment()."
+                        })
+            except ValidationError:
+                raise
+            except Exception:
+                pass
+
             # ============================================================
             # 🔒 GARDE-FOU (AVANT ÉCRITURE) — Interdire paid -> non-paid si tx wallet
             # ============================================================
@@ -2796,7 +2890,7 @@ class Order(models.Model):
         #  - amount_paid borné [0, total_client_ttc]
         # ============================================================
         try:
-            st = (getattr(self, "payment_status", "") or "unpaid").strip().lower()
+            st = (getattr(self, "payment_status", "") or "pending").strip().lower()
 
             total_ttc = Decimal(str(getattr(self, "total_client_ttc", 0) or 0))
             # ✅ fallback : si update_financials a ramené 0 mais qu'on avait un total existant en DB
@@ -2830,8 +2924,9 @@ class Order(models.Model):
                 if getattr(self, "payment_date", None) is None:
                     self.payment_date = timezone.now()
 
-            elif st == "unpaid":
-                # unpaid => aucun montant payé ni date
+            elif st in ("pending", "unpaid"):
+                # compat legacy: unpaid est traité comme pending
+                self.payment_status = "pending"
                 if amt != 0:
                     self.amount_paid = Decimal("0")
                 if getattr(self, "payment_date", None) is not None:
@@ -2844,7 +2939,7 @@ class Order(models.Model):
                     if getattr(self, "payment_date", None) is None:
                         self.payment_date = timezone.now()
                 elif amt <= 0:
-                    self.payment_status = "unpaid"
+                    self.payment_status = "pending"
                     self.amount_paid = Decimal("0")
                     self.payment_date = None
                 else:
@@ -2935,19 +3030,19 @@ class Order(models.Model):
 
                 # total invalide => jamais paid
                 if total_ttc <= 0:
-                    new_status = "unpaid"
+                    new_status = "pending"
                     effective_paid = Decimal("0")
                 else:
                     effective_paid = min(paid_sum, total_ttc)
                     if paid_sum <= 0:
-                        new_status = "unpaid"
+                        new_status = "pending"
                     elif paid_sum < total_ttc:
                         new_status = "partial"
                     else:
                         new_status = "paid"
 
                 # 🔒 si déjà PAID et des tx wallet existent => on ne downgrade pas
-                old_status_db = (getattr(old, "payment_status", None) if old else None) or getattr(self, "payment_status", None) or "unpaid"
+                old_status_db = (getattr(old, "payment_status", None) if old else None) or getattr(self, "payment_status", None) or "pending"
                 if old_status_db == "paid" and new_status != "paid":
                     WalletTransaction = apps.get_model("wallets", "WalletTransaction")
                     if WalletTransaction.objects.filter(order_id=self.pk).exists():
@@ -2981,7 +3076,7 @@ class Order(models.Model):
                         self.invoice_status = "paid"
 
                 # si unpaid => optionnel : effacer payment_date (mais tu avais déjà ce verrou avant)
-                if new_status == "unpaid":
+                if new_status == "pending":
                     # on ne force pas, mais si tu veux strict:
                     # updates["payment_date"] = None; self.payment_date = None
                     pass
@@ -2999,7 +3094,7 @@ class Order(models.Model):
         # Cas réel: leg terminé AVANT le paiement -> payout doit partir à l'instant où ça devient PAID.
         # ============================================================
         try:
-            prev_status = (old_status_db or (getattr(old, "payment_status", None) if old else None) or "unpaid")
+            prev_status = (old_status_db or (getattr(old, "payment_status", None) if old else None) or "pending")
             became_paid_via_resync = (prev_status != "paid" and getattr(self, "payment_status", None) == "paid")
 
             if became_paid_via_resync and self.pk:
@@ -3724,18 +3819,18 @@ class Payment(models.Model):
             paid_sum = Decimal("0")
 
         if total_ttc <= 0:
-            new_status = "unpaid"
+            new_status = "pending"
             effective_paid = Decimal("0")
         else:
             effective_paid = min(paid_sum, total_ttc)
             if paid_sum <= 0:
-                new_status = "unpaid"
+                new_status = "pending"
             elif paid_sum < total_ttc:
                 new_status = "partial"
             else:
                 new_status = "paid"
 
-        old_status_db = type(o).objects.filter(pk=o.pk).values_list("payment_status", flat=True).first() or "unpaid"
+        old_status_db = type(o).objects.filter(pk=o.pk).values_list("payment_status", flat=True).first() or "pending"
         becomes_paid = (old_status_db != "paid" and new_status == "paid")
 
         updates = {"amount_paid": effective_paid}
@@ -3914,3 +4009,92 @@ class OrderUpsell(models.Model):
 
     def __str__(self):
         return f"Upsell commande #{getattr(self.order, 'id', '—')} — {self.total} XOF"
+
+
+class OrderPaymentEvent(models.Model):
+    CHANNEL_CHOICES = [
+        ("wallet", "Wallet"),
+        ("wave_webhook", "Wave webhook"),
+        ("wave_ops", "Wave OPS"),
+        ("cash", "Cash"),
+        ("manual", "Manuel"),
+    ]
+
+    order = models.ForeignKey(
+        "orders.Order",
+        on_delete=models.CASCADE,
+        related_name="payment_events",
+        verbose_name="Commande",
+    )
+
+    channel = models.CharField(
+        "Canal",
+        max_length=30,
+        choices=CHANNEL_CHOICES,
+        default="manual",
+    )
+
+    reference = models.CharField(
+        "Référence",
+        max_length=255,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+
+    amount = models.DecimalField(
+        "Montant appliqué",
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+    )
+
+    amount_paid_before = models.DecimalField(
+        "Montant payé avant",
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+    )
+
+    amount_paid_after = models.DecimalField(
+        "Montant payé après",
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+    )
+
+    status_before = models.CharField(
+        "Statut avant",
+        max_length=30,
+        blank=True,
+        default="",
+    )
+
+    status_after = models.CharField(
+        "Statut après",
+        max_length=30,
+        blank=True,
+        default="",
+    )
+
+    note = models.TextField("Note", blank=True, default="")
+    created_at = models.DateTimeField("Créé le", auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["order", "created_at"]),
+            models.Index(fields=["channel", "reference"]),
+        ]
+        verbose_name = "Événement de paiement commande"
+        verbose_name_plural = "Événements de paiement commande"
+
+    def __str__(self):
+        return f"{getattr(self.order, 'code', self.order_id)} - {self.channel} - {self.amount}"
+
+
+class WaveEvent(models.Model):
+    event_id = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.event_id

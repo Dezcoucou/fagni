@@ -212,7 +212,6 @@ def debit_wallet(
     - ancien param: label=...
     - nouveau param: description=...
     """
-    # compat label -> description si description vide
     if (not description) and label:
         description = label
 
@@ -224,6 +223,31 @@ def debit_wallet(
 
     if amount <= 0:
         return None
+
+    # ✅ Idempotence par clé explicite
+    if idempotency_key:
+        existing = WalletTransaction.objects.filter(idempotency_key=idempotency_key).order_by("id").first()
+        if existing:
+            return existing
+
+    # ✅ Idempotence métier sur une commande
+    # Seulement si aucune clé explicite n'est fournie.
+    # Si idempotency_key existe, elle devient la source d'idempotence.
+    if order is not None and not idempotency_key:
+        qs = WalletTransaction.objects.filter(
+            wallet=wallet,
+            order=order,
+            type=tx_type,
+            direction="out",
+        )
+        if leg is not None:
+            qs = qs.filter(leg=leg)
+        else:
+            qs = qs.filter(leg__isnull=True)
+
+        existing = qs.order_by("id").first()
+        if existing:
+            return existing
 
     wallet.balance = (wallet.balance - amount).quantize(
         Decimal("0.01"), rounding=ROUND_HALF_UP

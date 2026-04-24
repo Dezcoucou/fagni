@@ -1,186 +1,265 @@
 {% extends "orders/client_base.html" %}
 {% load money_filters %}
 {% block title %}Nouvelle commande – Étape 4{% endblock %}
+
 {% block content %}
 <div class="page co-page">
   <div class="co-head">
     <div>
-      <h1 class="co-title">Récapitulatif</h1>
-      <p class="co-subtitle">Étape 4/4 — Vérifie puis confirme</p>
+      <h1 class="co-title">Récapitulatif final</h1>
+      <p class="co-subtitle">Étape 4/4 — Vérifie une dernière fois puis confirme ta commande</p>
+
+      <div class="co-steps" aria-label="progression">
+        <span class="co-step">1 • Infos</span>
+        <span class="co-step">2 • Mode & livraison</span>
+        <span class="co-step">3 • Contenu</span>
+        <span class="co-step active">4 • Confirmation</span>
+      </div>
     </div>
+
     <div class="co-head__actions">
-      <a class="btn btn-light" href="{% url 'orders:client_new_order_step3' order.id %}">← Modifier</a>
+      <a class="btn btn-light" href="{% url 'orders:client_new_order_step3' order.id %}">
+        ← Modifier
+      </a>
     </div>
   </div>
 
   <form method="post" class="co-form">
     {% csrf_token %}
+    <input type="hidden" name="confirm_order" value="1">
 
-    <div class="card co-card">
-      <div class="co-card__head">
-        <div>
-          <div class="co-card__title">
-            {% if display_summary.is_bag %}{{ display_summary.pricing_label }}{% else %}Articles sélectionnés{% endif %}
+    <div class="co-layout">
+      <div class="co-main">
+
+        <div class="card co-card">
+          <div class="co-card__head">
+            <div>
+              <div class="co-card__title">
+                {% if display_summary.is_bag %}
+                  {{ display_summary.pricing_label }}
+                {% else %}
+                  Articles sélectionnés
+                {% endif %}
+              </div>
+              <div class="co-card__sub">
+                {% if is_bag_mode %}
+                  {{ display_summary.pricing_label }} — {{ display_summary.bag_label }}
+                {% else %}
+                  {{ items|length }} ligne(s)
+                {% endif %}
+              </div>
+            </div>
+
+            <span class="badge-status badge-status--in_progress">Vérification</span>
           </div>
-          <div class="co-card__sub">
+
+          <div class="co-section">
             {% if is_bag_mode %}
-              {{ display_summary.pricing_label }} — {{ display_summary.bag_label }}
+              <div class="co-bag-summary">
+                <div class="co-bag-summary__top">
+                  <div>
+                    <div class="co-item__name">{{ display_summary.bag_label }}</div>
+                    <div class="co-item__meta">{{ display_summary.content_label }}</div>
+                  </div>
+                  <div class="co-item__right">
+                    <div class="co-item__k">Base</div>
+                    <div class="co-item__total">{{ bag_base_price|floatformat:0 }} FCFA</div>
+                  </div>
+                </div>
+
+                <div class="co-rule-box">
+                  <div class="co-rule-box__title">✅ Règles validées</div>
+                  <div class="co-rule-box__text">
+                    Le sac FAGNI contient uniquement des {{ display_summary.content_label|lower }}.
+                    {{ display_summary.exclusions_label }}.
+                  </div>
+                </div>
+              </div>
             {% else %}
-              {{ items|length }} ligne(s)
+              <div class="co-items">
+                {% for it in items %}
+                  <div class="co-item">
+                    <div class="co-item__left">
+                      <div class="co-item__name">{{ it.designation|default:"Article" }}</div>
+                      <div class="co-item__meta">
+                        {{ it.quantity|default:0 }} × {{ it.unit_price|default:0|floatformat:0 }} FCFA
+                      </div>
+                      <div class="co-pill">Qté : {{ it.quantity|default:0 }}</div>
+                    </div>
+                    <div class="co-item__right">
+                      <div class="co-item__k">Total</div>
+                      <div class="co-item__total">{{ it.total|default:0|floatformat:0 }} FCFA</div>
+                    </div>
+                  </div>
+                {% empty %}
+                  <div class="co-warn">
+                    Aucun article ajouté. Retourne à l’étape 3.
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+          {% if items and not is_bag_mode %}
+            <div class="co-section co-section--divider">
+              <div class="co-card__title" style="margin-bottom:10px;">Photos envoyées</div>
+
+              <div class="co-photos-grid">
+                {% for it in items %}
+                  {% for ph in it.photos.all %}
+                    {% if ph.image %}
+                      <img
+                        src="{{ ph.image.url }}"
+                        alt="photo article"
+                        class="co-photo"
+                      >
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="card co-card">
+          <div class="co-section">
+            <div class="co-card__title">Informations client</div>
+
+            <div class="co-grid2" style="margin-top:12px;">
+              <div class="co-kv">
+                <div class="co-k">Client</div>
+                <div class="co-v">
+                  {% if order.customer %}{{ order.customer }}{% else %}—{% endif %}
+                </div>
+              </div>
+
+              <div class="co-kv">
+                <div class="co-k">Adresse</div>
+                <div class="co-v">
+                  {% if order.customer and order.customer.address %}
+                    {{ order.customer.address }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            {% if order.notes %}
+              <div class="co-kv" style="margin-top:12px;">
+                <div class="co-k">Notes</div>
+                <div class="co-v">{{ order.notes }}</div>
+              </div>
             {% endif %}
           </div>
         </div>
-        <span class="badge-status badge-status--in_progress">Vérification</span>
+
       </div>
 
-      <div class="co-section">
-        {% if is_bag_mode %}
-          <div class="co-bag-summary">
-            <div class="co-bag-summary__top">
-              <div>
-                <div class="co-item__name">{{ display_summary.bag_label }}</div>
-                <div class="co-item__meta">{{ display_summary.content_label }}</div>
+      <aside class="co-side">
+        <div class="card co-card co-card--summary">
+          <div class="co-section">
+            <div class="co-card__title">Résumé financier</div>
+
+            <div class="co-summary-box">
+              <div class="co-summary-row">
+                <span>Prestations</span>
+                <strong>{{ finance_summary.prestation_total|floatformat:0 }} FCFA</strong>
               </div>
-              <div class="co-item__right">
-                <div class="co-item__k">Base</div>
-                <div class="co-item__total">{{ bag_base_price|floatformat:0 }} FCFA</div>
+
+              <div class="co-summary-row">
+                <span>Livraison</span>
+                <strong>{{ finance_summary.delivery_fee_client|floatformat:0 }} FCFA</strong>
+              </div>
+
+              <div class="co-summary-row">
+                <span>Frais FAGNI</span>
+                <strong>{{ service_fee_client_ttc|floatformat:0 }} FCFA</strong>
+              </div>
+
+              <div class="co-summary-row">
+                <span>Mode de livraison</span>
+                <strong>
+                  {% if order.delivery_mode == "express" %}
+                    Express (24h)
+                  {% elif order.delivery_mode == "scheduled" %}
+                    Programmée
+                  {% else %}
+                    Standard (48h)
+                  {% endif %}
+                </strong>
+              </div>
+
+              <div class="co-summary-row">
+                <span>Créneau</span>
+                <strong>
+                  {% if order.delivery_mode == "scheduled" and order.scheduled_delivery_at %}
+                    {{ order.scheduled_delivery_at|date:"d/m/Y H:i" }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </strong>
+              </div>
+
+              <div class="co-summary-row co-summary-row--total">
+                <span>Total TTC</span>
+                <strong>{{ finance_summary.total_client_ttc|floatformat:0 }} FCFA</strong>
               </div>
             </div>
 
-            <div class="co-rule-box">
-              <div class="co-rule-box__title">✅ Règles validées</div>
-              <div class="co-rule-box__text">
-                Le sac FAGNI contient uniquement des {{ display_summary.content_label|lower }}. {{ display_summary.exclusions_label }}.
-              </div>
+            <div class="co-confirm-note">
+              Après confirmation : paiement <strong>Wave</strong> si nécessaire.
             </div>
-          </div>
-        {% else %}
-          <div class="co-items">
-            {% for it in items %}
-              <div class="co-item">
-                <div class="co-item__left">
-                  <div class="co-item__name">{{ it.designation }}</div>
-                  <div class="co-item__meta">
-                    {{ it.quantity }} × {{ it.unit_price|floatformat:0 }} FCFA
-                  </div>
-                  <div class="co-pill">Qté: {{ it.quantity }}</div>
-                </div>
-                <div class="co-item__right">
-                  <div class="co-item__k">Total</div>
-                  <div class="co-item__total">{{ it.total|floatformat:0 }} FCFA</div>
-                </div>
-              </div>
-            {% empty %}
-              <div class="co-warn">
-                Aucun article ajouté. Retourne à l’étape 3 pour sélectionner au moins un article.
-              </div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      </div>
 
-      <div class="co-section">
-        <div class="co-grid2">
-          <div class="co-kv">
-            <div class="co-k">Prestations</div>
-            <div class="co-v">{{ finance_summary.prestation_total|floatformat:0 }} FCFA</div>
-          </div>
-          <div class="co-kv">
-            <div class="co-k">Livraison</div>
-            <div class="co-v">{{ finance_summary.delivery_fee_client|floatformat:0 }} FCFA</div>
-          </div>
-        </div>
+            <div class="co-side-actions">
+              <a class="btn btn-light btn-block" href="{% url 'orders:client_new_order_step3' order.id %}">
+                ← Modifier {% if is_bag_mode %}le sac{% else %}les articles{% endif %}
+              </a>
 
-        <div class="co-grid2" style="margin-top:10px;">
-          <div class="co-kv">
-            <div class="co-k">Frais FAGNI</div>
-            <div class="co-v">{{ service_fee_client_ttc|floatformat:0 }} FCFA</div>
-          </div>
-          <div class="co-kv">
-            <div class="co-k">Mode de livraison</div>
-            <div class="co-v">
-              {% if order.delivery_mode == "express" %}
-                Express (24h)
-              {% elif order.delivery_mode == "scheduled" %}
-                Programmée
-              {% else %}
-                Standard (48h)
-              {% endif %}
+              <button id="confirmBtnTop" class="btn btn-premium btn-block" type="submit" name="confirm_order" value="1">
+                Confirmer et continuer
+              </button>
             </div>
           </div>
         </div>
-
-        <div class="co-grid2" style="margin-top:10px;">
-          <div class="co-kv">
-            <div class="co-k">Créneau</div>
-            <div class="co-v">
-              {% if order.delivery_mode == "scheduled" and order.scheduled_delivery_at %}
-                {{ order.scheduled_delivery_at|date:"d/m/Y H:i" }}
-              {% else %}
-                —
-              {% endif %}
-            </div>
-          </div>
-          <div class="co-kv co-kv--strong">
-            <div class="co-k">Total TTC</div>
-            <div class="co-v">{{ finance_summary.total_client_ttc|floatformat:0 }} FCFA</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="co-section">
-        <div class="co-grid2">
-          <div class="co-kv">
-            <div class="co-k">Client</div>
-            <div class="co-v">
-              {% if order.customer %}{{ order.customer }}{% else %}—{% endif %}
-            </div>
-          </div>
-          <div class="co-kv">
-            <div class="co-k">Adresse</div>
-            <div class="co-v">
-              {% if order.customer and order.customer.address %}
-                {{ order.customer.address }}
-              {% else %}
-                —
-              {% endif %}
-            </div>
-          </div>
-        </div>
-        {% if order.notes %}
-          <div class="co-kv" style="margin-top:10px">
-            <div class="co-k">Notes</div>
-            <div class="co-v">{{ order.notes }}</div>
-          </div>
-        {% endif %}
-      </div>
-
-      <div class="co-actions">
-        <a class="btn btn-light" href="{% url 'orders:client_new_order_step3' order.id %}">
-          ← Modifier {% if is_bag_mode %}le sac{% else %}les articles{% endif %}
-        </a>
-        <div class="co-actions__spacer"></div>
-        <div class="hint">
-          Après confirmation : paiement <strong>Wave</strong> si nécessaire.
-        </div>
-      </div>
+      </aside>
     </div>
 
     <div class="co-sticky" role="region" aria-label="Total et confirmation">
       <div>
         <div class="co-sticky__k">Total TTC</div>
-        <div class="co-sticky__v">{{ finance_breakdown.total_client_ttc|floatformat:0 }} FCFA</div>
-        <div class="co-sticky__mini">Confirme pour finaliser (paiement Wave si besoin)</div>
+        <div class="co-sticky__v">{{ finance_summary.total_client_ttc|default:0|floatformat:0 }} FCFA</div>
+        <div class="co-sticky__mini">Confirme pour finaliser puis passer au paiement si nécessaire</div>
       </div>
+
       <div class="co-sticky__spacer"></div>
-      <button class="btn btn-premium" type="submit">
-        Confirmer
+
+      <button id="confirmBtnSticky" class="btn btn-premium" type="submit" name="confirm_order" value="1">
+        Confirmer et continuer vers le paiement
       </button>
     </div>
   </form>
 </div>
 
 <style>
+  .co-layout{
+    display:grid;
+    grid-template-columns:minmax(0,1.5fr) minmax(320px,.9fr);
+    gap:18px;
+    align-items:start;
+  }
+
+  .co-main,
+  .co-side{
+    display:grid;
+    gap:18px;
+  }
+
+  .co-card--summary{
+    position:sticky;
+    top:14px;
+  }
+
   .co-bag-summary__top{
     display:flex;
     align-items:flex-start;
@@ -188,34 +267,139 @@
     gap:16px;
     margin-bottom:14px;
   }
+
   .co-rule-box{
     border:1px solid #E8EDF5;
     border-radius:16px;
     padding:14px 16px;
     background:#fff;
   }
+
   .co-rule-box__title{
     font-weight:800;
     color:#1E3A5F;
     margin-bottom:6px;
   }
+
   .co-rule-box__text{
     color:#6B7280;
     line-height:1.5;
+  }
+
+  .co-photos-grid{
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0,1fr));
+    gap:10px;
+  }
+
+  .co-photo{
+    width:100%;
+    height:110px;
+    object-fit:cover;
+    border-radius:14px;
+    border:1px solid #E8EDF5;
+    display:block;
+  }
+
+  .co-summary-box{
+    margin-top:12px;
+    display:grid;
+    gap:10px;
+    border:1px solid #E8EDF5;
+    border-radius:18px;
+    background:#fff;
+    padding:14px;
+  }
+
+  .co-summary-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    color:#6B7280;
+    font-size:14px;
+  }
+
+  .co-summary-row strong{
+    color:#1E3A5F;
+    text-align:right;
+  }
+
+  .co-summary-row--total{
+    margin-top:4px;
+    padding-top:12px;
+    border-top:1px dashed #E8EDF5;
+    font-size:15px;
+  }
+
+  .co-summary-row--total strong{
+    color:#E87722;
+    font-size:22px;
+    font-weight:900;
+  }
+
+  .co-confirm-note{
+    margin-top:14px;
+    padding:12px 14px;
+    border-radius:16px;
+    background:#F8FAFD;
+    border:1px solid #E8EDF5;
+    color:#475569;
+    font-size:13px;
+    line-height:1.5;
+    font-weight:700;
+  }
+
+  .co-side-actions{
+    display:grid;
+    gap:10px;
+    margin-top:14px;
+  }
+
+  .btn-block{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  @media (max-width: 980px){
+    .co-layout{
+      grid-template-columns:1fr;
+    }
+
+    .co-card--summary{
+      position:static;
+    }
+  }
+
+  @media (max-width: 720px){
+    .co-photos-grid{
+      grid-template-columns:repeat(2, minmax(0,1fr));
+    }
+  }
+
+  @media (max-width: 520px){
+    .co-photos-grid{
+      grid-template-columns:1fr 1fr;
+    }
   }
 </style>
 
 <script>
   document.addEventListener("DOMContentLoaded", function() {
-    const form = document.querySelector("form");
-    const btn = document.querySelector('button[type="submit"]');
-    if (form && btn) {
-      form.addEventListener("submit", function() {
+    const form = document.querySelector(".co-form");
+    const btns = document.querySelectorAll('button[type="submit"][name="confirm_order"]');
+
+    if (!form || !btns.length) return;
+
+    form.addEventListener("submit", function() {
+      btns.forEach(function(btn){
         btn.disabled = true;
         btn.innerHTML = "Redirection vers paiement sécurisé...";
         btn.style.opacity = "0.7";
       });
-    }
+    });
   });
 </script>
 {% endblock %}

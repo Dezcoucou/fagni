@@ -1,6 +1,7 @@
 {% extends "orders/client_base.html" %}
 {% load static %}
 {% block title %}Nouvelle commande – Client FAGNI{% endblock %}
+
 {% block extra_head %}
 {{ block.super }}
 <style>
@@ -328,6 +329,9 @@
     background:#fff;
     border:1px solid #e2e8f0;
   }
+  .premium-panel{
+    margin-top:18px;
+  }
   .client-cta{
     margin-top:18px;
     display:flex;
@@ -353,39 +357,6 @@
     line-height:1.55;
     font-weight:700;
   }
-  @media (max-width:1100px){
-    .client-create-hero,
-    .client-create-mini,
-    .client-form-grid{
-      grid-template-columns:1fr;
-    }
-  }
-  @media (max-width:760px){
-    .client-create-top,
-    .client-form-head,
-    .client-cta{
-      flex-direction:column;
-      align-items:flex-start;
-    }
-  }
-  @media (max-width:640px){
-    .client-order-create{
-      padding:10px 8px 104px;
-    }
-    .co-address-actions{
-      flex-direction:column;
-    }
-    .co-address-actions .fagni-btn{
-      width:100%;
-    }
-    .co-coords{
-      grid-template-columns:1fr;
-    }
-    .client-create-title{
-      font-size:24px;
-    }
-  }
-
   .client-option-card{
     position:relative;
     display:block;
@@ -439,8 +410,44 @@
     border:1px solid #fed7aa;
   }
 
+  @media (max-width:1100px){
+    .client-create-hero,
+    .client-create-mini,
+    .client-form-grid{
+      grid-template-columns:1fr;
+    }
+  }
+  @media (max-width:760px){
+    .client-create-top,
+    .client-form-head,
+    .client-cta{
+      flex-direction:column;
+      align-items:flex-start;
+    }
+  }
+  @media (max-width:640px){
+    .client-order-create{
+      padding:10px 8px 104px;
+    }
+    .co-address-actions{
+      flex-direction:column;
+    }
+    .co-address-actions .fagni-btn{
+      width:100%;
+    }
+    .co-coords{
+      grid-template-columns:1fr;
+    }
+    .client-create-title{
+      font-size:24px;
+    }
+    .hero-v2__actions{
+      flex-direction:column;
+    }
+  }
 </style>
 {% endblock %}
+
 {% block content %}
 <div class="page client-order-create">
   <div class="client-create-top">
@@ -460,6 +467,7 @@
       <a class="fagni-btn fagni-btn--light" href="{% url 'orders:client_home' %}">← Retour</a>
     </div>
   </div>
+
   <section class="client-create-hero">
     <div class="client-create-hero-main">
       <div class="fagni-eyebrow">FAGNI • Création de commande</div>
@@ -487,6 +495,7 @@
         </div>
       </div>
     </div>
+
     <div class="client-create-hero-side">
       <div class="fagni-eyebrow" style="color:#64748b;">Ce qu’il faut savoir</div>
       <h3 class="fagni-title" style="font-size:20px;color:#0f172a;">Avant de continuer</h3>
@@ -518,6 +527,7 @@
       </div>
     </div>
   </section>
+
   <section class="client-form-panel">
     <div class="client-form-head">
       <div>
@@ -527,9 +537,11 @@
         </div>
       </div>
     </div>
+
     {% if error %}
       <div class="client-alert">{{ error }}</div>
     {% endif %}
+
     <form method="post" id="clientNewOrderForm">
       {% csrf_token %}
       <input type="hidden" name="pickup_lat" id="pickupLat" value="">
@@ -537,12 +549,14 @@
       <input type="hidden" name="pickup_place_id" id="pickupPlaceId" value="">
       <input type="hidden" name="pickup_geo_source" id="pickupGeoSource" value="">
       <input type="hidden" name="pickup_geo_label" id="pickupGeoLabel" value="">
+
       <div class="client-form-grid">
         <div class="client-field">
           <label class="client-label">Téléphone</label>
           <input value="{{ phone }}" disabled class="client-input client-input--disabled" />
           <small class="client-help">Ce numéro sert à retrouver tes commandes.</small>
         </div>
+
         <div class="client-field">
           <label class="client-label">Nom</label>
           <input
@@ -555,46 +569,40 @@
           />
           <small class="client-help">Ex : Désiré Tongbé</small>
         </div>
+
         <div class="client-field client-field--full">
           <label class="client-label">Adresse de collecte / livraison</label>
           <div class="co-geo-grid">
             <input
               id="addressInput"
               name="address"
-              placeholder="Ex: Cocody Riviera 3, près du carrefour Shell"
               value="{{ address_init }}"
-              placeholder="Ex : Cocody Angré 8ème tranche…"
+              placeholder="Ex : Cocody Riviera 3, près du carrefour Shell"
               class="client-input"
               autocomplete="street-address"
               required
             />
 
-            <div class="client-geo-tools" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-              <button type="button" id="btn-use-location" class="btn btn-light" style="min-height:44px;font-weight:900;">
-              </button>
-              <div id="geo-feedback" style="font-size:12px;font-weight:800;color:#64748b;"></div>
-            </div>
-
-
-            <input type="hidden" name="pickup_lat" id="id_pickup_lat" value="{{ request.POST.pickup_lat|default:'' }}">
-            <input type="hidden" name="pickup_lng" id="id_pickup_lng" value="{{ request.POST.pickup_lng|default:'' }}">
-            <input type="hidden" name="pickup_geo_label" id="id_pickup_geo_label" value="{{ request.POST.pickup_geo_label|default:'' }}">
-
             <div class="co-address-actions">
               <button type="button" class="fagni-btn fagni-btn--light" id="btnLocateMe">📍 Utiliser ma position</button>
               <button type="button" class="fagni-btn fagni-btn--light" id="btnClearGeo">✕ Effacer la géolocalisation</button>
             </div>
+
             <div class="co-geo-note">
               Tu peux saisir ton adresse manuellement, utiliser l’autocomplétion, ou autoriser ta position pour préremplir une adresse plus fiable.
             </div>
+
             <div id="geoStatus" class="co-geo-status"></div>
+
             <div class="co-coords">
               <small class="client-help" id="latPreview">Latitude : —</small>
               <small class="client-help" id="lngPreview">Longitude : —</small>
             </div>
+
             <div id="mapPreview" class="co-map-preview"></div>
           </div>
         </div>
+
         <div class="client-field client-field--full">
           <label class="client-label">Détails / Notes (optionnel)</label>
           <textarea
@@ -606,60 +614,63 @@
           <small class="client-help">Plus c’est précis, plus c’est simple pour l’équipe.</small>
         </div>
       </div>
+
+      <div class="client-form-panel premium-panel">
+        <div class="client-form-head">
+          <div>
+            <h2 class="client-form-title">Options premium</h2>
+            <div class="client-form-sub">
+              Améliore ton service avec des options rapides et rentables.
+            </div>
+          </div>
+        </div>
+
+        <div class="client-form-grid">
+          <label class="client-field client-option-card">
+            <input type="checkbox" name="premium_ironing" value="1" class="client-option-check">
+            <div class="client-option-body">
+              <div class="client-option-title">Repassage premium</div>
+              <div class="client-option-desc">Finition plus soignée et présentation renforcée.</div>
+              <div class="client-option-price">+ 500 FCFA</div>
+            </div>
+          </label>
+
+          <label class="client-field client-option-card">
+            <input type="checkbox" name="fragrance" value="1" class="client-option-check">
+            <div class="client-option-body">
+              <div class="client-option-title">Parfum linge</div>
+              <div class="client-option-desc">Ajout d’une touche parfumée agréable.</div>
+              <div class="client-option-price">+ 300 FCFA</div>
+            </div>
+          </label>
+
+          <label class="client-field client-option-card">
+            <input type="checkbox" name="delicate_care" value="1" class="client-option-check">
+            <div class="client-option-body">
+              <div class="client-option-title">Soin délicat</div>
+              <div class="client-option-desc">Traitement spécial pour textiles sensibles.</div>
+              <div class="client-option-price">+ 1 000 FCFA</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
       <div class="client-cta">
-        
-<div class="client-form-panel" style="margin-top:14px;">
-  <div class="client-form-head">
-    <div>
-      <h2 class="client-form-title">Options premium</h2>
-      <div class="client-form-sub">
-        Améliore ton service avec des options rapides et rentables.
-      </div>
-    </div>
-  </div>
-
-  <div class="client-form-grid">
-    <label class="client-field client-option-card">
-      <input type="checkbox" name="premium_ironing" value="1" class="client-option-check">
-      <div class="client-option-body">
-        <div class="client-option-title">Repassage premium</div>
-        <div class="client-option-desc">Finition plus soignée et présentation renforcée.</div>
-        <div class="client-option-price">+ 500 FCFA</div>
-      </div>
-    </label>
-
-    <label class="client-field client-option-card">
-      <input type="checkbox" name="fragrance" value="1" class="client-option-check">
-      <div class="client-option-body">
-        <div class="client-option-title">Parfum linge</div>
-        <div class="client-option-desc">Ajout d’une touche parfumée agréable.</div>
-        <div class="client-option-price">+ 300 FCFA</div>
-      </div>
-    </label>
-
-    <label class="client-field client-option-card">
-      <input type="checkbox" name="delicate_care" value="1" class="client-option-check">
-      <div class="client-option-body">
-        <div class="client-option-title">Soin délicat</div>
-        <div class="client-option-desc">Traitement spécial pour textiles sensibles.</div>
-        <div class="client-option-price">+ 1 000 FCFA</div>
-      </div>
-    </label>
-  </div>
-</div>
-
-<button type="submit" class="fagni-btn fagni-btn--primary">Continuer → Étape 2</button>
+        <button type="submit" class="fagni-btn fagni-btn--primary">Continuer → Étape 2</button>
         <span class="client-cta-meta">Temps estimé : <strong>30 secondes</strong></span>
       </div>
+
       <div class="client-note">
         <strong>Info :</strong> le montant dépend des <strong>articles</strong> et des <strong>quantités</strong> que tu choisiras à l’étape suivante.
       </div>
     </form>
   </section>
 </div>
+
 {% if google_maps_api_key %}
 <script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places&loading=async"></script>
 {% endif %}
+
 <script>
 (function(){
   const addressInput = document.getElementById("addressInput");
@@ -673,16 +684,34 @@
   const geoStatus = document.getElementById("geoStatus");
   const latPreview = document.getElementById("latPreview");
   const lngPreview = document.getElementById("lngPreview");
+  const mapPreview = document.getElementById("mapPreview");
+
   function showStatus(msg, type){
     if(!geoStatus) return;
     geoStatus.className = "co-geo-status";
     if(type){ geoStatus.classList.add(type); }
     geoStatus.textContent = msg || "";
   }
+
   function updatePreview(lat, lng){
     if(latPreview) latPreview.textContent = "Latitude : " + (lat || "—");
     if(lngPreview) lngPreview.textContent = "Longitude : " + (lng || "—");
   }
+
+  function updateMap(lat, lng){
+    if(!mapPreview) return;
+    if(!lat || !lng){
+      mapPreview.style.display = "none";
+      mapPreview.innerHTML = "";
+      return;
+    }
+    mapPreview.style.display = "block";
+    mapPreview.innerHTML = `<iframe
+      loading="lazy"
+      referrerpolicy="no-referrer-when-downgrade"
+      src="https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed"></iframe>`;
+  }
+
   function setGeo(lat, lng, opts){
     const options = opts || {};
     latInput.value = lat || "";
@@ -691,7 +720,9 @@
     geoSourceInput.value = options.source || "";
     geoLabelInput.value = options.label || "";
     updatePreview(latInput.value, lngInput.value);
+    updateMap(latInput.value, lngInput.value);
   }
+
   async function reverseGeocode(lat, lng){
     try{
       const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`;
@@ -708,6 +739,7 @@
       return { address: "", placeId: "" };
     }
   }
+
   async function locateMe(){
     if(!navigator.geolocation){
       showStatus("Géolocalisation non disponible.", "is-err");
@@ -733,9 +765,26 @@
       }
     );
   }
+
+  function clearGeo(){
+    setGeo("", "", {
+      source: "",
+      label: "",
+      placeId: ""
+    });
+    showStatus("Géolocalisation effacée.", "is-warn");
+  }
+
   if(btnLocateMe){
     btnLocateMe.addEventListener("click", locateMe);
   }
+
+  if(btnClearGeo){
+    btnClearGeo.addEventListener("click", clearGeo);
+  }
+
+  updatePreview(latInput.value, lngInput.value);
+  updateMap(latInput.value, lngInput.value);
 })();
 </script>
 {% endblock %}

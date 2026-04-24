@@ -1,750 +1,877 @@
 {% extends "orders/client_base.html" %}
 {% load static %}
+{% load money_filters %}
 
-{% block title %}Mon espace — FAGNI
-<a href="{% url 'orders:client_new_order' %}" class="fab-new-order">
-  <span>＋</span>
-  <span>Nouvelle commande</span>
-</a>
-
-{% endblock %}
+{% block title %}FAGNI Client{% endblock %}
 
 {% block extra_head %}
+{{ block.super }}
 <style>
-  :root{
-    --navy:#1E3A5F;
-    --navy-2:#27476f;
-    --orange:#E87722;
-    --orange-dark:#C4611A;
-    --cream:#FFF8F2;
-    --text:#1E3A5F;
-    --muted:#6B7280;
-    --border:#E8EDF5;
-    --bg:#F4F7FB;
-    --shadow:0 10px 30px rgba(30,58,95,.10);
-    --shadow-orange:0 10px 24px rgba(232,119,34,.18);
-    --radius:20px;
+  .client-home-v2{
+    max-width:1100px;
+    margin:0 auto;
+    padding:18px 14px 90px;
   }
-  *{ box-sizing:border-box; }
-  body{ background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,sans-serif; -webkit-font-smoothing:antialiased; }
-  a{ text-decoration:none; color:inherit; }
-  img{ display:block; max-width:100%; }
-  .shell{ width:min(1100px, calc(100% - 24px)); margin:0 auto; }
 
-  .client-topbar{ background:linear-gradient(90deg,var(--navy),var(--navy-2)); box-shadow:0 4px 20px rgba(0,0,0,.10); position:sticky; top:0; z-index:40; }
-  .client-topbar-inner{ display:flex; align-items:center; justify-content:space-between; min-height:68px; gap:16px; }
-  .topbar-brand img{ height:32px; filter:brightness(0) invert(1); }
-  .topbar-right{ display:flex; align-items:center; gap:12px; }
-  .topbar-btn{ min-height:40px; padding:0 18px; border-radius:999px; background:var(--orange); color:#fff; font-size:13px; font-weight:800; display:inline-flex; align-items:center; gap:8px; box-shadow:var(--shadow-orange); transition:background .2s; }
-  .topbar-btn:hover{ background:var(--orange-dark); }
-  .topbar-ghost{ min-height:38px; padding:0 14px; border-radius:999px; border:1px solid rgba(255,255,255,.22); color:#fff; font-size:13px; font-weight:700; display:inline-flex; align-items:center; }
-  .topbar-avatar{ width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,#f7c7a2,#ffe4d0); border:2px solid rgba(255,255,255,.40); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; color:var(--navy); }
+  .hero-v2{
+    background:linear-gradient(135deg,#234a78 0%, #1E3A5F 45%, #16192d 100%);
+    border-radius:28px;
+    padding:22px 18px;
+    color:#fff;
+    box-shadow:0 14px 40px rgba(30,58,95,.12);
+  }
 
-  .welcome-hero{ background:linear-gradient(90deg,var(--navy),var(--navy-2)); color:#fff; padding:32px 0 80px; margin-bottom:-56px; }
-  .welcome-inner{ display:grid; grid-template-columns:1fr 220px; gap:24px; align-items:center; }
-  .welcome-title{ font-size:clamp(22px,4vw,34px); font-weight:900; letter-spacing:-0.03em; margin-bottom:6px; }
-  .welcome-sub{ color:rgba(255,255,255,.75); font-size:15px; }
-  .welcome-visual{
-    height:140px;
-    border-radius:20px;
-    overflow:hidden;
+  .hero-v2--media{
+    display:grid;
+    grid-template-columns:minmax(0,1.08fr) minmax(320px,.92fr);
+    gap:18px;
+    align-items:stretch;
+  }
+
+  .hero-v2__content{
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+  }
+
+  .hero-v2__media{
     position:relative;
-    box-shadow:0 10px 30px rgba(0,0,0,.12);
-  }
-
-  .welcome-visual img{
-    width:100%;
-    height:100%;
-    object-fit:cover;
-  }
-
-  /* Overlay premium FAGNI */
-  .welcome-visual::after{
-    content:"";
-    position:absolute;
-    inset:0;
-    background:linear-gradient(
-      135deg,
-      rgba(30,58,95,.55) 0%,
-      rgba(30,58,95,.25) 60%,
-      rgba(30,58,95,.05) 100%
-    );
-  }
-  .welcome-avatar{ width:90px; height:90px; border-radius:50%; background:linear-gradient(135deg,#f7c7a2,#ffe4d0); border:3px solid rgba(255,255,255,.50); display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:900; color:var(--navy); }
-
-  .stats-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; position:relative; z-index:2; }
-  .stat-card{ background:#fff; border:1px solid var(--border); border-radius:18px; padding:18px 16px; box-shadow:var(--shadow); display:flex; align-items:center; gap:14px; transition:transform .2s; }
-  .stat-card:hover{ transform:translateY(-3px); }
-  .stat-icon{ width:48px; height:48px; border-radius:14px; background:#EEF3FB; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
-  .stat-icon.orange{ background:#FFF0E4; }
-  .stat-value{ font-size:26px; font-weight:900; color:var(--navy); line-height:1; margin-bottom:4px; }
-  .stat-label{ font-size:13px; color:var(--muted); font-weight:600; }
-
-  .section{ margin-top:28px; }
-  .section-head{ display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:16px; }
-  .section-title{ font-size:20px; font-weight:900; color:var(--navy); letter-spacing:-0.02em; }
-  .section-link{ font-size:13px; font-weight:700; color:var(--orange); }
-
-  .priority-card{
-    background:#FFF8F2;
-    border-radius:20px;
-    padding:20px;
-    margin:20px 0;
-    box-shadow:0 10px 30px rgba(232,119,34,.08);
-    border:1px solid rgba(232,119,34,.15);
-  }
-
-  .priority-content{
-    display:flex;
-    gap:20px;
-    align-items:center;
-  }
-
-  .priority-left{
-    flex:1;
-  }
-
-  .priority-title{
-    font-size:18px;
-    font-weight:800;
-    color:#1E3A5F;
-    margin-bottom:6px;
-  }
-
-  .priority-meta{
-    font-size:13px;
-    color:#6B7280;
-    margin-bottom:10px;
-  }
-
-  .priority-price{
-    font-size:22px;
-    font-weight:900;
-    color:#1E3A5F;
-    margin-bottom:14px;
-  }
-
-  .priority-actions{
-    display:flex;
-    gap:10px;
-    flex-wrap:wrap;
-  }
-
-  .btn-pay{
-    background:#E87722;
-    color:#fff;
-    padding:10px 18px;
-    border-radius:999px;
-    font-weight:800;
-    text-decoration:none;
-    box-shadow:0 8px 20px rgba(232,119,34,.25);
-  }
-
-  .btn-link{
-    color:#1E3A5F;
-    font-weight:700;
-    text-decoration:none;
-  }
-
-  .priority-visual{
-    width:110px;
-    height:110px;
-    border-radius:16px;
+    min-height:380px;
+    border-radius:24px;
     overflow:hidden;
-    flex-shrink:0;
+    border:1px solid rgba(255,255,255,.10);
+    box-shadow:0 14px 34px rgba(15,23,42,.18);
+    background:rgba(255,255,255,.06);
   }
 
-  .priority-visual img{
-    width:100%;
-    height:100%;
-    object-fit:cover;
-  }
-  @media(max-width:768px){
-    .priority-content{
-      flex-direction:column;
-      align-items:flex-start;
-    }
-
-    .priority-visual{
-      width:100%;
-      height:140px;
-    }
-  }
-  .priority-inner{ display:grid; grid-template-columns:68px 1fr auto; gap:16px; align-items:center; }
-  .order-thumb{ width:68px; height:68px; border-radius:14px; background:linear-gradient(135deg,#f6e7d8,#fff8f2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0; }
-  .order-ref{ font-size:12px; color:var(--muted); font-weight:600; margin-bottom:4px; }
-  .order-name{ font-size:17px; font-weight:900; color:var(--navy); margin-bottom:4px; }
-  .order-meta{ font-size:13px; color:var(--muted); }
-  .amount-value{ font-size:22px; font-weight:900; color:var(--navy); }
-  .amount-fcfa{ font-size:13px; color:var(--muted); font-weight:700; }
-  .pay-btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:0 18px; border-radius:14px; background:var(--orange); color:#fff; font-size:14px; font-weight:800; margin-top:8px; box-shadow:var(--shadow-orange); transition:background .2s; white-space:nowrap; }
-  .pay-btn:hover{ background:var(--orange-dark); }
-
-  .badge{ display:inline-flex; align-items:center; min-height:26px; padding:0 10px; border-radius:999px; font-size:11px; font-weight:800; }
-  .badge-unpaid,.badge-pending{ background:#FFF4CD; color:#8A6D00; }
-  .badge-paid,.badge-done{ background:#D8F7DF; color:#0D7A2B; }
-  .badge-in_progress{ background:#DDEEFF; color:#1E3A5F; }
-  .badge-canceled{ background:#FFE4E4; color:#A30000; }
-  .badge-partial{ background:#FFE8CC; color:#C4611A; }
-
-  .quick-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
-  .quick-card{ background:#fff; border:1px solid var(--border); border-radius:18px; padding:18px 14px; text-align:center; box-shadow:var(--shadow); transition:transform .2s; cursor:pointer; }
-  .quick-card:hover{ transform:translateY(-3px); }
-  .quick-icon{ font-size:28px; margin-bottom:10px; }
-  .quick-label{ font-size:13px; font-weight:800; color:var(--navy); }
-  .quick-sub{ font-size:11px; color:var(--muted); margin-top:3px; }
-
-  .filters{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
-  .filter-pill{ min-height:36px; padding:0 16px; border-radius:999px; border:1px solid var(--border); background:#fff; color:var(--navy); font-size:13px; font-weight:700; cursor:pointer; transition:all .2s; }
-  .filter-pill.active{ background:var(--navy); color:#fff; border-color:var(--navy); }
-
-  .orders-list{ display:flex; flex-direction:column; gap:12px; }
-  .order-row{ background:#fff; border:1px solid var(--border); border-radius:18px; padding:16px 18px; box-shadow:var(--shadow); display:grid; grid-template-columns:48px 1fr auto auto auto; gap:14px; align-items:center; transition:transform .2s; }
-  .order-row:hover{ transform:translateY(-2px); }
-  .order-row-thumb{ width:48px; height:48px; border-radius:12px; background:linear-gradient(135deg,#EEF3FB,#F4F7FB); display:flex; align-items:center; justify-content:center; font-size:20px; }
-  .order-row-name{ font-size:15px; font-weight:800; color:var(--navy); margin-bottom:3px; }
-  .order-row-meta{ font-size:12px; color:var(--muted); }
-  .order-row-amount{ font-size:15px; font-weight:900; color:var(--navy); text-align:right; white-space:nowrap; }
-  .order-row-arrow{ color:var(--muted); font-size:18px; }
-
-  .faq-list{ display:flex; flex-direction:column; gap:10px; }
-  .faq-item{ background:#fff; border:1px solid var(--border); border-radius:16px; padding:16px 18px; box-shadow:var(--shadow); }
-  .faq-q{ font-size:14px; font-weight:700; color:var(--navy); display:flex; justify-content:space-between; }
-
-  .bottom-nav{ display:none; position:fixed; bottom:0; left:0; right:0; background:var(--navy); border-top:1px solid rgba(255,255,255,.08); z-index:50; padding:8px 0 12px; }
-  .bottom-nav-inner{ display:grid; grid-template-columns:repeat(4,1fr); }
-  .bottom-tab{ display:flex; flex-direction:column; align-items:center; gap:4px; padding:6px 4px; color:rgba(255,255,255,.70); font-size:11px; font-weight:700; border-radius:14px; margin:0 4px; }
-  .tab-icon{ font-size:20px; line-height:1; }
-  .bottom-tab.active{ background:var(--orange); color:#fff; }
-
-  @media (max-width:900px){
-    .welcome-visual{ display:none; }
-    .welcome-inner{ grid-template-columns:1fr; }
-    .quick-grid{ grid-template-columns:repeat(2,1fr); }
-    .priority-inner{ grid-template-columns:52px 1fr; }
-    .order-row{ grid-template-columns:48px 1fr auto; }
-    .order-row-arrow{ display:none; }
-    .bottom-nav{ display:block; }
-    .page-body{ padding-bottom:80px; }
-  }
-  @media (max-width:600px){
-    .stats-grid{ grid-template-columns:1fr 1fr; }
-    .topbar-ghost{ display:none; }
-  }.empty-state{
-    text-align:center;
-    padding:40px 20px;
-  }
-
-  .empty-visual{
-    width:160px;
-    height:160px;
-    margin:0 auto 20px;
-    border-radius:20px;
-    overflow:hidden;
-    box-shadow:0 10px 30px rgba(0,0,0,.08);
-  }
-
-  .empty-visual img{
-    width:100%;
-    height:100%;
-    object-fit:cover;
-  }
-
-  .empty-title{
-    font-weight:800;
-    color:#1E3A5F;
-    margin-bottom:8px;
-    font-size:16px;
-  }
-
-  .empty-desc{
-    font-size:13px;
-    color:#6B7280;
-    margin-bottom:16px;
-  }
-
-  .empty-btn{
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    padding:10px 20px;
-    border-radius:999px;
-    background:#E87722;
-    color:#fff;
-    font-weight:800;
-    text-decoration:none;
-    box-shadow:0 8px 20px rgba(232,119,34,.25);
-  }
-
-
-  .kpi-card{
-    background:#fff;
-    border:1px solid #E8EDF5;
-    border-radius:20px;
-    padding:16px 18px;
-    box-shadow:0 6px 20px rgba(30,58,95,.06);
-    transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;
-  }
-
-  .kpi-card:hover{
-    transform:translateY(-3px);
-    box-shadow:0 12px 28px rgba(30,58,95,.10);
-  }
-
-  .kpi-card.kpi-primary{ border-color:rgba(30,58,95,.18); }
-  .kpi-card.kpi-accent{ border-color:rgba(232,119,34,.20); }
-  .kpi-card.kpi-alert{ border-color:rgba(220,38,38,.16); }
-
-  .kpi-top{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    margin-bottom:8px;
-  }
-
-  .kpi-icon{
-    width:40px;
-    height:40px;
-    border-radius:14px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size:18px;
-    font-weight:900;
-    flex:0 0 auto;
-  }
-
-  .kpi-primary .kpi-icon{
-    background:rgba(30,58,95,.10);
-    color:#1E3A5F;
-  }
-
-  .kpi-accent .kpi-icon{
-    background:rgba(232,119,34,.12);
-    color:#E87722;
-  }
-
-  .kpi-alert .kpi-icon{
-    background:rgba(220,38,38,.10);
-    color:#DC2626;
-  }
-
-  .kpi-value{
-    font-size:28px;
-    line-height:1;
-    font-weight:900;
-    letter-spacing:-0.03em;
-    color:#1E3A5F;
-  }
-
-  .kpi-label{
-    font-size:12px;
-    font-weight:800;
-    color:#6B7280;
-    margin-top:4px;
-  }
-
-  .action-card{
-    background:#fff;
-    border-radius:20px;
-    padding:14px;
-    border:1px solid #E8EDF5;
-    transition:.2s;
-    cursor:pointer;
-    box-shadow:0 4px 16px rgba(30,58,95,.05);
-  }
-
-  .action-card:hover{
-    transform:translateY(-4px);
-    box-shadow:0 12px 30px rgba(30,58,95,.10);
-    border-color:rgba(232,119,34,.24);
-  }
-
-  .action-visual{
-    height:80px;
-    border-radius:14px;
-    overflow:hidden;
-    margin-bottom:10px;
-  }
-
-  .action-visual img{
+  .hero-v2__media img{
     width:100%;
     height:100%;
     object-fit:cover;
     display:block;
   }
 
-  .action-title{
+  .hero-v2__eyebrow{
+    display:inline-flex;
+    align-items:center;
+    padding:7px 12px;
+    border-radius:999px;
+    background:rgba(255,255,255,.12);
+    border:1px solid rgba(255,255,255,.14);
+    font-size:12px;
     font-weight:800;
-    color:#1E3A5F;
-    font-size:14px;
+    margin-bottom:14px;
   }
 
-  .action-desc{
-    font-size:12px;
-    color:#6B7280;
+  .hero-v2__title{
+    margin:0;
+    font-size:clamp(30px, 5vw, 52px);
+    line-height:1.02;
+    font-weight:900;
+    letter-spacing:-.03em;
+    color:#fff;
+    max-width:760px;
   }
 
-  .order-row{
-    background:#fff;
-    border:1px solid #E8EDF5;
-    border-radius:20px;
-    padding:16px 18px;
-    box-shadow:0 4px 16px rgba(30,58,95,.04);
-    transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  .hero-v2__title span{
+    display:block;
+    color:#F2A257;
   }
 
-  .order-row:hover{
-    transform:translateY(-2px);
-    box-shadow:0 10px 24px rgba(30,58,95,.08);
+  .hero-v2__text{
+    margin:14px 0 0;
+    max-width:620px;
+    color:rgba(255,255,255,.86);
+    font-size:15px;
+    line-height:1.6;
   }
 
-  .order-row__meta{
-    color:#6B7280;
-    font-size:12px;
+  .hero-v2__actions{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-top:18px;
+  }
+
+  .hero-v2__trust{
+    display:flex;
+    flex-wrap:wrap;
+    gap:14px;
+    margin-top:16px;
+    color:#fff;
+    font-size:13px;
     font-weight:700;
   }
 
-  .order-row__code{
-    color:#1E3A5F;
-    font-size:18px;
-    font-weight:900;
-    letter-spacing:-0.02em;
-  }
-
-  .order-row__amount{
-    color:#1E3A5F;
-    font-size:20px;
-    font-weight:900;
-    white-space:nowrap;
-  }
-
-  .order-row__badge{
+  .btn-main-v2,
+  .btn-alt-v2{
     display:inline-flex;
     align-items:center;
     justify-content:center;
-    min-height:30px;
+    min-height:46px;
+    padding:0 18px;
+    border-radius:16px;
+    font-weight:800;
+    text-decoration:none;
+    transition:.2s ease;
+  }
+
+  .btn-main-v2{
+    background:#E87722;
+    color:#fff;
+    box-shadow:0 12px 30px rgba(232,119,34,.25);
+  }
+
+  .btn-alt-v2{
+    background:rgba(255,255,255,.12);
+    color:#fff;
+    border:1px solid rgba(255,255,255,.16);
+  }
+
+  .kpis-v2{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:14px;
+    margin-top:18px;
+  }
+
+  .kpi-v2{
+    background:linear-gradient(135deg,#3d79bb 0%, #1f4676 55%, #23182e 100%);
+    color:#fff;
+    border-radius:22px;
+    padding:18px 16px;
+    min-height:90px;
+    box-shadow:0 10px 24px rgba(30,58,95,.08);
+  }
+
+  .kpi-v2 strong{
+    display:block;
+    font-size:22px;
+    font-weight:900;
+    margin-bottom:4px;
+  }
+
+  .kpi-v2 small{
+    color:rgba(255,255,255,.82);
+    font-size:13px;
+    font-weight:700;
+  }
+
+  .quick-actions-v2,
+  .recent-orders-v2,
+  .services-v2{
+    margin-top:22px;
+  }
+
+  .section-head-v2{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:14px;
+    margin-bottom:12px;
+    flex-wrap:wrap;
+  }
+
+  .section-head-v2 h2{
+    margin:0;
+    font-size:22px;
+    font-weight:900;
+    color:#1E3A5F;
+  }
+
+  .section-kicker-v2{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.14em;
+    color:#B67A45;
+    font-weight:800;
+    margin-bottom:4px;
+  }
+
+  .section-link-v2{
+    color:#1E3A5F;
+    font-size:14px;
+    font-weight:800;
+    text-decoration:none;
+  }
+
+  .quick-grid-v2{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:14px;
+  }
+
+  .quick-card-v2{
+    display:flex;
+    gap:14px;
+    align-items:flex-start;
+    background:#fff;
+    border:1px solid #E8EDF5;
+    border-radius:22px;
+    padding:18px;
+    text-decoration:none;
+    box-shadow:0 8px 22px rgba(30,58,95,.05);
+  }
+
+  .quick-card-v2__icon{
+    flex:0 0 28px;
+    font-size:22px;
+    line-height:1;
+    color:#1E3A5F;
+  }
+
+  .quick-card-v2 strong{
+    display:block;
+    color:#1E3A5F;
+    font-size:16px;
+    margin-bottom:4px;
+  }
+
+  .quick-card-v2 p{
+    margin:0;
+    color:#6B7280;
+    font-size:13px;
+    line-height:1.5;
+  }
+
+  .orders-stack-v2{
+    display:grid;
+    gap:14px;
+  }
+
+  .order-card-v2{
+    background:#fff;
+    border:1px solid #E8EDF5;
+    border-radius:22px;
+    padding:18px;
+    box-shadow:0 8px 20px rgba(30,58,95,.05);
+  }
+
+  .order-header-v2{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+  }
+
+  .order-code-v2{
+    display:block;
+    color:#1E3A5F;
+    font-size:18px;
+    font-weight:900;
+    line-height:1.1;
+  }
+
+  .order-date-v2{
+    margin-top:4px;
+    font-size:12px;
+    color:#9AA4B2;
+    font-weight:600;
+  }
+
+  .status-badge-v2{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:32px;
     padding:0 12px;
     border-radius:999px;
     font-size:12px;
     font-weight:800;
+    white-space:nowrap;
   }
 
-  .order-row__badge.badge-unpaid{
-    background:#FFF4CD;
-    color:#8A6D00;
+  .status-badge-v2.ready{
+    background:#E9F7EF;
+    color:#177245;
   }
 
-  .order-row__badge.badge-paid{
-    background:#D8F7DF;
-    color:#0D7A2B;
+  .status-badge-v2.progress{
+    background:#EEF5FF;
+    color:#215C9B;
   }
 
-
-  .fab-new-order:hover{
-    transform:translateY(-2px);
+  .status-badge-v2.pending{
+    background:#FFF0E5;
+    color:#B65C13;
   }
 
-  @media(min-width: 901px){
-
+  .order-body-v2{
+    display:grid;
+    grid-template-columns:1fr 1fr auto;
+    gap:12px;
+    margin-top:14px;
+    align-items:end;
   }
 
-
-.hero{
-  position:relative;
-  border-radius:24px;
-  padding:28px;
-  background:linear-gradient(135deg,#0F2A44,#1E3A5F);
-  color:#fff;
-  overflow:hidden;
-}
-
-.hero::after{
-  content:'';
-  position:absolute;
-  right:0;
-  top:0;
-  width:45%;
-  height:100%;
-  background:url('/static/img/client/client_dashboard_hero.jpg') center/cover no-repeat;
-  opacity:.35;
-}
-
-.hero h1{
-  font-size:24px;
-  font-weight:900;
-  margin-bottom:6px;
-}
-
-.hero p{
-  font-size:13px;
-  opacity:.85;
-}
-
-
-.order-row__badge{
-  padding:6px 12px;
-  border-radius:999px;
-  font-size:11px;
-  font-weight:900;
-}
-
-.badge-unpaid{
-  background:#FFE4E4;
-  color:#B42318;
-}
-
-.badge-paid{
-  background:#DCFCE7;
-  color:#15803D;
-}
-
-
-
-  .hero-conversion-note{
-    margin-top:10px;
-    font-size:13px;
-    line-height:1.6;
-    color:rgba(255,255,255,.88);
-    max-width:520px;
-  }
-
-  .priority-note{
-    margin:0 0 14px;
-    font-size:13px;
-    line-height:1.6;
-    color:#6B7280;
+  .label-v2{
+    font-size:12px;
+    color:#9AA4B2;
+    margin-bottom:4px;
     font-weight:700;
   }
 
-  .action-card.action-primary{
-    border-color:rgba(232,119,34,.24);
-    box-shadow:0 10px 24px rgba(232,119,34,.10);
+  .value-v2{
+    color:#1E3A5F;
+    font-size:14px;
+    font-weight:800;
   }
 
-  .action-card.action-primary .action-title{
-    color:#C4611A;
+  .price-v2{
+    font-size:30px;
+    font-weight:900;
+    color:#8B3E12;
+    line-height:1;
+    text-align:right;
   }
 
-  .fab-new-order{
-    min-height:58px;
-    padding:0 22px;
-    background:linear-gradient(135deg,#E87722,#FF9B3D);
-    box-shadow:0 18px 40px rgba(232,119,34,.35);
+  .order-total-v2{
+    text-align:right;
+  }
+
+  .order-footer-v2{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-top:16px;
+  }
+
+  .order-actions-v2{
+    width:100%;
+  }
+
+  .btn-pay-v2.full,
+  .btn-track-v2.full{
+    width:100%;
+    height:42px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:14px;
+    font-weight:900;
+    text-decoration:none;
+  }
+
+  .btn-pay-v2.full{
+    background:#E87722;
+    color:#fff;
+    box-shadow:0 10px 20px rgba(232,119,34,.25);
+  }
+
+  .btn-track-v2.full{
+    background:#1E3A5F;
+    color:#fff;
+  }
+
+  .services-grid-v2{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:14px;
+  }
+
+  .service-card-v2{
+    background:#fff;
+    border:1px solid #E8EDF5;
+    border-radius:22px;
+    padding:18px;
+    text-decoration:none;
+    box-shadow:0 8px 20px rgba(30,58,95,.04);
+    min-height:150px;
+  }
+
+  .service-card-v2__icon{
+    font-size:22px;
+    margin-bottom:10px;
+  }
+
+  .service-card-v2 strong{
+    display:block;
+    color:#1E3A5F;
+    font-size:18px;
+    margin-bottom:8px;
+  }
+
+  .service-card-v2 p{
+    margin:0 0 8px;
+    color:#6B7280;
+    font-size:14px;
+    line-height:1.5;
+  }
+
+  .service-card-v2 small{
+    color:#9AA4B2;
+    font-size:12px;
+    font-weight:700;
+  }
+
+  .floating-cta-v2{
+    position:fixed;
+    right:18px;
+    bottom:18px;
+    z-index:60;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:46px;
+    padding:0 18px;
+    border-radius:999px;
+    background:#B94E1D;
+    color:#fff;
+    text-decoration:none;
     font-size:14px;
     font-weight:900;
+    box-shadow:0 18px 35px rgba(185,78,29,.32);
+  }
+
+  .empty-box-v2{
+    background:#fff;
+    border:1px solid #E8EDF5;
+    border-radius:22px;
+    padding:22px;
+    box-shadow:0 8px 20px rgba(30,58,95,.04);
+  }
+
+  .empty-box-v2 strong{
+    display:block;
+    color:#1E3A5F;
+    font-size:18px;
+    margin-bottom:8px;
+  }
+
+  .empty-box-v2 p{
+    margin:0 0 14px;
+    color:#6B7280;
+  }
+
+  .orders-pagination{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    flex-wrap:wrap;
+    margin:18px 0 8px;
+  }
+
+  .pg-pages{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .pg-btn,
+  .pg-page{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:40px;
+    height:40px;
+    padding:0 14px;
+    border-radius:999px;
+    text-decoration:none;
+    font-weight:800;
+    border:1px solid #E8EDF5;
+    background:#fff;
+    color:#1E3A5F;
+  }
+
+  .pg-page.is-active{
+    background:#E87722;
+    color:#fff;
+    border-color:#E87722;
+  }
+
+  .pg-btn--disabled{
+    opacity:.45;
+    pointer-events:none;
+  }
+
+  .pg-dots{
+    color:#6B7280;
+    font-weight:900;
+    padding:0 2px;
+  }
+
+  @media (max-width: 900px){
+    .hero-v2--media,
+    .kpis-v2,
+    .quick-grid-v2,
+    .services-grid-v2{
+      grid-template-columns:1fr;
+    }
+
+    .hero-v2__media{
+      min-height:260px;
+    }
+
+    .order-body-v2{
+      grid-template-columns:1fr;
+    }
+
+    .order-total-v2,
+    .price-v2{
+      text-align:left;
+    }
+  }
+
+  @media (max-width: 640px){
+    .client-home-v2{
+      padding:14px 12px 90px;
+    }
+
+    .hero-v2{
+      padding:18px 16px;
+      border-radius:24px;
+    }
+
+    .hero-v2__title{
+      font-size:22px;
+    }
+
+    .hero-v2__title span{
+      display:inline;
+    }
+
+    .hero-v2__actions{
+      flex-direction:column;
+    }
+
+    .btn-main-v2,
+    .btn-alt-v2{
+      width:100%;
+    }
+
+    .order-header-v2{
+      flex-direction:column;
+      align-items:flex-start;
+    }
+
+    .order-footer-v2{
+      flex-wrap:wrap;
+    }
+
+    .btn-pay-v2.full,
+    .btn-track-v2.full{
+      width:100%;
+    }
+
+    .floating-cta-v2{
+      right:14px;
+      bottom:14px;
+    }
+  }
+
+  .wallet-boost-banner{
+    margin:16px 0;
+    padding:14px;
+    border-radius:16px;
+    background:#FFF8F2;
+    border:1px solid #E87722;
+    font-weight:800;
+    color:#1E3A5F;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+
+  .wallet-boost-amount{
+    color:#E87722;
+  }
+
+  .wallet-boost-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:40px;
+    padding:0 14px;
+    background:#E87722;
+    color:#fff;
+    border-radius:999px;
+    text-decoration:none;
+    font-weight:900;
+    white-space:nowrap;
+  }
+
+  @media (max-width: 760px){
+    .wallet-boost-banner{
+      align-items:flex-start;
+      flex-direction:column;
+    }
+
+    .wallet-boost-btn{
+      width:100%;
+    }
   }
 
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="page-body">
+<div class="client-home-v2">
 
-  <header class="client-topbar">
-    <div class="shell client-topbar-inner">
-      <div class="topbar-brand">
-        <img src="{% load static %}{% static 'img/logo_fagni.svg' %}" alt="FAGNI">
+  <section class="hero-v2 hero-v2--media">
+    <div class="hero-v2__content">
+      <div class="hero-v2__eyebrow">Service premium à domicile</div>
+      <h1 class="hero-v2__title">
+        Pressing, retouche et cordonnerie
+        <span>collectés et livrés chez toi</span>
+      </h1>
+      <p class="hero-v2__text">
+        FAGNI simplifie ton quotidien avec une expérience fluide, rapide et sécurisée.
+      </p>
+
+      <div class="hero-v2__actions">
+        <a href="{% url 'orders:client_new_order' %}" class="btn-main-v2">Créer une commande</a>
+        <a href="#recent-orders" class="btn-alt-v2">Mes commandes</a>
       </div>
-      <div class="topbar-right">
-        <a href="{% url 'orders:client_new_order' %}" class="topbar-btn">+ Nouvelle commande</a>
-        <a href="{% url 'orders:client_wallet' %}" class="topbar-ghost">👛 Wallet</a>
-        <div class="topbar-avatar">{{ customer.name|first|upper|default:"C" }}</div>
+
+      <div class="hero-v2__trust">
+        <span>✓ Partenaires vérifiés</span>
+        <span>✓ Collecte à domicile</span>
+        <span>✓ Paiement sécurisé</span>
       </div>
     </div>
-  </header>
 
-  <div class="welcome-hero">
-    <div class="shell welcome-inner">
+    <div class="hero-v2__media">
+      <img src="{% static 'img/client/fagni-hero-home.jpg' %}" alt="Cliente FAGNI avec sac de linge et suivi de commande sur smartphone">
+    </div>
+  </section>
+
+<section class="kpis-v2">
+    <div class="kpi-v2">
+      <strong>12 min</strong>
+      <small>Réponse</small>
+    </div>
+    <div class="kpi-v2">
+      <strong>4.9/5</strong>
+      <small>Satisfaction</small>
+    </div>
+    <div class="kpi-v2">
+      <strong>Wave</strong>
+      <small>Paiement instantané</small>
+    </div>
+  </section>
+
+{% if wallet_balance > 0 %}
+<div class="wallet-boost-banner">
+  🎉 Tu as <span class="wallet-boost-amount">{{ wallet_balance|floatformat:0 }} FCFA</span> disponible !
+  <a href="{% url 'orders:client_new_order' %}" class="wallet-boost-btn">
+    Utiliser maintenant
+  </a>
+</div>
+{% endif %}
+
+<section class="quick-actions-v2">
+    <div class="section-head-v2">
       <div>
-        <div class="welcome-title">Bonjour, {{ customer.name|default:"Client" }} 👋</div>
-        <div class="welcome-sub">Commande, suis ton linge et paie en quelques secondes depuis ton espace FAGNI.</div>
-      </div>
-      <div class="welcome-visual">
-        <img src="{% static 'img/client/client_dashboard_hero.jpg' %}" alt="FAGNI client" />
+        <div class="section-kicker-v2">Actions rapides</div>
+        <h2>Accède à l’essentiel</h2>
       </div>
     </div>
-  </div>
 
-  <div class="shell">
-
-    <div class="stats-grid section">
-      <a href="{% url 'orders:client_home' %}" class="stat-card">
-        <div class="stat-icon">📦</div>
+    <div class="quick-grid-v2">
+      <a href="{% url 'orders:client_new_order' %}" class="quick-card-v2">
+        <div class="quick-card-v2__icon">＋</div>
         <div>
-          <div class="stat-value">{{ orders_count_all|default:"0" }}</div>
-          <div class="stat-label">Commandes</div>
+          <strong>Nouvelle commande</strong>
+          <p>Créer une nouvelle demande rapidement</p>
         </div>
       </a>
-      <a href="{% url 'orders:client_home' %}?status=in_progress" class="stat-card">
-        <div class="stat-icon">🔄</div>
+
+      <a href="#recent-orders" class="quick-card-v2">
+        <div class="quick-card-v2__icon">📦</div>
         <div>
-          <div class="stat-value">{{ active_orders_count|default:"0" }}</div>
-          <div class="stat-label">En cours</div>
+          <strong>Mes commandes</strong>
+          <p>Voir l’état et les détails</p>
         </div>
       </a>
-      <a href="{% url 'orders:client_home' %}?status=pending" class="stat-card">
-        <div class="stat-icon orange">⚠️</div>
+
+      <a href="{% url 'orders:client_wallet' %}" class="quick-card-v2">
+        <div class="quick-card-v2__icon">💼</div>
         <div>
-          <div class="stat-value">{{ unpaid_orders_count|default:"0" }}</div>
-          <div class="stat-label">À payer</div>
+          <strong>Mon wallet</strong>
+          <p>Suivre paiements et mouvements</p>
+        </div>
+      </a>
+
+      <a href="{% url 'orders:client_new_order' %}" class="quick-card-v2">
+        <div class="quick-card-v2__icon">⚡</div>
+        <div>
+          <strong>Commander vite</strong>
+          <p>Aller directement au parcours de commande</p>
         </div>
       </a>
     </div>
+  </section>
 
-    {% with priority_order=orders|first %}
-    {% if priority_order %}
-    <div class="section">
-      <div class="section-head">
-        <div class="section-title">Commande prioritaire à suivre</div>
-        <span class="badge badge-{{ priority_order.payment_status }}">
-          {{ priority_order.get_payment_status_display }}
-        </span>
+  <section class="recent-orders-v2" id="recent-orders">
+    <div class="section-head-v2">
+      <div>
+        <div class="section-kicker-v2">Commandes</div>
+        <h2>Mes commandes récentes</h2>
       </div>
-      <div class="priority-card">
-  
-        <div class="priority-content">
-          <div class="priority-left">
-            <div class="priority-title">Commande FAGNI</div>
-            <div class="priority-meta">CMD-1481 • 02 Avril 2026</div>
+    </div>
 
-            <div class="priority-price"><span class="order-row__amount">8367 FCFA</span></div>
+    <div class="orders-stack-v2">
+      {% for order in orders %}
+        <div class="order-card-v2">
+          <div class="order-header-v2">
+            <div class="order-main-v2">
+              <strong class="order-code-v2">{{ order.code|default:order.id }}</strong>
+              <div class="order-date-v2">
+                {% if order.created_at %}{{ order.created_at|date:"d/m/Y H:i" }}{% else %}—{% endif %}
+              </div>
+            </div>
 
-            <div class="priority-actions">
-      
-
-              <a href="#" class="btn-pay">Payer maintenant</a>
-              <a href="#" class="btn-link">Voir le détail →</a>
+            <div class="order-status-wrap-v2">
+              <span class="status-badge-v2 {% if order.status == 'completed' or order.status == 'ready' %}ready{% elif order.status == 'pending' or order.status == 'draft' %}pending{% else %}progress{% endif %}">
+                {% if order.status == 'completed' or order.status == 'ready' %}
+                  Prêt
+                {% elif order.status == 'pending' or order.status == 'draft' %}
+                  En attente
+                {% else %}
+                  En cours
+                {% endif %}
+              </span>
             </div>
           </div>
 
-          <div class="priority-visual">
-            <img src="{% static 'img/client/client_priority_order.jpg' %}" alt="">
+          <div class="order-body-v2">
+            <div class="order-col-v2">
+              <div class="label-v2">Type</div>
+              <div class="value-v2">
+                {{ order.service_type|default:"Commande FAGNI"|capfirst }}
+              </div>
+            </div>
+
+            <div class="order-col-v2">
+              <div class="label-v2">Paiement</div>
+              <div class="value-v2">
+                {% if order.payment_status == "paid" %}
+                  Payée
+                {% elif order.payment_status == "partial" %}
+                  Partielle
+                {% else %}
+                  Non payée
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="order-col-v2 order-total-v2">
+              <div class="label-v2">Total</div>
+              <div class="value-v2 price-v2">
+                {% if order.total_client_ttc %}
+                  {{ order.total_client_ttc|floatformat:0 }} FCFA
+                {% elif order.total %}
+                  {{ order.total|floatformat:0 }} FCFA
+                {% else %}
+                  0 FCFA
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <div class="order-footer-v2">
+            <div class="order-actions-v2">
+              {% if order.payment_status != "paid" %}
+                <a href="{% url 'orders:client_order_pay_wave_page' order.id %}" class="btn-pay-v2 full">
+                  Payer maintenant
+                </a>
+              {% else %}
+                <a href="{% url 'orders:client_order_detail' order.id %}" class="btn-track-v2 full">
+                  Suivre la commande
+                </a>
+              {% endif %}
+            </div>
           </div>
         </div>
-
-      </div>
-    </div>
-    {% endif %}
-    {% endwith %}
-
-    <div class="section">
-      <div class="section-head">
-        <div class="section-title">Les actions essentielles</div>
-      </div>
-      <div class="quick-grid">
-        <a href="{% url 'orders:client_home' %}" class="quick-card">
-          <div class="quick-icon">📋</div>
-          <div class="quick-label">Mes commandes</div>
-          <div class="quick-sub">Historique et suivi</div>
-        </a>
-        <a href="{% url 'orders:client_referrals' %}" class="quick-card">
-          <div class="quick-icon">🎁</div>
-          <div class="action-visual">
-  <img src="{% static 'img/client/client_referral.jpg' %}" alt="Parrainage FAGNI">
-</div>
-
-<div class="action-content">
-  <div class="action-title">Parrainage</div>
-  <div class="action-desc">Inviter et gagner</div>
-</div>
-        </a>
-        <a href="{% url 'orders:client_wallet' %}" class="quick-card">
-          <div class="quick-icon">👛</div>
-          <div class="action-visual">
-  <img src="{% static 'img/client/client_wallet.jpg' %}" alt="Paiement FAGNI">
-</div>
-
-<div class="action-content">
-  <div class="action-title">Wallet</div>
-  <div class="action-desc">Solde et paiements</div>
-</div>
-        </a>
-        <a href="#aide" class="quick-card">
-          <div class="quick-icon">❓</div>
-          <div class="quick-label">Aide</div>
-          <div class="quick-sub">FAQ et support</div>
-        </a>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-head">
-        <div class="section-title">Mes commandes</div>
-        <a href="{% url 'orders:client_home' %}" class="section-link">Voir tout →</a>
-      </div>
-      <div class="filters">
-        <a href="{% url 'orders:client_home' %}" class="filter-pill {% if current_status == 'all' %}active{% endif %}">Toutes</a>
-        <a href="{% url 'orders:client_home' %}?status=pending" class="filter-pill {% if current_status == 'pending' %}active{% endif %}">En attente</a>
-        <a href="{% url 'orders:client_home' %}?status=in_progress" class="filter-pill {% if current_status == 'in_progress' %}active{% endif %}">En cours</a>
-        <a href="{% url 'orders:client_home' %}?status=done" class="filter-pill {% if current_status == 'done' %}active{% endif %}">Terminées</a>
-        <a href="{% url 'orders:client_home' %}?status=canceled" class="filter-pill {% if current_status == 'canceled' %}active{% endif %}">Annulées</a>
-      </div>
-      <div class="orders-list">
-        {% for order in orders %}
-        <a href="{% url 'orders:client_order_detail' order.id %}" class="order-row">
-          <div class="order-row-thumb">🧺</div>
-          <div>
-            <div class="order-row-name">CMD-{{ order.order_number|default:order.id }}</div>
-            <div class="order-row-meta">{{ order.get_status_display }} • {{ order.created_at|date:"d/m/Y" }}</div>
-          </div>
-          <div><span class="badge badge-{{ order.payment_status }}">{{ order.get_payment_status_display }}</span></div>
-          <div class="order-row-amount">{{ order.total_client_display|floatformat:0|default:order.total_client_ttc|floatformat:0 }} FCFA</div>
-          <div class="order-row-arrow">›</div>
-        </a>
-        {% empty %}
-        <div style="text-align:center;padding:32px 20px;background:#fff;border-radius:20px;border:1px solid var(--border);box-shadow:var(--shadow);">
-          <div style="font-size:72px;line-height:1;margin-bottom:16px;">🧺</div>
-          <div style="font-weight:900;font-size:20px;color:var(--navy);margin-bottom:8px;letter-spacing:-0.02em;">Pas de commandes pour l'instant 🫲</div>
-          <div style="font-size:14px;color:var(--muted);margin-bottom:24px;line-height:1.5;">Vous n'avez aucune commande à afficher ici.</div>
-          <a href="{% url 'orders:client_new_order' %}" style="display:inline-flex;align-items:center;justify-content:center;min-height:50px;width:100%;border-radius:999px;background:var(--orange);color:#fff;font-weight:800;font-size:15px;box-shadow:0 10px 24px rgba(232,119,34,.25);">Créer une commande</a>
+      {% empty %}
+        <div class="empty-box-v2">
+          <strong>Aucune commande pour le moment</strong>
+          <p>Crée ta première commande FAGNI pour commencer.</p>
+          <a href="{% url 'orders:client_new_order' %}" class="btn-main-v2">Créer une commande</a>
         </div>
-        {% endfor %}
-      </div>
-      {% if is_paginated %}
-      <div style="display:flex;justify-content:center;gap:8px;margin-top:24px;flex-wrap:wrap;">
+      {% endfor %}
+    </div>
+
+    {% if is_paginated %}
+      <div class="orders-pagination">
         {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="filter-pill">‹ Préc.</a>
+          <a class="pg-btn" href="?page={{ page_obj.previous_page_number }}#recent-orders">← Précédent</a>
+        {% else %}
+          <span class="pg-btn pg-btn--disabled">← Précédent</span>
         {% endif %}
-        <span class="filter-pill active">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+
+        <div class="pg-pages">
+          <a class="pg-page {% if page_obj.number == 1 %}is-active{% endif %}" href="?page=1#recent-orders">1</a>
+
+          {% if show_left_ellipsis %}
+            <span class="pg-dots">…</span>
+          {% endif %}
+
+          {% for n in pages %}
+            <a class="pg-page {% if page_obj.number == n %}is-active{% endif %}" href="?page={{ n }}#recent-orders">{{ n }}</a>
+          {% endfor %}
+
+          {% if page_obj.paginator.num_pages > 1 %}
+            {% if show_right_ellipsis %}
+              <span class="pg-dots">…</span>
+            {% endif %}
+            <a class="pg-page {% if page_obj.number == page_obj.paginator.num_pages %}is-active{% endif %}" href="?page={{ page_obj.paginator.num_pages }}#recent-orders">{{ page_obj.paginator.num_pages }}</a>
+          {% endif %}
+        </div>
+
         {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="filter-pill">Suiv. ›</a>
+          <a class="pg-btn" href="?page={{ page_obj.next_page_number }}#recent-orders">Suivant →</a>
+        {% else %}
+          <span class="pg-btn pg-btn--disabled">Suivant →</span>
         {% endif %}
       </div>
-      {% endif %}
-    </div>
+    {% endif %}
+  </section>
 
-    <div class="section" id="aide" style="margin-bottom:40px;">
-      <div class="section-head">
-        <div class="section-title">Réponses rapides aux questions courantes</div>
+  <section class="services-v2">
+    <div class="section-head-v2">
+      <div>
+        <div class="section-kicker-v2">Services</div>
+        <h2>Choisis ton besoin</h2>
       </div>
-      <div class="faq-list">
-        <div class="faq-item"><div class="faq-q">Comment est calculé le prix ? <span>›</span></div></div>
-        <div class="faq-item"><div class="faq-q">Comment je paie ? <span>›</span></div></div>
-        <div class="faq-item"><div class="faq-q">Comment fonctionne le parrainage ? <span>›</span></div></div>
-        <div class="faq-item"><div class="faq-q">Que faire en cas d'incident ? <span>›</span></div></div>
-      </div>
+      <a href="{% url 'orders:client_new_order' %}" class="section-link-v2">Commander →</a>
     </div>
 
-  </div>
+    <div class="services-grid-v2">
+      <a href="{% url 'orders:client_new_order' %}" class="service-card-v2">
+        <div class="service-card-v2__icon">👔</div>
+        <strong>Pressing</strong>
+        <p>Chemises, pantalons, t-shirts et vêtements du quotidien.</p>
+        <small>Délai standard 48h</small>
+      </a>
 
-  <nav class="bottom-nav">
-    <div class="shell bottom-nav-inner">
-      <a href="{% url 'orders:client_home' %}" class="bottom-tab {% if current_status == 'all' %}active{% endif %}">
-        <span class="tab-icon">🏠</span>Accueil
+      <a href="{% url 'orders:client_new_order' %}" class="service-card-v2">
+        <div class="service-card-v2__icon">🧵</div>
+        <strong>Retouche</strong>
+        <p>Ourlets, fermetures, ajustements et petites réparations.</p>
+        <small>Traitement simple</small>
       </a>
-      <a href="{% url 'orders:client_new_order' %}" class="bottom-tab">
-        <span class="tab-icon">＋</span>Créer
+
+      <a href="{% url 'orders:client_new_order' %}" class="service-card-v2">
+        <div class="service-card-v2__icon">👞</div>
+        <strong>Cordonnerie</strong>
+        <p>Entretien, restauration et réparation de chaussures.</p>
+        <small>Suivi clair</small>
       </a>
-      <a href="{% url 'orders:client_home' %}" class="bottom-tab">
-        <span class="tab-icon">📋</span>Commandes
-      </a>
-      <a href="#aide" class="bottom-tab">
-        <span class="tab-icon">❓</span>Aide
+
+      <a href="{% url 'orders:client_new_order' %}" class="service-card-v2">
+        <div class="service-card-v2__icon">🧺</div>
+        <strong>Lavage au sac</strong>
+        <p>Une solution pratique pour gérer plus de linge en une seule commande.</p>
+        <small>Format simple</small>
       </a>
     </div>
-  </nav>
+  </section>
 
+  <a href="{% url 'orders:client_new_order' %}" class="floating-cta-v2">+ Commander</a>
 </div>
 {% endblock %}

@@ -1,5 +1,6 @@
 {% extends "orders/client_base.html" %}
 {% load static %}
+{% load money_filters %}
 
 {% block title %}CMD-{{ order.order_number|default:order.id }} — FAGNI{% endblock %}
 {% block topbar %}{% endblock %}
@@ -7,101 +8,792 @@
 {% block extra_head %}
 <style>
   :root{
-    --navy:#1E3A5F;--orange:#E87722;--orange-dark:#C4611A;
-    --cream:#FFF8F2;--text:#1E3A5F;--muted:#6B7280;
-    --border:#E8EDF5;--green:#16A34A;--red:#DC2626;
-    --shadow:0 10px 30px rgba(30,58,95,.10);
+    --navy:#1E3A5F;
+    --navy-2:#27476F;
+    --orange:#E87722;
+    --orange-dark:#C4611A;
+    --cream:#FFF8F2;
+    --card:#FFFFFF;
+    --text:#1E3A5F;
+    --muted:#6B7280;
+    --border:#E8EDF5;
+    --green:#16A34A;
+    --red:#DC2626;
+    --shadow-soft:0 10px 30px rgba(30,58,95,.08);
     --shadow-orange:0 10px 24px rgba(232,119,34,.18);
   }
+
   *{box-sizing:border-box}
-  body{margin:0;background:#F4F7FB;color:var(--text);font-family:system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+  body{
+    margin:0;
+    background:#F4F7FB;
+    color:var(--text);
+    font-family:system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
   a{text-decoration:none;color:inherit}
-  .shell{width:min(720px,calc(100% - 24px));margin:0 auto}
+
+  .page-body{
+    padding-bottom:110px;
+  }
+
+  .shell{
+    width:min(1120px,calc(100% - 24px));
+    margin:0 auto;
+  }
 
   /* TOPBAR */
-  .topbar{background:linear-gradient(90deg,var(--navy),#27476f);position:sticky;top:0;z-index:40;box-shadow:0 4px 20px rgba(0,0,0,.10)}
-  .topbar-inner{display:flex;align-items:center;justify-content:space-between;min-height:64px;gap:12px}
-  .topbar-brand img{height:28px;filter:brightness(0) invert(1)}
-  .topbar-back{color:rgba(255,255,255,.80);font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}
-  .topbar-ref{color:rgba(255,255,255,.70);font-size:12px;font-weight:600}
+  .topbar{
+    background:linear-gradient(90deg,var(--navy),var(--navy-2));
+    position:sticky;
+    top:0;
+    z-index:40;
+    box-shadow:0 4px 20px rgba(0,0,0,.10);
+  }
 
-  /* HERO STATUS */
-  .hero-status{background:linear-gradient(90deg,var(--navy),#27476f);color:#fff;padding:24px 0 70px;margin-bottom:-50px}
-  .hero-status-inner{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
-  .status-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.70);margin-bottom:6px}
-  .status-value{font-size:26px;font-weight:900;letter-spacing:-0.02em}
-  .status-sub{font-size:14px;color:rgba(255,255,255,.75);margin-top:6px}
-  .status-badge{min-height:32px;padding:0 14px;border-radius:999px;font-size:12px;font-weight:800;display:inline-flex;align-items:center}
-  .badge-inprogress{background:rgba(59,130,246,.20);color:#93C5FD;border:1px solid rgba(93,165,246,.30)}
-  .badge-done{background:rgba(22,163,74,.20);color:#86EFAC;border:1px solid rgba(22,163,74,.30)}
-  .badge-pending{background:rgba(244,183,64,.20);color:#FDE68A;border:1px solid rgba(244,183,64,.30)}
-  .badge-canceled{background:rgba(220,38,38,.20);color:#FCA5A5;border:1px solid rgba(220,38,38,.30)}
+  .topbar-inner{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    min-height:64px;
+    gap:12px;
+  }
 
-  /* CARDS */
-  .section{margin-top:16px}
-  .card{background:#fff;border:1px solid var(--border);border-radius:20px;padding:20px;box-shadow:var(--shadow)}
-  .card-title{font-size:15px;font-weight:900;color:var(--navy);margin-bottom:14px;letter-spacing:-0.01em}
+  .topbar-back{
+    color:rgba(255,255,255,.84);
+    font-size:13px;
+    font-weight:800;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+
+  .topbar-ref{
+    color:rgba(255,255,255,.72);
+    font-size:12px;
+    font-weight:700;
+  }
+
+  .topbar-logo{
+    height:26px;
+    filter:brightness(0) invert(1);
+  }
+
+  /* HERO */
+  .hero-status{
+    background:linear-gradient(90deg,var(--navy),var(--navy-2));
+    color:#fff;
+    padding:24px 0 78px;
+    margin-bottom:-58px;
+  }
+
+  .hero-status-card{
+    display:grid;
+    grid-template-columns:minmax(0,1.12fr) minmax(280px,.88fr);
+    gap:18px;
+    align-items:stretch;
+  }
+
+  .hero-copy,
+  .hero-media{
+    border-radius:24px;
+    overflow:hidden;
+  }
+
+  .hero-copy{
+    padding:22px 22px 20px;
+    background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.10);
+    backdrop-filter:blur(6px);
+  }
+
+  .status-label{
+    font-size:12px;
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:rgba(255,255,255,.72);
+    margin-bottom:6px;
+  }
+
+  .status-value{
+    font-size:30px;
+    font-weight:900;
+    letter-spacing:-0.02em;
+    line-height:1.05;
+  }
+
+  .status-sub{
+    font-size:14px;
+    color:rgba(255,255,255,.78);
+    margin-top:8px;
+    line-height:1.55;
+    max-width:540px;
+  }
+
+  .hero-chips{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:14px;
+  }
+
+  .hero-chip{
+    min-height:32px;
+    padding:0 12px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.16);
+    background:rgba(255,255,255,.10);
+    color:#fff;
+    font-size:12px;
+    font-weight:800;
+    display:inline-flex;
+    align-items:center;
+  }
+
+  .hero-badge-wrap{
+    margin-top:16px;
+  }
+
+  .status-badge{
+    min-height:34px;
+    padding:0 14px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:900;
+    display:inline-flex;
+    align-items:center;
+    white-space:nowrap;
+  }
+
+  .badge-inprogress,
+  .badge-processing,
+  .badge-in_progress{
+    background:rgba(59,130,246,.20);
+    color:#93C5FD;
+    border:1px solid rgba(93,165,246,.30);
+  }
+
+  .badge-done,
+  .badge-completed,
+  .badge-ready{
+    background:rgba(22,163,74,.20);
+    color:#86EFAC;
+    border:1px solid rgba(22,163,74,.30);
+  }
+
+  .badge-pending,
+  .badge-draft{
+    background:rgba(244,183,64,.20);
+    color:#FDE68A;
+    border:1px solid rgba(244,183,64,.30);
+  }
+
+  .badge-canceled,
+  .badge-cancelled{
+    background:rgba(220,38,38,.20);
+    color:#FCA5A5;
+    border:1px solid rgba(220,38,38,.30);
+  }
+
+  .hero-media{
+    position:relative;
+    min-height:280px;
+    border:1px solid rgba(255,255,255,.10);
+    background:rgba(255,255,255,.08);
+    box-shadow:0 14px 34px rgba(15,23,42,.18);
+  }
+
+  .hero-media img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+
+  .hero-media:after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:linear-gradient(180deg,rgba(15,23,42,.08),rgba(15,23,42,.22));
+    pointer-events:none;
+  }
+
+  /* LAYOUT */
+  .detail-grid{
+    display:grid;
+    grid-template-columns:minmax(0,1.45fr) minmax(280px,.9fr);
+    gap:16px;
+    position:relative;
+    z-index:2;
+  }
+
+  .left-col,
+  .right-col{
+    display:grid;
+    gap:16px;
+    align-self:start;
+  }
+
+  .section{
+    margin-top:16px;
+  }
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:22px;
+    padding:20px;
+    box-shadow:var(--shadow-soft);
+  }
+
+  .card-title{
+    font-size:15px;
+    font-weight:900;
+    color:var(--navy);
+    margin-bottom:14px;
+    letter-spacing:-0.01em;
+  }
+
+  .card-subtitle{
+    color:var(--muted);
+    font-size:13px;
+    line-height:1.5;
+    margin-top:-4px;
+    margin-bottom:14px;
+  }
+
+  /* SUMMARY / PAYMENT */
+  .summary-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+  }
+
+  .amount-box{
+    background:#F8FAFD;
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:14px;
+  }
+
+  .amount-box.highlight{
+    background:var(--cream);
+    border-color:#F0C9A0;
+  }
+
+  .amount-label{
+    font-size:12px;
+    color:var(--muted);
+    font-weight:700;
+    margin-bottom:4px;
+  }
+
+  .amount-value{
+    font-size:22px;
+    font-weight:900;
+    color:var(--navy);
+    line-height:1.1;
+  }
+
+  .amount-value.orange{
+    color:var(--orange);
+  }
+
+  .summary-list{
+    margin-top:14px;
+    display:grid;
+    gap:10px;
+    padding:14px;
+    border:1px solid var(--border);
+    border-radius:16px;
+    background:#fff;
+  }
+
+  .summary-row{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    align-items:flex-start;
+    font-size:14px;
+    color:var(--muted);
+  }
+
+  .summary-row strong{
+    color:var(--navy);
+    text-align:right;
+  }
+
+  .summary-row.total{
+    padding-top:10px;
+    border-top:1px dashed var(--border);
+  }
+
+  .summary-row.total strong{
+    color:var(--orange);
+    font-size:18px;
+  }
+
+  .payment-note{
+    margin-top:14px;
+    padding:12px 14px;
+    border-radius:16px;
+    background:#F8FAFD;
+    border:1px solid var(--border);
+    color:#475569;
+    font-size:13px;
+    line-height:1.55;
+    font-weight:700;
+  }
+
+  .pay-btn{
+    width:100%;
+    min-height:52px;
+    border:none;
+    border-radius:999px;
+    background:var(--orange);
+    color:#fff;
+    font-size:15px;
+    font-weight:900;
+    cursor:pointer;
+    box-shadow:var(--shadow-orange);
+    transition:background .2s ease, transform .2s ease;
+    font-family:inherit;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+  }
+
+  .pay-btn:hover{
+    background:var(--orange-dark);
+    transform:translateY(-1px);
+  }
+
+  .pay-btn--dark{
+    background:var(--navy);
+    box-shadow:0 10px 24px rgba(30,58,95,.18);
+  }
+
+  .paid-badge{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    min-height:48px;
+    border-radius:999px;
+    background:#ECFDF5;
+    border:1px solid #A7F3D0;
+    color:#065F46;
+    font-size:14px;
+    font-weight:900;
+  }
+
+  .action-stack{
+    display:grid;
+    gap:10px;
+    margin-top:14px;
+  }
+
+  .ghost-btn{
+    min-height:46px;
+    border-radius:14px;
+    border:1px solid var(--border);
+    background:#fff;
+    color:var(--navy);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:14px;
+    font-weight:800;
+    text-align:center;
+    padding:0 12px;
+  }
+
+  .ghost-btn.soft{
+    background:#F8FAFD;
+  }
+
+  /* NEXT STEP */
+  .next-step{
+    padding:16px;
+    border-radius:18px;
+    background:linear-gradient(180deg,#FFF8F2 0%, #fff 100%);
+    border:1px solid #F0C9A0;
+  }
+
+  .next-step__label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:#B65C13;
+    font-weight:900;
+    margin-bottom:6px;
+  }
+
+  .next-step__title{
+    font-size:16px;
+    font-weight:900;
+    color:var(--navy);
+    margin-bottom:6px;
+  }
+
+  .next-step__text{
+    font-size:13px;
+    line-height:1.55;
+    color:var(--muted);
+  }
 
   /* TIMELINE */
-  .timeline{position:relative;padding-left:16px}
-  .timeline:before{content:"";position:absolute;left:6px;top:6px;bottom:6px;width:2px;background:#E2E8F0}
-  .t-row{position:relative;padding-left:20px;margin-bottom:20px}
-  .t-row:last-child{margin-bottom:0}
-  .t-row:before{content:"";position:absolute;left:-10px;top:3px;width:14px;height:14px;border-radius:50%;background:#E2E8F0;border:3px solid #fff;box-shadow:0 0 0 1px #E2E8F0}
-  .t-row.done:before{background:var(--green);box-shadow:0 0 0 1px var(--green)}
-  .t-row.active:before{background:var(--orange);box-shadow:0 0 0 3px rgba(232,119,34,.20)}
-  .t-row.pending:before{background:#fff;border:2px solid #CBD5E1;box-shadow:none}
-  .t-label{font-size:14px;font-weight:800;color:var(--navy)}
-  .t-row.active .t-label{color:var(--orange)}
-  .t-row.pending .t-label{color:var(--muted)}
-  .t-time{font-size:12px;color:var(--muted);margin-top:2px}
+  .timeline{
+    position:relative;
+    padding-left:16px;
+  }
 
-  /* MONTANTS */
-  .amount-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
-  .amount-box{background:#F8FAFD;border:1px solid var(--border);border-radius:14px;padding:14px}
-  .amount-box.highlight{background:var(--cream);border-color:#F0C9A0}
-  .amount-label{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:4px}
-  .amount-value{font-size:20px;font-weight:900;color:var(--navy)}
-  .amount-value.orange{color:var(--orange)}
+  .timeline:before{
+    content:"";
+    position:absolute;
+    left:6px;
+    top:6px;
+    bottom:6px;
+    width:2px;
+    background:#E2E8F0;
+  }
 
-  /* BOUTON PAYER */
-  .pay-btn{width:100%;height:52px;border:none;border-radius:999px;background:var(--orange);color:#fff;font-size:15px;font-weight:900;cursor:pointer;box-shadow:var(--shadow-orange);transition:background .2s;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px}
-  .pay-btn:hover{background:var(--orange-dark)}
-  .paid-badge{display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;border-radius:999px;background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;font-size:14px;font-weight:800}
+  .t-row{
+    position:relative;
+    padding-left:20px;
+    margin-bottom:20px;
+  }
 
-  /* ARTICLES */
-  .item-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
-  .item-row:last-child{border-bottom:none}
-  .item-name{font-size:14px;font-weight:700;color:var(--navy)}
-  .item-qty{font-size:13px;color:var(--muted)}
-  .item-price{font-size:14px;font-weight:800;color:var(--navy)}
+  .t-row:last-child{
+    margin-bottom:0;
+  }
 
-  /* ADRESSE */
-  .address-box{background:#F8FAFD;border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;gap:12px;align-items:flex-start}
-  .address-icon{font-size:20px;flex-shrink:0}
-  .address-text{font-size:14px;color:var(--text);line-height:1.5}
+  .t-row:before{
+    content:"";
+    position:absolute;
+    left:-10px;
+    top:3px;
+    width:14px;
+    height:14px;
+    border-radius:50%;
+    background:#E2E8F0;
+    border:3px solid #fff;
+    box-shadow:0 0 0 1px #E2E8F0;
+  }
 
-  /* JAMBES LIVRAISON */
-  .leg-row{display:flex;align-items:center;gap:12px;padding:12px;background:#F8FAFD;border-radius:14px;margin-bottom:8px}
-  .leg-icon{font-size:22px;width:42px;height:42px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);flex-shrink:0}
-  .leg-label{font-size:14px;font-weight:800;color:var(--navy)}
-  .leg-status{font-size:12px;color:var(--muted)}
-  .leg-badge{margin-left:auto;min-height:26px;padding:0 10px;border-radius:999px;font-size:11px;font-weight:800;display:inline-flex;align-items:center}
-  .leg-done{background:#ECFDF5;color:#065F46}
-  .leg-progress{background:#EFF6FF;color:#1D4ED8}
-  .leg-pending{background:#F8FAFD;color:var(--muted)}
+  .t-row.done:before{
+    background:var(--green);
+    box-shadow:0 0 0 1px var(--green);
+  }
 
-  /* BOTTOM NAV */
-  .bottom-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);padding:12px 16px 20px;box-shadow:0 -8px 24px rgba(30,58,95,.08);z-index:40}
-  .bottom-bar-inner{display:flex;gap:12px;align-items:center;max-width:720px;margin:0 auto}
-  .bottom-ref{font-size:12px;color:var(--muted);font-weight:600;flex:1}
-  .bottom-amount{font-size:14px;font-weight:900;color:var(--navy);white-space:nowrap}
+  .t-row.active:before{
+    background:var(--orange);
+    box-shadow:0 0 0 3px rgba(232,119,34,.20);
+  }
 
-  .page-body{padding-bottom:100px}
+  .t-row.pending:before{
+    background:#fff;
+    border:2px solid #CBD5E1;
+    box-shadow:none;
+  }
 
-  @media(max-width:600px){
-    .amount-grid{grid-template-columns:1fr}
-    .hero-status-inner{flex-direction:column;gap:8px}
+  .t-label{
+    font-size:14px;
+    font-weight:800;
+    color:var(--navy);
+  }
+
+  .t-row.active .t-label{
+    color:var(--orange);
+  }
+
+  .t-row.pending .t-label{
+    color:var(--muted);
+  }
+
+  .t-time{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+
+  /* INFO GRID */
+  .info-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+  }
+
+  .info-box{
+    background:#F8FAFD;
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:14px;
+  }
+
+  .info-k{
+    font-size:12px;
+    color:var(--muted);
+    font-weight:700;
+    margin-bottom:6px;
+  }
+
+  .info-v{
+    font-size:14px;
+    color:var(--navy);
+    font-weight:800;
+    line-height:1.5;
+  }
+
+  .address-box{
+    background:#F8FAFD;
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:14px;
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+  }
+
+  .address-icon{
+    font-size:20px;
+    flex-shrink:0;
+  }
+
+  .address-text{
+    font-size:14px;
+    color:var(--text);
+    line-height:1.55;
+    font-weight:700;
+  }
+
+  /* ITEMS */
+  .item-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:12px 0;
+    border-bottom:1px solid var(--border);
+    gap:12px;
+  }
+
+  .item-row:last-child{
+    border-bottom:none;
+  }
+
+  .item-name{
+    font-size:14px;
+    font-weight:800;
+    color:var(--navy);
+  }
+
+  .item-qty{
+    font-size:13px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+
+  .item-price{
+    font-size:14px;
+    font-weight:900;
+    color:var(--navy);
+    white-space:nowrap;
+    text-align:right;
+  }
+
+  .bag-box{
+    padding:14px;
+    border-radius:16px;
+    background:#F8FAFD;
+    border:1px solid var(--border);
+  }
+
+  .bag-box__top{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+  }
+
+  .bag-box__name{
+    font-size:16px;
+    font-weight:900;
+    color:var(--navy);
+  }
+
+  .bag-box__meta{
+    font-size:13px;
+    color:var(--muted);
+    margin-top:4px;
+  }
+
+  .bag-box__price{
+    font-size:18px;
+    font-weight:900;
+    color:var(--orange);
+    white-space:nowrap;
+  }
+
+  .bag-rule{
+    margin-top:12px;
+    padding:12px 14px;
+    border-radius:14px;
+    background:#fff;
+    border:1px solid var(--border);
+    font-size:13px;
+    line-height:1.5;
+    color:var(--muted);
+    font-weight:700;
+  }
+
+  /* LEGS */
+  .leg-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:12px;
+    background:#F8FAFD;
+    border-radius:14px;
+    margin-bottom:8px;
+  }
+
+  .leg-row:last-child{
+    margin-bottom:0;
+  }
+
+  .leg-icon{
+    font-size:22px;
+    width:42px;
+    height:42px;
+    border-radius:12px;
+    background:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:1px solid var(--border);
+    flex-shrink:0;
+  }
+
+  .leg-label{
+    font-size:14px;
+    font-weight:900;
+    color:var(--navy);
+  }
+
+  .leg-status{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+
+  .leg-badge{
+    margin-left:auto;
+    min-height:26px;
+    padding:0 10px;
+    border-radius:999px;
+    font-size:11px;
+    font-weight:900;
+    display:inline-flex;
+    align-items:center;
+    white-space:nowrap;
+  }
+
+  .leg-done{
+    background:#ECFDF5;
+    color:#065F46;
+  }
+
+  .leg-progress{
+    background:#EFF6FF;
+    color:#1D4ED8;
+  }
+
+  .leg-pending{
+    background:#F8FAFD;
+    color:var(--muted);
+    border:1px solid var(--border);
+  }
+
+  /* BOTTOM BAR */
+  .bottom-bar{
+    position:fixed;
+    bottom:0;
+    left:0;
+    right:0;
+    background:#fff;
+    border-top:1px solid var(--border);
+    padding:12px 16px 20px;
+    box-shadow:0 -8px 24px rgba(30,58,95,.08);
+    z-index:40;
+  }
+
+  .bottom-bar-inner{
+    display:flex;
+    gap:12px;
+    align-items:center;
+    max-width:1120px;
+    margin:0 auto;
+  }
+
+  .bottom-ref{
+    font-size:12px;
+    color:var(--muted);
+    font-weight:700;
+    flex:1;
+    line-height:1.4;
+  }
+
+  .bottom-amount{
+    font-size:14px;
+    font-weight:900;
+    color:var(--navy);
+    white-space:nowrap;
+    margin-top:2px;
+  }
+
+  @media (max-width: 900px){
+    .hero-status-card{
+      grid-template-columns:1fr;
+    }
+
+    .detail-grid{
+      grid-template-columns:1fr;
+    }
+
+    .right-col{
+      order:-1;
+    }
+
+    .hero-media{
+      min-height:240px;
+    }
+  }
+
+  @media (max-width: 640px){
+    .summary-grid,
+    .info-grid{
+      grid-template-columns:1fr;
+    }
+
+    .item-row{
+      align-items:flex-start;
+    }
+
+    .bottom-bar-inner{
+      flex-direction:column;
+      align-items:stretch;
+    }
+
+    .status-value{
+      font-size:24px;
+    }
+
+    .hero-copy{
+      padding:18px 16px;
+    }
   }
 </style>
 {% endblock %}
@@ -109,172 +801,376 @@
 {% block content %}
 <div class="page-body">
 
-  <!-- TOPBAR -->
   <header class="topbar">
     <div class="shell topbar-inner">
       <a href="{% url 'orders:client_home' %}" class="topbar-back">← Retour</a>
       <span class="topbar-ref">CMD-{{ order.order_number|default:order.id }}</span>
-      <img src="{% static 'img/logo_fagni.svg' %}" alt="FAGNI" style="height:26px;filter:brightness(0) invert(1);">
+      <img src="{% static 'img/logo_fagni.svg' %}" alt="FAGNI" class="topbar-logo">
     </div>
   </header>
 
-  <!-- HERO STATUS -->
-  <div class="hero-status">
+  <section class="hero-status">
     <div class="shell">
-      <div class="hero-status-inner">
-        <div>
+      <div class="hero-status-card">
+        <div class="hero-copy">
           <div class="status-label">FAGNI · Suivi commande</div>
           <div class="status-value">{{ hero_title }}</div>
           <div class="status-sub">{{ hero_text }}</div>
+
+          <div class="hero-chips">
+            <span class="hero-chip">Commande {{ order.order_number|default:order.id }}</span>
+            {% if payment_ui == "paid" %}
+              <span class="hero-chip">Paiement confirmé</span>
+            {% elif order.payment_status == "declared" or order.payment_verification_status == "pending_review" %}
+              <span class="hero-chip">Paiement déclaré · Vérification en cours</span>
+            {% elif remain_amount > 0 %}
+              <span class="hero-chip">Paiement restant : {{ remain_amount|floatformat:0 }} FCFA</span>
+            {% endif %}
+          </div>
+
+          <div class="hero-badge-wrap">
+            <span class="status-badge badge-{{ order.status }}">
+              {{ order.get_status_display }}
+            </span>
+          </div>
         </div>
-        <span class="status-badge badge-{{ order.status }}">
-          {{ order.get_status_display }}
-        </span>
+
+        <div class="hero-media">
+          <img src="{% static 'img/client/fagni-hero-home.jpg' %}" alt="Cliente FAGNI avec sac de linge et suivi de commande sur smartphone">
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 
   <div class="shell">
+    <div class="detail-grid">
 
-    <!-- MONTANTS + PAIEMENT -->
-    <div class="section card" style="position:relative;z-index:2;">
-      <div class="amount-grid">
-        <div class="amount-box">
-          <div class="amount-label">Total TTC</div>
-          <div class="amount-value">{{ finance_summary.total_client_ttc|floatformat:0 }} <span style="font-size:13px;color:var(--muted)">FCFA</span></div>
-        </div>
-        <div class="amount-box highlight">
-          <div class="amount-label">Reste à payer</div>
-          <div class="amount-value orange">{{ finance_summary.amount_remaining|floatformat:0 }} <span style="font-size:13px;">FCFA</span></div>
-        </div>
-      </div>
+      <div class="left-col">
 
-      {% if payment_ui == "paid" %}
-      <div class="paid-badge">✅ Commande payée</div>
-      {% elif finance_summary.amount_remaining > 0 %}
-      <a href="{% url 'orders:client_order_pay_wave_page' order.id %}" class="pay-btn">
-        💳 Payer maintenant via Wave
-      </a>
-      {% endif %}
-    </div>
+        <div class="card">
+          <div class="card-title">Suivi de progression</div>
+          <div class="timeline">
+            {% for step in timeline %}
+              <div class="t-row {% if step.done %}done{% elif step.active %}active{% else %}pending{% endif %}">
+                <div class="t-label">
+                  {% if step.done %}✅ {% elif step.active %}🔄 {% else %}⏳ {% endif %}
+                  {{ step.label }}
+                </div>
 
-    <!-- TIMELINE -->
-    <div class="section card">
-      <div class="card-title">Suivi de progression</div>
-      <div class="timeline">
-        {% for step in timeline %}
-        <div class="t-row {% if step.done %}done{% elif step.active %}active{% else %}pending{% endif %}">
-          <div class="t-label">
-            {% if step.done %}✅ {% elif step.active %}🔄 {% else %}⏳ {% endif %}
-            {{ step.label }}
+                {% if step.ts %}
+                  <div class="t-time">{{ step.ts|date:"d/m/Y H:i" }}</div>
+                {% elif step.active %}
+                  <div class="t-time">En cours</div>
+                {% elif not step.done %}
+                  <div class="t-time">Prochaine étape</div>
+                {% endif %}
+              </div>
+            {% endfor %}
           </div>
-          {% if step.ts %}
-          <div class="t-time">{{ step.ts|date:"d/m/Y H:i" }}</div>
-          {% elif step.active %}
-          <div class="t-time">En cours</div>
-          {% elif not step.done %}
-          <div class="t-time">Prochaine étape</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Informations de la commande</div>
+
+          <div class="info-grid">
+            <div class="info-box">
+              <div class="info-k">Commande</div>
+              <div class="info-v">CMD-{{ order.order_number|default:order.id }}</div>
+            </div>
+
+            <div class="info-box">
+              <div class="info-k">Paiement</div>
+              <div class="info-v">
+                {% if payment_ui == "paid" %}
+                  Payée
+                {% elif order.payment_status == "declared" or order.payment_verification_status == "pending_review" %}
+                  Paiement déclaré · vérification en cours
+                {% elif finance_summary.amount_paid > 0 %}
+                  Partiellement payée
+                {% else %}
+                  En attente
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <div class="address-box" style="margin-top:12px;">
+            <div class="address-icon">📍</div>
+            <div class="address-text">{{ display_address }}</div>
+          </div>
+
+          {% if order.notes %}
+            <div class="payment-note" style="margin-top:12px;">
+              <strong>Note client :</strong> {{ order.notes }}
+            </div>
           {% endif %}
         </div>
-        {% endfor %}
+
+        {% if display_summary.is_bag %}
+          <div class="card">
+            <div class="card-title">Commande en sac</div>
+
+            <div class="bag-box">
+              <div class="bag-box__top">
+                <div>
+                  <div class="bag-box__name">{{ display_summary.bag_label }}</div>
+                  <div class="bag-box__meta">{{ display_summary.content_label }}</div>
+                </div>
+                <div class="bag-box__price">{{ finance_summary.prestation_total|floatformat:0 }} FCFA</div>
+              </div>
+
+              <div class="bag-rule">
+                ✅ Le sac FAGNI contient uniquement des {{ display_summary.content_label|lower }}.
+                {{ display_summary.exclusions_label }}.
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if items %}
+          <div class="card">
+            <div class="card-title">Articles commandés</div>
+
+            {% for item in items %}
+              <div class="item-row">
+                <div>
+                  <div class="item-name">{{ item.label }}</div>
+                  <div class="item-qty">× {{ item.qty }}</div>
+                </div>
+                <div class="item-price">
+                  {% if item.price %}
+                    {{ item.price|floatformat:0 }} FCFA
+                  {% else %}
+                    —
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {% if legs_ui %}
+          <div class="card">
+            <div class="card-title">Logistique</div>
+
+            {% for leg in legs_ui %}
+              <div class="leg-row">
+                <div class="leg-icon">
+                  {% if leg.leg_type == "pickup" %}
+                    🚚
+                  {% elif leg.leg_type == "return" %}
+                    📦
+                  {% else %}
+                    🧺
+                  {% endif %}
+                </div>
+
+                <div>
+                  <div class="leg-label">{{ leg.leg_type_label }}</div>
+                  <div class="leg-status">{{ leg.driver_name }}</div>
+                </div>
+
+                <span class="leg-badge leg-{{ leg.status_class }}">{{ leg.status_label }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
       </div>
+
+      <aside class="right-col">
+
+        <div class="card">
+          <div class="card-title">Résumé financier</div>
+
+          <div class="summary-grid">
+            <div class="amount-box">
+              <div class="amount-label">Total TTC</div>
+              <div class="amount-value">
+                {{ finance_summary.total_client_ttc|floatformat:0 }}
+                <span style="font-size:13px;color:var(--muted)">FCFA</span>
+              </div>
+            </div>
+
+            {% if order.payment_status == "declared" or order.payment_verification_status == "pending_review" %}
+            <div class="amount-box highlight">
+              <div class="amount-label">Montant déclaré</div>
+              <div class="amount-value orange">
+                {{ finance_summary.total_client_ttc|floatformat:0 }}
+                <span style="font-size:13px;">FCFA</span>
+              </div>
+            </div>
+            {% else %}
+            <div class="amount-box highlight">
+              <div class="amount-label">Reste à payer</div>
+              <div class="amount-value orange">
+                {{ finance_summary.amount_remaining|floatformat:0 }}
+                <span style="font-size:13px;">FCFA</span>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="summary-list">
+            <div class="summary-row">
+              <span>Prestations</span>
+              <strong>{{ finance_summary.prestation_total|floatformat:0 }} FCFA</strong>
+            </div>
+            <div class="summary-row">
+              <span>Livraison</span>
+              <strong>{{ finance_summary.delivery_fee_client|floatformat:0 }} FCFA</strong>
+            </div>
+            {% if order.payment_status == "declared" or order.payment_verification_status == "pending_review" %}
+            <div class="summary-row">
+              <span>Montant déclaré</span>
+              <strong>{{ finance_summary.total_client_ttc|floatformat:0 }} FCFA</strong>
+            </div>
+            <div class="summary-row total">
+              <span>Statut</span>
+              <strong>Vérification en cours</strong>
+            </div>
+            {% else %}
+            {% if wallet_used > 0 %}
+            <div class="summary-row">
+              <span>Wallet utilisé</span>
+              <strong>{{ wallet_used|floatformat:0 }} FCFA</strong>
+            </div>
+            {% endif %}
+            <div class="summary-row">
+              <span>Déjà payé</span>
+              <strong>{{ finance_summary.amount_paid|floatformat:0 }} FCFA</strong>
+            </div>
+            <div class="summary-row">
+              <span>Reste à payer</span>
+              <strong>{{ finance_summary.amount_remaining|floatformat:0 }} FCFA</strong>
+            </div>
+            <div class="summary-row total">
+              <span>Statut paiement</span>
+              <strong>
+                {% if finance_summary.amount_remaining > 0 %}
+                  Paiement incomplet
+                {% else %}
+                  Paiement terminé
+                {% endif %}
+              </strong>
+            </div>
+            {% endif %}
+          </div>
+
+          {% if payment_ui == "paid" %}
+            <div class="paid-badge" style="margin-top:14px;">✅ Commande payée</div>
+          {% elif order.payment_status == "declared" or order.payment_verification_status == "pending_review" %}
+            <div class="payment-note" style="margin-top:14px;background:#FFF8F2;border-color:#F4D4B6;color:#9A3412;">
+              ⏳ Paiement déclaré et transmis à l’équipe FAGNI pour vérification.
+            </div>
+            <div class="action-stack">
+              <a href="{% url 'orders:client_order_pay_wave_page' order.id %}" class="ghost-btn">
+                💰 Voir l’état du paiement
+              </a>
+            </div>
+          {% elif finance_summary.amount_remaining > 0 %}
+            <div class="action-stack">
+              <a href="{% url 'orders:client_order_pay_wave_page' order.id %}" class="pay-btn">
+                💳 Régler le reste via Wave
+              </a>
+
+              <a href="{% url 'orders:client_order_payment_ui' order.id %}" class="ghost-btn">
+                💰 Voir le paiement
+              </a>
+            </div>
+          {% endif %}
+
+          <div class="payment-note">
+            {% if payment_ui == "paid" %}
+              Ton paiement a bien été pris en compte. Tu peux suivre sereinement l’évolution de ta commande.
+            {% elif order.payment_status == "declared" or order.payment_verification_status == "pending_review" %}
+              Ta déclaration de paiement a été enregistrée. La confirmation finale interviendra après contrôle par l’équipe FAGNI.
+            {% else %}
+              Le paiement du solde restant permet de finaliser le traitement et de sécuriser la suite du parcours.
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Prochaine étape</div>
+
+          <div class="next-step">
+            <div class="next-step__label">À faire maintenant</div>
+
+            {% if payment_ui != "paid" and order.payment_status == "declared" or payment_ui != "paid" and order.payment_verification_status == "pending_review" %}
+              <div class="next-step__title">Attendre la vérification</div>
+              <div class="next-step__text">
+                Ton paiement a été déclaré. L’équipe FAGNI doit maintenant vérifier puis confirmer le règlement.
+              </div>
+            {% elif payment_ui != "paid" and remain_amount > 0 %}
+              <div class="next-step__title">Payer la commande</div>
+              <div class="next-step__text">
+                Utilise Wave pour régler uniquement le montant restant affiché et finaliser le paiement de ta commande.
+              </div>
+            {% else %}
+              <div class="next-step__title">Suivre la progression</div>
+              <div class="next-step__text">
+                Ta commande continue son traitement. Reviens ici pour suivre chaque étape.
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="action-stack">
+            <a href="{% url 'orders:order_ticket_pdf' order.id %}" target="_blank" class="ghost-btn soft">
+              🧾 Ouvrir ticket A4
+            </a>
+
+            <a href="{% url 'orders:order_ticket_thermal_pdf' order.id %}" target="_blank" class="ghost-btn soft">
+              🖨️ Ouvrir ticket thermique
+            </a>
+
+            {% if payment_ui == "paid" %}
+              <a href="{% url 'orders:order_invoice_pdf' order.id %}" target="_blank" class="ghost-btn soft">
+                📄 Ouvrir la facture
+              </a>
+            {% endif %}
+
+            <a href="{% url 'orders:client_new_order' %}" class="ghost-btn">
+              + Créer une nouvelle commande
+            </a>
+          </div>
+        </div>
+
+      </aside>
     </div>
 
-    <!-- ADRESSE -->
-    <div class="section card">
-      <div class="card-title">Adresse de collecte & livraison</div>
-      <div class="address-box">
-        <div class="address-icon">📍</div>
-        <div class="address-text">{{ display_address }}</div>
-      </div>
-    </div>
-
-    <!-- COMMANDE EN SAC -->
-    {% if display_summary.is_bag %}
-    <div class="section card">
-      <div class="card-title">Commande en sac</div>
-
-      <div class="item-row" style="align-items:flex-start;">
-        <div>
-          <div class="item-name">{{ display_summary.bag_label }}</div>
-          <div class="item-qty">{{ display_summary.content_label }}</div>
-        </div>
-        <div class="item-price">
-          {{ finance_summary.prestation_total|floatformat:0 }} FCFA
-        </div>
-      </div>
-
-      <div style="margin-top:12px;padding:12px 14px;border-radius:14px;background:#F8FAFD;border:1px solid var(--border);font-size:13px;line-height:1.5;color:var(--muted);font-weight:700;">
-        ✅ Le sac FAGNI contient uniquement des {{ display_summary.content_label|lower }}.  
-        {{ display_summary.exclusions_label }}.
-      </div>
-    </div>
-    {% endif %}
-
-    <!-- ARTICLES -->
-    {% if items %}
-    <div class="section card">
-      <div class="card-title">Articles commandés</div>
-      {% for item in items %}
-      <div class="item-row">
-        <div>
-          <div class="item-name">{{ item.label }}</div>
-          <div class="item-qty">× {{ item.qty }}</div>
-        </div>
-        <div class="item-price">
-          {% if item.price %}{{ item.price|floatformat:0 }} FCFA{% else %}—{% endif %}
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    <!-- JAMBES LIVRAISON -->
-    {% if legs_ui %}
-    <div class="section card">
-      <div class="card-title">Logistique</div>
-      {% for leg in legs_ui %}
-      <div class="leg-row">
-        <div class="leg-icon">
-          {% if leg.leg_type == "pickup" %}🚚
-          {% elif leg.leg_type == "return" %}📦
-          {% else %}🧺{% endif %}
-        </div>
-        <div>
-          <div class="leg-label">{{ leg.leg_type_label }}</div>
-          <div class="leg-status">{{ leg.driver_name }}</div>
-        </div>
-        <span class="leg-badge leg-{{ leg.status_class }}">{{ leg.status_label }}</span>
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    <!-- ACTIONS -->
-    <div class="section" style="margin-bottom:24px;">
-      <a href="{% url 'orders:client_new_order' %}"
-         style="display:flex;align-items:center;justify-content:center;min-height:48px;border-radius:999px;border:1.5px solid var(--navy);color:var(--navy);font-size:14px;font-weight:800;">
-        + Créer une nouvelle commande
-      </a>
-    </div>
-
+    <div class="section" style="margin-bottom:24px;"></div>
   </div>
 
-  <!-- BARRE BAS -->
   <div class="bottom-bar">
     <div class="bottom-bar-inner">
       <div>
-        <div class="bottom-ref">CMD-{{ order.order_number|default:order.id }} · {{ order.get_status_display }}</div>
-        <div class="bottom-amount">{{ remain_amount|floatformat:0 }} FCFA restant</div>
+        <div class="bottom-ref">
+          CMD-{{ order.order_number|default:order.id }} · {{ order.get_status_display }}
+        </div>
+        <div class="bottom-amount">
+          {% if payment_ui != "paid" and order.payment_status == "declared" or payment_ui != "paid" and order.payment_verification_status == "pending_review" %}
+            Paiement déclaré · vérification en cours
+          {% elif payment_ui != "paid" and remain_amount > 0 %}
+            {{ remain_amount|floatformat:0 }} FCFA restant
+          {% else %}
+            Commande suivie dans ton espace client
+          {% endif %}
+        </div>
       </div>
-      {% if payment_ui != "paid" and remain_amount > 0 %}
-      <a href="{% url 'orders:client_order_pay_wave_page' order.id %}" class="pay-btn" style="width:auto;min-width:140px;">
-        → Payer
-      </a>
+
+      {% if payment_ui != "paid" and order.payment_status == "declared" or payment_ui != "paid" and order.payment_verification_status == "pending_review" %}
+        <a href="{% url 'orders:client_order_pay_wave_page' order.id %}" class="pay-btn pay-btn--dark" style="width:auto;min-width:160px;">
+          Voir paiement
+        </a>
+      {% elif payment_ui != "paid" and remain_amount > 0 %}
+        <a href="{% url 'orders:client_order_pay_wave_page' order.id %}" class="pay-btn" style="width:auto;min-width:160px;">
+          → Payer
+        </a>
       {% else %}
-      <a href="{% url 'orders:client_home' %}" class="pay-btn" style="width:auto;min-width:140px;background:var(--navy);">
-        Mes commandes
-      </a>
+        <a href="{% url 'orders:client_home' %}" class="pay-btn pay-btn--dark" style="width:auto;min-width:160px;">
+          Mes commandes
+        </a>
       {% endif %}
     </div>
   </div>

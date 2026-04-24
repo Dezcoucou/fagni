@@ -8,19 +8,24 @@
 <script defer>
 (function(){
   function intVal(x){
-    const n = parseInt(String(x || "0").replace(/\s+/g,""), 10);
+    const n = parseInt(String(x || "0").replace(/\s+/g, ""), 10);
     return isNaN(n) ? 0 : n;
   }
+
   function fmt(n){
     try { return (n || 0).toLocaleString("fr-FR"); }
     catch(e){ return String(n || 0); }
   }
+
   function init(){
     const grid = document.getElementById("svcGrid");
     if(!grid) return;
+
     const inputs = Array.from(grid.querySelectorAll(".co-qty-input"));
     const grandTotalEl = document.getElementById("grandTotal");
+    const grandTotalInline = document.getElementById("grandTotalInline");
     const itemsCountEl = document.getElementById("itemsCount");
+    const itemsCountInline = document.getElementById("itemsCountInline");
     const stickyContinue = document.getElementById("stickyContinue");
     const search = document.getElementById("svcSearch");
     const sort = document.getElementById("svcSort");
@@ -28,22 +33,27 @@
     function refreshLine(inp){
       const qty = Math.max(0, intVal(inp.value));
       inp.value = String(qty);
+
       const price = intVal(inp.dataset.unitPrice || "0");
       const total = qty * price;
+
       const line = inp.closest(".co-qty")?.querySelector(".co-line-total");
       if(line){
         line.textContent = qty > 0 ? ("Total : " + fmt(total) + " FCFA") : "";
       }
+
       const row = inp.closest(".co-svc");
       if(row){
         row.dataset.selected = qty > 0 ? "1" : "0";
       }
+
       return { qty, total };
     }
 
     function refreshAll(){
       let sum = 0;
       let selected = 0;
+
       inputs.forEach(inp => {
         const r = refreshLine(inp);
         if(r.qty > 0){
@@ -51,13 +61,18 @@
           selected += 1;
         }
       });
+
       if(grandTotalEl) grandTotalEl.textContent = fmt(sum) + " FCFA";
+      if(grandTotalInline) grandTotalInline.textContent = fmt(sum) + " FCFA";
       if(itemsCountEl) itemsCountEl.textContent = selected + " article(s) sélectionné(s)";
+      if(itemsCountInline) itemsCountInline.textContent = selected + " article(s) sélectionné(s)";
+
       const any = selected > 0;
       if(stickyContinue){
         stickyContinue.disabled = !any;
         stickyContinue.classList.toggle("is-disabled", !any);
       }
+
       if(sort && sort.value === "selected"){
         applySort();
       }
@@ -66,6 +81,7 @@
     function applyFilter(){
       const q = (search?.value || "").trim().toLowerCase();
       const rows = Array.from(grid.querySelectorAll(".co-svc"));
+
       rows.forEach(r => {
         const name = (r.dataset.svcName || "");
         const show = !q || name.includes(q);
@@ -76,11 +92,12 @@
     function applySort(){
       const rows = Array.from(grid.querySelectorAll(".co-svc"));
       const mode = (sort?.value || "selected");
+
       const keyName = (r) => (r.dataset.svcName || "");
       const keyPrice = (r) => intVal(r.dataset.price || "0");
       const keySelected = (r) => intVal(r.dataset.selected || "0");
 
-      rows.sort((a,b) => {
+      rows.sort((a, b) => {
         if(mode === "az") return keyName(a).localeCompare(keyName(b), "fr");
         if(mode === "price_desc") return keyPrice(b) - keyPrice(a);
         if(mode === "price_asc") return keyPrice(a) - keyPrice(b);
@@ -95,9 +112,11 @@
     grid.addEventListener("click", function(e){
       const btn = e.target.closest(".co-qty-btn");
       if(!btn) return;
+
       const wrap = btn.closest(".co-qty-wrap");
       const inp = wrap ? wrap.querySelector(".co-qty-input") : null;
       if(!inp) return;
+
       const delta = intVal(btn.dataset.delta || "0");
       inp.value = String(Math.max(0, intVal(inp.value) + delta));
       refreshAll();
@@ -134,11 +153,12 @@
     <div>
       {% if pricing_mode == "bag" %}
         <h1 class="co-title">Choisis ton sac</h1>
-        <p class="co-subtitle">Étape 3/4 — Sélectionne la taille adaptée à tes vêtements.</p>
+        <p class="co-subtitle">Étape 3/4 — Sélectionne la taille adaptée à ton volume.</p>
       {% else %}
-        <h1 class="co-title">Ajouter des articles</h1>
+        <h1 class="co-title">Ajoute tes articles</h1>
         <p class="co-subtitle">Étape 3/4 — {{ category.name }}</p>
       {% endif %}
+
       <div class="co-steps" aria-label="progression">
         <span class="co-step">1 • Infos</span>
         <span class="co-step">2 • Mode & livraison</span>
@@ -146,28 +166,41 @@
         <span class="co-step">4 • Récap</span>
       </div>
     </div>
+
     <div class="co-actions">
-      <a class="btn btn-outline btn-sm" href="{% url 'orders:client_new_order_step2' order.id %}">← Retour étape 2</a>
+      <a class="btn btn-outline btn-sm" href="{% url 'orders:client_new_order_step2' order.id %}">
+        ← Retour étape 2
+      </a>
     </div>
   </div>
+
+  {% if order.service_type %}
+    <div class="co-alert" style="background:#FFF8F2;border:1px solid #F0C9A0;color:#9A3412;">
+      ⚠️ Cette commande est déjà en mode <strong>{{ order.service_type }}</strong>. N’ajoute pas un autre type de service dans cette même commande.
+    </div>
+  {% endif %}
 
   {% if error %}
     <div class="co-alert co-alert--danger">{{ error }}</div>
   {% endif %}
 
   {% if pricing_mode == "bag" %}
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
+
       <div class="card co-card">
         <div class="co-section">
           <div class="co-h3">1) Taille du sac</div>
+          <div class="co-help" style="margin-top:6px;">Choisis la taille qui correspond le mieux à ton volume de vêtements.</div>
+
           <div class="co-grid-bags">
             <label class="co-bag-card {% if selected_bag_size == 'small' %}is-selected{% endif %}">
               <input type="radio" name="bag_size" value="small" {% if selected_bag_size == "small" %}checked{% endif %}>
               <div class="co-bag-card__body">
+                <div class="co-bag-card__icon">🧺</div>
                 <div class="co-bag-card__title">Petit sac</div>
                 <div class="co-bag-card__price">7 000 FCFA</div>
-                <div class="co-bag-card__text">Pour un petit volume de vêtements</div>
+                <div class="co-bag-card__text">Pour un petit volume de vêtements du quotidien.</div>
               </div>
             </label>
 
@@ -175,18 +208,20 @@
               <input type="radio" name="bag_size" value="medium" {% if selected_bag_size == "medium" or not selected_bag_size %}checked{% endif %}>
               <div class="co-bag-card__body">
                 <div class="co-bag-card__badge">Le plus choisi</div>
+                <div class="co-bag-card__icon">🔥</div>
                 <div class="co-bag-card__title">Sac moyen</div>
                 <div class="co-bag-card__price">10 000 FCFA</div>
-                <div class="co-bag-card__text">Idéal pour le quotidien</div>
+                <div class="co-bag-card__text">Le meilleur équilibre entre volume, simplicité et prix.</div>
               </div>
             </label>
 
             <label class="co-bag-card {% if selected_bag_size == 'large' %}is-selected{% endif %}">
               <input type="radio" name="bag_size" value="large" {% if selected_bag_size == "large" %}checked{% endif %}>
               <div class="co-bag-card__body">
+                <div class="co-bag-card__icon">🧳</div>
                 <div class="co-bag-card__title">Grand sac</div>
                 <div class="co-bag-card__price">14 000 FCFA</div>
-                <div class="co-bag-card__text">Pour un volume important de vêtements</div>
+                <div class="co-bag-card__text">Pour un volume important de vêtements uniquement.</div>
               </div>
             </label>
           </div>
@@ -205,14 +240,14 @@
           <div class="co-rule-box co-rule-box--warn">
             <div class="co-rule-box__title">🚫 Non inclus</div>
             <div class="co-rule-box__text">
-              Draps, serviettes, couettes, rideaux, articles volumineux, chaussures, cuir, daim, vêtements délicats ou spéciaux.
+              Draps, serviettes, couettes, rideaux, chaussures, cuir, daim, articles volumineux, vêtements délicats ou spéciaux.
             </div>
           </div>
 
           <label class="co-check-card">
             <input type="checkbox" name="confirm_bag_rules" value="1" {% if bag_rules_confirmed %}checked{% endif %}>
             <div>
-              <strong>Je confirme que mon sac contient uniquement des vêtements.</strong>
+              <strong>Je confirme que mon sac contient uniquement des vêtements autorisés.</strong>
               <small>Les articles non conformes pourront être retirés ou facturés séparément.</small>
             </div>
           </label>
@@ -224,48 +259,17 @@
       </div>
     </form>
 
-    <style>
-      .co-grid-bags{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-      .co-bag-card{position:relative;display:block;border:1px solid #E8EDF5;border-radius:20px;background:#fff;cursor:pointer;overflow:hidden;transition:all .2s ease}
-      .co-bag-card input{position:absolute;opacity:0;pointer-events:none}
-      .co-bag-card__body{padding:18px}
-      .co-bag-card__badge{display:inline-block;margin-bottom:10px;background:#FFF3E8;color:#E87722;border:1px solid rgba(232,119,34,.18);border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700}
-      .co-bag-card__title{font-size:18px;font-weight:800;color:#1E3A5F;margin-bottom:8px}
-      .co-bag-card__price{font-size:22px;font-weight:900;color:#E87722;margin-bottom:6px}
-      .co-bag-card__text{color:#6B7280;font-size:14px}
-      .co-bag-card.is-selected{border-color:#E87722;box-shadow:0 10px 24px rgba(30,58,95,.08);background:linear-gradient(180deg,#FFFFFF 0%, #FFF8F2 100%)}
-      .co-rule-box{border:1px solid #E8EDF5;border-radius:16px;padding:14px 16px;background:#fff;margin-bottom:12px}
-      .co-rule-box--warn{background:#FFF8F2}
-      .co-rule-box__title{font-weight:800;color:#1E3A5F;margin-bottom:6px}
-      .co-rule-box__text{color:#6B7280;line-height:1.5}
-      .co-check-card{display:flex;gap:12px;align-items:flex-start;border:1px solid #E8EDF5;border-radius:16px;padding:14px 16px;background:#fff;cursor:pointer}
-      .co-check-card small{display:block;color:#6B7280;margin-top:4px}
-      @media (max-width: 900px){.co-grid-bags{grid-template-columns:1fr}}
-    </style>
-
-    <script>
-      (function(){
-        const cards = document.querySelectorAll('.co-bag-card');
-        cards.forEach(card => {
-          const radio = card.querySelector('input[type="radio"]');
-          if(!radio) return;
-          radio.addEventListener('change', function(){
-            cards.forEach(c => c.classList.remove('is-selected'));
-            if(radio.checked){ card.classList.add('is-selected'); }
-          });
-        });
-      })();
-    </script>
-
   {% else %}
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
+
       <div class="card co-card">
         <div class="co-catalog-head">
           <div>
             <div class="co-h3" style="margin:0;">Catalogue</div>
-            <div class="co-help" style="margin-top:4px;">Indique les quantités par article.</div>
+            <div class="co-help" style="margin-top:4px;">Choisis les quantités par article. Le total se met à jour automatiquement.</div>
           </div>
+
           <div class="co-toolbar">
             <input id="svcSearch" class="co-search" type="search" placeholder="Rechercher un article…">
             <select id="svcSort" class="co-search">
@@ -285,9 +289,10 @@
                  data-selected="0">
               <div class="co-svc__info">
                 <div class="co-svc__name">{{ s.name }}</div>
-                <div class="co-svc__price">{{ s.default_price }} FCFA / unité</div>
+                <div class="co-svc__price">{{ s.default_price|floatformat:0 }} FCFA / unité</div>
                 <div class="co-svc__hint">Choisis la quantité à traiter.</div>
               </div>
+
               <div class="co-qty">
                 <div class="co-qty-wrap">
                   <button type="button" class="co-qty-btn" data-delta="-1" aria-label="Diminuer">−</button>
@@ -303,7 +308,19 @@
                   >
                   <button type="button" class="co-qty-btn" data-delta="1" aria-label="Augmenter">+</button>
                 </div>
+
                 <div class="co-line-total" aria-live="polite"></div>
+
+                <div class="co-photo-block">
+                  <label class="co-photo-label">Photos de l'article</label>
+                  <input
+                    type="file"
+                    name="photos_{{ s.id }}"
+                    multiple
+                    accept="image/*"
+                    class="co-photo-input"
+                  >
+                </div>
               </div>
             </div>
           {% empty %}
@@ -313,8 +330,66 @@
           {% endfor %}
         </div>
 
+        <div class="co-section co-section--divider">
+          <div class="co-h3">Ajout manuel</div>
+          <div class="co-help">Ajoute un article libre si tu ne le trouves pas dans le catalogue.</div>
+
+          <div class="co-manual-grid">
+            <div>
+              <label class="co-manual-label">Désignation</label>
+              <input
+                type="text"
+                name="designation"
+                placeholder="Ex : Chemise blanche"
+                class="co-manual-input"
+              >
+            </div>
+
+            <div>
+              <label class="co-manual-label">Quantité</label>
+              <input
+                type="number"
+                name="quantity"
+                min="1"
+                value="1"
+                class="co-manual-input"
+              >
+            </div>
+          </div>
+
+          <div style="margin-top:12px;">
+            <label class="co-manual-label">Photos</label>
+            <input
+              type="file"
+              name="photos"
+              multiple
+              accept="image/*"
+              class="co-photo-input"
+            >
+          </div>
+        </div>
+
+        <div class="co-section co-section--divider">
+          <div class="co-h3">Récap rapide</div>
+          <div class="co-help">Le total ci-dessous se met à jour pendant ta sélection.</div>
+
+          <div class="co-summary-live">
+            <div class="co-summary-live__box">
+              <div class="co-summary-live__k">Articles sélectionnés</div>
+              <div id="itemsCountInline" class="co-summary-live__v">0 article(s) sélectionné(s)</div>
+            </div>
+
+            <div class="co-summary-live__box co-summary-live__box--accent">
+              <div class="co-summary-live__k">Total prestations</div>
+              <div id="grandTotalInline" class="co-summary-live__v co-summary-live__v--price">0 FCFA</div>
+            </div>
+          </div>
+        </div>
+
         <div class="co-footer co-footer--divider">
-          <button class="btn btn-outline btn-sm" name="action" value="add_more" type="submit">+ Ajouter & rester ici</button>
+          <button class="btn btn-outline btn-sm" name="action" value="add_more" type="submit">
+            + Ajouter & rester ici
+          </button>
           <div class="co-spacer"></div>
           <button class="btn btn-premium co-cta" type="submit">Continuer → Étape 4</button>
         </div>
@@ -334,4 +409,400 @@
     </form>
   {% endif %}
 </div>
+
+<style>
+  .co-grid-bags{
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0,1fr));
+    gap:16px;
+  }
+
+  .co-bag-card{
+    position:relative;
+    display:block;
+    border:1px solid #E8EDF5;
+    border-radius:20px;
+    background:#fff;
+    cursor:pointer;
+    overflow:hidden;
+    transition:all .2s ease;
+  }
+
+  .co-bag-card input{
+    position:absolute;
+    opacity:0;
+    pointer-events:none;
+  }
+
+  .co-bag-card__body{
+    padding:18px;
+  }
+
+  .co-bag-card__icon{
+    font-size:26px;
+    margin-bottom:10px;
+  }
+
+  .co-bag-card__badge{
+    display:inline-block;
+    margin-bottom:10px;
+    background:#FFF3E8;
+    color:#E87722;
+    border:1px solid rgba(232,119,34,.18);
+    border-radius:999px;
+    padding:4px 10px;
+    font-size:12px;
+    font-weight:700;
+  }
+
+  .co-bag-card__title{
+    font-size:18px;
+    font-weight:800;
+    color:#1E3A5F;
+    margin-bottom:8px;
+  }
+
+  .co-bag-card__price{
+    font-size:24px;
+    font-weight:900;
+    color:#E87722;
+    margin-bottom:8px;
+  }
+
+  .co-bag-card__text{
+    color:#6B7280;
+    font-size:14px;
+    line-height:1.5;
+  }
+
+  .co-bag-card.is-selected{
+    border-color:#E87722;
+    box-shadow:0 10px 24px rgba(30,58,95,.08);
+    background:linear-gradient(180deg,#FFFFFF 0%, #FFF8F2 100%);
+  }
+
+  .co-rule-box{
+    border:1px solid #E8EDF5;
+    border-radius:16px;
+    padding:14px 16px;
+    background:#fff;
+    margin-bottom:12px;
+  }
+
+  .co-rule-box--warn{
+    background:#FFF8F2;
+  }
+
+  .co-rule-box__title{
+    font-weight:800;
+    color:#1E3A5F;
+    margin-bottom:6px;
+  }
+
+  .co-rule-box__text{
+    color:#6B7280;
+    line-height:1.5;
+  }
+
+  .co-check-card{
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+    border:1px solid #E8EDF5;
+    border-radius:16px;
+    padding:14px 16px;
+    background:#fff;
+    cursor:pointer;
+  }
+
+  .co-check-card small{
+    display:block;
+    color:#6B7280;
+    margin-top:4px;
+  }
+
+  .co-catalog-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:14px;
+    padding:18px 18px 0;
+    flex-wrap:wrap;
+  }
+
+  .co-toolbar{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  .co-search{
+    min-height:44px;
+    border:1px solid #E8EDF5;
+    border-radius:14px;
+    padding:0 14px;
+    font-size:14px;
+    background:#fff;
+  }
+
+  .co-catalog{
+    display:grid;
+    gap:14px;
+    padding:18px;
+  }
+
+  .co-svc{
+    display:grid;
+    grid-template-columns:minmax(0,1.2fr) minmax(260px,.8fr);
+    gap:16px;
+    border:1px solid #E8EDF5;
+    border-radius:18px;
+    background:#fff;
+    padding:16px;
+    align-items:start;
+  }
+
+  .co-svc__name{
+    font-size:17px;
+    font-weight:900;
+    color:#1E3A5F;
+    line-height:1.2;
+  }
+
+  .co-svc__price{
+    margin-top:6px;
+    font-size:14px;
+    font-weight:800;
+    color:#E87722;
+  }
+
+  .co-svc__hint{
+    margin-top:6px;
+    font-size:12px;
+    color:#6B7280;
+    line-height:1.5;
+  }
+
+  .co-qty{
+    min-width:0;
+  }
+
+  .co-qty-wrap{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  .co-qty-btn{
+    width:42px;
+    height:42px;
+    border:none;
+    border-radius:14px;
+    background:#F3F6FA;
+    color:#1E3A5F;
+    font-size:22px;
+    font-weight:900;
+    cursor:pointer;
+  }
+
+  .co-qty-input{
+    width:84px;
+    height:42px;
+    border:1px solid #E8EDF5;
+    border-radius:14px;
+    text-align:center;
+    font-size:16px;
+    font-weight:800;
+    color:#1E3A5F;
+    background:#fff;
+  }
+
+  .co-line-total{
+    min-height:22px;
+    margin-top:10px;
+    font-size:13px;
+    font-weight:800;
+    color:#E87722;
+  }
+
+  .co-photo-block{
+    margin-top:12px;
+  }
+
+  .co-photo-label{
+    display:block;
+    font-size:12px;
+    font-weight:700;
+    color:#6B7280;
+    margin-bottom:6px;
+  }
+
+  .co-photo-input{
+    display:block;
+    width:100%;
+    font-size:12px;
+  }
+
+  .co-manual-grid{
+    display:grid;
+    grid-template-columns:1.4fr .6fr;
+    gap:12px;
+    margin-top:14px;
+  }
+
+  .co-manual-label{
+    display:block;
+    font-size:12px;
+    font-weight:700;
+    color:#6B7280;
+    margin-bottom:6px;
+  }
+
+  .co-manual-input{
+    width:100%;
+    height:48px;
+    border:1px solid #E8EDF5;
+    border-radius:14px;
+    padding:0 14px;
+    font-size:14px;
+    background:#fff;
+  }
+
+  .co-summary-live{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+    margin-top:14px;
+  }
+
+  .co-summary-live__box{
+    border:1px solid #E8EDF5;
+    border-radius:16px;
+    padding:14px;
+    background:#F8FAFD;
+  }
+
+  .co-summary-live__box--accent{
+    border:1px solid #F0C9A0;
+    background:#FFF8F2;
+  }
+
+  .co-summary-live__k{
+    font-size:12px;
+    color:#6B7280;
+    font-weight:700;
+  }
+
+  .co-summary-live__v{
+    margin-top:6px;
+    font-size:18px;
+    font-weight:900;
+    color:#1E3A5F;
+  }
+
+  .co-summary-live__v--price{
+    font-size:20px;
+    color:#E87722;
+  }
+
+  .co-sticky{
+    position:sticky;
+    bottom:12px;
+    margin-top:16px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    border:1px solid #E8EDF5;
+    border-radius:20px;
+    background:rgba(255,255,255,.96);
+    backdrop-filter:blur(10px);
+    box-shadow:0 12px 28px rgba(30,58,95,.08);
+    padding:14px 16px;
+  }
+
+  .co-sticky-k{
+    font-size:12px;
+    color:#6B7280;
+    font-weight:700;
+  }
+
+  .co-sticky-v{
+    margin-top:4px;
+    font-size:22px;
+    font-weight:900;
+    color:#E87722;
+  }
+
+  .co-sticky-mini{
+    margin-top:4px;
+    font-size:12px;
+    color:#64748b;
+    font-weight:700;
+  }
+
+  .co-sticky-btn.is-disabled{
+    opacity:.55;
+  }
+
+  .co-empty{
+    border:1px dashed #E8EDF5;
+    border-radius:16px;
+    padding:18px;
+    text-align:center;
+    color:#64748b;
+    font-weight:700;
+  }
+
+  @media (max-width: 960px){
+    .co-grid-bags,
+    .co-summary-live,
+    .co-manual-grid{
+      grid-template-columns:1fr;
+    }
+
+    .co-svc{
+      grid-template-columns:1fr;
+    }
+  }
+
+  @media (max-width: 720px){
+    .co-sticky{
+      flex-direction:column;
+      align-items:flex-start;
+    }
+
+    .co-sticky-btn{
+      width:100%;
+    }
+
+    .co-toolbar{
+      width:100%;
+      flex-direction:column;
+    }
+
+    .co-search{
+      width:100%;
+    }
+  }
+</style>
+
+{% if pricing_mode == "bag" %}
+<script>
+(function(){
+  const cards = document.querySelectorAll('.co-bag-card');
+
+  cards.forEach(card => {
+    const radio = card.querySelector('input[type="radio"]');
+    if(!radio) return;
+
+    radio.addEventListener('change', function(){
+      cards.forEach(c => c.classList.remove('is-selected'));
+      if(radio.checked){
+        card.classList.add('is-selected');
+      }
+    });
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

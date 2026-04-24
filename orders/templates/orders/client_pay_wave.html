@@ -1,277 +1,774 @@
 {% extends "orders/client_base.html" %}
 {% load money_filters %}
 {% block title %}Paiement Wave – Commande {{ order.code|default:order.id }}{% endblock %}
+
 {% block content %}
-<!-- CLIENT_PAY_WAVE_TEMPLATE_CLEAN_REPLACE_20260226 -->
-<div class="co-page paywave">
-  <div class="co-head">
-    <div>
-      <h1 class="co-title">Paiement Wave</h1>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
-        <a class="co-btn co-btn--ghost" href="{% url 'orders:client_order_detail' order.id %}">← Retour commande</a>
-        <form method="post" style="margin:0;">
-          {% csrf_token %}
-          {% if remain > 0 and order.payment_status != "paid" %}
-            {% if wave_declared %}
-              <div class="co-notice co-notice--warn" style="margin-top:12px;">
-                <div class="co-notice__icon">✓</div>
-                <div>
-                  <p class="co-notice__title">Paiement déjà déclaré</p>
-                  <p class="co-notice__desc">Merci. Nous vérifions ton paiement Wave. Tu seras notifié dès validation.</p>
-                </div>
-              </div>
-            {% else %}
-              <button id="btnWavePaid" class="co-btn" type="submit">J’ai payé</button>
-            {% endif %}
-          {% else %}
-            <div class="co-notice co-notice--ok" style="margin-top:12px;">
-              <div class="co-notice__icon">✓</div>
-              <div>
-                <p class="co-notice__title">Paiement déjà confirmé</p>
-                <p class="co-notice__desc">Merci. Aucun paiement supplémentaire requis.</p>
-              </div>
-            </div>
-          {% endif %}
-        </form>
-      </div>
-      <p class="co-sub">Commande <strong>{{ order.code|default:order.id }}</strong></p>
-
-      <div class="co-mini-summary" style="margin-top:14px;">
-        <div class="co-mini-summary__card">
-          <div class="co-mini-summary__title">
-            {% if pricing_mode == "bag" %}
-              Commande en sac — {{ bag_label }}
-            {% else %}
-              Commande à la pièce
-            {% endif %}
-          </div>
-          <div class="co-mini-summary__rows">
-            <div class="co-mini-summary__row">
-              <span>Prestations</span>
-              <strong>{{ finance_breakdown.prestation_total|floatformat:0 }} FCFA</strong>
-            </div>
-            <div class="co-mini-summary__row">
-              <span>Livraison</span>
-              <strong>{{ finance_breakdown.delivery_fee_client|floatformat:0 }} FCFA</strong>
-            </div>
-            <div class="co-mini-summary__row">
-              <span>Frais FAGNI</span>
-              <strong>{{ service_fee_client_ttc|floatformat:0 }} FCFA</strong>
-            </div>
-            <div class="co-mini-summary__row co-mini-summary__row--total">
-              <span>Total TTC</span>
-              <strong>{{ finance_breakdown.total_client_ttc|floatformat:0 }} FCFA</strong>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="co-chips" aria-label="Actions rapides">
-        <a class="co-chip" href="{% url 'orders:client_order_detail' order.id %}">← Retour commande</a>
-        <a class="wave-return-strong" href="{% url 'orders:client_home' %}#mes-commandes">← Mes commandes</a>
-      </div>
-    </div>
-    <div class="paywave-badge">
-      <span class="co-pill">💳 Wave</span>
-    </div>
+<div class="pw-page">
+  <div class="pw-topbar">
+    <a class="pw-back" href="{% url 'orders:client_order_detail' order.id %}">← Retour commande</a>
+    <div class="pw-order-code">Commande {{ order.code|default:order.id }}</div>
   </div>
-  <div class="co-card paywave-card">
-    {% if remain <= 0 %}
-      <div class="paywave-state paywave-state--paid">
-        <div class="paywave-state__left">
-          <div class="paywave-state__title">✅ Commande déjà réglée</div>
-          <div class="paywave-state__sub">Aucun paiement à effectuer via Wave.</div>
-        </div>
-        <div class="paywave-state__right">
-          <a class="co-btn co-btn--primary" href="{% url 'orders:client_order_detail' order.id %}">Voir la commande</a>
-        </div>
+
+  <div class="pw-hero">
+    <div class="pw-hero__left">
+      
+<div class="pw-badge">💳 Paiement sécurisé Wave</div>
+
+{% if wallet_balance > 0 %}
+  <section class="pw-wallet-box">
+    <div class="pw-wallet-title">💼 Wallet FAGNI disponible</div>
+    <div class="pw-wallet-lines">
+      <div>Solde wallet : <strong>{{ wallet_balance|floatformat:0 }} FCFA</strong></div>
+      <div>Montant utilisable maintenant : <strong>{{ wallet_usable|floatformat:0 }} FCFA</strong></div>
+      <div>Reste à payer via Wave : <strong>{{ wave_remaining|floatformat:0 }} FCFA</strong></div>
+    </div>
+
+    {% if wallet_applied %}
+      <div class="pw-wallet-ok">
+        ✅ Le wallet a été appliqué. Tu peux maintenant payer uniquement le reste via Wave.
       </div>
-      <div class="paywave-kpis">
-        <div class="paywave-kpi"><div class="k">Total</div><div class="v">{{ total|fcfa }}</div></div>
-        <div class="paywave-kpi"><div class="k">Déjà payé</div><div class="v">{{ paid|fcfa }}</div></div>
-        <div class="paywave-kpi paywave-kpi--ok"><div class="k">Reste</div><div class="v">{{ remain|fcfa }}</div></div>
-      </div>
-      <div class="co-note co-note--ok">Si tu veux vérifier le détail, retourne sur la commande.</div>
-    {% else %}
-      <div class="paywave-state">
-        <div class="paywave-state__left">
-          <div class="paywave-state__title">À payer maintenant</div>
-          <div class="paywave-state__sub">
-            Reste : <strong class="paywave-amount">{{ remain|fcfa }}</strong>
-          </div>
-        </div>
-        <div class="paywave-state__right">
-          {% if pay_link %}
-            <a class="co-btn co-btn--primary" href="{{ pay_link }}" target="_blank" rel="noopener">Payer via Wave</a>
-            <button class="co-btn co-btn--ghost" type="button" data-copy="#wavePayLinkHidden">Copier lien</button>
-          {% else %}
-            <button class="co-btn co-btn--ghost" type="button" data-copy="#wavePhone">Copier numéro</button>
-          {% endif %}
-        </div>
-      </div>
-      <div class="paywave-grid">
-        <div class="paywave-qrbox">
-          <div class="paywave-qr">
-            <!-- QR Wave: doit encoder pay_link (ou fallback URL Wave) -->
-            <img src="{{ qr_data_uri }}" alt="QR Wave">
-            {% if pay_link %}
-              <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">
-                <a class="co-btn co-btn--primary" href="{{ pay_link }}" target="_blank" rel="noopener">Ouvrir dans Wave</a>
-                <button class="co-btn co-btn--ghost" type="button" data-copy="#wavePayLinkHidden">Copier le lien</button>
-              </div>
-              <code id="wavePayLinkHidden" style="display:none;">{{ pay_link }}</code>
-            {% else %}
-              <div class="co-note co-note--warn" style="margin-top:10px" data-flag="WAVE_NO_PAYLINK_WARN">
-                Le lien de paiement automatique est momentanément indisponible. Utilise le numéro Wave affiché ci-dessous et saisis le montant indiqué.
-              </div>
-            {% endif %}
-          </div>
-          <div class="paywave-meta">
-            <div class="paywave-meta__row">
-              <span class="k">Numéro Wave</span>
-              <code id="wavePhone" class="v">{{ wave_phone }}</code>
-            </div>
-            {% if pay_link %}
-              <div class="paywave-meta__row">
-                <span class="k">Lien</span>
-                <button class="co-btn co-btn--sm co-btn--ghost" type="button" id="waveLinkToggleBtn">Afficher</button>
-              </div>
-              <div class="paywave-linkbox" id="waveLinkBox" hidden>
-                <div class="paywave-linkbox__inner">
-                  <code id="wavePayLinkVisible">{{ pay_link }}</code>
-                  <button class="co-btn co-btn--sm co-btn--ghost" type="button" data-copy="#wavePayLinkVisible">Copier</button>
-                </div>
-              </div>
-            {% endif %}
-          </div>
-          <div class="co-note co-note--warn">
-            Ouvre <strong>Wave</strong> → <strong>Scanner</strong> → scanne le QR → vérifie le numéro → saisis
-            <strong>{{ remain|fcfa }}</strong>.
-            {% if pay_link %}
-              <br><br>Si le bouton <strong>Payer via Wave</strong> est dispo, utilise-le (plus simple).
-            {% endif %}
-          </div>
-        </div>
-        <div class="paywave-side">
-          <div class="paywave-kpis">
-            <div class="paywave-kpi"><div class="k">Total</div><div class="v">{{ total|fcfa }}</div></div>
-            <div class="paywave-kpi"><div class="k">Déjà payé</div><div class="v">{{ paid|fcfa }}</div></div>
-            <div class="paywave-kpi paywave-kpi--focus"><div class="k">Reste</div><div class="v">{{ remain|fcfa }}</div></div>
-          </div>
-          <div class="co-note co-note--soft">Après paiement, reviens sur la commande pour voir le statut “Payé”.</div>
-          <div class="paywave-actions">
-            {% if pay_link %}
-              <a class="co-btn co-btn--primary co-btn--full" href="{{ pay_link }}" target="_blank" rel="noopener">
-                Ouvrir Wave & payer
-              </a>
-            {% endif %}
-            <a class="co-btn co-btn--dark co-btn--full" href="{% url 'orders:client_order_detail' order.id %}">
-              Revenir à la commande
-            </a>
-          </div>
-        </div>
-      </div>
-      <script>
-      (function(){
-        const toggleBtn = document.getElementById("waveLinkToggleBtn");
-        const linkBox = document.getElementById("waveLinkBox");
-        if(toggleBtn && linkBox){
-          toggleBtn.addEventListener("click", function(){
-            const isHidden = linkBox.hasAttribute("hidden");
-            if(isHidden){
-              linkBox.removeAttribute("hidden");
-              toggleBtn.textContent = "Masquer";
-            }else{
-              linkBox.setAttribute("hidden","hidden");
-              toggleBtn.textContent = "Afficher";
-            }
-          });
-        }
-        async function copyText(txt){
-          if(!txt) return false;
-          try{ await navigator.clipboard.writeText(txt); return true; }
-          catch(e){ return false; }
-        }
-        document.addEventListener("click", async function(e){
-          const btn = e.target.closest("[data-copy]");
-          if(!btn) return;
-          const sel = btn.getAttribute("data-copy");
-          const el = sel ? document.querySelector(sel) : null;
-          const txt = el ? (el.textContent || "").trim() : "";
-          if(!txt){ alert("❌ Rien à copier."); return; }
-          const ok = await copyText(txt);
-          if(ok) alert("✅ Copié.");
-          else prompt("Copie :", txt);
-        });
-      })();
-      </script>
     {% endif %}
+
+    {% if wallet_usable > 0 %}
+      <form method="post" class="pw-wallet-form" data-wallet-form>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="use_wallet">
+        <button type="submit" class="pw-wallet-btn" data-wallet-btn>
+          Utiliser {{ wallet_usable|floatformat:0 }} FCFA de mon wallet
+        </button>
+      </form>
+    {% endif %}
+  </section>
+{% endif %}
+
+<div class="pw-card">
+            <div class="pw-card__head">
+              <div>
+                <div class="pw-card__title">Informations de paiement</div>
+                <div class="pw-card__sub">Vérifie avant validation</div>
+              </div>
+            </div>
+
+            <div class="pw-meta">
+              <div class="pw-meta__row">
+                <span>Numéro Wave</span>
+                <strong id="wavePhone">{{ wave_phone }}</strong>
+              </div>
+              <div class="pw-meta__row">
+                <span>Montant à payer</span>
+                <strong>{{ wave_remaining|fcfa }}</strong>
+              </div>
+              <div class="pw-meta__row">
+                <span>Commande</span>
+                <strong>{{ order.code|default:order.id }}</strong>
+              </div>
+            </div>
+
+            <div class="pw-actions-stack">
+              <button class="pw-btn pw-btn--ghost pw-btn--full" type="button" data-copy="#wavePhone">
+                Copier le numéro Wave
+              </button>
+            </div>
+
+            <div class="pw-note pw-note--soft">
+              Ouvre <strong>Wave</strong>, scanne le QR ou saisis le numéro, puis vérifie le montant exact :
+              <strong>{{ wave_remaining|fcfa }}</strong>.
+            </div>
+          </div>
+        </div>
+
+    </div>
+
+    <aside class="pw-side">
+      <div class="pw-card">
+        <div class="pw-card__head">
+          <div>
+            <div class="pw-card__title">Résumé commande</div>
+            <div class="pw-card__sub">
+              {% if pricing_mode == "bag" %}
+                Commande en sac — {{ bag_label }}
+              {% else %}
+                Commande à la pièce
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div class="pw-summary">
+          <div class="pw-summary__row">
+            <span>Prestations</span>
+            <strong>{{ finance_breakdown.prestation_total|floatformat:0 }} FCFA</strong>
+          </div>
+          <div class="pw-summary__row">
+            <span>Livraison</span>
+            <strong>{{ finance_breakdown.delivery_fee_client|floatformat:0 }} FCFA</strong>
+          </div>
+          <div class="pw-summary__row">
+            <span>Frais FAGNI</span>
+            <strong>{{ service_fee_client_ttc|floatformat:0 }} FCFA</strong>
+          </div>
+          {% if wallet_balance > 0 or wallet_applied %}
+          <div class="pw-summary__row">
+            <span>Wallet utilisé</span>
+            <strong>{{ wallet_used|fcfa }}</strong>
+          </div>
+          {% endif %}
+          <div class="pw-summary__row">
+            <span>Déjà payé</span>
+            <strong>{{ paid|fcfa }}</strong>
+          </div>
+          <div class="pw-summary__row pw-summary__row--total">
+            <span>Total TTC</span>
+            <strong>{{ total|fcfa }}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="pw-card">
+        <div class="pw-card__head">
+          <div>
+            <div class="pw-card__title">Que faire maintenant ?</div>
+            <div class="pw-card__sub">Étapes simples</div>
+          </div>
+        </div>
+
+        <div class="pw-timeline">
+          <div class="pw-timeline__item">
+            <div class="pw-timeline__dot"></div>
+            <div>
+              <strong>1. Payer via Wave</strong>
+              <div>Utilise le bouton principal ou le QR code.</div>
+            </div>
+          </div>
+          <div class="pw-timeline__item">
+            <div class="pw-timeline__dot"></div>
+            <div>
+              <strong>2. Déclarer si nécessaire</strong>
+              <div>Si tu as déjà payé, clique sur “J’ai déjà payé”.</div>
+            </div>
+          </div>
+          <div class="pw-timeline__item">
+            <div class="pw-timeline__dot"></div>
+            <div>
+              <strong>3. Suivre la commande</strong>
+              <div>Retourne sur ta commande pour suivre la validation.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pw-actions-stack" style="margin-top:16px;">
+          <a class="pw-btn pw-btn--dark pw-btn--full" href="{% url 'orders:client_order_detail' order.id %}">
+            Revenir à la commande
+          </a>
+          <a class="pw-btn pw-btn--ghost pw-btn--full" href="{% url 'orders:client_home' %}#mes-commandes">
+            Voir mes commandes
+          </a>
+        </div>
+      </div>
+    </aside>
   </div>
 </div>
+
 <style>
-  .co-mini-summary__card{
+  .pw-page{
+    max-width:1200px;
+    margin:0 auto;
+    padding:20px 16px 40px;
+  }
+
+  .pw-topbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin-bottom:18px;
+    flex-wrap:wrap;
+  }
+
+  .pw-back{
+    text-decoration:none;
+    color:#1E3A5F;
+    font-weight:700;
+  }
+
+  .pw-order-code{
+    font-size:13px;
+    color:#6B7280;
     background:#fff;
     border:1px solid #E8EDF5;
-    border-radius:18px;
-    padding:14px 16px;
+    border-radius:999px;
+    padding:8px 12px;
   }
-  .co-mini-summary__title{
-    font-size:14px;
-    font-weight:900;
+
+  .pw-hero{
+    display:grid;
+    grid-template-columns:1.4fr .8fr;
+    gap:18px;
+    margin-bottom:18px;
+  }
+
+  .pw-hero__left,
+  .pw-hero__right{
+    background:#fff;
+    border:1px solid #E8EDF5;
+    border-radius:24px;
+    padding:18px;
+    box-shadow:0 10px 30px rgba(30,58,95,.06);
+  }
+
+  .pw-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    background:#FFF8F2;
+    color:#E87722;
+    border:1px solid #F5D7BF;
+    border-radius:999px;
+    padding:8px 12px;
+    font-weight:800;
+    font-size:12px;
+    margin-bottom:14px;
+  }
+
+  .pw-title{
+    margin:0;
+    font-size:28px;
+    line-height:1.1;
     color:#1E3A5F;
+  }
+
+  .pw-subtitle{
+    margin:10px 0 0;
+    color:#6B7280;
+    font-size:15px;
+    line-height:1.6;
+  }
+
+  .pw-hero-trust{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:16px;
+  }
+
+  .pw-hero-trust span{
+    display:inline-flex;
+    align-items:center;
+    min-height:34px;
+    padding:0 12px;
+    border-radius:999px;
+    background:#F8FAFC;
+    border:1px solid #E8EDF5;
+    color:#1E3A5F;
+    font-size:12px;
+    font-weight:800;
+  }
+
+  .pw-total-card{
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:flex-start;
+  }
+
+  .pw-total-card__label{
+    color:#6B7280;
+    font-size:13px;
     margin-bottom:10px;
   }
-  .co-mini-summary__rows{
-    display:grid;
-    gap:8px;
+
+  .pw-total-card__value{
+    font-size:42px;
+    font-weight:900;
+    color:#E87722;
+    line-height:1;
+    letter-spacing:-0.02em;
   }
-  .co-mini-summary__row{
+
+  .pw-total-card__hint{
+    margin-top:10px;
+    color:#1E3A5F;
+    font-size:13px;
+    font-weight:700;
+  }
+
+  .pw-layout{
+    display:grid;
+    grid-template-columns:1.5fr .9fr;
+    gap:18px;
+  }
+
+  .pw-main,
+  .pw-side{
+    display:grid;
+    gap:18px;
+  }
+
+  .pw-card{
+    background:#fff;
+    border:1px solid #E8EDF5;
+    border-radius:24px;
+    padding:20px;
+    box-shadow:0 10px 30px rgba(30,58,95,.05);
+  }
+
+  .pw-card__head{
+    margin-bottom:16px;
+  }
+
+  .pw-card__title{
+    font-size:18px;
+    font-weight:900;
+    color:#1E3A5F;
+  }
+
+  .pw-card__sub{
+    margin-top:4px;
+    color:#6B7280;
+    font-size:13px;
+  }
+
+  .pw-state{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    background:#fff;
+    border:1px solid #E8EDF5;
+    border-radius:24px;
+    padding:18px 20px;
+    box-shadow:0 10px 30px rgba(30,58,95,.05);
+  }
+
+  .pw-state--success{
+    border-color:#CDEFD8;
+    background:#F4FFF7;
+  }
+
+  .pw-state--warning{
+    border-color:#F7D7B8;
+    background:#FFF8F2;
+  }
+
+  .pw-urgency--declared{
+    background:#FFF8F2;
+    border:1px solid #F4D4B6;
+    color:#9A3412;
+  }
+
+  .pw-state--action{
+    border:1px solid #F3D1BC;
+    box-shadow:0 12px 32px rgba(232,119,34,.10);
+  }
+
+  .pw-state__icon{
+    width:52px;
+    height:52px;
+    border-radius:16px;
+    background:#F6F9FC;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:24px;
+    flex-shrink:0;
+  }
+
+  .pw-state__content{
+    flex:1;
+  }
+
+  .pw-state__title{
+    font-size:18px;
+    font-weight:900;
+    color:#1E3A5F;
+  }
+
+  .pw-state__text{
+    margin-top:6px;
+    color:#6B7280;
+    font-size:14px;
+    line-height:1.5;
+  }
+
+  .pw-state__actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  .pw-state__actions--stack{
+    min-width:280px;
+    flex-direction:column;
+    align-items:stretch;
+  }
+
+  .pw-inline-form{
+    margin:0;
+  }
+
+  .pw-inline-form--full{
+    width:100%;
+  }
+
+  .pw-payment-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px;
+  }
+
+  .pw-qr-wrap{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:12px;
+    background:#F8FAFC;
+    border:1px dashed #D8E2EE;
+    border-radius:20px;
+    margin-bottom:14px;
+  }
+
+  .pw-qr{
+    width:min(100%, 260px);
+    height:auto;
+    display:block;
+  }
+
+  .pw-meta{
+    display:grid;
+    gap:12px;
+    margin-bottom:14px;
+  }
+
+  .pw-meta__row,
+  .pw-summary__row{
     display:flex;
     justify-content:space-between;
     gap:12px;
-    font-size:13px;
+    align-items:flex-start;
+  }
+
+  .pw-meta__row span,
+  .pw-summary__row span{
     color:#6B7280;
-  }
-  .co-mini-summary__row strong{
-    color:#1E3A5F;
-  }
-  .co-mini-summary__row--total{
-    padding-top:8px;
-    border-top:1px dashed #E8EDF5;
     font-size:14px;
   }
-  .co-mini-summary__row--total strong{
-    color:#E87722;
+
+  .pw-meta__row strong,
+  .pw-summary__row strong{
+    color:#1E3A5F;
+    text-align:right;
   }
+
+  .pw-summary{
+    display:grid;
+    gap:12px;
+  }
+
+  .pw-summary__row--total{
+    padding-top:12px;
+    border-top:1px dashed #E8EDF5;
+    font-size:15px;
+  }
+
+  .pw-summary__row--total strong{
+    color:#E87722;
+    font-size:18px;
+  }
+
+  .pw-timeline{
+    display:grid;
+    gap:14px;
+  }
+
+  .pw-timeline__item{
+    display:grid;
+    grid-template-columns:14px 1fr;
+    gap:12px;
+    align-items:start;
+  }
+
+  .pw-timeline__dot{
+    width:10px;
+    height:10px;
+    border-radius:999px;
+    background:#E87722;
+    margin-top:6px;
+  }
+
+  .pw-actions-stack{
+    display:grid;
+    gap:10px;
+  }
+
+  .pw-btn{
+    appearance:none;
+    border:none;
+    border-radius:16px;
+    padding:14px 16px;
+    font-weight:800;
+    font-size:14px;
+    text-decoration:none;
+    cursor:pointer;
+    display:inline-flex;
+    justify-content:center;
+    align-items:center;
+    gap:8px;
+    transition:.2s ease;
+  }
+
+  .pw-btn--wave{
+    background:linear-gradient(90deg, #E9A94B 0%, #E87722 100%);
+    color:#fff;
+    box-shadow:0 10px 25px rgba(232,119,34,.25);
+  }
+
+  .pw-btn--xl{
+    min-height:56px;
+    font-size:16px;
+    font-weight:900;
+  }
+
+  .pw-btn--ghost{
+    background:#fff;
+    border:2px solid #E87722;
+    color:#E87722;
+    font-weight:700;
+  }
+
+  .pw-btn--dark{
+    background:#1E3A5F;
+    color:#fff;
+  }
+
+  .pw-btn--full{
+    width:100%;
+  }
+
+  .pw-note{
+    margin-top:14px;
+    border-radius:16px;
+    padding:14px 16px;
+    font-size:13px;
+    line-height:1.6;
+  }
+
+  .pw-note--warn{
+    background:#FFF8F2;
+    border:1px solid #F4D4B6;
+    color:#9A3412;
+  }
+
+  .pw-note--soft{
+    background:#F8FAFC;
+    border:1px solid #E8EDF5;
+    color:#475569;
+  }
+
+  .pw-hidden-copy{
+    display:none;
+  }
+
+  .pw-trust-text{
+    text-align:center;
+    font-size:12px;
+    color:#6B7280;
+    margin-top:2px;
+    font-weight:700;
+  }
+
+  .pw-separator{
+    text-align:center;
+    margin:4px 0 2px;
+    color:#9CA3AF;
+    font-weight:700;
+    font-size:13px;
+  }
+
+  .pw-urgency{
+    margin:14px 0 18px;
+    padding:12px 14px;
+    border-radius:14px;
+    background:#FFF8F2;
+    border:1px solid #F4D4B6;
+    color:#9A3412;
+    font-size:13px;
+    font-weight:800;
+    text-align:center;
+  }
+
+  .pw-reassurance{
+    display:flex;
+    justify-content:center;
+    gap:14px;
+    flex-wrap:wrap;
+    font-size:12px;
+    color:#6B7280;
+    margin-top:10px;
+    font-weight:700;
+  }
+
+  .pw-pay-hint{
+    text-align:center;
+    font-size:12px;
+    color:#6B7280;
+    margin-top:6px;
+    font-weight:700;
+  }
+
+  .pw-steps{
+    display:grid;
+    gap:8px;
+    margin-top:10px;
+    font-size:13px;
+    color:#1E3A5F;
+    font-weight:700;
+  }
+
+  .pw-step{
+    background:#F8FAFC;
+    border:1px solid #E8EDF5;
+    padding:10px 12px;
+    border-radius:12px;
+  }
+
+  @media (max-width: 960px){
+    .pw-hero,
+    .pw-layout,
+    .pw-payment-grid{
+      grid-template-columns:1fr;
+    }
+
+    .pw-title{
+      font-size:26px;
+    }
+
+    .pw-state{
+      flex-direction:column;
+      align-items:flex-start;
+    }
+
+    .pw-state__actions,
+    .pw-state__actions--stack{
+      width:100%;
+      min-width:0;
+    }
+
+    .pw-state__actions .pw-btn{
+      width:100%;
+    }
+  }
+
+  .pw-wallet-box{
+    margin:16px 0 20px;
+    padding:16px;
+    border-radius:18px;
+    border:1px solid #E87722;
+    background:#FFF8F2;
+  }
+  .pw-wallet-title{
+    font-size:15px;
+    font-weight:1000;
+    color:#1E3A5F;
+  }
+  .pw-wallet-lines{
+    margin-top:8px;
+    display:grid;
+    gap:6px;
+    font-size:13px;
+    line-height:1.5;
+    color:#475569;
+    font-weight:700;
+  }
+  .pw-wallet-ok{
+    margin-top:10px;
+    padding:10px 12px;
+    border-radius:14px;
+    background:#ECFDF3;
+    border:1px solid #86EFAC;
+    color:#166534;
+    font-size:13px;
+    font-weight:800;
+  }
+  .pw-wallet-form{
+    margin-top:12px;
+  }
+  .pw-wallet-btn{
+    min-height:46px;
+    padding:0 18px;
+    border:0;
+    border-radius:999px;
+    background:#E87722;
+    color:#fff;
+    font-weight:900;
+    font-size:13px;
+    box-shadow:0 10px 24px rgba(232,119,34,.22);
+    cursor:pointer;
+  }
+
 </style>
 
-<!-- WAVE_PAID_BTN_GUARD_OK -->
+
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-  const forms = Array.from(document.querySelectorAll("form"));
-  let paidForm = null;
-  for (const f of forms) {
-    const hasCsrf = !!f.querySelector('input[name="csrfmiddlewaretoken"]');
-    const hasSubmit = !!f.querySelector('button[type="submit"], input[type="submit"]');
-    if (hasCsrf && hasSubmit) { paidForm = f; break; }
-  }
-  if (!paidForm) return;
-  const btn = paidForm.querySelector('button[type="submit"], input[type="submit"]');
-  if (!btn) return;
-  let locked = false;
-  paidForm.addEventListener("submit", function(e) {
-    if (locked) { e.preventDefault(); return false; }
-    locked = true;
-    if (btn.tagName.toLowerCase() === "button") {
-      btn.disabled = true;
-      btn.textContent = "Vérification en cours…";
-      btn.style.opacity = "0.75";
-    } else {
-      btn.disabled = true;
-      btn.value = "Vérification en cours…";
-      btn.style.opacity = "0.75";
+(function(){
+
+  async function copyText(txt){
+    if(!txt) return false;
+    try{
+      await navigator.clipboard.writeText(txt);
+      return true;
+    }catch(e){
+      return false;
     }
-  }, { passive: false });
-});
+  }
+
+  document.addEventListener("click", async function(e){
+    const btn = e.target.closest("[data-copy]");
+    if(!btn) return;
+
+    const selector = btn.getAttribute("data-copy");
+    const el = selector ? document.querySelector(selector) : null;
+    const txt = el ? (el.textContent || "").trim() : "";
+
+    if(!txt){
+      alert("❌ Rien à copier.");
+      return;
+    }
+
+    const ok = await copyText(txt);
+    if(ok){
+      alert("✅ Copié.");
+    }else{
+      prompt("Copie ce texte :", txt);
+    }
+  });
+
+  // bouton wallet sécurisé
+  const walletForm = document.querySelector("[data-wallet-form]");
+  const walletBtn = document.querySelector("[data-wallet-btn]");
+
+  if(walletForm && walletBtn){
+    walletForm.addEventListener("submit", function(){
+      if(walletBtn.disabled) return;
+      walletBtn.disabled = true;
+      walletBtn.textContent = "Traitement...";
+      walletBtn.style.opacity = "0.7";
+      walletBtn.style.cursor = "not-allowed";
+    });
+  }
+
+  // bouton "j'ai payé"
+  const paidBtn = document.getElementById("btnWavePaid");
+  if(paidBtn){
+    paidBtn.addEventListener("click", function(){
+      paidBtn.disabled = true;
+      paidBtn.textContent = "Déclaration en cours...";
+      const form = paidBtn.closest("form");
+      if(form){ form.submit(); }
+    });
+  }
+
+})();
 </script>
+
 {% endblock %}

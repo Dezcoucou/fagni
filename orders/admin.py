@@ -492,16 +492,26 @@ class DeliveryLegAdmin(UnfoldModelAdmin):
 
 @admin.register(Order)
 class OrderAdmin(UnfoldModelAdmin):
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+
+        # 🔒 CLEAN FIX UNFOLD (corrige crash root cause)
+        for name, (func, code, desc) in actions.items():
+            if hasattr(func, "attrs"):
+                if not isinstance(func.attrs, dict):
+                    func.attrs = {}
+
+        return actions
+
     # 🔒 TEMP FIX UNFOLD — désactive les boutons submit_line qui crashent
     change_form_show_cancel_button = False
     show_full_result_count = False
     def render_change_form(self, request, context, *args, **kwargs):
-        # 🔒 TEMP FIX UNFOLD — évite le crash submit_line sur la page change
-        context["actions_submit_line"] = []
-        context["show_save"] = False
-        context["show_save_and_continue"] = False
+        # On garde les boutons Django standards via templates/admin/submit_line.html
+        context["show_save"] = True
+        context["show_save_and_continue"] = True
         context["show_save_and_add_another"] = False
-        context["show_delete"] = False
         return super().render_change_form(request, context, *args, **kwargs)
 
     list_display = (
@@ -563,6 +573,9 @@ class OrderAdmin(UnfoldModelAdmin):
         "admin_catchup_driver_payout_legs",
         "admin_run_v2_flow",
         "admin_run_v2_flow_with_incident",
+        "mark_payment_declared",
+        "mark_payment_verified",
+        "reject_payment_declared",
     )
 
     def get_readonly_fields(self, request, obj=None):
@@ -581,6 +594,115 @@ class OrderAdmin(UnfoldModelAdmin):
             super().save_model(request, obj, form, change)
         except ValidationError as e:
             self.message_user(request, "❌ " + "; ".join(e.messages), level=messages.ERROR)
+
+    @admin.action(description="Marquer comme paiement déclaré")
+    def mark_payment_declared(self, request, queryset):
+        updated = 0
+        for obj in queryset:
+            fields = []
+
+            if getattr(obj, "payment_status", None) != "declared":
+                obj.payment_status = "declared"
+                fields.append("payment_status")
+
+            if getattr(obj, "payment_verification_status", None) != "pending_review":
+                obj.payment_verification_status = "pending_review"
+                fields.append("payment_verification_status")
+
+            if not getattr(obj, "payment_declared_at", None):
+                obj.payment_declared_at = timezone.now()
+                fields.append("payment_declared_at")
+
+            if not getattr(obj, "payment_declared_channel", ""):
+                obj.payment_declared_channel = "admin"
+                fields.append("payment_declared_channel")
+
+            if fields:
+                obj.save(update_fields=list(dict.fromkeys(fields)))
+                updated += 1
+
+        self.message_user(request, f"{updated} commande(s) marquée(s) comme paiement déclaré.")
+
+    @admin.action(description="Marquer comme paiement vérifié")
+    def mark_payment_verified(self, request, queryset):
+        from decimal import Decimal
+        from orders.views import build_order_finance_summary, apply_order_payment
+
+        updated = 0
+
+        for obj in queryset:
+            try:
+                fs = build_order_finance_summary(obj)
+                total = Decimal(str(fs.get("total_client_ttc", 0) or 0))
+                paid = Decimal(str(getattr(obj, "amount_paid", 0) or 0))
+                remaining = total - paid
+
+                if remaining > 0:
+                    apply_order_payment(
+                        obj,
+                        remaining,
+                        channel="admin",
+                        reference=f"ADMIN-VERIFY-{obj.id}",
+                        note="Validation paiement depuis admin",
+                    )
+
+                obj.refresh_from_db()
+
+                fields = []
+
+                if getattr(obj, "payment_verification_status", None) != "verified":
+                    obj.payment_verification_status = "verified"
+                    fields.append("payment_verification_status")
+
+                if not getattr(obj, "payment_declared_at", None):
+                    obj.payment_declared_at = timezone.now()
+                    fields.append("payment_declared_at")
+
+                obj.payment_verified_at = timezone.now()
+                fields.append("payment_verified_at")
+
+                if getattr(obj, "payment_verified_by_id", None) != getattr(request.user, "id", None):
+                    obj.payment_verified_by = request.user
+                    fields.append("payment_verified_by")
+
+                if fields:
+                    obj.save(update_fields=list(dict.fromkeys(fields)))
+
+                updated += 1
+
+            except Exception as e:
+                self.message_user(request, f"Erreur commande {getattr(obj, 'id', '?')} : {e}", level=messages.ERROR)
+
+        self.message_user(request, f"{updated} commande(s) marquée(s) comme paiement vérifié.")
+
+    @admin.action(description="Rejeter la déclaration de paiement")
+    def reject_payment_declared(self, request, queryset):
+        updated = 0
+
+        for obj in queryset:
+            fields = []
+
+            if getattr(obj, "payment_verification_status", None) != "rejected":
+                obj.payment_verification_status = "rejected"
+                fields.append("payment_verification_status")
+
+            if getattr(obj, "payment_status", None) != "paid" and getattr(obj, "payment_status", None) != "pending":
+                obj.payment_status = "pending"
+                fields.append("payment_status")
+
+            if getattr(obj, "payment_verified_by_id", None):
+                obj.payment_verified_by = None
+                fields.append("payment_verified_by")
+
+            if getattr(obj, "payment_verified_at", None):
+                obj.payment_verified_at = None
+                fields.append("payment_verified_at")
+
+            if fields:
+                obj.save(update_fields=list(dict.fromkeys(fields)))
+                updated += 1
+
+        self.message_user(request, f"{updated} déclaration(s) de paiement rejetée(s).")
 
     # ============================================================
     #  ACTIONS
@@ -1323,170 +1445,6 @@ try:
             ))
             OrderAdmin.fieldsets = tuple(fieldsets)
 
-    print("PATCH ADMIN BLOC A OK")
 except NameError:
     print("OrderAdmin introuvable dans orders/admin.py")
     raise
-
-
-
-# === PAYMENT REVIEW ACTIONS AUTO PATCH ===
-from django.utils import timezone
-
-def _action_mark_payment_declared(self, request, queryset):
-    updated = 0
-    for obj in queryset:
-        changed = False
-
-        if getattr(obj, "payment_status", None) != "declared":
-            obj.payment_status = "declared"
-            changed = True
-
-        if getattr(obj, "payment_verification_status", None) != "pending_review":
-            obj.payment_verification_status = "pending_review"
-            changed = True
-
-        if not getattr(obj, "payment_declared_at", None):
-            obj.payment_declared_at = timezone.now()
-            changed = True
-
-        if not getattr(obj, "payment_declared_channel", ""):
-            obj.payment_declared_channel = "admin"
-            changed = True
-
-        if changed:
-            fields = [
-                "payment_status",
-                "payment_verification_status",
-                "payment_declared_at",
-                "payment_declared_channel",
-            ]
-            obj.save(update_fields=fields)
-            updated += 1
-
-    self.message_user(request, f"{updated} commande(s) marquée(s) comme paiement déclaré.")
-_action_mark_payment_declared.short_description = "Marquer comme paiement déclaré"
-
-def _action_mark_payment_verified(self, request, queryset):
-    updated = 0
-    for obj in queryset:
-        changed = False
-
-        if getattr(obj, "payment_status", None) != "paid":
-            obj.payment_status = "paid"
-            changed = True
-
-        if getattr(obj, "payment_verification_status", None) != "verified":
-            obj.payment_verification_status = "verified"
-            changed = True
-
-        if not getattr(obj, "payment_declared_at", None):
-            obj.payment_declared_at = timezone.now()
-            changed = True
-
-        if not getattr(obj, "payment_verified_at", None):
-            obj.payment_verified_at = timezone.now()
-            changed = True
-        else:
-            obj.payment_verified_at = timezone.now()
-            changed = True
-
-        if getattr(obj, "payment_verified_by_id", None) != getattr(request.user, "id", None):
-            obj.payment_verified_by = request.user
-            changed = True
-
-        # Cohérence minimale avec ancien moteur
-        try:
-            total = getattr(obj, "total_client_ttc", None) or 0
-            if total and getattr(obj, "amount_paid", 0) != total:
-                obj.amount_paid = total
-                changed = True
-        except Exception:
-            pass
-
-        try:
-            if not getattr(obj, "payment_date", None):
-                obj.payment_date = timezone.now()
-                changed = True
-        except Exception:
-            pass
-
-        if changed:
-            fields = [
-                "payment_status",
-                "payment_verification_status",
-                "payment_declared_at",
-                "payment_verified_at",
-                "payment_verified_by",
-            ]
-            if hasattr(obj, "amount_paid"):
-                fields.append("amount_paid")
-            if hasattr(obj, "payment_date"):
-                fields.append("payment_date")
-
-            obj.save(update_fields=list(dict.fromkeys(fields)))
-            updated += 1
-
-    self.message_user(request, f"{updated} commande(s) marquée(s) comme paiement vérifié.")
-_action_mark_payment_verified.short_description = "Marquer comme paiement vérifié"
-
-def _action_reject_payment_declared(self, request, queryset):
-    updated = 0
-    for obj in queryset:
-        changed = False
-
-        if getattr(obj, "payment_verification_status", None) != "rejected":
-            obj.payment_verification_status = "rejected"
-            changed = True
-
-        # Si pas déjà payé, on revient à pending
-        if getattr(obj, "payment_status", None) != "paid":
-            if getattr(obj, "payment_status", None) != "pending":
-                obj.payment_status = "pending"
-                changed = True
-
-        if getattr(obj, "payment_verified_by_id", None):
-            obj.payment_verified_by = None
-            changed = True
-
-        if getattr(obj, "payment_verified_at", None):
-            obj.payment_verified_at = None
-            changed = True
-
-        if changed:
-            obj.save(update_fields=[
-                "payment_status",
-                "payment_verification_status",
-                "payment_verified_by",
-                "payment_verified_at",
-            ])
-            updated += 1
-
-    self.message_user(request, f"{updated} déclaration(s) de paiement rejetée(s).")
-_action_reject_payment_declared.short_description = "Rejeter la déclaration de paiement"
-
-try:
-    if "mark_payment_declared" not in OrderAdmin.__dict__:
-        OrderAdmin.mark_payment_declared = _action_mark_payment_declared
-
-    if "mark_payment_verified" not in OrderAdmin.__dict__:
-        OrderAdmin.mark_payment_verified = _action_mark_payment_verified
-
-    if "reject_payment_declared" not in OrderAdmin.__dict__:
-        OrderAdmin.reject_payment_declared = _action_reject_payment_declared
-
-    existing_actions = list(getattr(OrderAdmin, "actions", ()) or [])
-    for name in [
-        "mark_payment_declared",
-        "mark_payment_verified",
-        "reject_payment_declared",
-    ]:
-        if name not in existing_actions:
-            existing_actions.append(name)
-    OrderAdmin.actions = tuple(existing_actions)
-
-    print("PATCH ADMIN BLOC B OK")
-except NameError:
-    print("OrderAdmin introuvable dans orders/admin.py")
-    raise
-

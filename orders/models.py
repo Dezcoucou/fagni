@@ -2825,26 +2825,40 @@ class Order(models.Model):
 
             # 🔒 PAYMENT GUARD — interdit toute modification directe hors apply_order_payment()
             try:
-                if old and (
-                    getattr(old, "amount_paid", None) != getattr(self, "amount_paid", None)
-                    or getattr(old, "payment_status", None) != getattr(self, "payment_status", None)
-                ):
-                    import inspect
-                    allowed = any(frame.function == "apply_order_payment" for frame in inspect.stack())
-                    if not allowed:
-                        import logging
-                        logger = logging.getLogger("payment_security")
-                        logger.error(
-                            "🚨 PAYMENT_FRAUD_BLOCKED | order_id=%s | old_paid=%s | new_paid=%s | old_status=%s | new_status=%s",
-                            self.pk,
-                            getattr(old, "amount_paid", None),
-                            getattr(self, "amount_paid", None),
-                            getattr(old, "payment_status", None),
-                            getattr(self, "payment_status", None),
-                        )
-                        raise ValidationError({
-                            "payment": "Modification paiement interdite hors apply_order_payment()."
-                        })
+                if old:
+                    old_paid = getattr(old, "amount_paid", None)
+                    new_paid = getattr(self, "amount_paid", None)
+                    old_status = getattr(old, "payment_status", None)
+                    new_status = getattr(self, "payment_status", None)
+
+                    amount_changed = old_paid != new_paid
+                    status_changed = old_status != new_status
+
+                    # ✅ Autoriser les statuts déclaratifs sans toucher au montant
+                    allowed_declarative_statuses = {"declared", "pending", "unpaid"}
+                    declarative_only = (
+                        status_changed
+                        and not amount_changed
+                        and new_status in allowed_declarative_statuses
+                    )
+
+                    if (amount_changed or status_changed) and not declarative_only:
+                        import inspect
+                        allowed = any(frame.function == "apply_order_payment" for frame in inspect.stack())
+                        if not allowed:
+                            import logging
+                            logger = logging.getLogger("payment_security")
+                            logger.error(
+                                "🚨 PAYMENT_FRAUD_BLOCKED | order_id=%s | old_paid=%s | new_paid=%s | old_status=%s | new_status=%s",
+                                self.pk,
+                                old_paid,
+                                new_paid,
+                                old_status,
+                                new_status,
+                            )
+                            raise ValidationError({
+                                "payment": "Modification paiement interdite hors apply_order_payment()."
+                            })
             except ValidationError:
                 raise
             except Exception:

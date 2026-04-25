@@ -6635,6 +6635,10 @@ def client_order_pay_wave_page(request, order_id: int):
 
         key = f"wave_declared_{order.id}"
 
+        payment_reference = (request.POST.get("payment_reference") or "").strip()
+        if action == "declare_wave_paid" and not payment_reference:
+            return redirect(reverse("orders:client_order_pay_wave_page", args=[order.id]) + "?wave=missing_reference")
+
         update_fields = []
 
         if getattr(order, "payment_status", None) != "paid":

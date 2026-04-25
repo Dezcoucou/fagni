@@ -68,6 +68,28 @@
               <button class="pw-btn pw-btn--ghost pw-btn--full" type="button" data-copy="#wavePhone">
                 Copier le numéro Wave
               </button>
+
+              <div class="pw-note pw-note--soft">
+                ⚠️ Code à mettre dans le paiement Wave :
+                <strong>FAGNI-{{ order.code|default:order.id }}</strong>
+              </div>
+
+              <form method="post" class="pw-declare-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="declare_wave_paid">
+
+                <input
+                  type="text"
+                  name="payment_reference"
+                  required
+                  placeholder="Référence Wave ou code transaction"
+                  style="width:100%;padding:14px 16px;border:1px solid #E8EDF5;border-radius:14px;margin:10px 0;font-weight:700;"
+                >
+
+                <button class="pw-btn pw-btn--dark pw-btn--full" type="submit">
+                  J’ai payé avec Wave
+                </button>
+              </form>
             </div>
 
             <div class="pw-note pw-note--soft">

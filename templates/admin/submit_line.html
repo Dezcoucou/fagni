@@ -1,0 +1,18 @@
+{% load i18n admin_urls %}
+
+<div class="submit-row" id="submit-row" style="padding:16px;display:flex;gap:10px;justify-content:flex-end;background:#fff;border-top:1px solid #ddd;">
+  {% if show_delete_link and original %}
+    {% url opts|admin_urlname:'delete' original.pk|admin_urlquote as delete_url %}
+    <a href="{{ delete_url }}" class="deletelink" style="margin-right:auto;color:#b91c1c;">
+      {% trans "Delete" %}
+    </a>
+  {% endif %}
+
+  {% if show_save_and_continue %}
+    <input type="submit" value="{% trans 'Save and continue editing' %}" name="_continue">
+  {% endif %}
+
+  {% if show_save %}
+    <input type="submit" value="{% trans 'Save' %}" class="default" name="_save">
+  {% endif %}
+</div>

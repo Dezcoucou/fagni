@@ -492,6 +492,18 @@ class DeliveryLegAdmin(UnfoldModelAdmin):
 
 @admin.register(Order)
 class OrderAdmin(UnfoldModelAdmin):
+    # 🔒 TEMP FIX UNFOLD — désactive les boutons submit_line qui crashent
+    change_form_show_cancel_button = False
+    show_full_result_count = False
+    def render_change_form(self, request, context, *args, **kwargs):
+        # 🔒 TEMP FIX UNFOLD — évite le crash submit_line sur la page change
+        context["actions_submit_line"] = []
+        context["show_save"] = False
+        context["show_save_and_continue"] = False
+        context["show_save_and_add_another"] = False
+        context["show_delete"] = False
+        return super().render_change_form(request, context, *args, **kwargs)
+
     list_display = (
         "code",
         "customer",

@@ -507,3 +507,8 @@ body { font-family: 'DM Sans', -apple-system, sans-serif !important; }
   .fhome__services-grid { grid-template-columns:repeat(3,1fr); }
   .fhome__fab { display:none; }
 }
+
+/* Force 2 colonnes services comme prototype */
+.fhome__services-grid {
+  grid-template-columns: 1fr 1fr !important;
+}

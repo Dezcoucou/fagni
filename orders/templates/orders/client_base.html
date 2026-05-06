@@ -1,10 +1,41 @@
 {% extends "base.html" %}
 {% load static %}
-{# Base Client : centralise le CSS + la topbar côté client #}
+
 {% block page_css %}
   {{ block.super }}
   <link rel="stylesheet" href="{% static 'css/client_app.css' %}">
+  <link rel="stylesheet" href="{% static 'css/client_premium.css' %}">
 {% endblock %}
+
 {% block topbar %}
   {% include "orders/_client_topbar.html" %}
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<nav class="client-bottom-nav" aria-label="Navigation client">
+  <a href="{% url 'orders:client_home' %}"
+     class="client-bottom-nav__item {% block nav_home %}{% endblock %}">
+    <span class="client-bottom-nav__icon">🏠</span>
+    <span>Accueil</span>
+  </a>
+  <a href="#recent-orders"
+     class="client-bottom-nav__item {% block nav_orders %}{% endblock %}">
+    <span class="client-bottom-nav__icon">📦</span>
+    <span>Commandes</span>
+  </a>
+  <div class="client-bottom-nav__fab">
+    <a href="{% url 'orders:client_new_order' %}" aria-label="Nouvelle commande">＋</a>
+  </div>
+  <a href="{% url 'orders:client_wallet' %}"
+     class="client-bottom-nav__item {% block nav_wallet %}{% endblock %}">
+    <span class="client-bottom-nav__icon">💼</span>
+    <span>Wallet</span>
+  </a>
+  <a href="https://wa.me/TON_NUMERO" target="_blank" rel="noopener"
+     class="client-bottom-nav__item">
+    <span class="client-bottom-nav__icon">💬</span>
+    <span>Support</span>
+  </a>
+</nav>
 {% endblock %}

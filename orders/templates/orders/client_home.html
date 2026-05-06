@@ -609,122 +609,130 @@
 {% endblock %}
 
 {% block content %}
-<div class="client-home-v2">
+<div class="fhome">
 
-{# HERO — personnalisé avec données réelles #}
-<section class="hero-v2">
-  <div class="hero-v2__content">
-    <div class="hero-v2__eyebrow">
-      {% if customer %}Bonjour, {{ customer.name|title }} 👋{% else %}Bienvenue sur FAGNI{% endif %}
-    </div>
-    <h1 class="hero-v2__title">
-      Collecte, traitement
-      <span>livraison à domicile</span>
+<div class="fhome__header">
+  <div>
+    <p class="fhome__greeting">Bonjour 👋</p>
+    <h1 class="fhome__name">
+      {% if customer %}{{ customer.name|title|truncatewords:1 }}{% else %}FAGNI{% endif %}
+      <span>✦</span>
     </h1>
-    <p class="hero-v2__text">
-      FAGNI prend en charge ton pressing et ta cordonnerie —
-      collectés chez toi, traités par nos partenaires vérifiés, livrés propres.
-    </p>
-    <div class="hero-v2__actions">
-      <a href="{% url 'orders:client_new_order' %}" class="btn-main-v2">+ Nouvelle commande</a>
-      <a href="#recent-orders" class="btn-alt-v2">Mes commandes</a>
+  </div>
+  <div class="fhome__header-right">
+    <div class="fhome__score">
+      🪙 <span>{{ orders_count_all|default:"0" }} cmde{{ orders_count_all|pluralize }}</span>
     </div>
-    <div class="hero-v2__trust">
-      <span>✓ Partenaires vérifiés</span>
-      <span>✓ Collecte à domicile</span>
-      <span>✓ Paiement Wave sécurisé</span>
+    <div class="fhome__avatar">
+      {% if customer %}{{ customer.name|first|upper }}{% else %}F{% endif %}
     </div>
   </div>
-</section>
+</div>
 
-{# KPIs — données réelles uniquement #}
-<section class="kpis-v2">
-  <div class="kpi-v2">
-    <strong>{{ orders_count_all|default:"0" }}</strong>
-    <small>Commande{{ orders_count_all|pluralize }}</small>
+<a href="{% url 'orders:client_wallet' %}" class="fhome__wallet">
+  <p class="fhome__wallet-label">FAGNI PAY • SOLDE</p>
+  <p class="fhome__wallet-balance">{{ wallet_balance|floatformat:0|default:"0" }} <span>FCFA</span></p>
+  <div class="fhome__wallet-actions">
+    <div class="fhome__wallet-action"><div class="fhome__wallet-action-btn">💸</div><span>Recharger</span></div>
+    <div class="fhome__wallet-action"><div class="fhome__wallet-action-btn">↗</div><span>Payer</span></div>
+    <div class="fhome__wallet-action"><div class="fhome__wallet-action-btn">🎁</div><span>Cashback</span></div>
   </div>
-  <div class="kpi-v2">
-    <strong>{{ active_orders_count|default:"0" }}</strong>
-    <small>En cours</small>
-  </div>
-  <div class="kpi-v2">
-    {% if wallet_balance %}
-      <strong>{{ wallet_balance|floatformat:0 }}</strong>
-      <small>FCFA wallet</small>
-    {% else %}
-      <strong>Wave</strong>
-      <small>Paiement sécurisé</small>
-    {% endif %}
-  </div>
-</section>
+</a>
 
-{# ALERTE IMPAYÉES — uniquement si unpaid_orders_count > 0 #}
+{% with first=orders.0 %}
+{% if first and first.status != 'completed' and first.status != 'ready' %}
+<a href="{% url 'orders:client_order_detail' first.id %}" class="fhome__active-order">
+  <div class="fhome__active-order-icon">🧺</div>
+  <div class="fhome__active-order-info">
+    <div class="fhome__active-order-row">
+      <p class="fhome__active-order-title">Commande {{ first.code|default:first.id }} en cours</p>
+      <span class="fhome__active-order-badge">EN COURS</span>
+    </div>
+    <p class="fhome__active-order-sub">{{ first.service_type|default:"FAGNI"|capfirst }}</p>
+  </div>
+  <span class="fhome__active-order-arrow">›</span>
+</a>
+{% endif %}
+{% endwith %}
+
 {% if unpaid_orders_count > 0 %}
-<div class="wallet-boost-banner" style="background:#FEF2F2;border-color:#DC2626;">
-  ⚠️ Tu as
-  <strong style="color:#DC2626;">
-    {{ unpaid_orders_count }} commande{{ unpaid_orders_count|pluralize }} non payée{{ unpaid_orders_count|pluralize }}
-  </strong>
-  en attente de paiement.
-  <a href="#recent-orders" class="wallet-boost-btn" style="background:#DC2626;">Payer maintenant</a>
+<div class="fhome__promo" style="border-color:rgba(220,38,38,0.4);background:rgba(220,38,38,0.08);">
+  <span class="fhome__promo-emoji">⚠️</span>
+  <div>
+    <p class="fhome__promo-title" style="color:#fca5a5;">{{ unpaid_orders_count }} commande{{ unpaid_orders_count|pluralize }} non payée{{ unpaid_orders_count|pluralize }}</p>
+    <p class="fhome__promo-sub">Règle ta situation pour continuer</p>
+  </div>
 </div>
 {% endif %}
 
-{# WALLET BOOST — uniquement si solde réel > 0 #}
-{% if wallet_balance > 0 %}
-<div class="wallet-boost-banner">
-  🎉 Tu as <span class="wallet-boost-amount">{{ wallet_balance|floatformat:0 }} FCFA</span> disponible !
-  <a href="{% url 'orders:client_new_order' %}" class="wallet-boost-btn">Utiliser maintenant</a>
+<div class="fhome__promo">
+  <span class="fhome__promo-emoji">🎁</span>
+  <div>
+    <p class="fhome__promo-title">-30% sur ta 1ère commande</p>
+    <p class="fhome__promo-sub">Code <strong>FAGNI30</strong> • Valable 7 jours</p>
+  </div>
 </div>
-{% endif %}
 
-{# ACTIONS RAPIDES #}
-<section class="quick-actions-v2">
-  <div class="section-head-v2">
-    <div>
-      <div class="section-kicker-v2">Actions rapides</div>
-      <h2>Accède à l'essentiel</h2>
+<div>
+  <div class="fhome__section-head">
+    <h2>Nos Services</h2>
+    <span class="fhome__section-tag">Collecte → Traitement → Livraison</span>
+  </div>
+  <div class="fhome__services-grid">
+    <a href="{% url 'orders:client_new_order' %}" class="fhome__service fhome__service--active" style="--sc:#2B5BA8">
+      <div class="fhome__service-bar"></div>
+      <span class="fhome__service-emoji">🧺</span>
+      <span class="fhome__service-name">Pressing</span>
+      <span class="fhome__service-sub">Lavage & Repassage</span>
+      <span class="fhome__service-price">Dès 3 500 FCFA →</span>
+    </a>
+    <a href="{% url 'orders:client_new_order' %}" class="fhome__service fhome__service--active" style="--sc:#E07020">
+      <div class="fhome__service-bar"></div>
+      <span class="fhome__service-emoji">👟</span>
+      <span class="fhome__service-name">Cordonnerie</span>
+      <span class="fhome__service-sub">Réparation chaussures</span>
+      <span class="fhome__service-price">Dès 2 000 FCFA →</span>
+    </a>
+    <div class="fhome__service fhome__service--soon">
+      <span class="fhome__service-emoji">🧹</span>
+      <span class="fhome__service-name">Ménage</span>
+      <span class="fhome__service-sub">Nettoyage domicile</span>
+      <span class="fhome__service-soon">Bientôt</span>
+    </div>
+    <div class="fhome__service fhome__service--soon">
+      <span class="fhome__service-emoji">🧵</span>
+      <span class="fhome__service-name">Retouche</span>
+      <span class="fhome__service-sub">Couture & réparation</span>
+      <span class="fhome__service-soon">Bientôt</span>
+    </div>
+    <div class="fhome__service fhome__service--soon">
+      <span class="fhome__service-emoji">💈</span>
+      <span class="fhome__service-name">Coiffure</span>
+      <span class="fhome__service-sub">À domicile</span>
+      <span class="fhome__service-soon">Bientôt</span>
+    </div>
+    <div class="fhome__service fhome__service--soon">
+      <span class="fhome__service-emoji">🛒</span>
+      <span class="fhome__service-name">Courses</span>
+      <span class="fhome__service-sub">Livraison marché</span>
+      <span class="fhome__service-soon">Bientôt</span>
     </div>
   </div>
-  <div class="quick-grid-v2">
-    <a href="{% url 'orders:client_new_order' %}" class="quick-card-v2">
-      <div class="quick-card-v2__icon">＋</div>
-      <div>
-        <strong>Nouvelle commande</strong>
-        <p>Créer une nouvelle demande rapidement</p>
-      </div>
-    </a>
-    <a href="#recent-orders" class="quick-card-v2">
-      <div class="quick-card-v2__icon">📦</div>
-      <div>
-        <strong>Mes commandes</strong>
-        <p>{% if orders_count_all %}{{ orders_count_all }} commande{{ orders_count_all|pluralize }} au total{% else %}Voir l'état et les détails{% endif %}</p>
-      </div>
-    </a>
-    <a href="{% url 'orders:client_wallet' %}" class="quick-card-v2">
-      <div class="quick-card-v2__icon">💼</div>
-      <div>
-        <strong>Mon wallet</strong>
-        <p>{% if wallet_balance %}{{ wallet_balance|floatformat:0 }} FCFA disponibles{% else %}Suivre paiements et mouvements{% endif %}</p>
-      </div>
-    </a>
-    <a href="https://wa.me/TON_NUMERO" target="_blank" rel="noopener" class="quick-card-v2">
-      <div class="quick-card-v2__icon">💬</div>
-      <div>
-        <strong>Support WhatsApp</strong>
-        <p>Un problème ? On répond rapidement</p>
-      </div>
-    </a>
-  </div>
-</section>
+</div>
 
-{# COMMANDES RÉCENTES — données réelles #}
-<section class="recent-orders-v2" id="recent-orders">
-  <div class="section-head-v2">
-    <div>
-      <div class="section-kicker-v2">Commandes</div>
-      <h2>Mes commandes récentes</h2>
-    </div>
+<a href="https://wa.me/TON_NUMERO" target="_blank" rel="noopener" class="fhome__wa">
+  <span class="fhome__wa-icon">💬</span>
+  <div>
+    <p class="fhome__wa-title">Commander via WhatsApp</p>
+    <p class="fhome__wa-sub">Réponse en moins de 30 min · 7j/7</p>
+  </div>
+  <span class="fhome__wa-arrow">›</span>
+</a>
+
+<div id="recent-orders">
+  <div class="fhome__orders-head">
+    <h2>Mes commandes</h2>
+    {% if orders_count_all %}<span style="font-size:11px;color:var(--fp-gris);">{{ orders_count_all }} au total</span>{% endif %}
   </div>
   <div class="orders-stack-v2">
     {% for order in orders %}
@@ -732,43 +740,35 @@
       <div class="order-header-v2">
         <div class="order-main-v2">
           <strong class="order-code-v2">{{ order.code|default:order.id }}</strong>
-          <div class="order-date-v2">
-            {% if order.created_at %}{{ order.created_at|date:"d/m/Y H:i" }}{% else %}—{% endif %}
-          </div>
+          <div class="order-date-v2">{% if order.created_at %}{{ order.created_at|date:"d/m/Y H:i" }}{% else %}—{% endif %}</div>
         </div>
-        <div class="order-status-wrap-v2">
-          <span class="status-badge-v2 {% if order.status == 'completed' or order.status == 'ready' %}ready{% elif order.status == 'pending' or order.status == 'draft' %}pending{% else %}progress{% endif %}">
-            {% if order.status == 'completed' or order.status == 'ready' %}Prêt
-            {% elif order.status == 'pending' or order.status == 'draft' %}En attente
-            {% else %}En cours{% endif %}
-          </span>
-        </div>
+        <span class="status-badge-v2 {% if order.status == 'completed' or order.status == 'ready' %}ready{% elif order.status == 'pending' or order.status == 'draft' %}pending{% else %}progress{% endif %}">
+          {% if order.status == 'completed' or order.status == 'ready' %}Prêt{% elif order.status == 'pending' or order.status == 'draft' %}En attente{% else %}En cours{% endif %}
+        </span>
       </div>
       <div class="order-body-v2">
         <div class="order-col-v2">
           <div class="label-v2">Service</div>
-          <div class="value-v2">{{ order.service_type|default:"Commande FAGNI"|capfirst }}</div>
+          <div class="value-v2">{{ order.service_type|default:"FAGNI"|capfirst }}</div>
         </div>
         <div class="order-col-v2">
           <div class="label-v2">Paiement</div>
           <div class="value-v2">
-            {% if order.payment_status == "paid" %}<span style="color:#177245;font-weight:900;">✓ Payée</span>
-            {% elif order.payment_status == "partial" %}<span style="color:#B65C13;font-weight:900;">Partielle</span>
-            {% else %}<span style="color:#DC2626;font-weight:900;">Non payée</span>{% endif %}
+            {% if order.payment_status == "paid" %}<span style="color:#4ade80;font-weight:700;">✓ Payée</span>
+            {% elif order.payment_status == "partial" %}<span style="color:var(--fp-or);font-weight:700;">Partielle</span>
+            {% else %}<span style="color:#f87171;font-weight:700;">Non payée</span>{% endif %}
           </div>
         </div>
         <div class="order-col-v2 order-total-v2">
           <div class="label-v2">Total</div>
           <div class="value-v2 price-v2">
-            {% if order.total_client_ttc %}{{ order.total_client_ttc|floatformat:0 }}
-            {% elif order.total %}{{ order.total|floatformat:0 }}
-            {% else %}0{% endif %} FCFA
+            {% if order.total_client_ttc %}{{ order.total_client_ttc|floatformat:0 }}{% elif order.total %}{{ order.total|floatformat:0 }}{% else %}0{% endif %} FCFA
           </div>
         </div>
       </div>
       {% if order.pickup_address_short and order.pickup_address_short != '—' %}
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid #E8EDF5;">
-        <span style="font-size:12px;color:#9AA4B2;font-weight:600;">📍 {{ order.pickup_address_short }}</span>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--fp-border);">
+        <span style="font-size:12px;color:var(--fp-gris);font-weight:600;">📍 {{ order.pickup_address_short }}</span>
       </div>
       {% endif %}
       <div class="order-footer-v2">
@@ -776,93 +776,34 @@
           {% if order.payment_status != "paid" %}
             <a href="{% url 'orders:client_order_pay_wave_page' order.id %}" class="btn-pay-v2 full">💳 Payer maintenant</a>
           {% else %}
-            <a href="{% url 'orders:client_order_detail' order.id %}" class="btn-track-v2 full">Suivre la commande →</a>
+            <a href="{% url 'orders:client_order_detail' order.id %}" class="btn-track-v2 full">Suivre →</a>
           {% endif %}
         </div>
       </div>
     </div>
     {% empty %}
     <div class="empty-box-v2">
+      <p style="font-size:48px;margin-bottom:12px;">🧺</p>
       <strong>Aucune commande pour le moment</strong>
-      <p>Crée ta première commande FAGNI — collecte à domicile, livraison garantie.</p>
-      <a href="{% url 'orders:client_new_order' %}" class="btn-main-v2">Créer ma première commande</a>
+      <p>Lance ta première commande FAGNI</p>
+      <a href="{% url 'orders:client_new_order' %}" class="btn-main-v2" style="margin-top:14px;display:inline-flex;">+ Commander maintenant</a>
     </div>
     {% endfor %}
   </div>
-
   {% if is_paginated %}
   <div class="orders-pagination">
-    {% if page_obj.has_previous %}
-      <a class="pg-btn" href="?page={{ page_obj.previous_page_number }}#recent-orders">← Précédent</a>
-    {% else %}
-      <span class="pg-btn pg-btn--disabled">← Précédent</span>
-    {% endif %}
+    {% if page_obj.has_previous %}<a class="pg-btn" href="?page={{ page_obj.previous_page_number }}#recent-orders">← Précédent</a>{% else %}<span class="pg-btn pg-btn--disabled">← Précédent</span>{% endif %}
     <div class="pg-pages">
       <a class="pg-page {% if page_obj.number == 1 %}is-active{% endif %}" href="?page=1#recent-orders">1</a>
       {% if show_left_ellipsis %}<span class="pg-dots">…</span>{% endif %}
-      {% for n in pages %}
-        <a class="pg-page {% if page_obj.number == n %}is-active{% endif %}" href="?page={{ n }}#recent-orders">{{ n }}</a>
-      {% endfor %}
-      {% if page_obj.paginator.num_pages > 1 %}
-        {% if show_right_ellipsis %}<span class="pg-dots">…</span>{% endif %}
-        <a class="pg-page {% if page_obj.number == page_obj.paginator.num_pages %}is-active{% endif %}" href="?page={{ page_obj.paginator.num_pages }}#recent-orders">{{ page_obj.paginator.num_pages }}</a>
-      {% endif %}
+      {% for n in pages %}<a class="pg-page {% if page_obj.number == n %}is-active{% endif %}" href="?page={{ n }}#recent-orders">{{ n }}</a>{% endfor %}
+      {% if page_obj.paginator.num_pages > 1 %}{% if show_right_ellipsis %}<span class="pg-dots">…</span>{% endif %}<a class="pg-page {% if page_obj.number == page_obj.paginator.num_pages %}is-active{% endif %}" href="?page={{ page_obj.paginator.num_pages }}#recent-orders">{{ page_obj.paginator.num_pages }}</a>{% endif %}
     </div>
-    {% if page_obj.has_next %}
-      <a class="pg-btn" href="?page={{ page_obj.next_page_number }}#recent-orders">Suivant →</a>
-    {% else %}
-      <span class="pg-btn pg-btn--disabled">Suivant →</span>
-    {% endif %}
+    {% if page_obj.has_next %}<a class="pg-btn" href="?page={{ page_obj.next_page_number }}#recent-orders">Suivant →</a>{% else %}<span class="pg-btn pg-btn--disabled">Suivant →</span>{% endif %}
   </div>
   {% endif %}
-</section>
-
-{# SERVICES — Pressing + Cordonnerie actifs, autres Bientôt #}
-<section class="services-v2">
-  <div class="section-head-v2">
-    <div>
-      <div class="section-kicker-v2">Services disponibles</div>
-      <h2>Choisis ton service</h2>
-    </div>
-    <a href="{% url 'orders:client_new_order' %}" class="section-link-v2">Commander →</a>
-  </div>
-  <div class="services-grid-v2">
-    <a href="{% url 'orders:client_new_order' %}" class="service-card-v2">
-      <div class="service-card-v2__icon">👔</div>
-      <strong>Pressing</strong>
-      <p>Chemises, pantalons, vêtements du quotidien. Collecte et livraison incluses.</p>
-      <small>✅ Disponible · Délai 48h</small>
-    </a>
-    <a href="{% url 'orders:client_new_order' %}" class="service-card-v2">
-      <div class="service-card-v2__icon">👟</div>
-      <strong>Cordonnerie</strong>
-      <p>Réparation, entretien et restauration de chaussures. Collecte à domicile.</p>
-      <small>✅ Disponible · Sur devis</small>
-    </a>
-    <div class="service-card-v2" style="opacity:.5;cursor:default;pointer-events:none;">
-      <div class="service-card-v2__icon">🧵</div>
-      <strong>Retouche</strong>
-      <p>Ourlets, fermetures, ajustements et réparations textiles.</p>
-      <small>🔜 Bientôt disponible</small>
-    </div>
-    <div class="service-card-v2" style="opacity:.5;cursor:default;pointer-events:none;">
-      <div class="service-card-v2__icon">🧹</div>
-      <strong>Ménage</strong>
-      <p>Nettoyage domicile, surfaces et entretien courant.</p>
-      <small>🔜 Bientôt disponible</small>
-    </div>
-  </div>
-</section>
-
-{# SUPPORT WHATSAPP #}
-<div class="wallet-boost-banner" style="background:#F0FDF4;border-color:#16a34a;">
-  💬 <span style="color:#166534;font-weight:800;">Un problème ? Une question ? On répond sous 30 minutes.</span>
-  <a href="https://wa.me/TON_NUMERO" target="_blank" rel="noopener" class="wallet-boost-btn" style="background:#25D366;">
-    Contacter sur WhatsApp
-  </a>
 </div>
 
-<a href="{% url 'orders:client_new_order' %}" class="floating-cta-v2">+ Commander</a>
-
 </div>
+<a href="{% url 'orders:client_new_order' %}" class="fhome__fab" aria-label="Nouvelle commande">＋</a>
 {% endblock %}

@@ -8,6 +8,9 @@ from .views import wave_webhook
 app_name = "orders"
 
 urlpatterns = [
+    path("admin/payment-review/", views.admin_payment_review, name="admin_payment_review"),
+    path("admin/payment-review/<int:order_id>/confirm/", views.admin_payment_review_confirm, name="admin_payment_review_confirm"),
+    path("admin/payment-review/<int:order_id>/reject/", views.admin_payment_review_reject, name="admin_payment_review_reject"),
 
     path(
         "admin/orders/<int:order_id>/payment/confirm-declared/",

@@ -6636,8 +6636,13 @@ def client_order_pay_wave_page(request, order_id: int):
         key = f"wave_declared_{order.id}"
 
         payment_reference = (request.POST.get("payment_reference") or "").strip()
+        payment_proof = request.FILES.get("payment_proof")
+
         if action == "declare_wave_paid" and not payment_reference:
             return redirect(reverse("orders:client_order_pay_wave_page", args=[order.id]) + "?wave=missing_reference")
+
+        if action == "declare_wave_paid" and not payment_proof and not getattr(order, "payment_proof", None):
+            return redirect(reverse("orders:client_order_pay_wave_page", args=[order.id]) + "?wave=missing_proof")
 
         update_fields = []
 
@@ -6657,6 +6662,21 @@ def client_order_pay_wave_page(request, order_id: int):
             if getattr(order, "payment_declared_channel", "") != "wave":
                 order.payment_declared_channel = "wave"
                 update_fields.append("payment_declared_channel")
+
+            # 🔒 Sauvegarde référence Wave
+            if payment_reference:
+                order.payment_declared_reference = payment_reference
+                update_fields.append("payment_declared_reference")
+
+
+            # 🔒 FIX — sauvegarde stricte de la référence
+            if payment_reference:
+                order.payment_declared_reference = payment_reference
+                update_fields.append("payment_declared_reference")
+
+            if payment_proof and hasattr(order, "payment_proof"):
+                order.payment_proof = payment_proof
+                update_fields.append("payment_proof")
 
             current_ref = (getattr(order, "payment_declared_reference", "") or "").strip()
             if not current_ref:
@@ -13993,6 +14013,8 @@ def laundry_update_status(request, order_id):
     order = get_object_or_404(Order, id=order_id)
 
     action = request.POST.get("action")
+    payment_reference = (request.POST.get("payment_reference") or "").strip()
+
 
     if action == "accept":
         order.status = "accepted"
@@ -14805,3 +14827,96 @@ def wave_webhook(request):
         "payment_status": payment_result["payment_status"],
     })
 
+
+
+from django.contrib.admin.views.decorators import staff_member_required
+
+@staff_member_required
+def admin_payment_review(request):
+    from orders.models import Order
+
+    orders = Order.objects.filter(
+        payment_status="declared",
+        payment_verification_status="pending_review"
+    ).order_by("-payment_declared_at")
+
+    return render(request, "admin/payment_review.html", {
+        "orders": orders
+    })
+
+
+@staff_member_required
+@require_POST
+def admin_payment_review_confirm(request, order_id: int):
+    from decimal import Decimal
+    from django.shortcuts import redirect, get_object_or_404
+    from django.utils import timezone
+    from orders.models import Order
+    from orders.views import build_order_finance_summary, apply_order_payment
+
+    order = get_object_or_404(Order, pk=order_id)
+
+    fs = build_order_finance_summary(order)
+    total = Decimal(str(fs.get("total_client_ttc", 0) or 0))
+    paid = Decimal(str(getattr(order, "amount_paid", 0) or 0))
+    remaining = total - paid
+
+    if remaining > 0:
+        apply_order_payment(
+            order,
+            remaining,
+            channel="wave_ops",
+            reference=getattr(order, "payment_declared_reference", "") or f"ADMIN-WAVE-{order.id}",
+            note="Validation paiement Wave depuis cockpit admin",
+        )
+
+    order.refresh_from_db()
+    update_fields = []
+
+    if getattr(order, "payment_verification_status", None) != "verified":
+        order.payment_verification_status = "verified"
+        update_fields.append("payment_verification_status")
+
+    order.payment_verified_at = timezone.now()
+    update_fields.append("payment_verified_at")
+
+    if getattr(request, "user", None) and request.user.is_authenticated:
+        order.payment_verified_by = request.user
+        update_fields.append("payment_verified_by")
+
+    if update_fields:
+        order.save(update_fields=list(dict.fromkeys(update_fields)))
+
+    return redirect("orders:admin_payment_review")
+
+
+@staff_member_required
+@require_POST
+def admin_payment_review_reject(request, order_id: int):
+    from django.shortcuts import redirect, get_object_or_404
+    from django.utils import timezone
+    from orders.models import Order
+
+    order = get_object_or_404(Order, pk=order_id)
+    update_fields = []
+
+    if getattr(order, "payment_verification_status", None) != "rejected":
+        order.payment_verification_status = "rejected"
+        update_fields.append("payment_verification_status")
+
+    if getattr(order, "payment_status", None) != "paid":
+        order.payment_status = "pending"
+        update_fields.append("payment_status")
+
+    if hasattr(order, "payment_verified_at"):
+        order.payment_verified_at = None
+        update_fields.append("payment_verified_at")
+
+    if hasattr(order, "payment_verified_by"):
+        order.payment_verified_by = None
+        update_fields.append("payment_verified_by")
+
+    if update_fields:
+        order.save(update_fields=list(dict.fromkeys(update_fields)))
+
+    return redirect("orders:admin_payment_review")

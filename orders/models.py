@@ -471,6 +471,32 @@ class Subscription(models.Model):
         verbose_name = "Abonnement"
         verbose_name_plural = "Abonnements"
         ordering = ["-created_at"]
+
+    def payment_trust_score(self):
+        score = 0
+
+        if getattr(self, "payment_declared_reference", ""):
+            score += 1
+
+        if getattr(self, "payment_proof", None):
+            score += 1
+
+        try:
+            if getattr(self, "total_client_ttc", 0) and getattr(self, "payment_status", "") in ("declared", "paid"):
+                score += 1
+        except Exception:
+            pass
+
+        return score
+
+    def payment_trust_label(self):
+        score = self.payment_trust_score()
+        if score >= 3:
+            return "🟢 OK"
+        if score == 2:
+            return "🟡 À vérifier"
+        return "🔴 Risque"
+
     def __str__(self):
         code = None
         try:
@@ -1125,6 +1151,14 @@ class Order(models.Model):
         max_length=120,
         blank=True,
         default="",
+    )
+
+    payment_proof = models.FileField(
+        "Preuve de paiement",
+        upload_to="payment_proofs/",
+        null=True,
+        blank=True,
+        help_text="Capture ou preuve du paiement Wave envoyée par le client.",
     )
 
     amount_paid = models.DecimalField(

@@ -3,6 +3,9 @@
 
 {% block page_css %}
   {{ block.super }}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/client_app.css' %}">
   <link rel="stylesheet" href="{% static 'css/client_premium.css' %}">
 {% endblock %}
@@ -14,26 +17,22 @@
 {% block extra_js %}
 {{ block.super }}
 <nav class="client-bottom-nav" aria-label="Navigation client">
-  <a href="{% url 'orders:client_home' %}"
-     class="client-bottom-nav__item {% block nav_home %}{% endblock %}">
+  <a href="{% url 'orders:client_home' %}" class="client-bottom-nav__item">
     <span class="client-bottom-nav__icon">🏠</span>
     <span>Accueil</span>
   </a>
-  <a href="#recent-orders"
-     class="client-bottom-nav__item {% block nav_orders %}{% endblock %}">
+  <a href="#recent-orders" class="client-bottom-nav__item">
     <span class="client-bottom-nav__icon">📦</span>
     <span>Commandes</span>
   </a>
   <div class="client-bottom-nav__fab">
     <a href="{% url 'orders:client_new_order' %}" aria-label="Nouvelle commande">＋</a>
   </div>
-  <a href="{% url 'orders:client_wallet' %}"
-     class="client-bottom-nav__item {% block nav_wallet %}{% endblock %}">
+  <a href="{% url 'orders:client_wallet' %}" class="client-bottom-nav__item">
     <span class="client-bottom-nav__icon">💼</span>
     <span>Wallet</span>
   </a>
-  <a href="https://wa.me/TON_NUMERO" target="_blank" rel="noopener"
-     class="client-bottom-nav__item">
+  <a href="https://wa.me/2250748643892" target="_blank" rel="noopener" class="client-bottom-nav__item">
     <span class="client-bottom-nav__icon">💬</span>
     <span>Support</span>
   </a>

@@ -1,4 +1,4 @@
-{% extends "orders/client_base.html" %}
+{% extends "orders/client_standalone_base.html" %}
 {% load static %}
 {% load money_filters %}
 
@@ -615,7 +615,7 @@
   <div>
     <p class="fhome__greeting">Bonjour 👋</p>
     <h1 class="fhome__name">
-      {% if customer %}{{ customer.name|title|truncatewords:1 }}{% else %}FAGNI{% endif %}
+      {% if customer %}{{ customer.name|title|truncatewords:1|cut:" ..." }}{% else %}FAGNI{% endif %}
       <span>✦</span>
     </h1>
   </div>
@@ -631,7 +631,7 @@
 
 <a href="{% url 'orders:client_wallet' %}" class="fhome__wallet">
   <p class="fhome__wallet-label">FAGNI PAY • SOLDE</p>
-  <p class="fhome__wallet-balance">{{ wallet_balance|floatformat:0|default:"0" }} <span>FCFA</span></p>
+  <p class="fhome__wallet-balance">{% if wallet_balance >= 0 %}{{ wallet_balance|floatformat:0 }}{% else %}0{% endif %} <span>FCFA</span></p>
   <div class="fhome__wallet-actions">
     <div class="fhome__wallet-action"><div class="fhome__wallet-action-btn">💸</div><span>Recharger</span></div>
     <div class="fhome__wallet-action"><div class="fhome__wallet-action-btn">↗</div><span>Payer</span></div>

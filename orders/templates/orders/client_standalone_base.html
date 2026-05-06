@@ -1,0 +1,102 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}FAGNI{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0A1628">
+  <link rel="icon" href="{% static 'favicon.png' %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/client_app.css' %}">
+  <link rel="stylesheet" href="{% static 'css/client_premium.css' %}">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    img { max-width: 100%; display: block; }
+    html, body { background: #0A1628 !important; color: #FAFAF7; font-family: 'DM Sans', -apple-system, sans-serif; }
+    ::-webkit-scrollbar { display: none; }
+
+    /* ── Topbar standalone ───────────────────────────────── */
+    .fagni-topbar {
+      background: #060D18 !important;
+      color: #f9fafb;
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 1px solid rgba(201,168,76,0.2);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    }
+    .fagni-topbar::after { display: none !important; }
+    .fagni-logo { display:flex; align-items:center; gap:8px; text-decoration:none; color:inherit; }
+    .fagni-logo-mark { width:32px; height:32px; border-radius:10px; overflow:hidden; background:#020617; display:flex; align-items:center; justify-content:center; padding:4px; }
+    .fagni-logo-mark img { width:100%; height:100%; object-fit:contain; }
+    .fagni-logo-text { display:flex; flex-direction:column; line-height:1.1; }
+    .fagni-logo-text-main { font-weight:700; letter-spacing:0.08em; font-size:11px; text-transform:uppercase; color:#f9fafb; }
+    .fagni-logo-text-sub { font-size:10px; color:#C9A84C; }
+    .fagni-topbar-left { display:flex; align-items:center; gap:10px; }
+    .fagni-topbar-right { display:flex; align-items:center; gap:8px; }
+    .fagni-topbar-tag { font-size:10px; padding:3px 10px; border-radius:999px; background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.25); display:inline-flex; align-items:center; gap:4px; color:#C9A84C; text-decoration:none; cursor:pointer; font-family:inherit; }
+    button.fagni-topbar-tag { background:rgba(255,255,255,0.07); border-color:rgba(255,255,255,0.12); color:rgba(250,250,247,0.7); }
+
+    /* ── Shell ───────────────────────────────────────────── */
+    .cs-shell { min-height: 100vh; background: #0A1628; }
+
+    /* ── Flash messages ──────────────────────────────────── */
+    .cs-messages { padding: 12px 16px 0; display:flex; flex-direction:column; gap:8px; }
+    .cs-message { padding:10px 14px; border-radius:14px; font-size:13px; font-weight:500; border:1px solid rgba(255,255,255,0.1); background:rgba(15,30,48,0.8); color:#f8fafc; }
+    .cs-message--success { border-color:rgba(34,197,94,0.4); color:#bbf7d0; }
+    .cs-message--error { border-color:rgba(239,68,68,0.4); color:#fca5a5; }
+    .cs-message--warning { border-color:rgba(245,158,11,0.4); color:#fde68a; }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+  {% block topbar %}
+    {% include "orders/_client_topbar.html" %}
+  {% endblock %}
+
+  <div class="cs-shell">
+    {% if messages %}
+    <div class="cs-messages">
+      {% for message in messages %}
+      <div class="cs-message cs-message--{{ message.tags|default:'info' }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </div>
+
+  {% block extra_js %}
+  <nav class="client-bottom-nav" aria-label="Navigation">
+    <a href="{% url 'orders:client_home' %}" class="client-bottom-nav__item">
+      <span class="client-bottom-nav__icon">🏠</span>
+      <span>Accueil</span>
+    </a>
+    <a href="#recent-orders" class="client-bottom-nav__item">
+      <span class="client-bottom-nav__icon">📦</span>
+      <span>Commandes</span>
+    </a>
+    <div class="client-bottom-nav__fab">
+      <a href="{% url 'orders:client_new_order' %}" aria-label="Nouvelle commande">＋</a>
+    </div>
+    <a href="{% url 'orders:client_wallet' %}" class="client-bottom-nav__item">
+      <span class="client-bottom-nav__icon">💼</span>
+      <span>Wallet</span>
+    </a>
+    <a href="https://wa.me/002250748643892" target="_blank" rel="noopener" class="client-bottom-nav__item">
+      <span class="client-bottom-nav__icon">💬</span>
+      <span>Support</span>
+    </a>
+  </nav>
+  {% endblock %}
+
+</body>
+</html>

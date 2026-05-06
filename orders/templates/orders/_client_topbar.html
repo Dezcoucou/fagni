@@ -1,29 +1,32 @@
 {% load static %}
 <header class="fagni-topbar client-topbar">
   <div class="fagni-topbar-left">
-    <a href="{% url 'orders:client_home' %}" class="fagni-logo" aria-label="Accueil client">
+    <a href="{% url 'orders:client_home' %}" class="fagni-logo" aria-label="Accueil FAGNI">
       <span class="fagni-logo-mark">
         <img src="{% static 'img/fagni_logo_ok.png' %}" alt="FAGNI">
       </span>
       <span class="fagni-logo-text">
         <span class="fagni-logo-text-main">FAGNI</span>
-        <span class="fagni-logo-text-sub">Client</span>
+        <span class="fagni-logo-text-sub" style="color:var(--fp-or,#C9A84C);">Super-App</span>
       </span>
     </a>
-    <span class="fagni-topbar-tag">👤 Client</span>
   </div>
-  <div class="fagni-topbar-right">
-    <a class="fagni-topbar-tag" href="{% url 'orders:client_new_order' %}" style="text-decoration:none;">➕ Créer</a>
+  <div class="fagni-topbar-right" style="display:flex;align-items:center;gap:8px;">
+    <a href="{% url 'orders:client_new_order' %}"
+       style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#C9A84C,#E07020);color:#fff;font-size:11px;font-weight:700;padding:5px 12px;border-radius:50px;text-decoration:none;">
+      ＋ Commander
+    </a>
     {% if phone %}
-      <span class="fagni-topbar-user">
-        <span class="fagni-topbar-tag">📞 {{ phone }}</span>
-      </span>
+      <span class="fagni-topbar-tag" style="font-size:10px;">📞 {{ phone }}</span>
       <form method="post" action="{% url 'orders:client_logout' %}" style="display:inline;">
-  {% csrf_token %}
-  <button type="submit" class="fagni-topbar-tag" style="text-decoration:none;background:transparent;border:0;cursor:pointer;text-decoration:none;">Déconnexion</button>
-</form>
+        {% csrf_token %}
+        <button type="submit"
+                style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);color:rgba(250,250,247,0.7);font-size:10px;padding:4px 10px;border-radius:50px;cursor:pointer;">
+          Déconnexion
+        </button>
+      </form>
     {% else %}
-      <a class="fagni-topbar-tag" href="{% url 'orders:client_login' %}" style="text-decoration:none;">Connexion</a>
+      <a href="{% url 'orders:client_login' %}" class="fagni-topbar-tag">Connexion</a>
     {% endif %}
   </div>
 </header>

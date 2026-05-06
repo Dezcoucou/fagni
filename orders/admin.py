@@ -521,6 +521,7 @@ class OrderAdmin(UnfoldModelAdmin):
         "bag_size_display",
         "status",
         "payment_badge",
+        "payment_trust_badge",
         "invoice_badge",
         "total_client_ttc_display",
         "amount_paid",
@@ -577,6 +578,14 @@ class OrderAdmin(UnfoldModelAdmin):
         "mark_payment_verified",
         "reject_payment_declared",
     )
+
+
+    def payment_trust_badge(self, obj):
+        try:
+            return obj.payment_trust_label()
+        except Exception:
+            return "🔴 Risque"
+    payment_trust_badge.short_description = "Confiance paiement"
 
     def get_readonly_fields(self, request, obj=None):
         ro = list(super().get_readonly_fields(request, obj))
@@ -1390,6 +1399,7 @@ try:
         "payment_declared_at",
         "payment_declared_channel",
         "payment_declared_reference",
+            "payment_proof",
         "payment_verified_at",
         "payment_verified_by",
     ]:

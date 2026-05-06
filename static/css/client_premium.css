@@ -418,7 +418,6 @@ body {
 }
 
 /* ── DM SANS FONT (identique au prototype React) ───────── */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');
 body { font-family: 'DM Sans', -apple-system, sans-serif !important; }
 
 /* ── FHOME — Structure React-style ─────────────────────── */

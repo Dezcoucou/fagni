@@ -19,16 +19,19 @@ BAG_PRICING = {
         "label": "Petit sac",
         "price": Decimal("7000"),
         "estimated_items": 15,
+        "max_weight_kg": 6.0,
     },
     "medium": {
         "label": "Sac moyen",
         "price": Decimal("10000"),
         "estimated_items": 25,
+        "max_weight_kg": 10.0,
     },
     "large": {
         "label": "Grand sac",
         "price": Decimal("14000"),
         "estimated_items": 40,
+        "max_weight_kg": 18.0,
     },
 }
 

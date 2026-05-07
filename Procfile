@@ -1,1 +1,1 @@
-web: gunicorn fagni.wsgi
+web: gunicorn fagni.wsgi:application

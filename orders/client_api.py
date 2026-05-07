@@ -1,0 +1,301 @@
+import jwt
+from decimal import Decimal
+from datetime import datetime, timedelta
+
+from django.conf import settings
+from django.db.models import Sum, F, Value, DecimalField, Q
+from django.db.models.functions import Coalesce, Cast
+
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework.authentication import BaseAuthentication
+from rest_framework.exceptions import AuthenticationFailed
+
+from .models import Order, Customer
+
+
+# ── JWT CUSTOM CLIENT ─────────────────────────────────────
+
+def _make_token(customer):
+    payload = {
+        'cid':   customer.id,
+        'phone': customer.phone,
+        'exp':   datetime.utcnow() + timedelta(days=30),
+        'iat':   datetime.utcnow(),
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
+
+def _read_token(token):
+    try:
+        return jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+    except Exception:
+        return None
+
+class ClientAuth(BaseAuthentication):
+    def authenticate(self, request):
+        header = request.headers.get('Authorization', '')
+        if not header.startswith('Bearer '):
+            return None
+        payload = _read_token(header[7:])
+        if not payload:
+            raise AuthenticationFailed('Token invalide')
+        customer = Customer.objects.filter(id=payload.get('cid')).first()
+        if not customer:
+            raise AuthenticationFailed('Client introuvable')
+        return (customer, header[7:])
+
+
+# ── HELPERS ───────────────────────────────────────────────
+
+def _items_sum_annotation():
+    return Coalesce(
+        Sum(
+            Cast(F("items__quantity"), DecimalField(max_digits=10, decimal_places=2))
+            * Cast(F("items__unit_price"), DecimalField(max_digits=10, decimal_places=2)),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        ),
+        Value(Decimal("0"), output_field=DecimalField(max_digits=12, decimal_places=2)),
+    )
+
+def _order_to_dict(o):
+    total = float(o.total_client_ttc or getattr(o, 'total', 0) or getattr(o, 'items_total', 0) or 0)
+    return {
+        'id':             o.id,
+        'code':           o.code or str(o.id),
+        'status':         o.status,
+        'payment_status': getattr(o, 'payment_status', 'unpaid'),
+        'service_type':   getattr(o, 'service_type', None) or 'FAGNI',
+        'total':          total,
+        'created_at':     o.created_at.isoformat() if o.created_at else None,
+    }
+
+def _wallet_balance(customer):
+    try:
+        from wallets.models import Wallet
+        w = Wallet.objects.filter(customer=customer).first()
+        return float(w.balance or 0) if w else 0.0
+    except Exception:
+        return 0.0
+
+
+# ── ENDPOINTS ─────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_login(request):
+    """POST /api/client/auth/login/ — { phone } → { access, customer }"""
+    phone = (request.data.get('phone') or '').strip()
+    if not phone:
+        return Response({'error': 'Numéro requis'}, status=400)
+    customer = Customer.objects.filter(phone=phone).first()
+    if not customer:
+        return Response({'error': 'Numéro non reconnu'}, status=404)
+    return Response({
+        'access': _make_token(customer),
+        'customer': {'name': customer.name, 'phone': customer.phone},
+    })
+
+
+@api_view(['GET'])
+@authentication_classes([ClientAuth])
+@permission_classes([])
+def api_home(request):
+    """GET /api/client/home/ — données homepage"""
+    customer = request.user
+    qs = (
+        Order.objects.filter(customer=customer)
+        .order_by("-created_at")
+        .annotate(items_total=_items_sum_annotation())
+        .filter(Q(total_client_ttc__gt=0) | Q(items_total__gt=0))
+    )
+    return Response({
+        'customer': {
+            'name':    customer.name,
+            'phone':   customer.phone,
+            'initial': (customer.name or 'F')[0].upper(),
+        },
+        'wallet_balance':      _wallet_balance(customer),
+        'orders_count_all':    qs.count(),
+        'active_orders_count': qs.filter(status__in=['pending', 'in_progress']).count(),
+        'unpaid_orders_count': qs.exclude(payment_status='paid').count(),
+        'recent_orders':       [_order_to_dict(o) for o in qs[:5]],
+    })
+
+
+@api_view(['GET'])
+@authentication_classes([ClientAuth])
+@permission_classes([])
+def api_orders(request):
+    """GET /api/client/orders/?page=1"""
+    customer  = request.user
+    page      = max(1, int(request.GET.get('page', 1)))
+    per_page  = 10
+    qs = (
+        Order.objects.filter(customer=customer)
+        .order_by("-created_at")
+        .annotate(items_total=_items_sum_annotation())
+        .filter(Q(total_client_ttc__gt=0) | Q(items_total__gt=0))
+    )
+    total  = qs.count()
+    start  = (page - 1) * per_page
+    return Response({
+        'count':   total,
+        'page':    page,
+        'pages':   max(1, (total + per_page - 1) // per_page),
+        'results': [_order_to_dict(o) for o in qs[start:start + per_page]],
+    })
+
+
+@api_view(['GET'])
+@authentication_classes([ClientAuth])
+@permission_classes([])
+def api_order_detail(request, order_id):
+    """GET /api/client/orders/<id>/"""
+    customer = request.user
+    order = Order.objects.filter(id=order_id, customer=customer).annotate(
+        items_total=_items_sum_annotation()
+    ).first()
+
+    if not order:
+        return Response({'error': 'Commande introuvable'}, status=404)
+
+    total = float(order.total_client_ttc or getattr(order,'total',0) or order.items_total or 0)
+    amount_paid = float(getattr(order, 'amount_paid', 0) or 0)
+
+    items = []
+    for item in order.items.all():
+        items.append({
+            'id':         item.id,
+            'name':       getattr(item, 'name', None) or getattr(item, 'description', None) or 'Article',
+            'quantity':   float(getattr(item, 'quantity', 1) or 1),
+            'unit_price': float(getattr(item, 'unit_price', 0) or 0),
+        })
+
+    return Response({
+        'id':             order.id,
+        'code':           order.code or str(order.id),
+        'status':         order.status,
+        'payment_status': getattr(order, 'payment_status', 'unpaid'),
+        'service_type':   getattr(order, 'service_type', None) or 'FAGNI',
+        'total':          total,
+        'amount_paid':    amount_paid,
+        'remaining':      max(0, total - amount_paid),
+        'created_at':     order.created_at.isoformat() if order.created_at else None,
+        'items':          items,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_pricing_bags(request):
+    """GET /api/client/pricing/bags/ — tarifs sacs depuis BAG_PRICING"""
+    from orders.utils.pricing import BAG_PRICING
+    bags = [
+        {
+            'id':               key,
+            'label':            val['label'],
+            'price':            int(val['price']),
+            'estimated_items':  val['estimated_items'],
+        }
+        for key, val in BAG_PRICING.items()
+    ]
+    return Response({'bags': bags})
+
+
+@api_view(['POST'])
+@authentication_classes([ClientAuth])
+@permission_classes([])
+def api_create_order(request):
+    """POST /api/client/orders/create/"""
+    from orders.utils.pricing import BAG_PRICING
+    from datetime import date, time as dtime, timedelta
+
+    bag_size      = (request.data.get('bag_size') or '').strip()
+    pickup_addr   = (request.data.get('pickup_address') or '').strip()
+    pickup_lat    = request.data.get('pickup_lat')
+    pickup_lng    = request.data.get('pickup_lng')
+    pickup_slot   = (request.data.get('pickup_slot') or '').strip()
+    articles      = request.data.get('articles', [])
+
+    if bag_size not in BAG_PRICING:
+        return Response({'error': 'Taille de sac invalide'}, status=400)
+
+    customer = request.user
+    today    = date.today()
+
+    slot_map = {
+        'demain_matin':       (today + timedelta(days=1), dtime(8, 0)),
+        'demain_soir':        (today + timedelta(days=1), dtime(14, 0)),
+        'apres_demain_matin': (today + timedelta(days=2), dtime(8, 0)),
+        'apres_demain_soir':  (today + timedelta(days=2), dtime(14, 0)),
+    }
+    pickup_date, pickup_time = slot_map.get(
+        pickup_slot, (today + timedelta(days=1), dtime(8, 0))
+    )
+    delivery_date = pickup_date + timedelta(days=2)
+
+    # Frais FAGNI : 10% avec minimum 500 FCFA
+    bag_price   = int(BAG_PRICING[bag_size]['price'])
+    raw_fee     = int(bag_price * 0.10)
+    service_fee = max(500, raw_fee)
+    total       = bag_price + service_fee
+
+    notes_parts = []
+    if articles:
+        notes_parts.append(f"Articles: {articles}")
+    if pickup_slot:
+        notes_parts.append(f"Creneau: {pickup_slot}")
+
+    try:
+        order = Order.objects.create(
+            customer=customer,
+            bag_size=bag_size,
+            pickup_address=pickup_addr or getattr(customer, 'address', '') or '',
+            pickup_lat=pickup_lat,
+            pickup_lng=pickup_lng,
+            pickup_scheduled_date=pickup_date,
+            pickup_scheduled_time=pickup_time,
+            delivery_scheduled_date=delivery_date,
+            delivery_scheduled_time=dtime(12, 0),
+            service_fee=service_fee,
+            notes=' | '.join(notes_parts),
+            status='pending',
+        )
+        return Response({
+            'order_id':      order.id,
+            'code':          order.code or str(order.id),
+            'bag_size':      bag_size,
+            'bag_price':     bag_price,
+            'service_fee':   service_fee,
+            'total':         total,
+            'pickup_date':   pickup_date.strftime('%d/%m/%Y'),
+            'pickup_slot':   pickup_slot,
+            'delivery_date': delivery_date.strftime('%d/%m/%Y'),
+        }, status=201)
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_articles(request):
+    """GET /api/client/articles/ — catalogue articles avec slots et poids"""
+    from orders.utils.article_catalog import ARTICLE_CATALOG, HORS_GABARIT
+    from orders.utils.pricing import BAG_PRICING
+
+    bags = {
+        k: {
+            "label":           v["label"],
+            "price":           int(v["price"]),
+            "max_items":       v["estimated_items"],
+            "max_weight_kg":   v["max_weight_kg"],
+        }
+        for k, v in BAG_PRICING.items()
+    }
+
+    return Response({
+        "bags":        bags,
+        "catalog":     ARTICLE_CATALOG,
+        "hors_gabarit": HORS_GABARIT,
+    })

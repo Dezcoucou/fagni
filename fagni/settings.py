@@ -85,6 +85,8 @@ INSTALLED_APPS = [
     'accounts',
     'services',
     'orders',
+    'rest_framework',
+    'corsheaders',
     'logistics',
     'production',
     'pricing',
@@ -96,6 +98,7 @@ INSTALLED_APPS = [
 #  MIDDLEWARE
 # ========================
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -503,3 +506,15 @@ try:
     })
 except Exception:
     pass
+
+# ── API CLIENT FAGNI ─────────────────────────────────────
+REST_FRAMEWORK = {
+    'DEFAULT_RENDERER_CLASSES': ['rest_framework.renderers.JSONRenderer'],
+}
+
+CORS_ALLOWED_ORIGINS = [
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+    "http://localhost:3000",
+]
+CORS_ALLOW_CREDENTIALS = True

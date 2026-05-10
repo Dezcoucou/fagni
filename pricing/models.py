@@ -24,16 +24,16 @@ class PricingRule(TimeStampedModel):
         null=True,
         blank=True,
         related_name="pricing_rules_v2",
-    )
+    , verbose_name="Partenaire")
 
     rule_type = models.CharField(max_length=30, choices=RULE_TYPE_CHOICES)
-    label = models.CharField(max_length=150)
+    label = models.CharField(max_length=150, verbose_name="Libellé")
 
     value = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     min_value = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     max_value = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, verbose_name="Actif")
     priority = models.PositiveIntegerField(default=100)
 
     starts_at = models.DateTimeField(null=True, blank=True)
@@ -54,7 +54,7 @@ class PriceQuote(TimeStampedModel):
         ("final", "Final"),
     ]
 
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="price_quotes_v2")
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="price_quotes_v2", verbose_name="Commande")
 
     quote_type = models.CharField(max_length=20, choices=QUOTE_TYPE_CHOICES, default="estimated")
 
@@ -64,10 +64,10 @@ class PriceQuote(TimeStampedModel):
     discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
-    currency = models.CharField(max_length=10, default="XOF")
+    currency = models.CharField(max_length=10, default="XOF", verbose_name="Devise")
     is_final = models.BooleanField(default=False)
     generated_at = models.DateTimeField(auto_now_add=True)
-    notes = models.TextField(blank=True)
+    notes = models.TextField(blank=True, verbose_name="Notes")
 
     def __str__(self):
         return f"{self.order.code} - {self.quote_type}"
@@ -96,15 +96,15 @@ class BagPricingRule(models.Model):
         choices=BAG_CODE_CHOICES,
         unique=True,
         db_index=True,
-    )
-    label = models.CharField("Libellé", max_length=100)
+    , verbose_name="Code")
+    label = models.CharField("Libellé", max_length=100, verbose_name="Libellé")
     price = models.DecimalField("Prix prestation (FCFA)", max_digits=10, decimal_places=2)
     estimated_items = models.PositiveIntegerField("Nombre estimé de pièces", default=0)
-    is_active = models.BooleanField("Actif", default=True)
+    is_active = models.BooleanField("Actif", default=True, verbose_name="Actif")
     sort_order = models.PositiveIntegerField("Ordre", default=0)
-    notes = models.TextField("Notes internes", blank=True, default="")
-    created_at = models.DateTimeField("Créé le", auto_now_add=True)
-    updated_at = models.DateTimeField("Mis à jour le", auto_now=True)
+    notes = models.TextField("Notes internes", blank=True, default="", verbose_name="Notes")
+    created_at = models.DateTimeField("Créé le", auto_now_add=True, verbose_name="Créé le")
+    updated_at = models.DateTimeField("Mis à jour le", auto_now=True, verbose_name="Mis à jour le")
 
     class Meta:
         verbose_name = "Règle pricing sac"

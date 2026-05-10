@@ -29,21 +29,21 @@ class TrackingEvent(TimeStampedModel):
         ("system", "Système"),
     ]
 
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="tracking_events_v2")
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="tracking_events_v2", verbose_name="Commande")
     mission = models.ForeignKey(
         Mission,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="tracking_events",
-    )
+    , verbose_name="Mission")
     partner_job = models.ForeignKey(
         PartnerJob,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="tracking_events",
-    )
+    , verbose_name="Mission partenaire")
 
     event_type = models.CharField(max_length=30, choices=EVENT_TYPE_CHOICES, verbose_name="Type d'événement")
     actor_user = models.ForeignKey(
@@ -52,7 +52,7 @@ class TrackingEvent(TimeStampedModel):
         null=True,
         blank=True,
         related_name="tracking_events_v2",
-    )
+    , verbose_name="Utilisateur acteur")
     actor_role = models.CharField(max_length=20, choices=ACTOR_ROLE_CHOICES, default="system", verbose_name="Rôle acteur")
 
     status_before = models.CharField(max_length=50, blank=True, verbose_name="Statut avant")
@@ -80,21 +80,21 @@ class Proof(TimeStampedModel):
         ("receipt", "Reçu"),
     ]
 
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="proofs_v2")
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="proofs_v2", verbose_name="Commande")
     mission = models.ForeignKey(
         Mission,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="proofs",
-    )
+    , verbose_name="Mission")
     partner_job = models.ForeignKey(
         PartnerJob,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="proofs",
-    )
+    , verbose_name="Mission partenaire")
 
     proof_type = models.CharField(max_length=30, choices=PROOF_TYPE_CHOICES, verbose_name="Type de preuve")
     file = models.FileField(upload_to="proofs/", null=True, blank=True, verbose_name="Fichier")
@@ -106,7 +106,7 @@ class Proof(TimeStampedModel):
         null=True,
         blank=True,
         related_name="captured_proofs_v2",
-    )
+    , verbose_name="Capturé par")
     captured_at = models.DateTimeField(auto_now_add=True, verbose_name="Capturé le")
     notes = models.TextField(blank=True, verbose_name="Notes")
 
@@ -145,21 +145,21 @@ class Incident(TimeStampedModel):
         ("critical", "Critique"),
     ]
 
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="incidents_v2")
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="incidents_v2", verbose_name="Commande")
     mission = models.ForeignKey(
         Mission,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="incidents",
-    )
+    , verbose_name="Mission")
     partner_job = models.ForeignKey(
         PartnerJob,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="incidents",
-    )
+    , verbose_name="Mission partenaire")
 
     incident_type = models.CharField(max_length=30, choices=INCIDENT_TYPE_CHOICES, verbose_name="Type d'incident")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="open", verbose_name="Statut")
@@ -171,14 +171,14 @@ class Incident(TimeStampedModel):
         null=True,
         blank=True,
         related_name="reported_incidents_v2",
-    )
+    , verbose_name="Signalé par")
     assigned_to = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="assigned_incidents_v2",
-    )
+    , verbose_name="Assigné à")
 
     title = models.CharField(max_length=150, verbose_name="Titre")
     description = models.TextField(verbose_name="Description")

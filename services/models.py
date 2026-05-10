@@ -3,10 +3,10 @@ from core.models import TimeStampedModel
 
 
 class ServiceCategory(TimeStampedModel):
-    code = models.SlugField(max_length=50, unique=True)
-    name = models.CharField(max_length=120)
-    description = models.TextField(blank=True)
-    is_active = models.BooleanField(default=True)
+    code = models.SlugField(max_length=50, unique=True, verbose_name="Code")
+    name = models.CharField(max_length=120, verbose_name="Nom")
+    description = models.TextField(blank=True, verbose_name="Description")
+    is_active = models.BooleanField(default=True, verbose_name="Actif")
 
     def __str__(self):
         return self.name
@@ -25,23 +25,23 @@ class Service(TimeStampedModel):
         ("hybrid", "Hybride"),
     ]
 
-    code = models.SlugField(max_length=50, unique=True)
+    code = models.SlugField(max_length=50, unique=True, verbose_name="Code")
     category = models.ForeignKey(
         ServiceCategory,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="services",
-    )
-    name = models.CharField(max_length=120)
-    description = models.TextField(blank=True)
+    , verbose_name="Catégorie")
+    name = models.CharField(max_length=120, verbose_name="Nom")
+    description = models.TextField(blank=True, verbose_name="Description")
 
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, verbose_name="Actif")
     requires_partner = models.BooleanField(default=True)
     requires_logistics = models.BooleanField(default=True)
     requires_weighing = models.BooleanField(default=False)
 
-    pricing_mode = models.CharField(max_length=20, choices=PRICING_MODE_CHOICES, default="per_item")
+    pricing_mode = models.CharField(max_length=20, choices=PRICING_MODE_CHOICES, default="per_item", verbose_name="Mode de tarification")
     default_sla_hours = models.PositiveIntegerField(default=48)
 
     def __str__(self):
@@ -59,13 +59,13 @@ class ServiceOption(TimeStampedModel):
     ]
 
     service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="options")
-    code = models.SlugField(max_length=50)
-    name = models.CharField(max_length=120)
-    description = models.TextField(blank=True)
+    code = models.SlugField(max_length=50, verbose_name="Code")
+    name = models.CharField(max_length=120, verbose_name="Nom")
+    description = models.TextField(blank=True, verbose_name="Description")
 
     extra_price_type = models.CharField(max_length=20, choices=EXTRA_PRICE_TYPE_CHOICES, default="fixed")
     extra_price_value = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, verbose_name="Actif")
 
     class Meta:
         verbose_name = 'Option de service'

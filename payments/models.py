@@ -21,16 +21,16 @@ class Payment(TimeStampedModel):
         ("transfer", "Virement"),
     ]
 
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="payments_v2")
-    payment_reference = models.CharField(max_length=100, unique=True)
-    payment_method = models.CharField(max_length=30, choices=METHOD_CHOICES)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="payments_v2", verbose_name="Commande")
+    payment_reference = models.CharField(max_length=100, unique=True, verbose_name="Référence paiement")
+    payment_method = models.CharField(max_length=30, choices=METHOD_CHOICES, verbose_name="Mode de paiement")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending", verbose_name="Statut")
 
-    amount = models.DecimalField(max_digits=12, decimal_places=2)
-    currency = models.CharField(max_length=10, default="XOF")
-    paid_at = models.DateTimeField(null=True, blank=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Montant")
+    currency = models.CharField(max_length=10, default="XOF", verbose_name="Devise")
+    paid_at = models.DateTimeField(null=True, blank=True, verbose_name="Payé le")
 
-    provider_name = models.CharField(max_length=100, blank=True)
+    provider_name = models.CharField(max_length=100, blank=True, verbose_name="Nom fournisseur")
     provider_transaction_id = models.CharField(max_length=150, blank=True)
     raw_payload_json = models.JSONField(default=dict, blank=True)
 
@@ -71,14 +71,14 @@ class Payout(TimeStampedModel):
         related_name="payouts_v2",
     )
 
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="payouts_v2")
-    amount = models.DecimalField(max_digits=12, decimal_places=2)
-    currency = models.CharField(max_length=10, default="XOF")
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="payouts_v2", verbose_name="Commande")
+    amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Montant")
+    currency = models.CharField(max_length=10, default="XOF", verbose_name="Devise")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending", verbose_name="Statut")
 
     scheduled_at = models.DateTimeField(null=True, blank=True)
-    paid_at = models.DateTimeField(null=True, blank=True)
-    reference = models.CharField(max_length=100, blank=True)
+    paid_at = models.DateTimeField(null=True, blank=True, verbose_name="Payé le")
+    reference = models.CharField(max_length=100, blank=True, verbose_name="Référence")
 
     def __str__(self):
         return f"{self.order.code} - {self.beneficiary_type}"

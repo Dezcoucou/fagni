@@ -8,10 +8,10 @@ class PartnerBase(models.Model):
     - livreurs
     - points relais
     """
-    name = models.CharField("Nom", max_length=150)
-    phone = models.CharField("Téléphone", max_length=50, blank=True)
-    email = models.EmailField("Email", blank=True)
-    address = models.CharField("Adresse", max_length=255, blank=True)
+    name = models.CharField("Nom", max_length=150, verbose_name="Nom")
+    phone = models.CharField("Téléphone", max_length=50, blank=True, verbose_name="Téléphone")
+    email = models.EmailField("Email", blank=True, verbose_name="Email")
+    address = models.CharField("Adresse", max_length=255, blank=True, verbose_name="Adresse")
 
     # Coordonnées GPS (pour la logistique FAGNI)
     latitude = models.DecimalField(
@@ -20,21 +20,21 @@ class PartnerBase(models.Model):
         decimal_places=6,
         null=True,
         blank=True,
-    )
+    , verbose_name="Latitude")
     longitude = models.DecimalField(
         "Longitude",
         max_digits=9,
         decimal_places=6,
         null=True,
         blank=True,
-    )
+    , verbose_name="Longitude")
 
     city = models.CharField("Ville / Zone", max_length=120, blank=True)
-    notes = models.TextField("Notes internes", blank=True)
-    is_active = models.BooleanField("Actif", default=True)
+    notes = models.TextField("Notes internes", blank=True, verbose_name="Notes")
+    is_active = models.BooleanField("Actif", default=True, verbose_name="Actif")
 
-    created_at = models.DateTimeField("Créé le", auto_now_add=True)
-    updated_at = models.DateTimeField("Mis à jour le", auto_now=True)
+    created_at = models.DateTimeField("Créé le", auto_now_add=True, verbose_name="Créé le")
+    updated_at = models.DateTimeField("Mis à jour le", auto_now=True, verbose_name="Mis à jour le")
 
     class Meta:
         abstract = True

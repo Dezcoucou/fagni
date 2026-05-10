@@ -97,8 +97,8 @@ class Wallet(models.Model):
         default=Decimal("0.00"),
     )
 
-    created_at = models.DateTimeField("Créé le", auto_now_add=True, verbose_name="Créé le")
-    updated_at = models.DateTimeField("Mis à jour le", auto_now=True, verbose_name="Mis à jour le")
+    created_at = models.DateTimeField("Créé le", auto_now_add=True)
+    updated_at = models.DateTimeField("Mis à jour le", auto_now=True)
 
     class Meta:
         verbose_name = "Wallet"
@@ -341,7 +341,7 @@ class WalletTransaction(models.Model):
         default=Decimal("0.00"),
     )
 
-    description = models.TextField("Description", blank=True, verbose_name="Description")
+    description = models.TextField("Description", blank=True)
 
 
     idempotency_key = models.CharField(
@@ -351,7 +351,7 @@ class WalletTransaction(models.Model):
         blank=True,
         db_index=True,
     )
-    created_at = models.DateTimeField("Créée le", auto_now_add=True, verbose_name="Créé le")
+    created_at = models.DateTimeField("Créée le", auto_now_add=True)
 
 
     class Meta:
@@ -496,7 +496,7 @@ class WithdrawalRequest(models.Model):
         verbose_name="Statut"
     )
 
-    created_at = models.DateTimeField("Créée le", auto_now_add=True, verbose_name="Créé le")
+    created_at = models.DateTimeField("Créée le", auto_now_add=True)
 
     processed_at = models.DateTimeField("Traitée le", null=True, blank=True)
     processed_by = models.ForeignKey(

@@ -99,14 +99,14 @@ class BagPricingRule(models.Model):
         db_index=True,
         verbose_name="Code"
     )
-    label = models.CharField("Libellé", max_length=100, verbose_name="Libellé")
+    label = models.CharField("Libellé", max_length=100)
     price = models.DecimalField("Prix prestation (FCFA)", max_digits=10, decimal_places=2)
     estimated_items = models.PositiveIntegerField("Nombre estimé de pièces", default=0)
-    is_active = models.BooleanField("Actif", default=True, verbose_name="Actif")
+    is_active = models.BooleanField("Actif", default=True)
     sort_order = models.PositiveIntegerField("Ordre", default=0)
-    notes = models.TextField("Notes internes", blank=True, default="", verbose_name="Notes")
-    created_at = models.DateTimeField("Créé le", auto_now_add=True, verbose_name="Créé le")
-    updated_at = models.DateTimeField("Mis à jour le", auto_now=True, verbose_name="Mis à jour le")
+    notes = models.TextField("Notes internes", blank=True, default="")
+    created_at = models.DateTimeField("Créé le", auto_now_add=True)
+    updated_at = models.DateTimeField("Mis à jour le", auto_now=True)
 
     class Meta:
         verbose_name = "Règle pricing sac"

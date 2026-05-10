@@ -42,6 +42,10 @@ class PricingRule(TimeStampedModel):
     def __str__(self):
         return f"{self.service.name} - {self.label}"
 
+    class Meta:
+        verbose_name = 'Règle de prix'
+        verbose_name_plural = 'Règles de prix'
+
 
 class PriceQuote(TimeStampedModel):
     QUOTE_TYPE_CHOICES = [
@@ -67,6 +71,10 @@ class PriceQuote(TimeStampedModel):
 
     def __str__(self):
         return f"{self.order.code} - {self.quote_type}"
+
+    class Meta:
+        verbose_name = 'Devis'
+        verbose_name_plural = 'Devis'
 
 
 

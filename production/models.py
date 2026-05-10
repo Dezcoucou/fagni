@@ -33,6 +33,10 @@ class PartnerJob(TimeStampedModel):
     def __str__(self):
         return self.code
 
+    class Meta:
+        verbose_name = 'Mission partenaire'
+        verbose_name_plural = 'Missions partenaires'
+
 
 class WeighingRecord(TimeStampedModel):
     WEIGHING_STAGE_CHOICES = [
@@ -76,3 +80,7 @@ class WeighingRecord(TimeStampedModel):
 
     def __str__(self):
         return f"{self.order_id} - {self.net_weight}{self.unit}"
+
+    class Meta:
+        verbose_name = 'Pesée'
+        verbose_name_plural = 'Pesées'

@@ -3693,6 +3693,10 @@ class OrderWeighing(models.Model):
     def __str__(self):
         return f"Weighing order={self.order_id} {self.weight_kg}kg {self.status}"
 
+    class Meta:
+        verbose_name = 'Pesée'
+        verbose_name_plural = 'Pesées'
+
 
 
 # --- MVP pressing: avis client (rating) ---
@@ -3707,6 +3711,8 @@ class OrderRating(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        verbose_name = 'Évaluation'
+        verbose_name_plural = 'Évaluations'
         indexes = [
             models.Index(fields=["score", "created_at"]),
         ]
@@ -3780,6 +3786,8 @@ class OrderStatusHistory(models.Model):
     changed_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        verbose_name = 'Historique statut'
+        verbose_name_plural = 'Historiques statuts'
         ordering = ["-changed_at"]
 
     def __str__(self):
@@ -3896,6 +3904,10 @@ class Payment(models.Model):
             o2 = type(o).objects.get(pk=o.pk)
             o2.mark_as_paid_and_distribute()
 
+    class Meta:
+        verbose_name = 'Paiement'
+        verbose_name_plural = 'Paiements'
+
 
 class PaymentEvent(models.Model):
     """
@@ -3951,6 +3963,8 @@ class PaymentEvent(models.Model):
     processed_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
+        verbose_name = 'Événement paiement'
+        verbose_name_plural = 'Événements paiement'
         indexes = [
             models.Index(fields=["provider", "provider_reference"]),
             models.Index(fields=["status"]),
@@ -4146,3 +4160,7 @@ class WaveEvent(models.Model):
 
     def __str__(self):
         return self.event_id
+
+    class Meta:
+        verbose_name = 'Événement Wave'
+        verbose_name_plural = 'Événements Wave'

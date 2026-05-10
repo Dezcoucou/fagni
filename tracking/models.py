@@ -65,6 +65,10 @@ class TrackingEvent(TimeStampedModel):
     def __str__(self):
         return f"{self.order.code} - {self.event_type}"
 
+    class Meta:
+        verbose_name = 'Événement de suivi'
+        verbose_name_plural = 'Événements de suivi'
+
 
 class Proof(TimeStampedModel):
     PROOF_TYPE_CHOICES = [
@@ -108,6 +112,10 @@ class Proof(TimeStampedModel):
 
     def __str__(self):
         return f"{self.order.code} - {self.proof_type}"
+
+    class Meta:
+        verbose_name = 'Preuve'
+        verbose_name_plural = 'Preuves'
 
 
 class Incident(TimeStampedModel):
@@ -182,3 +190,7 @@ class Incident(TimeStampedModel):
 
     def __str__(self):
         return f"{self.order.code} - {self.incident_type}"
+
+    class Meta:
+        verbose_name = 'Incident'
+        verbose_name_plural = 'Incidents'

@@ -45,7 +45,7 @@ class TrackingEvent(TimeStampedModel):
         related_name="tracking_events",
     )
 
-    event_type = models.CharField(max_length=30, choices=EVENT_TYPE_CHOICES)
+    event_type = models.CharField(max_length=30, choices=EVENT_TYPE_CHOICES, verbose_name="Type d'événement")
     actor_user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -53,14 +53,14 @@ class TrackingEvent(TimeStampedModel):
         blank=True,
         related_name="tracking_events_v2",
     )
-    actor_role = models.CharField(max_length=20, choices=ACTOR_ROLE_CHOICES, default="system")
+    actor_role = models.CharField(max_length=20, choices=ACTOR_ROLE_CHOICES, default="system", verbose_name="Rôle acteur")
 
-    status_before = models.CharField(max_length=50, blank=True)
-    status_after = models.CharField(max_length=50, blank=True)
+    status_before = models.CharField(max_length=50, blank=True, verbose_name="Statut avant")
+    status_after = models.CharField(max_length=50, blank=True, verbose_name="Statut après")
 
     title = models.CharField(max_length=150, verbose_name="Titre")
-    description = models.TextField(blank=True)
-    metadata_json = models.JSONField(default=dict, blank=True)
+    description = models.TextField(blank=True, verbose_name="Description")
+    metadata_json = models.JSONField(default=dict, blank=True, verbose_name="Métadonnées")
 
     def __str__(self):
         return f"{self.order.code} - {self.event_type}"
@@ -96,9 +96,9 @@ class Proof(TimeStampedModel):
         related_name="proofs",
     )
 
-    proof_type = models.CharField(max_length=30, choices=PROOF_TYPE_CHOICES)
-    file = models.FileField(upload_to="proofs/", null=True, blank=True)
-    text_value = models.CharField(max_length=255, blank=True)
+    proof_type = models.CharField(max_length=30, choices=PROOF_TYPE_CHOICES, verbose_name="Type de preuve")
+    file = models.FileField(upload_to="proofs/", null=True, blank=True, verbose_name="Fichier")
+    text_value = models.CharField(max_length=255, blank=True, verbose_name="Valeur texte")
 
     captured_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -107,8 +107,8 @@ class Proof(TimeStampedModel):
         blank=True,
         related_name="captured_proofs_v2",
     )
-    captured_at = models.DateTimeField(auto_now_add=True)
-    notes = models.TextField(blank=True)
+    captured_at = models.DateTimeField(auto_now_add=True, verbose_name="Capturé le")
+    notes = models.TextField(blank=True, verbose_name="Notes")
 
     def __str__(self):
         return f"{self.order.code} - {self.proof_type}"
@@ -161,8 +161,8 @@ class Incident(TimeStampedModel):
         related_name="incidents",
     )
 
-    incident_type = models.CharField(max_length=30, choices=INCIDENT_TYPE_CHOICES)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="open")
+    incident_type = models.CharField(max_length=30, choices=INCIDENT_TYPE_CHOICES, verbose_name="Type d'incident")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="open", verbose_name="Statut")
     severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default="medium", verbose_name="Sévérité")
 
     reported_by = models.ForeignKey(
@@ -181,11 +181,11 @@ class Incident(TimeStampedModel):
     )
 
     title = models.CharField(max_length=150, verbose_name="Titre")
-    description = models.TextField()
-    resolution_notes = models.TextField(blank=True)
+    description = models.TextField(verbose_name="Description")
+    resolution_notes = models.TextField(blank=True, verbose_name="Notes")
 
-    reported_at = models.DateTimeField(auto_now_add=True)
-    resolved_at = models.DateTimeField(null=True, blank=True)
+    reported_at = models.DateTimeField(auto_now_add=True, verbose_name="Signalé le")
+    resolved_at = models.DateTimeField(null=True, blank=True, verbose_name="Résolu le")
 
     def __str__(self):
         return f"{self.order.code} - {self.incident_type}"

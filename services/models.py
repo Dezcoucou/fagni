@@ -32,7 +32,8 @@ class Service(TimeStampedModel):
         null=True,
         blank=True,
         related_name="services",
-    , verbose_name="Catégorie")
+        verbose_name="Catégorie"
+    )
     name = models.CharField(max_length=120, verbose_name="Nom")
     description = models.TextField(blank=True, verbose_name="Description")
 

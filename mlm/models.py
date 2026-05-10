@@ -33,7 +33,8 @@ class ReferralLink(models.Model):
         "Code affilié",
         max_length=50,
         unique=True,
-    , verbose_name="Code parrainage")
+        verbose_name="Code parrainage"
+    )
 
     # Parrain (upline) sur 1 niveau
     sponsor = models.ForeignKey(
@@ -162,7 +163,8 @@ class WalletTransaction(models.Model):
         "Type de mouvement",
         max_length=20,
         choices=TYPE_CHOICES,
-    , verbose_name="Type")
+        verbose_name="Type"
+    )
 
     amount = models.IntegerField(
         "Montant (FCFA)",
@@ -175,13 +177,15 @@ class WalletTransaction(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="mlm_wallet_transactions",
-    , verbose_name="Commande")
+        verbose_name="Commande"
+    )
 
     description = models.CharField(
         "Description",
         max_length=255,
         blank=True,
-    , verbose_name="Description")
+        verbose_name="Description"
+    )
 
     created_at = models.DateTimeField("Créé le", auto_now_add=True, verbose_name="Créé le")
 
@@ -232,7 +236,8 @@ class WithdrawalRequest(models.Model):
         max_length=20,
         choices=STATUS_CHOICES,
         default="pending",
-    , verbose_name="Statut")
+        verbose_name="Statut"
+    )
 
     payout_method = models.CharField(
         "Moyen de paiement",
@@ -281,13 +286,15 @@ class MLMSettings(models.Model):
         "Nom du paramétrage",
         max_length=100,
         default="Paramétrage par défaut",
-    , verbose_name="Nom")
+        verbose_name="Nom"
+    )
 
     # Est-ce que ce set de paramétrage est actif ?
     is_active = models.BooleanField(
         "Actif",
         default=True,
-    , verbose_name="Actif")
+        verbose_name="Actif"
+    )
 
     # Pourcentages de commissions (en %)
     n1_percent = models.DecimalField(

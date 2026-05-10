@@ -644,14 +644,16 @@ class Customer(models.Model):
         decimal_places=6,
         null=True,
         blank=True,
-    , verbose_name="Latitude")
+        verbose_name="Latitude"
+    )
     longitude = models.DecimalField(
         "Longitude",
         max_digits=9,
         decimal_places=6,
         null=True,
         blank=True,
-    , verbose_name="Longitude")
+        verbose_name="Longitude"
+    )
 
     class Meta:
         verbose_name = "Client"
@@ -678,7 +680,8 @@ class LogisticsConfig(models.Model):
         "Nom de la configuration",
         max_length=150,
         default="Configuration par défaut",
-    , verbose_name="Nom")
+        verbose_name="Nom"
+    )
 
     city = models.CharField(
         "Ville / zone (optionnel)",
@@ -692,7 +695,8 @@ class LogisticsConfig(models.Model):
         "Configuration active",
         default=True,
         help_text="Une seule config active sera utilisée par défaut.",
-    , verbose_name="Actif")
+        verbose_name="Actif"
+    )
 
     # ----- COLLECTE -----
     pickup_cutoff_hour = models.PositiveSmallIntegerField(
@@ -860,7 +864,8 @@ class Order(models.Model):
         max_length=50,
         blank=True,
         null=True,
-    , verbose_name="Type de service")
+        verbose_name="Type de service"
+    )
 
 
     # ======================
@@ -1106,14 +1111,16 @@ class Order(models.Model):
         blank=True,
         null=True,
         help_text="Code parrain saisi lors de la création de la commande.",
-    , verbose_name="Code parrainage")
+        verbose_name="Code parrainage"
+    )
 
     # --------- Paiement client ---------
     payment_status = models.CharField(
         max_length=20,
         choices=PAYMENT_STATUS_CHOICES,
         default=PAYMENT_STATUS_PENDING,
-    , verbose_name="Statut paiement")
+        verbose_name="Statut paiement"
+    )
 
 
     payment_verification_status = models.CharField(
@@ -1121,23 +1128,27 @@ class Order(models.Model):
         choices=PAYMENT_VERIFICATION_STATUS_CHOICES,
         default=PAYMENT_VERIFICATION_NONE,
         blank=True,
-    , verbose_name="Statut vérification")
+        verbose_name="Statut vérification"
+    )
 
     payment_declared_at = models.DateTimeField(
         null=True,
         blank=True,
-    , verbose_name="Déclaré le")
+        verbose_name="Déclaré le"
+    )
 
     payment_declared_channel = models.CharField(
         max_length=20,
         blank=True,
         default="",
-    , verbose_name="Canal déclaré")
+        verbose_name="Canal déclaré"
+    )
 
     payment_verified_at = models.DateTimeField(
         null=True,
         blank=True,
-    , verbose_name="Vérifié le")
+        verbose_name="Vérifié le"
+    )
 
     payment_verified_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -1145,13 +1156,15 @@ class Order(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
-    , verbose_name="Vérifié par")
+        verbose_name="Vérifié par"
+    )
 
     payment_declared_reference = models.CharField(
         max_length=120,
         blank=True,
         default="",
-    , verbose_name="Référence déclarée")
+        verbose_name="Référence déclarée"
+    )
 
     payment_proof = models.FileField(
         "Preuve de paiement",
@@ -1159,7 +1172,8 @@ class Order(models.Model):
         null=True,
         blank=True,
         help_text="Capture ou preuve du paiement Wave envoyée par le client.",
-    , verbose_name="Preuve de paiement")
+        verbose_name="Preuve de paiement"
+    )
 
     amount_paid = models.DecimalField(
         "Montant effectivement payé (TTC, FCFA)",
@@ -1172,7 +1186,8 @@ class Order(models.Model):
         "Date de paiement",
         null=True,
         blank=True,
-    , verbose_name="Date de paiement")
+        verbose_name="Date de paiement"
+    )
 
     payment_reference = models.CharField(
         "Référence paiement (PSP)",
@@ -1188,7 +1203,8 @@ class Order(models.Model):
         blank=True,
         null=True,
         help_text="Ex : carte, mobile money, OM, Moov, etc.",
-    , verbose_name="Mode de paiement")
+        verbose_name="Mode de paiement"
+    )
 
     # ======================
     #  TVA & FACTURATION (Lot 4.11.2)
@@ -1385,12 +1401,14 @@ class Order(models.Model):
         "Date collecte programmée",
         blank=True,
         null=True,
-    , verbose_name="Date collecte prévue")
+        verbose_name="Date collecte prévue"
+    )
     pickup_scheduled_time = models.TimeField(
         "Heure collecte programmée",
         blank=True,
         null=True,
-    , verbose_name="Heure collecte prévue")
+        verbose_name="Heure collecte prévue"
+    )
 
     delivery_scheduled_date = models.DateField(
         "Date livraison programmée",
@@ -3250,7 +3268,8 @@ class DeliveryLeg(models.Model):
         max_length=20,
         choices=STATUS_CHOICES,
         default="pending",
-    , verbose_name="Statut")
+        verbose_name="Statut"
+    )
 
 
     # ======================
@@ -3596,7 +3615,8 @@ class OrderItemPhoto(models.Model):
     image = models.ImageField(
         "Photo",
         upload_to="order_items/photos/",
-    , verbose_name="Image")
+        verbose_name="Image"
+    )
     caption = models.CharField(
         "Description",
         max_length=255,
@@ -3774,7 +3794,8 @@ class OrderStatusHistory(models.Model):
         "Order",
         related_name="status_history",
         on_delete=models.CASCADE
-    , verbose_name="Commande")
+        verbose_name="Commande"
+    )
     previous_status = models.CharField(max_length=50, blank=True, null=True)
     new_status = models.CharField(max_length=50)
     changed_by = models.ForeignKey(
@@ -3957,7 +3978,8 @@ class PaymentEvent(models.Model):
         max_length=20,
         choices=STATUS_CHOICES,
         default="pending"
-    , verbose_name="Statut")
+        verbose_name="Statut"
+    )
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Créé le")
     processed_at = models.DateTimeField(blank=True, null=True)
@@ -4102,7 +4124,8 @@ class OrderPaymentEvent(models.Model):
         blank=True,
         default="",
         db_index=True,
-    , verbose_name="Référence")
+        verbose_name="Référence"
+    )
 
     amount = models.DecimalField(
         "Montant appliqué",
@@ -4130,14 +4153,16 @@ class OrderPaymentEvent(models.Model):
         max_length=30,
         blank=True,
         default="",
-    , verbose_name="Statut avant")
+        verbose_name="Statut avant"
+    )
 
     status_after = models.CharField(
         "Statut après",
         max_length=30,
         blank=True,
         default="",
-    , verbose_name="Statut après")
+        verbose_name="Statut après"
+    )
 
     note = models.TextField("Note", blank=True, default="")
     created_at = models.DateTimeField("Créé le", auto_now_add=True, verbose_name="Créé le")

@@ -28,7 +28,8 @@ class PartnerBase(models.Model):
         decimal_places=6,
         null=True,
         blank=True,
-    , verbose_name="Longitude")
+        verbose_name="Longitude"
+    )
 
     city = models.CharField("Ville / Zone", max_length=120, blank=True)
     notes = models.TextField("Notes internes", blank=True, verbose_name="Notes")

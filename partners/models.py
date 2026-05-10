@@ -19,16 +19,14 @@ class PartnerBase(models.Model):
         max_digits=9,
         decimal_places=6,
         null=True,
-        blank=True,
-        verbose_name="Latitude"
+        blank=True
     )
     longitude = models.DecimalField(
         "Longitude",
         max_digits=9,
         decimal_places=6,
         null=True,
-        blank=True,
-        verbose_name="Longitude"
+        blank=True
     )
 
     city = models.CharField("Ville / Zone", max_length=120, blank=True)

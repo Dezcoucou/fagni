@@ -44,7 +44,6 @@ class Wallet(models.Model):
         blank=True,
         on_delete=models.CASCADE,
         related_name="wallets",
-        verbose_name="Client",
     )
 
     laundry_partner = models.ForeignKey(
@@ -86,8 +85,7 @@ class Wallet(models.Model):
     currency = models.CharField(
         "Devise",
         max_length=10,
-        default="XOF",
-        verbose_name="Devise"
+        default="XOF"
     )
 
     balance = models.DecimalField(
@@ -299,7 +297,6 @@ class WalletTransaction(models.Model):
         Wallet,
         on_delete=models.CASCADE,
         related_name="transactions",
-        verbose_name="Wallet",
     )
 
     order = models.ForeignKey(
@@ -323,15 +320,13 @@ class WalletTransaction(models.Model):
     type = models.CharField(
         "Type",
         max_length=30,
-        choices=TxType.choices,
-        verbose_name="Type"
+        choices=TxType.choices
     )
 
     direction = models.CharField(
         "Sens",
         max_length=10,
-        choices=TxDirection.choices,
-        verbose_name="Direction"
+        choices=TxDirection.choices
     )
 
     amount = models.DecimalField(
@@ -469,7 +464,6 @@ class WithdrawalRequest(models.Model):
         Wallet,
         on_delete=models.CASCADE,
         related_name="withdrawals",
-        verbose_name="Wallet",
     )
 
     requested_by = models.ForeignKey(
@@ -484,16 +478,14 @@ class WithdrawalRequest(models.Model):
     amount = models.DecimalField(
         "Montant demandé",
         max_digits=12,
-        decimal_places=2,
-        verbose_name="Montant"
+        decimal_places=2
     )
 
     status = models.CharField(
         "Statut",
         max_length=20,
         choices=STATUS_CHOICES,
-        default="pending",
-        verbose_name="Statut"
+        default="pending"
     )
 
     created_at = models.DateTimeField("Créée le", auto_now_add=True)

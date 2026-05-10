@@ -163,8 +163,7 @@ class Incident(TimeStampedModel):
 
     incident_type = models.CharField(max_length=30, choices=INCIDENT_TYPE_CHOICES)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="open")
-    severity = models.CharField(
-        verbose_name="Sévérité",(max_length=20, choices=SEVERITY_CHOICES, default="medium")
+    severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default="medium", verbose_name="Sévérité")
 
     reported_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

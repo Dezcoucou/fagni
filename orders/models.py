@@ -442,7 +442,6 @@ class Subscription(models.Model):
         "Customer",
         on_delete=models.PROTECT,
         related_name="subscriptions",
-        verbose_name="Client",
     )
 
     pack = models.CharField("Pack", max_length=20, choices=PACK_CHOICES, default="essential")
@@ -577,7 +576,6 @@ class SubscriptionCycle(models.Model):
         "Subscription",
         on_delete=models.CASCADE,
         related_name="cycles",
-        verbose_name="Abonnement",
     )
 
     # dénormalisation utile pour filtres/exports
@@ -585,7 +583,6 @@ class SubscriptionCycle(models.Model):
         "Customer",
         on_delete=models.PROTECT,
         related_name="subscription_cycles",
-        verbose_name="Client",
     )
 
     week_start = models.DateField("Semaine (lundi)", db_index=True)
@@ -610,7 +607,6 @@ class SubscriptionCycle(models.Model):
         null=True,
         blank=True,
         related_name="subscription_cycles",
-        verbose_name="Commande liée (optionnel)",
     )
 
     created_at = models.DateTimeField("Créé le", auto_now_add=True)
@@ -643,16 +639,14 @@ class Customer(models.Model):
         max_digits=9,
         decimal_places=6,
         null=True,
-        blank=True,
-        verbose_name="Latitude"
+        blank=True
     )
     longitude = models.DecimalField(
         "Longitude",
         max_digits=9,
         decimal_places=6,
         null=True,
-        blank=True,
-        verbose_name="Longitude"
+        blank=True
     )
 
     class Meta:
@@ -679,8 +673,7 @@ class LogisticsConfig(models.Model):
     name = models.CharField(
         "Nom de la configuration",
         max_length=150,
-        default="Configuration par défaut",
-        verbose_name="Nom"
+        default="Configuration par défaut"
     )
 
     city = models.CharField(
@@ -694,8 +687,7 @@ class LogisticsConfig(models.Model):
     is_active = models.BooleanField(
         "Configuration active",
         default=True,
-        help_text="Une seule config active sera utilisée par défaut.",
-        verbose_name="Actif"
+        help_text="Une seule config active sera utilisée par défaut."
     )
 
     # ----- COLLECTE -----
@@ -863,8 +855,7 @@ class Order(models.Model):
     service_type = models.CharField(
         max_length=50,
         blank=True,
-        null=True,
-        verbose_name="Type de service"
+        null=True
     )
 
 
@@ -1012,7 +1003,6 @@ class Order(models.Model):
         max_length=20,
         choices=STATUS_CHOICES,
         default="pending",
-        verbose_name="Statut",
     )
 
     # Brouillon (Wizard client) : n’apparaît pas dans OPS tant que non validé
@@ -1063,7 +1053,6 @@ class Order(models.Model):
         Customer,
         on_delete=models.PROTECT,
         related_name="orders",
-        verbose_name="Client",
     )
 
     laundry_partner = models.ForeignKey(
@@ -1110,8 +1099,7 @@ class Order(models.Model):
         max_length=50,
         blank=True,
         null=True,
-        help_text="Code parrain saisi lors de la création de la commande.",
-        verbose_name="Code parrainage"
+        help_text="Code parrain saisi lors de la création de la commande."
     )
 
     # --------- Paiement client ---------
@@ -1171,8 +1159,7 @@ class Order(models.Model):
         upload_to="payment_proofs/",
         null=True,
         blank=True,
-        help_text="Capture ou preuve du paiement Wave envoyée par le client.",
-        verbose_name="Preuve de paiement"
+        help_text="Capture ou preuve du paiement Wave envoyée par le client."
     )
 
     amount_paid = models.DecimalField(
@@ -1185,8 +1172,7 @@ class Order(models.Model):
     payment_date = models.DateTimeField(
         "Date de paiement",
         null=True,
-        blank=True,
-        verbose_name="Date de paiement"
+        blank=True
     )
 
     payment_reference = models.CharField(
@@ -1202,8 +1188,7 @@ class Order(models.Model):
         max_length=50,
         blank=True,
         null=True,
-        help_text="Ex : carte, mobile money, OM, Moov, etc.",
-        verbose_name="Mode de paiement"
+        help_text="Ex : carte, mobile money, OM, Moov, etc."
     )
 
     # ======================
@@ -1400,14 +1385,12 @@ class Order(models.Model):
     pickup_scheduled_date = models.DateField(
         "Date collecte programmée",
         blank=True,
-        null=True,
-        verbose_name="Date collecte prévue"
+        null=True
     )
     pickup_scheduled_time = models.TimeField(
         "Heure collecte programmée",
         blank=True,
-        null=True,
-        verbose_name="Heure collecte prévue"
+        null=True
     )
 
     delivery_scheduled_date = models.DateField(
@@ -3245,7 +3228,6 @@ class DeliveryLeg(models.Model):
         Order,
         on_delete=models.CASCADE,
         related_name="legs",
-        verbose_name="Commande",
     )
 
     driver = models.ForeignKey(
@@ -3267,8 +3249,7 @@ class DeliveryLeg(models.Model):
         "Statut",
         max_length=20,
         choices=STATUS_CHOICES,
-        default="pending",
-        verbose_name="Statut"
+        default="pending"
     )
 
 
@@ -3537,7 +3518,6 @@ class OrderItem(models.Model):
         Order,
         on_delete=models.CASCADE,
         related_name="items",
-        verbose_name="Commande",
     )
 
     service = models.ForeignKey(
@@ -3545,7 +3525,6 @@ class OrderItem(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        verbose_name="Prestation cataloguée",
     )
 
     service_type = models.CharField(
@@ -3610,12 +3589,10 @@ class OrderItemPhoto(models.Model):
         OrderItem,
         on_delete=models.CASCADE,
         related_name="photos",
-        verbose_name="Ligne de commande",
     )
     image = models.ImageField(
         "Photo",
-        upload_to="order_items/photos/",
-        verbose_name="Image"
+        upload_to="order_items/photos/"
     )
     caption = models.CharField(
         "Description",
@@ -3769,7 +3746,6 @@ class ServiceItem(models.Model):
         ServiceCategory,
         on_delete=models.CASCADE,
         related_name="services",
-        verbose_name="Catégorie",
     )
     name = models.CharField("Nom", max_length=150)
     code = models.CharField("Code interne", max_length=50, blank=True)
@@ -3793,8 +3769,7 @@ class OrderStatusHistory(models.Model):
     order = models.ForeignKey(
         "Order",
         related_name="status_history",
-        on_delete=models.CASCADE,
-        verbose_name="Commande"
+        on_delete=models.CASCADE
     )
     previous_status = models.CharField(max_length=50, blank=True, null=True)
     new_status = models.CharField(max_length=50)
@@ -3977,7 +3952,7 @@ class PaymentEvent(models.Model):
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default="pending"
+        default="pending",
         verbose_name="Statut"
     )
 
@@ -4016,7 +3991,6 @@ class OrderUpsell(models.Model):
         "orders.Order",
         on_delete=models.CASCADE,
         related_name="upsell",
-        verbose_name="Commande",
     )
 
     express_24h = models.BooleanField("Express 24h", default=False)
@@ -4108,7 +4082,6 @@ class OrderPaymentEvent(models.Model):
         "orders.Order",
         on_delete=models.CASCADE,
         related_name="payment_events",
-        verbose_name="Commande",
     )
 
     channel = models.CharField(
@@ -4123,8 +4096,7 @@ class OrderPaymentEvent(models.Model):
         max_length=255,
         blank=True,
         default="",
-        db_index=True,
-        verbose_name="Référence"
+        db_index=True
     )
 
     amount = models.DecimalField(
@@ -4152,16 +4124,14 @@ class OrderPaymentEvent(models.Model):
         "Statut avant",
         max_length=30,
         blank=True,
-        default="",
-        verbose_name="Statut avant"
+        default=""
     )
 
     status_after = models.CharField(
         "Statut après",
         max_length=30,
         blank=True,
-        default="",
-        verbose_name="Statut après"
+        default=""
     )
 
     note = models.TextField("Note", blank=True, default="")

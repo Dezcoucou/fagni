@@ -96,8 +96,7 @@ class BagPricingRule(models.Model):
         max_length=20,
         choices=BAG_CODE_CHOICES,
         unique=True,
-        db_index=True,
-        verbose_name="Code"
+        db_index=True
     )
     label = models.CharField("Libellé", max_length=100)
     price = models.DecimalField("Prix prestation (FCFA)", max_digits=10, decimal_places=2)

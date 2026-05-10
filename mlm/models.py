@@ -23,7 +23,6 @@ class ReferralLink(models.Model):
         "orders.Customer",
         on_delete=models.CASCADE,
         related_name="referral_profiles",
-        verbose_name="Client FAGNI",
         null=True,
         blank=True,
     )
@@ -32,8 +31,7 @@ class ReferralLink(models.Model):
     referral_code = models.CharField(
         "Code affilié",
         max_length=50,
-        unique=True,
-        verbose_name="Code parrainage"
+        unique=True
     )
 
     # Parrain (upline) sur 1 niveau
@@ -43,7 +41,6 @@ class ReferralLink(models.Model):
         null=True,
         blank=True,
         related_name="direct_referrals",
-        verbose_name="Parrain",
     )
 
     actor_type = models.CharField(
@@ -96,7 +93,6 @@ class ReferralCommission(models.Model):
         ReferralLink,
         on_delete=models.CASCADE,
         related_name="commissions",
-        verbose_name="Bénéficiaire",
     )
 
     level = models.PositiveSmallIntegerField(
@@ -108,7 +104,6 @@ class ReferralCommission(models.Model):
         "orders.Order",
         on_delete=models.CASCADE,
         related_name="mlm_commissions",
-        verbose_name="Commande",
     )
 
     service_fee_base = models.IntegerField(
@@ -156,14 +151,12 @@ class WalletTransaction(models.Model):
         ReferralLink,
         on_delete=models.CASCADE,
         related_name="wallet_transactions",
-        verbose_name="Profil de parrainage",
     )
 
     type = models.CharField(
         "Type de mouvement",
         max_length=20,
-        choices=TYPE_CHOICES,
-        verbose_name="Type"
+        choices=TYPE_CHOICES
     )
 
     amount = models.IntegerField(
@@ -176,15 +169,13 @@ class WalletTransaction(models.Model):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
-        related_name="mlm_wallet_transactions",
-        verbose_name="Commande"
+        related_name="mlm_wallet_transactions"
     )
 
     description = models.CharField(
         "Description",
         max_length=255,
-        blank=True,
-        verbose_name="Description"
+        blank=True
     )
 
     created_at = models.DateTimeField("Créé le", auto_now_add=True)
@@ -235,8 +226,7 @@ class WithdrawalRequest(models.Model):
         "Statut",
         max_length=20,
         choices=STATUS_CHOICES,
-        default="pending",
-        verbose_name="Statut"
+        default="pending"
     )
 
     payout_method = models.CharField(
@@ -261,7 +251,6 @@ class WithdrawalRequest(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        verbose_name="Traité par",
     )
 
     notes = models.TextField("Notes internes", blank=True)
@@ -285,15 +274,13 @@ class MLMSettings(models.Model):
     name = models.CharField(
         "Nom du paramétrage",
         max_length=100,
-        default="Paramétrage par défaut",
-        verbose_name="Nom"
+        default="Paramétrage par défaut"
     )
 
     # Est-ce que ce set de paramétrage est actif ?
     is_active = models.BooleanField(
         "Actif",
-        default=True,
-        verbose_name="Actif"
+        default=True
     )
 
     # Pourcentages de commissions (en %)
@@ -341,7 +328,6 @@ class MLMSettings(models.Model):
     # Paramètres de retrait
     min_withdrawal_amount = models.PositiveIntegerField(
         default=5000,
-        verbose_name="Montant minimum de retrait (FCFA)",
     )
     max_daily_withdrawal = models.PositiveIntegerField(
         default=200000,

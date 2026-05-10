@@ -53,7 +53,7 @@ class ReferralLink(models.Model):
         default="client",
     )
 
-    created_at = models.DateTimeField("Créé le", auto_now_add=True, verbose_name="Créé le")
+    created_at = models.DateTimeField("Créé le", auto_now_add=True)
 
     class Meta:
         verbose_name = "Profil de parrainage"
@@ -127,7 +127,7 @@ class ReferralCommission(models.Model):
         "Montant de la commission (FCFA)",
     )
 
-    created_at = models.DateTimeField("Créée le", auto_now_add=True, verbose_name="Créé le")
+    created_at = models.DateTimeField("Créée le", auto_now_add=True)
 
     class Meta:
         verbose_name = "Commission MLM"
@@ -187,7 +187,7 @@ class WalletTransaction(models.Model):
         verbose_name="Description"
     )
 
-    created_at = models.DateTimeField("Créé le", auto_now_add=True, verbose_name="Créé le")
+    created_at = models.DateTimeField("Créé le", auto_now_add=True)
 
     class Meta:
         verbose_name = "Transaction Wallet"
@@ -253,7 +253,7 @@ class WithdrawalRequest(models.Model):
         help_text="Référence de transaction / reçu…",
     )
 
-    created_at = models.DateTimeField("Créée le", auto_now_add=True, verbose_name="Créé le")
+    created_at = models.DateTimeField("Créée le", auto_now_add=True)
     processed_at = models.DateTimeField("Traitée le", null=True, blank=True)
 
     processed_by = models.ForeignKey(
@@ -264,7 +264,7 @@ class WithdrawalRequest(models.Model):
         verbose_name="Traité par",
     )
 
-    notes = models.TextField("Notes internes", blank=True, verbose_name="Notes")
+    notes = models.TextField("Notes internes", blank=True)
 
     class Meta:
         verbose_name = "Demande de retrait"
@@ -353,8 +353,8 @@ class MLMSettings(models.Model):
         verbose_name="Autoriser un wallet négatif ?",
     )
 
-    created_at = models.DateTimeField("Créé le", auto_now_add=True, verbose_name="Créé le")
-    updated_at = models.DateTimeField("Mis à jour le", auto_now=True, verbose_name="Mis à jour le")
+    created_at = models.DateTimeField("Créé le", auto_now_add=True)
+    updated_at = models.DateTimeField("Mis à jour le", auto_now=True)
 
     class Meta:
         verbose_name = "Paramétrage MLM"

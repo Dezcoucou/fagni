@@ -446,7 +446,7 @@ class Subscription(models.Model):
     )
 
     pack = models.CharField("Pack", max_length=20, choices=PACK_CHOICES, default="essential")
-    bag_size = models.CharField("Taille sac", max_length=2, choices=BAG_SIZE_CHOICES, default="M", verbose_name="Taille du sac")
+    bag_size = models.CharField("Taille sac", max_length=2, choices=BAG_SIZE_CHOICES, default="M")
     pickup_weekday = models.PositiveSmallIntegerField(
         "Jour collecte",
         choices=WEEKDAY_CHOICES,
@@ -460,12 +460,12 @@ class Subscription(models.Model):
         help_text="Jour fixe de livraison hebdomadaire.",
     )
 
-    start_date = models.DateField("Date de début", null=True, blank=True, verbose_name="Date début")
-    is_active = models.BooleanField("Actif", default=True, verbose_name="Actif")
+    start_date = models.DateField("Date de début", null=True, blank=True)
+    is_active = models.BooleanField("Actif", default=True)
     notes = models.CharField("Notes (optionnel)", max_length=255, blank=True, default="")
 
-    created_at = models.DateTimeField("Créé le", auto_now_add=True, verbose_name="Créé le")
-    updated_at = models.DateTimeField("Mis à jour le", auto_now=True, verbose_name="Mis à jour le")
+    created_at = models.DateTimeField("Créé le", auto_now_add=True)
+    updated_at = models.DateTimeField("Mis à jour le", auto_now=True)
 
     class Meta:
         verbose_name = "Abonnement"
@@ -592,8 +592,8 @@ class SubscriptionCycle(models.Model):
     pickup_date = models.DateField("Date collecte", db_index=True)
     delivery_date = models.DateField("Date livraison", db_index=True)
 
-    bag_size = models.CharField("Taille sac", max_length=2, default="M", verbose_name="Taille du sac")
-    status = models.CharField("Statut", max_length=20, choices=STATUS_CHOICES, default="COLLECTE", verbose_name="Statut")
+    bag_size = models.CharField("Taille sac", max_length=2, default="M")
+    status = models.CharField("Statut", max_length=20, choices=STATUS_CHOICES, default="COLLECTE")
 
     # Brouillon (Wizard client) : n’apparaît pas dans OPS tant que non validé
     is_draft = models.BooleanField(
@@ -613,8 +613,8 @@ class SubscriptionCycle(models.Model):
         verbose_name="Commande liée (optionnel)",
     )
 
-    created_at = models.DateTimeField("Créé le", auto_now_add=True, verbose_name="Créé le")
-    updated_at = models.DateTimeField("Mis à jour le", auto_now=True, verbose_name="Mis à jour le")
+    created_at = models.DateTimeField("Créé le", auto_now_add=True)
+    updated_at = models.DateTimeField("Mis à jour le", auto_now=True)
 
     class Meta:
         verbose_name = "Cycle abonnement"
@@ -758,8 +758,8 @@ class LogisticsConfig(models.Model):
         help_text="Heure (0–23) à partir de laquelle on arrête les créneaux programmés.",
     )
 
-    created_at = models.DateTimeField("Créée le", auto_now_add=True, verbose_name="Créé le")
-    updated_at = models.DateTimeField("Mise à jour le", auto_now=True, verbose_name="Mis à jour le")
+    created_at = models.DateTimeField("Créée le", auto_now_add=True)
+    updated_at = models.DateTimeField("Mise à jour le", auto_now=True)
 
     class Meta:
         verbose_name = "Configuration logistique"
@@ -1056,7 +1056,7 @@ class Order(models.Model):
     )
 
     # Identifiant lisible
-    code = models.CharField("Code", max_length=20, unique=True, blank=True, verbose_name="Code")
+    code = models.CharField("Code", max_length=20, unique=True, blank=True)
 
     # --------- Liens principaux ---------
     customer = models.ForeignKey(
@@ -1094,8 +1094,8 @@ class Order(models.Model):
         verbose_name="Point relais partenaire",
     )
 
-    created_at = models.DateTimeField("Créée le", auto_now_add=True, verbose_name="Créé le")
-    updated_at = models.DateTimeField("Mise à jour le", auto_now=True, verbose_name="Mis à jour le")
+    created_at = models.DateTimeField("Créée le", auto_now_add=True)
+    updated_at = models.DateTimeField("Mise à jour le", auto_now=True)
 
     notes = models.TextField(
         "Notes / instructions internes",
@@ -3383,7 +3383,7 @@ class DeliveryLeg(models.Model):
         default=0,
     )
 
-    created_at = models.DateTimeField("Créée le", auto_now_add=True, verbose_name="Créé le")
+    created_at = models.DateTimeField("Créée le", auto_now_add=True)
     started_at = models.DateTimeField("Début de la course", null=True, blank=True)
     finished_at = models.DateTimeField("Fin de la course", null=True, blank=True)
 
@@ -3559,7 +3559,7 @@ class OrderItem(models.Model):
     )
 
     designation = models.CharField("Désignation", max_length=120)
-    quantity = models.PositiveIntegerField("Quantité", default=1, verbose_name="Quantité")
+    quantity = models.PositiveIntegerField("Quantité", default=1)
 
     unit_price = models.DecimalField(
         "Prix unitaire (FCFA)",
@@ -3622,7 +3622,7 @@ class OrderItemPhoto(models.Model):
         max_length=255,
         blank=True,
     )
-    created_at = models.DateTimeField("Ajoutée le", auto_now_add=True, verbose_name="Créé le")
+    created_at = models.DateTimeField("Ajoutée le", auto_now_add=True)
 
     class Meta:
         verbose_name = "Photo d'article"
@@ -3653,8 +3653,8 @@ class OrderEvidencePhoto(models.Model):
         ("issue", "Litige / anomalie"),
     ]
 
-    order = models.ForeignKey("orders.Order", on_delete=models.CASCADE, related_name="evidence_photos", verbose_name="Commande")
-    leg = models.ForeignKey("orders.DeliveryLeg", on_delete=models.SET_NULL, null=True, blank=True, related_name="evidence_photos", verbose_name="Trajet")
+    order = models.ForeignKey("orders.Order", on_delete=models.CASCADE, related_name="evidence_photos")
+    leg = models.ForeignKey("orders.DeliveryLeg", on_delete=models.SET_NULL, null=True, blank=True, related_name="evidence_photos")
 
     actor_type = models.CharField(max_length=16, choices=ACTOR_CHOICES)
     actor_id = models.PositiveIntegerField(null=True, blank=True)  # driver_id ou laundry_partner_id (simple)
@@ -3682,7 +3682,7 @@ class OrderWeighing(models.Model):
         ("resolved", "Résolue OPS"),
     ]
 
-    order = models.OneToOneField("orders.Order", on_delete=models.CASCADE, related_name="weighing", verbose_name="Commande")
+    order = models.OneToOneField("orders.Order", on_delete=models.CASCADE, related_name="weighing")
     weight_kg = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     scale_photo = models.ImageField(upload_to="orders/weighing/", null=True, blank=True)
 
@@ -3721,7 +3721,7 @@ class OrderWeighing(models.Model):
 
 # --- MVP pressing: avis client (rating) ---
 class OrderRating(models.Model):
-    order = models.OneToOneField("orders.Order", on_delete=models.CASCADE, related_name="rating", verbose_name="Commande")
+    order = models.OneToOneField("orders.Order", on_delete=models.CASCADE, related_name="rating")
 
     # 1 à 5 étoiles
     score = models.PositiveSmallIntegerField(default=0)
@@ -3748,9 +3748,9 @@ class ServiceCategory(models.Model):
     """
     Exemples : Blanchisserie, Cordonnerie, Retouche, Repassage, etc.
     """
-    name = models.CharField("Nom de la catégorie", max_length=100, verbose_name="Nom")
+    name = models.CharField("Nom de la catégorie", max_length=100)
     slug = models.SlugField(unique=True, verbose_name="Slug")
-    description = models.TextField("Description", blank=True, verbose_name="Description")
+    description = models.TextField("Description", blank=True)
 
     class Meta:
         verbose_name = "Catégorie de service"
@@ -3771,14 +3771,14 @@ class ServiceItem(models.Model):
         related_name="services",
         verbose_name="Catégorie",
     )
-    name = models.CharField("Nom", max_length=150, verbose_name="Nom")
-    code = models.CharField("Code interne", max_length=50, blank=True, verbose_name="Code")
+    name = models.CharField("Nom", max_length=150)
+    code = models.CharField("Code interne", max_length=50, blank=True)
     default_price = models.DecimalField(
         "Prix de base (FCFA)",
         max_digits=10,
         decimal_places=2,
     )
-    is_active = models.BooleanField("Actif", default=True, verbose_name="Actif")
+    is_active = models.BooleanField("Actif", default=True)
 
     class Meta:
         verbose_name = "Prestation / Article"
@@ -3793,7 +3793,7 @@ class OrderStatusHistory(models.Model):
     order = models.ForeignKey(
         "Order",
         related_name="status_history",
-        on_delete=models.CASCADE
+        on_delete=models.CASCADE,
         verbose_name="Commande"
     )
     previous_status = models.CharField(max_length=50, blank=True, null=True)
@@ -3816,7 +3816,7 @@ class OrderStatusHistory(models.Model):
 
 
 class Payment(models.Model):
-    order = models.ForeignKey("Order", on_delete=models.CASCADE, verbose_name="Commande")
+    order = models.ForeignKey("Order", on_delete=models.CASCADE)
     amount = models.DecimalField(max_digits=10, decimal_places=0, verbose_name="Montant")
     channel = models.CharField(max_length=20)  # orange, mtn, wave
     reference = models.CharField(max_length=120, blank=True, verbose_name="Référence")
@@ -3958,7 +3958,7 @@ class PaymentEvent(models.Model):
         ("error", "Error"),
     ]
 
-    order = models.ForeignKey("Order", on_delete=models.CASCADE, null=True, blank=True, verbose_name="Commande")
+    order = models.ForeignKey("Order", on_delete=models.CASCADE, null=True, blank=True)
     provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES)
 
     event_type = models.CharField(max_length=40, choices=EVENT_TYPE_CHOICES, verbose_name="Type d'événement")
@@ -4049,8 +4049,8 @@ class OrderUpsell(models.Model):
         default=Decimal("1000.00"),
     )
 
-    created_at = models.DateTimeField("Créé le", auto_now_add=True, verbose_name="Créé le")
-    updated_at = models.DateTimeField("Mis à jour le", auto_now=True, verbose_name="Mis à jour le")
+    created_at = models.DateTimeField("Créé le", auto_now_add=True)
+    updated_at = models.DateTimeField("Mis à jour le", auto_now=True)
 
     class Meta:
         verbose_name = "Upsell commande"
@@ -4165,7 +4165,7 @@ class OrderPaymentEvent(models.Model):
     )
 
     note = models.TextField("Note", blank=True, default="")
-    created_at = models.DateTimeField("Créé le", auto_now_add=True, verbose_name="Créé le")
+    created_at = models.DateTimeField("Créé le", auto_now_add=True)
 
     class Meta:
         indexes = [

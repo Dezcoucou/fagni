@@ -58,7 +58,7 @@ class TrackingEvent(TimeStampedModel):
     status_before = models.CharField(max_length=50, blank=True)
     status_after = models.CharField(max_length=50, blank=True)
 
-    title = models.CharField(max_length=150)
+    title = models.CharField(max_length=150, verbose_name="Titre")
     description = models.TextField(blank=True)
     metadata_json = models.JSONField(default=dict, blank=True)
 
@@ -155,7 +155,8 @@ class Incident(TimeStampedModel):
 
     incident_type = models.CharField(max_length=30, choices=INCIDENT_TYPE_CHOICES)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="open")
-    severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default="medium")
+    severity = models.CharField(
+        verbose_name="Sévérité",(max_length=20, choices=SEVERITY_CHOICES, default="medium")
 
     reported_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -172,7 +173,7 @@ class Incident(TimeStampedModel):
         related_name="assigned_incidents_v2",
     )
 
-    title = models.CharField(max_length=150)
+    title = models.CharField(max_length=150, verbose_name="Titre")
     description = models.TextField()
     resolution_notes = models.TextField(blank=True)
 

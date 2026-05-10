@@ -2,6 +2,7 @@ from django.apps import AppConfig
 
 
 class WalletsConfig(AppConfig):
+    verbose_name = 'Portefeuilles'
     default_auto_field = "django.db.models.BigAutoField"
     name = "wallets"
 

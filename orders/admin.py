@@ -220,20 +220,20 @@ class CycleOrderLinkedFilter(admin.SimpleListFilter):
 
 @admin.register(Customer)
 class CustomerAdmin(UnfoldModelAdmin):
-    list_display = ("name", "phone", "address", "nb_commandes", "montant_total")
+    list_display  = ("name", "phone", "address", "nb_commandes", "montant_total")
     search_fields = ("name", "phone", "address")
     list_per_page = 50
+    fields        = ("name", "phone", "address")  # masque lat/lng inutiles
+    save_on_top   = True  # bouton Save aussi en haut du formulaire
 
     def nb_commandes(self, obj):
         return obj.orders.count()
-
     nb_commandes.short_description = "Nb commandes"
 
     def montant_total(self, obj):
         agg = obj.orders.aggregate(total=Sum("total"))
-        return agg["total"] or 0
-
-    montant_total.short_description = "Montant total (FCFA)"
+        return f"{agg['total'] or 0:,.0f} FCFA"
+    montant_total.short_description = "Montant total"
 
 
 # ============================================================

@@ -69,6 +69,10 @@ class Mission(TimeStampedModel):
     def __str__(self):
         return self.code
 
+    class Meta:
+        verbose_name = 'Mission'
+        verbose_name_plural = 'Missions'
+
 
 class MissionActionLog(TimeStampedModel):
     ACTION_TYPE_CHOICES = [
@@ -91,6 +95,10 @@ class MissionActionLog(TimeStampedModel):
 
     def __str__(self):
         return f"{self.mission.code} - {self.action_type}"
+
+    class Meta:
+        verbose_name = 'Log de mission'
+        verbose_name_plural = 'Logs de missions'
 
 from .models_otp import MissionOTP
 from .models_signature import MissionSignature

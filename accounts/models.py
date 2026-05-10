@@ -17,6 +17,8 @@ class UserRole(TimeStampedModel):
     is_primary = models.BooleanField(default=False)
 
     class Meta:
+        verbose_name = 'Rôle utilisateur'
+        verbose_name_plural = 'Rôles utilisateurs'
         unique_together = ("user", "role")
 
     def __str__(self):
@@ -37,6 +39,10 @@ class CustomerProfile(TimeStampedModel):
 
     def __str__(self):
         return f"Client: {self.user}"
+
+    class Meta:
+        verbose_name = 'Profil client'
+        verbose_name_plural = 'Profils clients'
 
 
 class DriverProfile(TimeStampedModel):
@@ -63,3 +69,7 @@ class DriverProfile(TimeStampedModel):
 
     def __str__(self):
         return self.display_name or str(self.user)
+
+    class Meta:
+        verbose_name = 'Profil livreur'
+        verbose_name_plural = 'Profils livreurs'

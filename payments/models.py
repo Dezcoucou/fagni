@@ -37,6 +37,10 @@ class Payment(TimeStampedModel):
     def __str__(self):
         return self.payment_reference
 
+    class Meta:
+        verbose_name = 'Paiement'
+        verbose_name_plural = 'Paiements'
+
 
 class Payout(TimeStampedModel):
     STATUS_CHOICES = [
@@ -78,3 +82,7 @@ class Payout(TimeStampedModel):
 
     def __str__(self):
         return f"{self.order.code} - {self.beneficiary_type}"
+
+    class Meta:
+        verbose_name = 'Versement'
+        verbose_name_plural = 'Versements'

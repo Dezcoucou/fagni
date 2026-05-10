@@ -11,6 +11,10 @@ class ServiceCategory(TimeStampedModel):
     def __str__(self):
         return self.name
 
+    class Meta:
+        verbose_name = 'Catégorie de service'
+        verbose_name_plural = 'Catégories de service'
+
 
 class Service(TimeStampedModel):
     PRICING_MODE_CHOICES = [
@@ -43,6 +47,10 @@ class Service(TimeStampedModel):
     def __str__(self):
         return self.name
 
+    class Meta:
+        verbose_name = 'Service'
+        verbose_name_plural = 'Services'
+
 
 class ServiceOption(TimeStampedModel):
     EXTRA_PRICE_TYPE_CHOICES = [
@@ -60,6 +68,8 @@ class ServiceOption(TimeStampedModel):
     is_active = models.BooleanField(default=True)
 
     class Meta:
+        verbose_name = 'Option de service'
+        verbose_name_plural = 'Options de service'
         unique_together = ("service", "code")
 
     def __str__(self):

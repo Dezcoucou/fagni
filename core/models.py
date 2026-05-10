@@ -32,6 +32,10 @@ class Address(TimeStampedModel):
     def __str__(self):
         return self.label or self.full_address[:80]
 
+    class Meta:
+        verbose_name = 'Adresse'
+        verbose_name_plural = 'Adresses'
+
 
 class MediaAsset(TimeStampedModel):
     ASSET_TYPE_CHOICES = [
@@ -54,3 +58,7 @@ class MediaAsset(TimeStampedModel):
 
     def __str__(self):
         return f"{self.asset_type} #{self.pk}"
+
+    class Meta:
+        verbose_name = 'Média'
+        verbose_name_plural = 'Médias'

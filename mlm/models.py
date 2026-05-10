@@ -33,7 +33,7 @@ class ReferralLink(models.Model):
         "Code affilié",
         max_length=50,
         unique=True,
-    )
+    , verbose_name="Code parrainage")
 
     # Parrain (upline) sur 1 niveau
     sponsor = models.ForeignKey(
@@ -52,7 +52,7 @@ class ReferralLink(models.Model):
         default="client",
     )
 
-    created_at = models.DateTimeField("Créé le", auto_now_add=True)
+    created_at = models.DateTimeField("Créé le", auto_now_add=True, verbose_name="Créé le")
 
     class Meta:
         verbose_name = "Profil de parrainage"
@@ -126,7 +126,7 @@ class ReferralCommission(models.Model):
         "Montant de la commission (FCFA)",
     )
 
-    created_at = models.DateTimeField("Créée le", auto_now_add=True)
+    created_at = models.DateTimeField("Créée le", auto_now_add=True, verbose_name="Créé le")
 
     class Meta:
         verbose_name = "Commission MLM"
@@ -162,7 +162,7 @@ class WalletTransaction(models.Model):
         "Type de mouvement",
         max_length=20,
         choices=TYPE_CHOICES,
-    )
+    , verbose_name="Type")
 
     amount = models.IntegerField(
         "Montant (FCFA)",
@@ -175,15 +175,15 @@ class WalletTransaction(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="mlm_wallet_transactions",
-    )
+    , verbose_name="Commande")
 
     description = models.CharField(
         "Description",
         max_length=255,
         blank=True,
-    )
+    , verbose_name="Description")
 
-    created_at = models.DateTimeField("Créé le", auto_now_add=True)
+    created_at = models.DateTimeField("Créé le", auto_now_add=True, verbose_name="Créé le")
 
     class Meta:
         verbose_name = "Transaction Wallet"
@@ -232,7 +232,7 @@ class WithdrawalRequest(models.Model):
         max_length=20,
         choices=STATUS_CHOICES,
         default="pending",
-    )
+    , verbose_name="Statut")
 
     payout_method = models.CharField(
         "Moyen de paiement",
@@ -248,7 +248,7 @@ class WithdrawalRequest(models.Model):
         help_text="Référence de transaction / reçu…",
     )
 
-    created_at = models.DateTimeField("Créée le", auto_now_add=True)
+    created_at = models.DateTimeField("Créée le", auto_now_add=True, verbose_name="Créé le")
     processed_at = models.DateTimeField("Traitée le", null=True, blank=True)
 
     processed_by = models.ForeignKey(
@@ -259,7 +259,7 @@ class WithdrawalRequest(models.Model):
         verbose_name="Traité par",
     )
 
-    notes = models.TextField("Notes internes", blank=True)
+    notes = models.TextField("Notes internes", blank=True, verbose_name="Notes")
 
     class Meta:
         verbose_name = "Demande de retrait"
@@ -281,13 +281,13 @@ class MLMSettings(models.Model):
         "Nom du paramétrage",
         max_length=100,
         default="Paramétrage par défaut",
-    )
+    , verbose_name="Nom")
 
     # Est-ce que ce set de paramétrage est actif ?
     is_active = models.BooleanField(
         "Actif",
         default=True,
-    )
+    , verbose_name="Actif")
 
     # Pourcentages de commissions (en %)
     n1_percent = models.DecimalField(
@@ -346,8 +346,8 @@ class MLMSettings(models.Model):
         verbose_name="Autoriser un wallet négatif ?",
     )
 
-    created_at = models.DateTimeField("Créé le", auto_now_add=True)
-    updated_at = models.DateTimeField("Mis à jour le", auto_now=True)
+    created_at = models.DateTimeField("Créé le", auto_now_add=True, verbose_name="Créé le")
+    updated_at = models.DateTimeField("Mis à jour le", auto_now=True, verbose_name="Mis à jour le")
 
     class Meta:
         verbose_name = "Paramétrage MLM"

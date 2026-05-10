@@ -17,18 +17,18 @@ class PartnerJob(TimeStampedModel):
         ("issue", "Incident"),
     ]
 
-    code = models.CharField(max_length=30, unique=True)
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="partner_jobs_v2")
-    partner = models.ForeignKey(LaundryPartner, on_delete=models.CASCADE, related_name="jobs_v2")
+    code = models.CharField(max_length=30, unique=True, verbose_name="Code")
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="partner_jobs_v2", verbose_name="Commande")
+    partner = models.ForeignKey(LaundryPartner, on_delete=models.CASCADE, related_name="jobs_v2", verbose_name="Partenaire")
 
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="awaiting_reception")
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="awaiting_reception", verbose_name="Statut")
 
     received_at = models.DateTimeField(null=True, blank=True)
     processing_started_at = models.DateTimeField(null=True, blank=True)
     ready_at = models.DateTimeField(null=True, blank=True)
     handed_over_at = models.DateTimeField(null=True, blank=True)
 
-    notes = models.TextField(blank=True)
+    notes = models.TextField(blank=True, verbose_name="Notes")
 
     def __str__(self):
         return self.code
@@ -52,21 +52,21 @@ class WeighingRecord(TimeStampedModel):
         ("system", "Système"),
     ]
 
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="weighing_records_v2")
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="weighing_records_v2", verbose_name="Commande")
     partner_job = models.ForeignKey(
         PartnerJob,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="weighing_records",
-    )
+    , verbose_name="Mission partenaire")
     mission = models.ForeignKey(
         Mission,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="weighing_records",
-    )
+    , verbose_name="Mission")
 
     performed_by_role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="driver")
     weighing_stage = models.CharField(max_length=30, choices=WEIGHING_STAGE_CHOICES)
@@ -75,7 +75,7 @@ class WeighingRecord(TimeStampedModel):
     net_weight = models.DecimalField(max_digits=10, decimal_places=2)
     unit = models.CharField(max_length=10, default="kg")
 
-    notes = models.TextField(blank=True)
+    notes = models.TextField(blank=True, verbose_name="Notes")
     recorded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

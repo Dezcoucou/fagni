@@ -31,11 +31,11 @@ class Mission(TimeStampedModel):
         ("urgent", "Urgente"),
     ]
 
-    code = models.CharField(max_length=30, unique=True)
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="v2_missions")
+    code = models.CharField(max_length=30, unique=True, verbose_name="Code")
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="v2_missions", verbose_name="Commande")
 
     mission_type = models.CharField(max_length=30, choices=MISSION_TYPE_CHOICES)
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="assigned")
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="assigned", verbose_name="Statut")
 
     source_address = models.ForeignKey(
         Address,
@@ -86,12 +86,12 @@ class MissionActionLog(TimeStampedModel):
         ("completed", "Terminée"),
     ]
 
-    mission = models.ForeignKey(Mission, on_delete=models.CASCADE, related_name="action_logs")
+    mission = models.ForeignKey(Mission, on_delete=models.CASCADE, related_name="action_logs", verbose_name="Mission")
     action_type = models.CharField(max_length=30, choices=ACTION_TYPE_CHOICES)
     performed_at = models.DateTimeField(auto_now_add=True)
 
     payload_json = models.JSONField(default=dict, blank=True)
-    notes = models.TextField(blank=True)
+    notes = models.TextField(blank=True, verbose_name="Notes")
 
     def __str__(self):
         return f"{self.mission.code} - {self.action_type}"

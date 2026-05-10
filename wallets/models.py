@@ -87,7 +87,7 @@ class Wallet(models.Model):
         "Devise",
         max_length=10,
         default="XOF",
-    )
+    , verbose_name="Devise")
 
     balance = models.DecimalField(
         "Solde actuel",
@@ -96,8 +96,8 @@ class Wallet(models.Model):
         default=Decimal("0.00"),
     )
 
-    created_at = models.DateTimeField("Créé le", auto_now_add=True)
-    updated_at = models.DateTimeField("Mis à jour le", auto_now=True)
+    created_at = models.DateTimeField("Créé le", auto_now_add=True, verbose_name="Créé le")
+    updated_at = models.DateTimeField("Mis à jour le", auto_now=True, verbose_name="Mis à jour le")
 
     class Meta:
         verbose_name = "Wallet"
@@ -323,13 +323,13 @@ class WalletTransaction(models.Model):
         "Type",
         max_length=30,
         choices=TxType.choices,
-    )
+    , verbose_name="Type")
 
     direction = models.CharField(
         "Sens",
         max_length=10,
         choices=TxDirection.choices,
-    )
+    , verbose_name="Direction")
 
     amount = models.DecimalField(
         "Montant",
@@ -338,7 +338,7 @@ class WalletTransaction(models.Model):
         default=Decimal("0.00"),
     )
 
-    description = models.TextField("Description", blank=True)
+    description = models.TextField("Description", blank=True, verbose_name="Description")
 
 
     idempotency_key = models.CharField(
@@ -348,7 +348,7 @@ class WalletTransaction(models.Model):
         blank=True,
         db_index=True,
     )
-    created_at = models.DateTimeField("Créée le", auto_now_add=True)
+    created_at = models.DateTimeField("Créée le", auto_now_add=True, verbose_name="Créé le")
 
 
     class Meta:
@@ -482,16 +482,16 @@ class WithdrawalRequest(models.Model):
         "Montant demandé",
         max_digits=12,
         decimal_places=2,
-    )
+    , verbose_name="Montant")
 
     status = models.CharField(
         "Statut",
         max_length=20,
         choices=STATUS_CHOICES,
         default="pending",
-    )
+    , verbose_name="Statut")
 
-    created_at = models.DateTimeField("Créée le", auto_now_add=True)
+    created_at = models.DateTimeField("Créée le", auto_now_add=True, verbose_name="Créé le")
 
     processed_at = models.DateTimeField("Traitée le", null=True, blank=True)
     processed_by = models.ForeignKey(

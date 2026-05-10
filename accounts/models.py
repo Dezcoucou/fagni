@@ -12,7 +12,7 @@ class UserRole(TimeStampedModel):
         ("superadmin", "Super administrateur"),
     ]
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="roles")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="roles", verbose_name="Utilisateur")
     role = models.CharField(max_length=30, choices=ROLE_CHOICES)
     is_primary = models.BooleanField(default=False)
 
@@ -26,7 +26,7 @@ class UserRole(TimeStampedModel):
 
 
 class CustomerProfile(TimeStampedModel):
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="customer_profile")
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="customer_profile", verbose_name="Utilisateur")
     default_address = models.ForeignKey(
         Address,
         on_delete=models.SET_NULL,
@@ -35,7 +35,7 @@ class CustomerProfile(TimeStampedModel):
         related_name="customer_default_for",
     )
     preferred_contact_mode = models.CharField(max_length=30, blank=True)
-    notes = models.TextField(blank=True)
+    notes = models.TextField(blank=True, verbose_name="Notes")
 
     def __str__(self):
         return f"Client: {self.user}"
@@ -54,7 +54,7 @@ class DriverProfile(TimeStampedModel):
         ("other", "Autre"),
     ]
 
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="driver_profile")
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="driver_profile", verbose_name="Utilisateur")
     display_name = models.CharField(max_length=150, blank=True)
     phone_number = models.CharField(max_length=30, blank=True)
 
@@ -63,9 +63,9 @@ class DriverProfile(TimeStampedModel):
     zone = models.CharField(max_length=120, blank=True)
 
     is_available = models.BooleanField(default=True)
-    is_verified = models.BooleanField(default=False)
-    rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
-    notes = models.TextField(blank=True)
+    is_verified = models.BooleanField(default=False, verbose_name="Vérifié")
+    rating = models.DecimalField(max_digits=3, decimal_places=2, default=0, verbose_name="Note")
+    notes = models.TextField(blank=True, verbose_name="Notes")
 
     def __str__(self):
         return self.display_name or str(self.user)

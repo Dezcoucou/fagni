@@ -87,7 +87,8 @@ class Wallet(models.Model):
         "Devise",
         max_length=10,
         default="XOF",
-    , verbose_name="Devise")
+        verbose_name="Devise"
+    )
 
     balance = models.DecimalField(
         "Solde actuel",
@@ -323,13 +324,15 @@ class WalletTransaction(models.Model):
         "Type",
         max_length=30,
         choices=TxType.choices,
-    , verbose_name="Type")
+        verbose_name="Type"
+    )
 
     direction = models.CharField(
         "Sens",
         max_length=10,
         choices=TxDirection.choices,
-    , verbose_name="Direction")
+        verbose_name="Direction"
+    )
 
     amount = models.DecimalField(
         "Montant",
@@ -482,14 +485,16 @@ class WithdrawalRequest(models.Model):
         "Montant demandé",
         max_digits=12,
         decimal_places=2,
-    , verbose_name="Montant")
+        verbose_name="Montant"
+    )
 
     status = models.CharField(
         "Statut",
         max_length=20,
         choices=STATUS_CHOICES,
         default="pending",
-    , verbose_name="Statut")
+        verbose_name="Statut"
+    )
 
     created_at = models.DateTimeField("Créée le", auto_now_add=True, verbose_name="Créé le")
 

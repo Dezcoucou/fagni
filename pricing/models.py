@@ -24,7 +24,8 @@ class PricingRule(TimeStampedModel):
         null=True,
         blank=True,
         related_name="pricing_rules_v2",
-    , verbose_name="Partenaire")
+        verbose_name="Partenaire"
+    )
 
     rule_type = models.CharField(max_length=30, choices=RULE_TYPE_CHOICES)
     label = models.CharField(max_length=150, verbose_name="Libellé")
@@ -96,7 +97,8 @@ class BagPricingRule(models.Model):
         choices=BAG_CODE_CHOICES,
         unique=True,
         db_index=True,
-    , verbose_name="Code")
+        verbose_name="Code"
+    )
     label = models.CharField("Libellé", max_length=100, verbose_name="Libellé")
     price = models.DecimalField("Prix prestation (FCFA)", max_digits=10, decimal_places=2)
     estimated_items = models.PositiveIntegerField("Nombre estimé de pièces", default=0)

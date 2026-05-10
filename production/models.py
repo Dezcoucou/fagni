@@ -59,14 +59,16 @@ class WeighingRecord(TimeStampedModel):
         null=True,
         blank=True,
         related_name="weighing_records",
-    , verbose_name="Mission partenaire")
+        verbose_name="Mission partenaire"
+    )
     mission = models.ForeignKey(
         Mission,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="weighing_records",
-    , verbose_name="Mission")
+        verbose_name="Mission"
+    )
 
     performed_by_role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="driver")
     weighing_stage = models.CharField(max_length=30, choices=WEIGHING_STAGE_CHOICES)

@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django import forms
 from django.contrib import admin
-from unfold.admin import ModelAdmin as UnfoldModelAdmin
+from django.contrib.admin import ModelAdmin as UnfoldModelAdmin
 from django.contrib import messages
 from django.contrib.admin.helpers import ActionForm
 from django.core.exceptions import ValidationError

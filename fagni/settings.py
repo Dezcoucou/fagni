@@ -64,9 +64,6 @@ FAGNI_QR_BASE_URL = SITE_BASE_URL
 INSTALLED_APPS = [
     'dashboard',
 
-    'unfold',
-    'unfold.contrib.filters',
-    'unfold.contrib.forms',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

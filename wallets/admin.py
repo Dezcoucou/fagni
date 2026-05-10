@@ -1,5 +1,5 @@
 from django.contrib import admin
-from unfold.admin import ModelAdmin as UnfoldModelAdmin
+from django.contrib.admin import ModelAdmin as UnfoldModelAdmin
 from django.contrib import messages
 from django.db import transaction
 from django.utils import timezone

@@ -20,7 +20,8 @@ class PartnerBase(models.Model):
         decimal_places=6,
         null=True,
         blank=True,
-    , verbose_name="Latitude")
+        verbose_name="Latitude"
+    )
     longitude = models.DecimalField(
         "Longitude",
         max_digits=9,

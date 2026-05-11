@@ -177,3 +177,5 @@ cookies.txt
 archive_OLD_templates_*
 backups_*
 *.bak*
+*.sql
+fagni_data_export.json

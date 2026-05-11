@@ -1,4 +1,4 @@
-from orders.client_api import api_login, api_home, api_orders, api_order_detail, api_pricing_bags, api_create_order, api_articles
+from orders.client_api import api_login, api_home, api_orders, api_order_detail, api_pricing_bags, api_create_order, api_articles, api_wallet, api_parrainage
 from django.contrib import admin
 from django.urls import path, include
 from fagni.views import home, landing_riviera3
@@ -15,6 +15,8 @@ urlpatterns = [
     path("api/client/pricing/bags/", api_pricing_bags,  name="api-client-pricing-bags"),
     path("api/client/orders/create/",  api_create_order, name="api-client-create-order"),
     path("api/client/articles/",          api_articles,     name="api-client-articles"),
+    path("api/client/wallet/",             api_wallet,       name="api-client-wallet"),
+    path("api/client/parrainage/",         api_parrainage,   name="api-client-parrainage"),
 
     path("admin/", admin.site.urls),
     path("", home, name="home"),

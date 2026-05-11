@@ -299,3 +299,90 @@ def api_articles(request):
         "catalog":     ARTICLE_CATALOG,
         "hors_gabarit": HORS_GABARIT,
     })
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_wallet(request):
+    """GET /api/client/wallet/ — solde + historique transactions"""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        import jwt
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        from orders.models import Customer
+        customer = Customer.objects.get(id=payload['cid'])
+    except Exception:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    try:
+        from wallets.models import Wallet, WalletTransaction
+        wallet = Wallet.objects.filter(customer=customer).first()
+        balance = float(wallet.balance) if wallet else 0.0
+
+        transactions = []
+        if wallet:
+            txs = WalletTransaction.objects.filter(
+                wallet=wallet
+            ).order_by('-created_at')[:50]
+            for tx in txs:
+                transactions.append({
+                    'id':          tx.id,
+                    'type':        tx.type,
+                    'direction':   tx.direction,
+                    'amount':      float(tx.amount),
+                    'description': tx.description or '',
+                    'created_at':  tx.created_at.isoformat() if tx.created_at else None,
+                })
+
+        return Response({
+            'balance':      balance,
+            'currency':     'FCFA',
+            'transactions': transactions,
+        })
+    except Exception as e:
+        return Response({'balance': 0.0, 'currency': 'FCFA', 'transactions': [], 'error': str(e)})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_parrainage(request):
+    """GET /api/client/parrainage/ — lien de parrainage + commissions"""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        import jwt
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        from orders.models import Customer
+        customer = Customer.objects.get(id=payload['cid'])
+    except Exception:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    try:
+        from mlm.models import ReferralLink, ReferralCommission
+        from wallets.models import WalletTransaction
+
+        link = ReferralLink.objects.filter(customer=customer).first()
+        code = link.referral_code if link else f'FAGNI-{customer.id}'
+
+        commissions = []
+        if link:
+            txs = WalletTransaction.objects.filter(
+                wallet__customer=customer,
+                type='mlm_commission'
+            ).order_by('-created_at')[:20]
+            for tx in txs:
+                commissions.append({
+                    'amount':      float(tx.amount),
+                    'description': tx.description or '',
+                    'created_at':  tx.created_at.isoformat() if tx.created_at else None,
+                })
+
+        total_gains = sum(c['amount'] for c in commissions)
+
+        return Response({
+            'code':         code,
+            'lien':         f'https://fagni.app/ref/{code}',
+            'total_gains':  total_gains,
+            'commissions':  commissions,
+            'filleuls':     ReferralLink.objects.filter(sponsor=customer).count() if link else 0,
+        })
+    except Exception as e:
+        return Response({'code': f'FAGNI-{customer.id}', 'total_gains': 0, 'commissions': [], 'filleuls': 0})

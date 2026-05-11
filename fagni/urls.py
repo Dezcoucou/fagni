@@ -1,3 +1,4 @@
+from orders.partner_api import partner_login, partner_orders, partner_update_status
 from orders.client_api import api_login, api_home, api_orders, api_order_detail, api_pricing_bags, api_create_order, api_articles, api_wallet, api_parrainage
 from django.contrib import admin
 from django.urls import path, include
@@ -17,6 +18,9 @@ urlpatterns = [
     path("api/client/articles/",          api_articles,     name="api-client-articles"),
     path("api/client/wallet/",             api_wallet,       name="api-client-wallet"),
     path("api/client/parrainage/",         api_parrainage,   name="api-client-parrainage"),
+    path("api/partner/login/",              partner_login,         name="api-partner-login"),
+    path("api/partner/orders/",             partner_orders,        name="api-partner-orders"),
+    path("api/partner/orders/<int:order_id>/status/", partner_update_status, name="api-partner-status"),
 
     path("admin/", admin.site.urls),
     path("", home, name="home"),

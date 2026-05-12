@@ -97,6 +97,57 @@ def api_login(request):
     })
 
 
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_register(request):
+    """POST /api/client/auth/register/ — {phone, name, referral_code}"""
+    phone = (request.data.get('phone') or '').strip()
+    name  = (request.data.get('name') or '').strip()
+    referral_code = (request.data.get('referral_code') or '').strip()
+
+    if not phone:
+        return Response({'error': 'Numéro requis'}, status=400)
+    if not name:
+        return Response({'error': 'Nom requis'}, status=400)
+
+    # Vérifier si client existe déjà
+    existing = Customer.objects.filter(phone=phone).first()
+    if existing:
+        return Response({
+            'access': _make_token(existing),
+            'customer': {'name': existing.name, 'phone': existing.phone},
+            'created': False
+        })
+
+    # Créer le client
+    customer = Customer.objects.create(name=name, phone=phone)
+
+    # Créer son ReferralLink
+    try:
+        from mlm.models import ReferralLink
+        sponsor = None
+        if referral_code:
+            sponsor = ReferralLink.objects.filter(referral_code=referral_code).first()
+
+        # Générer un code unique pour ce client
+        import uuid
+        code = f'FAGNI-{customer.id}-{uuid.uuid4().hex[:4].upper()}'
+        ReferralLink.objects.create(
+            customer=customer,
+            referral_code=code,
+            sponsor=sponsor,
+            actor_type='customer'
+        )
+    except Exception as e:
+        pass  # Ne pas bloquer l'inscription si MLM échoue
+
+    return Response({
+        'access': _make_token(customer),
+        'customer': {'name': customer.name, 'phone': customer.phone},
+        'created': True
+    }, status=201)
+
 @api_view(['GET'])
 @authentication_classes([ClientAuth])
 @permission_classes([])

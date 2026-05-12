@@ -22,7 +22,8 @@ def partner_login(request):
         return Response({'error': 'Numéro requis'}, status=400)
     try:
         from partners.models import LaundryPartner
-        partner = LaundryPartner.objects.get(phone=phone, is_active=True)
+        partner = LaundryPartner.objects.filter(phone=phone, is_active=True).first()
+        if not partner: raise Exception('not found')
     except Exception:
         return Response({'error': 'Partenaire non trouvé'}, status=404)
 

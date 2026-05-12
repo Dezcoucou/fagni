@@ -218,6 +218,23 @@ class CycleOrderLinkedFilter(admin.SimpleListFilter):
 # ============================================================
 
 
+
+def notify_partner_whatsapp_action(modeladmin, request, queryset):
+    from django.contrib import messages
+    links = []
+    for order in queryset:
+        notes = order.notes or ""
+        for line in notes.split("\n"):
+            if line.startswith("WA_PARTNER:"):
+                link = line.replace("WA_PARTNER:", "").strip()
+                links.append(f"Commande {order.code} : {link}")
+    if links:
+        messages.info(request, " | ".join(links[:5]))
+    else:
+        messages.warning(request, "Aucun lien WhatsApp. Assigne une blanchisserie d'abord.")
+
+notify_partner_whatsapp_action.short_description = "Envoyer notification WhatsApp partenaire"
+
 @admin.register(Customer)
 class CustomerAdmin(UnfoldModelAdmin):
     list_display  = ("name", "phone", "address", "nb_commandes", "montant_total")

@@ -1,5 +1,5 @@
 from orders.partner_api import partner_login, partner_orders, partner_update_status
-from orders.ops_api import ops_login, ops_dashboard, ops_assign_partner, ops_update_status, ops_assign_driver, ops_mark_paid
+from orders.ops_api import ops_login, ops_dashboard, ops_assign_partner, ops_update_status, ops_assign_driver, ops_mark_paid, ops_add_partner, ops_add_driver, ops_list_partners
 from orders.driver_api import driver_login, driver_missions, driver_confirm_pickup, driver_confirm_delivery
 from orders.photo_api import driver_upload_photo, partner_upload_photo, order_photos
 from orders.client_api import api_login, api_home, api_orders, api_order_detail, api_pricing_bags, api_create_order, api_articles, api_wallet, api_parrainage, api_rate_order, api_register
@@ -32,6 +32,9 @@ urlpatterns = [
     path("api/ops/orders/<int:order_id>/status/", ops_update_status,  name="api-ops-status"),
     path("api/ops/orders/<int:order_id>/assign-driver/", ops_assign_driver, name="api-ops-assign-driver"),
     path("api/ops/orders/<int:order_id>/mark-paid/",    ops_mark_paid,    name="api-ops-mark-paid"),
+    path("api/ops/partners/",      ops_list_partners, name="api-ops-partners"),
+    path("api/ops/partners/add/",  ops_add_partner,   name="api-ops-add-partner"),
+    path("api/ops/drivers/add/",   ops_add_driver,    name="api-ops-add-driver"),
     path("api/driver/login/",                          driver_login,            name="api-driver-login"),
     path("api/driver/missions/",                       driver_missions,         name="api-driver-missions"),
     path("api/driver/orders/<int:order_id>/pickup/",   driver_confirm_pickup,   name="api-driver-pickup"),

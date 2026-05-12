@@ -4168,3 +4168,31 @@ class WaveEvent(models.Model):
     class Meta:
         verbose_name = 'Événement Wave'
         verbose_name_plural = 'Événements Wave'
+
+
+class PricingConfig(models.Model):
+    """
+    Configuration des prix FAGNI — modifiable via admin.
+    NE JAMAIS hardcoder les prix dans le code.
+    """
+    bag_size = models.CharField(
+        "Taille sac",
+        max_length=20,
+        choices=[('small','Petit sac'),('medium','Sac moyen'),('large','Grand sac')],
+        unique=True
+    )
+    pressing_amount = models.PositiveIntegerField("Prix pressing (FCFA)", default=5000)
+    delivery_fee    = models.PositiveIntegerField("Frais livraison (FCFA)", default=2000)
+    is_active       = models.BooleanField("Actif", default=True)
+    label           = models.CharField("Label affiché", max_length=50, blank=True)
+    description     = models.CharField("Description", max_length=100, blank=True)
+    created_at      = models.DateTimeField(auto_now_add=True)
+    updated_at      = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Configuration prix"
+        verbose_name_plural = "Configuration des prix"
+        ordering = ["pressing_amount"]
+
+    def __str__(self):
+        return f"{self.get_bag_size_display()} — {self.pressing_amount:,} FCFA"

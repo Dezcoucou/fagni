@@ -237,21 +237,7 @@ def api_order_detail(request, order_id):
     })
 
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def api_pricing_bags(request):
-    """GET /api/client/pricing/bags/ — tarifs sacs depuis BAG_PRICING"""
-    from orders.utils.pricing import BAG_PRICING
-    bags = [
-        {
-            'id':               key,
-            'label':            val['label'],
-            'price':            int(val['price']),
-            'estimated_items':  val['estimated_items'],
-        }
-        for key, val in BAG_PRICING.items()
-    ]
-    return Response({'bags': bags})
+
 
 
 @api_view(['POST'])
@@ -519,4 +505,28 @@ def api_pricing_detail(request):
     pricing = calculate_bag_pricing(bag, zone)
     pricing['receipt'] = format_receipt(pricing)
     return Response(pricing)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_pricing_bags(request):
+    """GET /api/client/pricing/bags/ — prix depuis la DB"""
+    from orders.models import PricingConfig
+    from orders.pricing_engine import calculate_order
+
+    configs = PricingConfig.objects.filter(is_active=True).order_by('pressing_amount')
+    result = {}
+    for config in configs:
+        pricing = calculate_order(config.pressing_amount, config.delivery_fee)
+        result[config.bag_size] = {
+            'label':            config.label or config.get_bag_size_display(),
+            'description':      config.description,
+            'pressing_amount':  config.pressing_amount,
+            'delivery_fee':     config.delivery_fee,
+            'service_fee':      pricing['service_fee'],
+            'total_client':     pricing['total_client'],
+            'total_fagni':      pricing['total_fagni'],
+            'part_pressing':    pricing['part_pressing'],
+            'part_livreur':     pricing['part_livreur'],
+        }
+    return Response(result)
 

@@ -124,3 +124,7 @@ def format_receipt(pricing):
         f"━━━━━━━━━━━━━━\n"
         f"💰 TOTAL        : {pricing['total_client']:,} FCFA\n"
     )
+
+
+# Alias pour compatibilité avec le code existant
+compute_order_pricing = calculate_order

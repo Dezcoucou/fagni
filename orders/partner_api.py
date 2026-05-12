@@ -64,8 +64,7 @@ def partner_orders(request):
             'pickup_address': o.pickup_address or '',
             'bag_size':       o.bag_size or '',
             'created_at':     o.created_at.isoformat() if o.created_at else None,
-            'customer_name':  o.customer.name if o.customer else '—',
-            'customer_phone': o.customer.phone if o.customer else '—',
+            'zone':           o.pickup_address.split(',')[0] if o.pickup_address else '—',
         })
 
     stats = {

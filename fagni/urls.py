@@ -1,6 +1,7 @@
 from orders.partner_api import partner_login, partner_orders, partner_update_status
 from orders.ops_api import ops_login, ops_dashboard, ops_assign_partner, ops_update_status, ops_assign_driver, ops_mark_paid
 from orders.driver_api import driver_login, driver_missions, driver_confirm_pickup, driver_confirm_delivery
+from orders.photo_api import driver_upload_photo, partner_upload_photo, order_photos
 from orders.client_api import api_login, api_home, api_orders, api_order_detail, api_pricing_bags, api_create_order, api_articles, api_wallet, api_parrainage, api_rate_order
 from django.contrib import admin
 from django.urls import path, include
@@ -34,6 +35,9 @@ urlpatterns = [
     path("api/driver/missions/",                       driver_missions,         name="api-driver-missions"),
     path("api/driver/orders/<int:order_id>/pickup/",   driver_confirm_pickup,   name="api-driver-pickup"),
     path("api/driver/orders/<int:order_id>/delivery/", driver_confirm_delivery, name="api-driver-delivery"),
+    path("api/driver/orders/<int:order_id>/photo/",    driver_upload_photo,    name="api-driver-photo"),
+    path("api/partner/orders/<int:order_id>/photo/",   partner_upload_photo,   name="api-partner-photo"),
+    path("api/ops/orders/<int:order_id>/photos/",      order_photos,           name="api-ops-photos"),
 
     path("admin/", admin.site.urls),
     path("", home, name="home"),

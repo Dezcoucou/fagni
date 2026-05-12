@@ -299,7 +299,7 @@ def notify_partner_on_assignment(sender, instance, created, **kwargs):
                 f"Connectez-vous sur fagni-partner.vercel.app"
             )
             encoded = msg.replace(' ', '%20').replace('\n', '%0A')
-        wa_link = f"https://wa.me/{phone}?text={encoded}" 
+            wa_link = f"https://wa.me/{phone}?text={encoded}"
 
             # Stocker le lien dans les notes si pas déjà présent
             notes = instance.notes or ''

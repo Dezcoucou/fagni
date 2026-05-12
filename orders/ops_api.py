@@ -222,3 +222,68 @@ def ops_mark_paid(request, order_id):
         })
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def ops_add_partner(request):
+    """POST /api/ops/partners/add/ — {name, phone, city, address}"""
+    try:
+        _check_ops(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    try:
+        from partners.models import LaundryPartner
+        partner = LaundryPartner.objects.create(
+            name=request.data.get('name','').strip(),
+            phone=request.data.get('phone','').strip(),
+            city=request.data.get('city','Abidjan').strip(),
+            address=request.data.get('address','').strip(),
+            is_active=True
+        )
+        return Response({'success': True, 'id': partner.id, 'name': partner.name})
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def ops_add_driver(request):
+    """POST /api/ops/drivers/add/ — {name, phone, vehicle_type}"""
+    try:
+        _check_ops(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    try:
+        from partners.models import DeliveryPartner
+        driver = DeliveryPartner.objects.create(
+            name=request.data.get('name','').strip(),
+            phone=request.data.get('phone','').strip(),
+            vehicle_type=request.data.get('vehicle_type','moto').strip(),
+            city=request.data.get('city','Abidjan').strip(),
+            is_active=True
+        )
+        return Response({'success': True, 'id': driver.id, 'name': driver.name})
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def ops_list_partners(request):
+    """GET /api/ops/partners/ — liste blanchisseries + livreurs"""
+    try:
+        _check_ops(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    from partners.models import LaundryPartner, DeliveryPartner
+    partners = list(LaundryPartner.objects.filter(is_active=True).values(
+        'id','name','phone','city','address'
+    ))
+    drivers = list(DeliveryPartner.objects.filter(is_active=True).values(
+        'id','name','phone','city','vehicle_type'
+    ))
+    return Response({'partners': partners, 'drivers': drivers})

@@ -1064,13 +1064,22 @@ class Order(models.Model):
         verbose_name="Blanchisserie partenaire",
     )
 
+    pickup_driver = models.ForeignKey(
+        DeliveryPartner,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pickup_orders",
+        verbose_name="Livreur collecte",
+    )
+
     delivery_partner = models.ForeignKey(
         DeliveryPartner,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="orders",
-        verbose_name="Livreur partenaire",
+        verbose_name="Livreur livraison",
     )
 
     # Point relais partenaire (optionnel)

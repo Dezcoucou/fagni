@@ -88,8 +88,10 @@ def ops_dashboard(request):
             'partner_id':     partner.id if partner else None,
             'wa_client':      wa_client,
             'wa_partner':     wa_partner,
-            'driver_name':    o.delivery_partner.name if o.delivery_partner else None,
-            'driver_id':      o.delivery_partner.id if o.delivery_partner else None,
+            'delivery_driver_name': o.delivery_partner.name if o.delivery_partner else None,
+            'delivery_driver_id':   o.delivery_partner.id if o.delivery_partner else None,
+            'pickup_driver_name':   o.pickup_driver.name if o.pickup_driver else None,
+            'pickup_driver_id':     o.pickup_driver.id if o.pickup_driver else None,
             'created_at':     o.created_at.isoformat() if o.created_at else None,
         })
 
@@ -176,8 +178,13 @@ def ops_assign_driver(request, order_id):
         order = Order.objects.get(id=order_id)
         driver_id = request.data.get('driver_id')
         driver = DeliveryPartner.objects.get(id=driver_id) if driver_id else None
-        order.delivery_partner = driver
-        order.save(update_fields=['delivery_partner', 'updated_at'])
-        return Response({'success': True, 'driver': driver.name if driver else None})
+        driver_type = request.data.get('driver_type', 'delivery')
+        if driver_type == 'pickup':
+            order.pickup_driver = driver
+            order.save(update_fields=['pickup_driver', 'updated_at'])
+        else:
+            order.delivery_partner = driver
+            order.save(update_fields=['delivery_partner', 'updated_at'])
+        return Response({'success': True, 'driver': driver.name if driver else None, 'type': driver_type})
     except Exception as e:
         return Response({'error': str(e)}, status=400)

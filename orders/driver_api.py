@@ -79,10 +79,19 @@ def driver_missions(request):
         return Response({'missions': result, 'driver': driver.name})
     except Exception as e:
         # Si pas de table Mission, retourner commandes directement
-        orders = Order.objects.filter(
+        # Missions collecte (pickup_driver)
+        pickup_orders = Order.objects.filter(
+            pickup_driver=driver,
+            status__in=['pending']
+        ).select_related('customer').order_by('-created_at')[:10]
+
+        # Missions livraison (delivery_partner)
+        delivery_orders = Order.objects.filter(
             delivery_partner=driver,
-            status__in=['pending','in_progress']
-        ).select_related('customer').order_by('-created_at')[:20]
+            status__in=['in_progress','done']
+        ).select_related('customer').order_by('-created_at')[:10]
+
+        orders = list(pickup_orders) + list(delivery_orders)
 
         result = []
         for o in orders:
@@ -90,7 +99,7 @@ def driver_missions(request):
                 'mission_id':   o.id,
                 'order_id':     o.id,
                 'order_code':   o.code or str(o.id),
-                'mission_type': 'pickup' if o.status == 'pending' else 'delivery',
+                'mission_type': 'pickup' if o in list(pickup_orders) else 'delivery',
                 'status':       'assigned',
                 'zone':         (o.pickup_address or '').split(',')[0] if o.pickup_address else 'Abidjan',
                 'bag_size':     o.bag_size or '',

@@ -517,3 +517,5 @@ CORS_ALLOWED_ORIGINS = [
     "https://fagni-partner.vercel.app",
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+OPS_PASSWORD = os.getenv('OPS_PASSWORD', 'fagni2025')

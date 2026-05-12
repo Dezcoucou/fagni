@@ -188,3 +188,37 @@ def ops_assign_driver(request, order_id):
         return Response({'success': True, 'driver': driver.name if driver else None, 'type': driver_type})
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def ops_mark_paid(request, order_id):
+    """POST /api/ops/orders/<id>/mark-paid/ — marquer commande comme payée"""
+    try:
+        _check_ops(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    from orders.models import Order
+    try:
+        order = Order.objects.get(id=order_id)
+        channel = request.data.get('channel', 'wave')
+        reference = request.data.get('reference', '').strip()
+
+        order.payment_status = 'paid'
+        order.amount_paid = order.total
+        order.payment_declared_channel = channel
+        order.payment_declared_reference = reference
+        order.save(update_fields=[
+            'payment_status', 'amount_paid',
+            'payment_declared_channel', 'payment_declared_reference',
+            'updated_at'
+        ])
+        return Response({
+            'success': True,
+            'payment_status': 'paid',
+            'amount': float(order.total or 0),
+            'channel': channel
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

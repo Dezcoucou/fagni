@@ -263,3 +263,48 @@ def order_post_save_trigger_payouts_when_paid(sender, instance: Order, created=F
             _schedule_payouts_for_paid_order(int(instance.pk))
     except Exception:
         pass
+
+
+# ── Notification WhatsApp partenaire (wa.me) ──────────────────
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+@receiver(post_save, sender=Order, dispatch_uid="notify_partner_whatsapp")
+def notify_partner_on_assignment(sender, instance, created, **kwargs):
+    """
+    Quand une commande est assignée à une blanchisserie,
+    génère et stocke le lien WhatsApp dans les notes de la commande.
+    """
+    try:
+        partner = instance.laundry_partner
+        if not partner or not partner.phone:
+            return
+
+        phone = partner.phone.replace(' ', '').replace('-', '')
+        if not phone.startswith('+'):
+            phone = '225' + phone.lstrip('0')
+
+        code = instance.code or str(instance.id)
+        bag = {'small': 'Petit sac', 'medium': 'Sac moyen', 'large': 'Grand sac'}.get(
+            instance.bag_size or '', 'Sac'
+        )
+
+        if instance.status == 'pending' and instance.laundry_partner_id:
+            msg = (
+                f"🧺 Bonjour {partner.name} !\n\n"
+                f"Nouvelle commande FAGNI reçue.\n"
+                f"Code : *{code}*\n"
+                f"Taille : *{bag}*\n\n"
+                f"Le livreur FAGNI va déposer le sac chez vous.\n"
+                f"Connectez-vous sur fagni-partner.vercel.app"
+            )
+            wa_link = f"https://wa.me/{phone}?text={msg.replace(' ', '%20').replace('\n', '%0A')}"
+
+            # Stocker le lien dans les notes si pas déjà présent
+            notes = instance.notes or ''
+            if 'WA_PARTNER:' not in notes:
+                Order.objects.filter(pk=instance.pk).update(
+                    notes=notes + f'\nWA_PARTNER:{wa_link}'
+                )
+    except Exception:
+        pass

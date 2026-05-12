@@ -468,3 +468,33 @@ def api_rate_order(request, order_id):
         return Response({'success': True, 'score': score, 'created': created})
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_report_litige(request, order_id):
+    """POST /api/client/orders/<id>/litige/ — {type, description}"""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        import jwt
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        from orders.models import Customer
+        customer = Customer.objects.get(id=payload['cid'])
+    except Exception:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    try:
+        from orders.models import Order
+        order = Order.objects.get(id=order_id, customer=customer)
+        litige_type = request.data.get('type', '').strip()
+        description = request.data.get('description', '').strip()
+
+        # Stocker dans les notes de la commande
+        notes = order.notes or ''
+        tag = f'\nLITIGE:{litige_type}|{description[:200]}'
+        order.notes = notes + tag
+        order.save(update_fields=['notes', 'updated_at'])
+
+        return Response({'success': True, 'message': 'Litige enregistré'})
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

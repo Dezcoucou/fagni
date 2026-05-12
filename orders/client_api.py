@@ -316,7 +316,6 @@ def api_create_order(request):
             service_fee=service_fee,
             notes=' | '.join(notes_parts),
             status='pending',
-            service_fee=pricing['service_fee'],
             delivery_fee=pricing['delivery_fee'],
             commission_delivery_ht=pricing['marge_livraison'],
             commission_laundry_ht=pricing['commission_pressing'],

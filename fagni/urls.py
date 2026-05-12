@@ -1,7 +1,7 @@
 from orders.partner_api import partner_login, partner_orders, partner_update_status
 from orders.ops_api import ops_login, ops_dashboard, ops_assign_partner, ops_update_status, ops_assign_driver
 from orders.driver_api import driver_login, driver_missions, driver_confirm_pickup, driver_confirm_delivery
-from orders.client_api import api_login, api_home, api_orders, api_order_detail, api_pricing_bags, api_create_order, api_articles, api_wallet, api_parrainage
+from orders.client_api import api_login, api_home, api_orders, api_order_detail, api_pricing_bags, api_create_order, api_articles, api_wallet, api_parrainage, api_rate_order
 from django.contrib import admin
 from django.urls import path, include
 from fagni.views import home, landing_riviera3
@@ -20,6 +20,7 @@ urlpatterns = [
     path("api/client/articles/",          api_articles,     name="api-client-articles"),
     path("api/client/wallet/",             api_wallet,       name="api-client-wallet"),
     path("api/client/parrainage/",         api_parrainage,   name="api-client-parrainage"),
+    path("api/client/orders/<int:order_id>/rate/", api_rate_order, name="api-client-rate"),
     path("api/partner/login/",              partner_login,         name="api-partner-login"),
     path("api/partner/orders/",             partner_orders,        name="api-partner-orders"),
     path("api/partner/orders/<int:order_id>/status/", partner_update_status, name="api-partner-status"),

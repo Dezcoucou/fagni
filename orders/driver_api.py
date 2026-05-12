@@ -1,0 +1,184 @@
+"""API Livreur FAGNI"""
+import jwt
+from django.conf import settings
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+
+
+def _get_driver(request):
+    token = request.headers.get('Authorization','').replace('Bearer ','')
+    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+    from partners.models import DeliveryPartner
+    return DeliveryPartner.objects.get(id=payload['did'])
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def driver_login(request):
+    """POST /api/driver/login/ — {phone}"""
+    phone = (request.data.get('phone') or '').strip()
+    if not phone:
+        return Response({'error': 'Numéro requis'}, status=400)
+    try:
+        from partners.models import DeliveryPartner
+        driver = DeliveryPartner.objects.filter(phone=phone, is_active=True).first()
+        if not driver:
+            raise Exception('not found')
+    except:
+        return Response({'error': 'Livreur non trouvé'}, status=404)
+
+    token = jwt.encode(
+        {'did': driver.id, 'name': driver.name},
+        settings.SECRET_KEY, algorithm='HS256'
+    )
+    return Response({
+        'access': token,
+        'driver': {
+            'id': driver.id,
+            'name': driver.name,
+            'phone': driver.phone,
+            'vehicle': driver.vehicle_type or 'moto'
+        }
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def driver_missions(request):
+    """GET /api/driver/missions/ — missions du livreur"""
+    try:
+        driver = _get_driver(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    from orders.models import Order
+    from logistics.models import Mission
+
+    # Missions actives assignées à ce livreur
+    try:
+        missions = Mission.objects.filter(
+            driver=driver,
+            status__in=['assigned','in_progress','pending']
+        ).select_related('order','order__customer').order_by('created_at')[:20]
+
+        result = []
+        for m in missions:
+            o = m.order
+            result.append({
+                'mission_id':   m.id,
+                'order_id':     o.id,
+                'order_code':   o.code or str(o.id),
+                'mission_type': m.leg_type if hasattr(m,'leg_type') else 'pickup',
+                'status':       m.status,
+                'zone':         (o.pickup_address or '').split(',')[0] if o.pickup_address else 'Abidjan',
+                'bag_size':     o.bag_size or '',
+                'order_status': o.status,
+                'created_at':   m.created_at.isoformat() if m.created_at else None,
+            })
+        return Response({'missions': result, 'driver': driver.name})
+    except Exception as e:
+        # Si pas de table Mission, retourner commandes directement
+        orders = Order.objects.filter(
+            delivery_partner=driver,
+            status__in=['pending','in_progress']
+        ).select_related('customer').order_by('-created_at')[:20]
+
+        result = []
+        for o in orders:
+            result.append({
+                'mission_id':   o.id,
+                'order_id':     o.id,
+                'order_code':   o.code or str(o.id),
+                'mission_type': 'pickup' if o.status == 'pending' else 'delivery',
+                'status':       'assigned',
+                'zone':         (o.pickup_address or '').split(',')[0] if o.pickup_address else 'Abidjan',
+                'bag_size':     o.bag_size or '',
+                'order_status': o.status,
+                'created_at':   o.created_at.isoformat() if o.created_at else None,
+            })
+        return Response({'missions': result, 'driver': driver.name})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def driver_confirm_pickup(request, order_id):
+    """POST /api/driver/orders/<id>/pickup/ — confirmer collecte"""
+    try:
+        driver = _get_driver(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    from orders.models import Order, OrderEvidencePhoto
+    try:
+        order = Order.objects.get(id=order_id)
+        articles_count = request.data.get('articles_count', 0)
+        notes = request.data.get('notes', '')
+
+        # Mettre à jour les notes avec le compte articles
+        existing_notes = order.notes or ''
+        order.notes = existing_notes + f'\nCOLLECTE:{articles_count} articles. {notes}'
+        order.save(update_fields=['notes', 'updated_at'])
+
+        # Générer lien WhatsApp reçu pour le client
+        client_phone = order.customer.phone if order.customer else ''
+        if client_phone:
+            p = client_phone.replace(' ','').replace('-','')
+            if not p.startswith('+'): p = '225' + p.lstrip('0')
+            bag = {'small':'Petit sac','medium':'Sac moyen','large':'Grand sac'}.get(order.bag_size or '','Sac')
+            msg = (
+                f"Bonjour ! Votre collecte FAGNI est confirmée.\n"
+                f"Commande : {order.code}\n"
+                f"Sac : {bag}\n"
+                f"Articles comptés : {articles_count}\n"
+                f"Vos vêtements sont entre de bonnes mains !"
+            )
+            encoded = msg.replace(' ','%20').replace('\n','%0A')
+            wa_link = f"https://wa.me/{p}?text={encoded}"
+        else:
+            wa_link = ''
+
+        return Response({
+            'success': True,
+            'wa_client': wa_link,
+            'message': f'Collecte confirmée — {articles_count} articles'
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def driver_confirm_delivery(request, order_id):
+    """POST /api/driver/orders/<id>/delivery/ — confirmer livraison"""
+    try:
+        driver = _get_driver(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    from orders.models import Order
+    try:
+        order = Order.objects.get(id=order_id)
+        order.status = 'done'
+        notes = order.notes or ''
+        order.notes = notes + f'\nLIVRAISON:Confirmée par livreur {driver.name}'
+        order.save(update_fields=['status', 'notes', 'updated_at'])
+
+        # WhatsApp client — livraison confirmée
+        client_phone = order.customer.phone if order.customer else ''
+        wa_link = ''
+        if client_phone:
+            p = client_phone.replace(' ','').replace('-','')
+            if not p.startswith('+'): p = '225' + p.lstrip('0')
+            msg = (
+                f"Bonjour ! Vos vêtements FAGNI ont été livrés.\n"
+                f"Commande : {order.code}\n"
+                f"Merci de votre confiance !\n"
+                f"Notez votre expérience : fagni-client.vercel.app"
+            )
+            encoded = msg.replace(' ','%20').replace('\n','%0A')
+            wa_link = f"https://wa.me/{p}?text={encoded}"
+
+        return Response({'success': True, 'wa_client': wa_link})
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

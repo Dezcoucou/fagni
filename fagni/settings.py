@@ -516,6 +516,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://fagni-client.vercel.app",
     "https://fagni-partner.vercel.app",
     "https://fagni-ops.vercel.app",
+    "https://fagni-driver.vercel.app",
 ]
 CORS_ALLOW_CREDENTIALS = True
 

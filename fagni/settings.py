@@ -521,3 +521,12 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 OPS_PASSWORD = os.getenv('OPS_PASSWORD', 'fagni2025')
+
+# Cloudinary
+import cloudinary
+cloudinary.config(
+    cloud_name = os.getenv('Racine', ''),
+    api_key    = os.getenv('812291377152719', ''),
+    api_secret = os.getenv('AJVTqTttX9G3mjpAWXHSEcWpAbY', ''),
+    secure     = True
+)

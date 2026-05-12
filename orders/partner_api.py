@@ -61,7 +61,6 @@ def partner_orders(request):
             'payment_status': o.payment_status,
             'service_type':   o.service_type or 'pressing',
             'total':          float(o.total or 0),
-            'pickup_address': o.pickup_address or '',
             'bag_size':       o.bag_size or '',
             'created_at':     o.created_at.isoformat() if o.created_at else None,
             'zone':           o.pickup_address.split(',')[0] if o.pickup_address else '—',

@@ -88,6 +88,8 @@ def ops_dashboard(request):
             'partner_id':     partner.id if partner else None,
             'wa_client':      wa_client,
             'wa_partner':     wa_partner,
+            'driver_name':    o.delivery_partner.name if o.delivery_partner else None,
+            'driver_id':      o.delivery_partner.id if o.delivery_partner else None,
             'created_at':     o.created_at.isoformat() if o.created_at else None,
         })
 
@@ -106,7 +108,11 @@ def ops_dashboard(request):
     # Partenaires pour filtre
     partners = list(LaundryPartner.objects.filter(is_active=True).values('id','name','phone'))
 
-    return Response({'orders': orders, 'stats': stats, 'partners': partners})
+    # Livreurs
+    from partners.models import DeliveryPartner
+    drivers = list(DeliveryPartner.objects.filter(is_active=True).values('id','name','phone'))
+
+    return Response({'orders': orders, 'stats': stats, 'partners': partners, 'drivers': drivers})
 
 
 @api_view(['POST'])
@@ -151,5 +157,27 @@ def ops_update_status(request, order_id):
         order.status = new_status
         order.save(update_fields=['status','updated_at'])
         return Response({'success': True, 'status': new_status})
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def ops_assign_driver(request, order_id):
+    """POST /api/ops/orders/<id>/assign-driver/ — {driver_id}"""
+    try:
+        _check_ops(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    from orders.models import Order
+    from partners.models import DeliveryPartner
+    try:
+        order = Order.objects.get(id=order_id)
+        driver_id = request.data.get('driver_id')
+        driver = DeliveryPartner.objects.get(id=driver_id) if driver_id else None
+        order.delivery_partner = driver
+        order.save(update_fields=['delivery_partner', 'updated_at'])
+        return Response({'success': True, 'driver': driver.name if driver else None})
     except Exception as e:
         return Response({'error': str(e)}, status=400)

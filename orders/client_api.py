@@ -299,6 +299,10 @@ def api_create_order(request):
         notes_parts.append(f"Creneau: {pickup_slot}")
 
     try:
+        # Calcul financier via pricing engine
+        from orders.pricing_engine import calculate_order
+        pricing = calculate_order(total, 2000)
+
         order = Order.objects.create(
             customer=customer,
             bag_size=bag_size,
@@ -312,6 +316,13 @@ def api_create_order(request):
             service_fee=service_fee,
             notes=' | '.join(notes_parts),
             status='pending',
+            service_fee=pricing['service_fee'],
+            delivery_fee=pricing['delivery_fee'],
+            commission_delivery_ht=pricing['marge_livraison'],
+            commission_laundry_ht=pricing['commission_pressing'],
+            amount_driver_partner=pricing['part_livreur'],
+            amount_laundry_partner=pricing['part_pressing'],
+            fagni_revenue_ht=pricing['total_fagni'],
         )
         return Response({
             'order_id':      order.id,
@@ -498,3 +509,15 @@ def api_report_litige(request, order_id):
         return Response({'success': True, 'message': 'Litige enregistré'})
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_pricing_detail(request):
+    """GET /api/client/pricing/detail/?bag=small&zone=standard"""
+    from orders.pricing_engine import calculate_bag_pricing, format_receipt
+    bag  = request.GET.get('bag', 'small')
+    zone = request.GET.get('zone', 'standard')
+    pricing = calculate_bag_pricing(bag, zone)
+    pricing['receipt'] = format_receipt(pricing)
+    return Response(pricing)
+

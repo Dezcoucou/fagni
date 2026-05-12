@@ -1,117 +1,126 @@
-from __future__ import annotations
-
-from dataclasses import dataclass, asdict
-from decimal import Decimal
-from typing import Any, Dict
-
-from orders.finance import compute_order_financials
-
-
-DECIMAL_ZERO = Decimal("0.00")
+"""
+FAGNI Pricing Engine v1.0
+Source of truth unique pour tous les calculs financiers.
+NE JAMAIS calculer les marges dans le frontend.
+"""
+from decimal import Decimal, ROUND_HALF_UP
 
 
-def _to_decimal(value: Any) -> Decimal:
-    try:
-        return Decimal(str(value if value is not None else 0))
-    except Exception:
-        return DECIMAL_ZERO
+def d(val):
+    """Convertir en Decimal propre."""
+    return Decimal(str(val or 0)).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 
 
-@dataclass(frozen=True)
-class PricingResult:
-    prestation_total: Decimal
-    delivery_fee_client: Decimal
-    delivery_cost_driver: Decimal
-    service_fee_ht: Decimal
-    vat_fagni: Decimal
-    service_fee_client_ttc: Decimal
-    express_surcharge: Decimal
-    express_for_client: Decimal
-    express_extra_fee_client: Decimal
-    commission_laundry_ht: Decimal
-    commission_delivery_ht: Decimal
-    amount_laundry: Decimal
-    amount_driver: Decimal
-    margin_delivery: Decimal
-    fagni_revenue_ht: Decimal
-    upsell_total: Decimal
-    total_client_ttc: Decimal
-    amount_paid: Decimal
-    amount_remaining: Decimal
-
-    def to_dict(self) -> Dict[str, Decimal]:
-        return asdict(self)
+# Taux officiels FAGNI
+COMMISSION_PRESSING   = Decimal('0.30')   # 30% sur prestation pressing
+SERVICE_FEE_RATE      = Decimal('0.05')   # 5% service fee client
+COMMISSION_LIVRAISON  = Decimal('0.30')   # 30% sur frais livraison
+PART_LIVREUR          = Decimal('0.70')   # 70% des frais livraison au livreur
 
 
-def compute_order_pricing(order) -> PricingResult:
+def calculate_order(pressing_amount, delivery_fee=2000):
     """
-    Source unique de vérité du pricing affichable / payable.
-    Ne modifie rien en base.
+    Calcul complet d'une commande FAGNI.
+
+    Args:
+        pressing_amount : Prix de la prestation pressing (FCFA)
+        delivery_fee    : Frais de livraison facturés au client (défaut 2000 FCFA)
+
+    Returns:
+        dict avec tous les montants décomposés
     """
-    raw = compute_order_financials(order) or {}
+    pressing   = d(pressing_amount)
+    livraison  = d(delivery_fee)
 
-    prestation_total = _to_decimal(raw.get("prestation_total"))
-    delivery_fee_client = _to_decimal(raw.get("delivery_fee_client"))
-    delivery_cost_driver = _to_decimal(raw.get("delivery_cost_driver"))
-    service_fee_ht = _to_decimal(raw.get("service_fee_ht"))
-    vat_fagni = _to_decimal(raw.get("vat_fagni"))
-    express_surcharge = _to_decimal(raw.get("express_surcharge"))
-    express_for_client = _to_decimal(raw.get("express_for_client"))
-    express_extra_fee_client = _to_decimal(raw.get("express_extra_fee_client"))
-    commission_laundry_ht = _to_decimal(raw.get("commission_laundry_ht"))
-    commission_delivery_ht = _to_decimal(raw.get("commission_delivery_ht"))
-    amount_laundry = _to_decimal(raw.get("amount_laundry"))
-    amount_driver = _to_decimal(raw.get("amount_driver"))
-    margin_delivery = _to_decimal(raw.get("margin_delivery"))
-    fagni_revenue_ht = _to_decimal(raw.get("fagni_revenue_ht"))
+    # Commission pressing
+    commission_pressing = (pressing * COMMISSION_PRESSING).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+    part_pressing       = pressing - commission_pressing
 
-    service_fee_client_ttc = service_fee_ht + vat_fagni
+    # Service fee
+    service_fee = (pressing * SERVICE_FEE_RATE).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 
-    try:
-        upsell = getattr(order, "upsell", None)
-        upsell_total = _to_decimal(getattr(upsell, "total", 0)) if upsell else DECIMAL_ZERO
-    except Exception:
-        upsell_total = DECIMAL_ZERO
+    # Livraison
+    part_livreur       = (livraison * PART_LIVREUR).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+    marge_livraison    = livraison - part_livreur
 
-    total_client_ttc = _to_decimal(
-        raw.get("total_client_ttc", raw.get("total_ttc_client", 0))
-    )
+    # Totaux
+    total_client = pressing + livraison + service_fee
+    total_fagni  = commission_pressing + marge_livraison + service_fee
+    total_ops    = pressing + livraison  # ce que FAGNI encaisse avant redistribution
 
-    if total_client_ttc <= DECIMAL_ZERO:
-        total_client_ttc = (
-            prestation_total
-            + delivery_fee_client
-            + service_fee_client_ttc
-            + express_extra_fee_client
-            + upsell_total
-        )
+    return {
+        # Ce que le client paie
+        'total_client':         int(total_client),
+        'pressing_amount':      int(pressing),
+        'delivery_fee':         int(livraison),
+        'service_fee':          int(service_fee),
 
-    amount_paid = _to_decimal(getattr(order, "amount_paid", 0))
-    if amount_paid < DECIMAL_ZERO:
-        amount_paid = DECIMAL_ZERO
+        # Ce que FAGNI redistribue
+        'part_pressing':        int(part_pressing),
+        'part_livreur':         int(part_livreur),
 
-    amount_remaining = total_client_ttc - amount_paid
-    if amount_remaining < DECIMAL_ZERO:
-        amount_remaining = DECIMAL_ZERO
+        # Revenus FAGNI
+        'commission_pressing':  int(commission_pressing),
+        'marge_livraison':      int(marge_livraison),
+        'total_fagni':          int(total_fagni),
 
-    return PricingResult(
-        prestation_total=prestation_total,
-        delivery_fee_client=delivery_fee_client,
-        delivery_cost_driver=delivery_cost_driver,
-        service_fee_ht=service_fee_ht,
-        vat_fagni=vat_fagni,
-        service_fee_client_ttc=service_fee_client_ttc,
-        express_surcharge=express_surcharge,
-        express_for_client=express_for_client,
-        express_extra_fee_client=express_extra_fee_client,
-        commission_laundry_ht=commission_laundry_ht,
-        commission_delivery_ht=commission_delivery_ht,
-        amount_laundry=amount_laundry,
-        amount_driver=amount_driver,
-        margin_delivery=margin_delivery,
-        fagni_revenue_ht=fagni_revenue_ht,
-        upsell_total=upsell_total,
-        total_client_ttc=total_client_ttc,
-        amount_paid=amount_paid,
-        amount_remaining=amount_remaining,
+        # Taux appliqués
+        'taux_commission':      float(COMMISSION_PRESSING),
+        'taux_service_fee':     float(SERVICE_FEE_RATE),
+        'taux_livraison':       float(COMMISSION_LIVRAISON),
+    }
+
+
+def calculate_bag_pricing(bag_size, zone='standard'):
+    """
+    Prix par défaut selon la taille du sac.
+    Modifiable via admin Django plus tard.
+    """
+    BAG_PRICES = {
+        'small':  5000,
+        'medium': 8000,
+        'large':  12000,
+    }
+    DELIVERY_FEES = {
+        'standard': 2000,
+        'express':  3500,
+        'premium':  5000,
+    }
+    pressing_amount = BAG_PRICES.get(bag_size, 5000)
+    delivery_fee    = DELIVERY_FEES.get(zone, 2000)
+    return calculate_order(pressing_amount, delivery_fee)
+
+
+def calculate_mlm_commissions(fagni_revenue, levels=None):
+    """
+    Calcul des commissions MLM sur le service fee FAGNI.
+    levels: [0.30, 0.15, 0.05] = N1 30%, N2 15%, N3 5%
+    """
+    if levels is None:
+        levels = [Decimal('0.30'), Decimal('0.15'), Decimal('0.05')]
+
+    fagni = d(fagni_revenue)
+    commissions = []
+    for i, rate in enumerate(levels):
+        amount = (fagni * rate).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+        commissions.append({
+            'niveau':    i + 1,
+            'taux':      float(rate),
+            'montant':   int(amount),
+        })
+    return commissions
+
+
+def format_receipt(pricing):
+    """
+    Générer un récapitulatif lisible pour WhatsApp.
+    """
+    return (
+        f"🧾 Récapitulatif FAGNI\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"🧺 Pressing     : {pricing['pressing_amount']:,} FCFA\n"
+        f"🚗 Livraison    : {pricing['delivery_fee']:,} FCFA\n"
+        f"⚡ Service fee  : {pricing['service_fee']:,} FCFA\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"💰 TOTAL        : {pricing['total_client']:,} FCFA\n"
     )

@@ -525,8 +525,8 @@ OPS_PASSWORD = os.getenv('OPS_PASSWORD', 'fagni2025')
 # Cloudinary
 import cloudinary
 cloudinary.config(
-    cloud_name = os.getenv('Racine', ''),
-    api_key    = os.getenv('***REMOVED***', ''),
-    api_secret = os.getenv('***REMOVED***', ''),
+    cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME', ''),
+    api_key    = os.getenv('CLOUDINARY_API_KEY', ''),
+    api_secret = os.getenv('CLOUDINARY_API_SECRET', ''),
     secure     = True
 )

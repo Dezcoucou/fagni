@@ -1476,6 +1476,8 @@ except NameError:
     print("OrderAdmin introuvable dans orders/admin.py")
     raise
 
+from orders.models import PricingConfig
+
 @admin.register(PricingConfig)
 class PricingConfigAdmin(admin.ModelAdmin):
     list_display  = ['bag_size', 'label', 'pressing_amount', 'delivery_fee', 'is_active']

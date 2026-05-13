@@ -770,3 +770,64 @@ def api_cancel_order(request, order_id):
         return Response({'canceled': True, 'late_fee': False, 'message': 'Commande annulée sans frais.'})
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_wallet(request):
+    """GET /api/client/wallet/ — solde + historique + alerte expiration"""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        import jwt
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        from orders.models import Customer
+        customer = Customer.objects.get(id=payload['cid'])
+    except Exception:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    try:
+        from wallets.models import Wallet, WalletTransaction
+        from django.utils import timezone
+        import datetime
+
+        wallet = Wallet.objects.filter(customer=customer).first()
+        balance = float(wallet.balance) if wallet else 0.0
+
+        # Vérifier expiration — dernière commande
+        from orders.models import Order
+        last_order = Order.objects.filter(
+            customer=customer
+        ).order_by('-created_at').first()
+
+        wallet_expires = None
+        wallet_warning = False
+        if last_order and last_order.created_at:
+            expiry_date = last_order.created_at + datetime.timedelta(days=365)
+            days_left = (expiry_date - timezone.now()).days
+            wallet_expires = expiry_date.strftime('%d/%m/%Y')
+            wallet_warning = days_left < 30
+
+        transactions = []
+        if wallet:
+            txs = WalletTransaction.objects.filter(
+                wallet=wallet
+            ).order_by('-created_at')[:50]
+            for tx in txs:
+                transactions.append({
+                    'id':          tx.id,
+                    'type':        tx.type,
+                    'direction':   tx.direction,
+                    'amount':      float(tx.amount),
+                    'description': tx.description or '',
+                    'created_at':  tx.created_at.isoformat() if tx.created_at else None,
+                })
+
+        return Response({
+            'balance':        balance,
+            'currency':       'FCFA',
+            'transactions':   transactions,
+            'wallet_expires': wallet_expires,
+            'wallet_warning': wallet_warning,
+        })
+    except Exception as e:
+        return Response({'balance': 0.0, 'currency': 'FCFA', 'transactions': [], 'error': str(e)})

@@ -554,3 +554,116 @@ def api_articles(request):
         'catalog': list(catalog.values()),
     })
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_order_tracking(request, order_id):
+    """GET /api/client/orders/<id>/tracking/ — suivi temps réel"""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        import jwt
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        from orders.models import Customer
+        customer = Customer.objects.get(id=payload['cid'])
+    except Exception:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    try:
+        from orders.models import Order
+        order = Order.objects.get(id=order_id, customer=customer)
+
+        status = order.status
+        payment = order.payment_status
+        notes   = order.notes or ''
+
+        # Construire la timeline
+        steps = [
+            {
+                'id':      'created',
+                'label':   'Commande créée',
+                'desc':    'Votre commande a été enregistrée',
+                'emoji':   '📱',
+                'done':    True,
+                'active':  status == 'pending',
+            },
+            {
+                'id':      'pickup',
+                'label':   'Collecte en cours',
+                'desc':    'Le livreur se dirige vers vous',
+                'emoji':   '🛵',
+                'done':    status in ['in_progress', 'done'],
+                'active':  status == 'pending' and order.pickup_driver_id is not None,
+            },
+            {
+                'id':      'pressing',
+                'label':   'Au pressing',
+                'desc':    'Vos vêtements sont en cours de traitement',
+                'emoji':   '🧺',
+                'done':    status in ['in_progress', 'done'],
+                'active':  status == 'in_progress',
+            },
+            {
+                'id':      'ready',
+                'label':   'Prêt pour livraison',
+                'desc':    'Vos vêtements sont propres et prêts',
+                'emoji':   '✅',
+                'done':    status == 'done',
+                'active':  False,
+            },
+            {
+                'id':      'delivery',
+                'label':   'Livraison en cours',
+                'desc':    'Le livreur arrive chez vous',
+                'emoji':   '🚗',
+                'done':    status == 'done' and 'LIVRAISON:Confirmée' in notes,
+                'active':  status == 'done' and order.delivery_partner_id is not None,
+            },
+            {
+                'id':      'delivered',
+                'label':   'Livré',
+                'desc':    'Vos vêtements ont été livrés',
+                'emoji':   '🎉',
+                'done':    status == 'done' and 'LIVRAISON:Confirmée' in notes,
+                'active':  False,
+            },
+        ]
+
+        # Infos livreur (anonymisé)
+        pickup_driver = None
+        if order.pickup_driver:
+            pickup_driver = {
+                'vehicle': order.pickup_driver.vehicle_type or 'moto',
+                'initials': order.pickup_driver.name[0].upper() if order.pickup_driver.name else 'L',
+            }
+
+        delivery_driver = None
+        if order.delivery_partner:
+            delivery_driver = {
+                'vehicle': order.delivery_partner.vehicle_type or 'moto',
+                'initials': order.delivery_partner.name[0].upper() if order.delivery_partner.name else 'L',
+            }
+
+        # Articles collectés
+        articles_count = 0
+        for line in notes.split('
+'):
+            if line.startswith('COLLECTE:'):
+                try:
+                    articles_count = int(line.split(':')[1].split(' ')[0])
+                except: pass
+
+        return Response({
+            'order_id':       order.id,
+            'code':           order.code or str(order.id),
+            'status':         status,
+            'payment_status': payment,
+            'bag_size':       order.bag_size or '',
+            'total':          float(order.total or 0),
+            'steps':          steps,
+            'pickup_driver':  pickup_driver,
+            'delivery_driver': delivery_driver,
+            'articles_count': articles_count,
+            'has_partner':    order.laundry_partner_id is not None,
+            'created_at':     order.created_at.isoformat() if order.created_at else None,
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=404)

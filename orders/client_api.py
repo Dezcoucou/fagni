@@ -644,7 +644,7 @@ def api_order_tracking(request, order_id):
 
         # Articles collectés
         articles_count = 0
-        for line in notes.split('
+        for line in notes.split('\n'):
 '):
             if line.startswith('COLLECTE:'):
                 try:

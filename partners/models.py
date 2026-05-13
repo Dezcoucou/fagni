@@ -30,6 +30,7 @@ class PartnerBase(models.Model):
     )
 
     city = models.CharField("Ville / Zone", max_length=120, blank=True)
+    wave_number = models.CharField("Numéro Wave", max_length=20, blank=True)
     notes = models.TextField("Notes internes", blank=True)
     is_active = models.BooleanField("Actif", default=True)
 

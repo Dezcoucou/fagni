@@ -324,28 +324,7 @@ def api_create_order(request):
         return Response({'error': str(e)}, status=400)
 
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def api_articles(request):
-    """GET /api/client/articles/ — catalogue articles avec slots et poids"""
-    from orders.utils.article_catalog import ARTICLE_CATALOG, HORS_GABARIT
-    from orders.utils.pricing import BAG_PRICING
 
-    bags = {
-        k: {
-            "label":           v["label"],
-            "price":           int(v["price"]),
-            "max_items":       v["estimated_items"],
-            "max_weight_kg":   v["max_weight_kg"],
-        }
-        for k, v in BAG_PRICING.items()
-    }
-
-    return Response({
-        "bags":        bags,
-        "catalog":     ARTICLE_CATALOG,
-        "hors_gabarit": HORS_GABARIT,
-    })
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -529,4 +508,49 @@ def api_pricing_bags(request):
             'part_livreur':     pricing['part_livreur'],
         }
     return Response(result)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_articles(request):
+    """GET /api/client/articles/ — catalogue depuis DB + pricing"""
+    from orders.models import ArticleConfig, PricingConfig
+    from orders.pricing_engine import calculate_order
+    from orders.utils.pricing import BAG_PRICING
+
+    # Articles depuis DB
+    articles = ArticleConfig.objects.filter(is_active=True).order_by('category','sort_order','label')
+
+    catalog = {}
+    for art in articles:
+        cat = art.category
+        if cat not in catalog:
+            catalog[cat] = {'id': cat, 'label': art.get_category_display(), 'items': []}
+        catalog[cat]['items'].append({
+            'id':         art.article_id,
+            'label':      art.label,
+            'emoji':      art.emoji,
+            'slots':      art.slots,
+            'weight_kg':  float(art.weight_kg),
+            'max_qty':    art.max_quantity,
+        })
+
+    # Bags depuis PricingConfig
+    pricing_configs = PricingConfig.objects.filter(is_active=True).order_by('pressing_amount')
+    bags = {}
+    for config in pricing_configs:
+        pricing = calculate_order(config.pressing_amount, config.delivery_fee)
+        bags[config.bag_size] = {
+            'label':       config.label,
+            'price':       pricing['total_client'],
+            'pressing':    config.pressing_amount,
+            'delivery':    config.delivery_fee,
+            'service_fee': pricing['service_fee'],
+            'max_items':   {'small':15,'medium':25,'large':40}.get(config.bag_size, 15),
+            'max_weight_kg': {'small':5,'medium':10,'large':15}.get(config.bag_size, 5),
+        }
+
+    return Response({
+        'bags':    bags,
+        'catalog': list(catalog.values()),
+    })
 

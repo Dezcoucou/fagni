@@ -1483,3 +1483,13 @@ class PricingConfigAdmin(admin.ModelAdmin):
     list_display  = ['bag_size', 'label', 'pressing_amount', 'delivery_fee', 'is_active']
     list_editable = ['pressing_amount', 'delivery_fee', 'is_active']
     ordering      = ['pressing_amount']
+
+from orders.models import ArticleConfig
+
+@admin.register(ArticleConfig)
+class ArticleConfigAdmin(admin.ModelAdmin):
+    list_display  = ['emoji', 'label', 'category', 'slots', 'weight_kg', 'max_quantity', 'is_active', 'sort_order']
+    list_editable = ['slots', 'weight_kg', 'max_quantity', 'is_active', 'sort_order']
+    list_filter   = ['category', 'is_active']
+    search_fields = ['label', 'article_id']
+    ordering      = ['category', 'sort_order']

@@ -110,11 +110,11 @@ def ops_dashboard(request):
     }
 
     # Partenaires pour filtre
-    partners = list(LaundryPartner.objects.filter(is_active=True).values('id','name','phone'))
+    partners = list(LaundryPartner.objects.filter(is_active=True).values('id','name','phone','wave_number'))
 
     # Livreurs
     from partners.models import DeliveryPartner
-    drivers = list(DeliveryPartner.objects.filter(is_active=True).values('id','name','phone'))
+    drivers = list(DeliveryPartner.objects.filter(is_active=True).values('id','name','phone','wave_number'))
 
     return Response({'orders': orders, 'stats': stats, 'partners': partners, 'drivers': drivers})
 
@@ -240,6 +240,7 @@ def ops_add_partner(request):
         partner = LaundryPartner.objects.create(
             name=request.data.get('name','').strip(),
             phone=request.data.get('phone','').strip(),
+            wave_number=request.data.get('wave_number','').strip(),
             city=request.data.get('city','Abidjan').strip(),
             address=request.data.get('address','').strip(),
             is_active=True
@@ -263,6 +264,7 @@ def ops_add_driver(request):
         driver = DeliveryPartner.objects.create(
             name=request.data.get('name','').strip(),
             phone=request.data.get('phone','').strip(),
+            wave_number=request.data.get('wave_number','').strip(),
             vehicle_type=request.data.get('vehicle_type','moto').strip(),
             city=request.data.get('city','Abidjan').strip(),
             is_active=True

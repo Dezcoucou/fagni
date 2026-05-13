@@ -4196,3 +4196,35 @@ class PricingConfig(models.Model):
 
     def __str__(self):
         return f"{self.get_bag_size_display()} — {self.pressing_amount:,} FCFA"
+
+
+class ArticleConfig(models.Model):
+    """
+    Catalogue articles FAGNI — modifiable via admin.
+    """
+    CATEGORY_CHOICES = [
+        ('hauts',      'Hauts'),
+        ('bas',        'Bas'),
+        ('robes',      'Robes & Ensembles'),
+        ('vestes',     'Vestes & Manteaux'),
+        ('accessoires','Accessoires'),
+        ('linge',      'Linge de maison'),
+    ]
+
+    article_id   = models.CharField("ID article", max_length=50, unique=True)
+    label        = models.CharField("Nom", max_length=100)
+    emoji        = models.CharField("Emoji", max_length=10, default="👕")
+    category     = models.CharField("Catégorie", max_length=50, choices=CATEGORY_CHOICES, default='hauts')
+    slots        = models.PositiveSmallIntegerField("Slots (place dans le sac)", default=1)
+    weight_kg    = models.DecimalField("Poids (kg)", max_digits=4, decimal_places=2, default=0.30)
+    max_quantity = models.PositiveSmallIntegerField("Quantité max par commande", default=10)
+    is_active    = models.BooleanField("Actif", default=True)
+    sort_order   = models.PositiveSmallIntegerField("Ordre d'affichage", default=0)
+
+    class Meta:
+        verbose_name = "Article catalogue"
+        verbose_name_plural = "Articles catalogue"
+        ordering = ["category", "sort_order", "label"]
+
+    def __str__(self):
+        return f"{self.emoji} {self.label} ({self.category})"

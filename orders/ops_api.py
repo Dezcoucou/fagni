@@ -88,6 +88,8 @@ def ops_dashboard(request):
             'partner_id':     partner.id if partner else None,
             'wa_client':      wa_client,
             'wa_partner':     wa_partner,
+            'is_premium':     getattr(o, 'notes', '') and 'VALEUR:premium' in (o.notes or ''),
+            'valeur_declaree': 'premium' if 'VALEUR:premium' in (o.notes or '') else 'sensible' if 'VALEUR:sensible' in (o.notes or '') else 'standard',
             'delivery_driver_name': o.delivery_partner.name if o.delivery_partner else None,
             'delivery_driver_id':   o.delivery_partner.id if o.delivery_partner else None,
             'pickup_driver_name':   o.pickup_driver.name if o.pickup_driver else None,

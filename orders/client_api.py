@@ -255,6 +255,9 @@ def is_in_delivery_zone(lat, lng):
     except:
         return True
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
 def api_create_order(request):
     """POST /api/client/orders/create/"""
     from orders.utils.pricing import BAG_PRICING

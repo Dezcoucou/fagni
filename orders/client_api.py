@@ -317,26 +317,38 @@ def api_create_order(request):
         # Calcul financier — déjà fait via PricingConfig
         pricing = _pricing
 
-        order = Order.objects.create(
-            customer=customer,
-            bag_size=bag_size,
-            pickup_address=pickup_addr or getattr(customer, 'address', '') or '',
-            pickup_lat=pickup_lat,
-            pickup_lng=pickup_lng,
-            pickup_scheduled_date=pickup_date,
-            pickup_scheduled_time=pickup_time,
-            delivery_scheduled_date=delivery_date,
-            delivery_scheduled_time=dtime(12, 0),
-            service_fee=service_fee,
-            notes=' | '.join(notes_parts),
-            status='pending',
-            delivery_fee=pricing['delivery_fee'],
-            commission_delivery_ht=pricing['marge_livraison'],
-            commission_laundry_ht=pricing['commission_pressing'],
-            amount_driver_partner=pricing['part_livreur'],
-            amount_laundry_partner=pricing['part_pressing'],
-            fagni_revenue_ht=pricing['total_fagni'],
-        )
+        # Champs de base — toujours présents
+        order_data = {
+            'customer':                customer,
+            'bag_size':                bag_size,
+            'pickup_address':          pickup_addr or getattr(customer, 'address', '') or '',
+            'pickup_lat':              pickup_lat,
+            'pickup_lng':              pickup_lng,
+            'pickup_scheduled_date':   pickup_date,
+            'pickup_scheduled_time':   pickup_time,
+            'delivery_scheduled_date': delivery_date,
+            'delivery_scheduled_time': dtime(12, 0),
+            'service_fee':             service_fee,
+            'notes':                   ' | '.join(notes_parts),
+            'status':                  'pending',
+        }
+
+        # Champs financiers — ajoutés si le champ existe dans le modèle
+        financial_fields = {
+            'delivery_fee':           pricing['delivery_fee'],
+            'commission_delivery_ht': pricing['marge_livraison'],
+            'commission_laundry_ht':  pricing['commission_pressing'],
+            'amount_driver_partner':  pricing['part_livreur'],
+            'amount_laundry_partner': pricing['part_pressing'],
+            'fagni_revenue_ht':       pricing['total_fagni'],
+            'total_client_ttc':       pricing['total_client'],
+        }
+
+        for field, value in financial_fields.items():
+            if hasattr(Order, field):
+                order_data[field] = value
+
+        order = Order.objects.create(**order_data)
         return Response({
             'order_id':      order.id,
             'code':          order.code or str(order.id),

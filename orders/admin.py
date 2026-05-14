@@ -1488,8 +1488,8 @@ from orders.models import ArticleConfig
 
 @admin.register(ArticleConfig)
 class ArticleConfigAdmin(admin.ModelAdmin):
-    list_display  = ['emoji', 'label', 'category', 'slots', 'weight_kg', 'max_quantity', 'is_active', 'sort_order']
-    list_editable = ['slots', 'weight_kg', 'max_quantity', 'is_active', 'sort_order']
+    list_display  = ['emoji', 'label', 'category', 'slots', 'weight_kg', 'max_quantity', 'sur_devis', 'prix_unitaire', 'is_active', 'sort_order']
+    list_editable = ['slots', 'weight_kg', 'max_quantity', 'sur_devis', 'prix_unitaire', 'is_active', 'sort_order']
     list_filter   = ['category', 'is_active']
     search_fields = ['label', 'article_id']
     ordering      = ['category', 'sort_order']

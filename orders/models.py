@@ -4217,7 +4217,9 @@ class ArticleConfig(models.Model):
     category     = models.CharField("Catégorie", max_length=50, choices=CATEGORY_CHOICES, default='hauts')
     slots        = models.PositiveSmallIntegerField("Slots (place dans le sac)", default=1)
     weight_kg    = models.DecimalField("Poids (kg)", max_digits=4, decimal_places=2, default=0.30)
-    max_quantity = models.PositiveSmallIntegerField("Quantité max par commande", default=10)
+    max_quantity  = models.PositiveSmallIntegerField("Quantité max par commande", default=10)
+    sur_devis     = models.BooleanField("Sur devis (validation OPS)", default=False)
+    prix_unitaire = models.PositiveIntegerField("Prix unitaire FCFA (si sur devis)", default=0)
     is_active    = models.BooleanField("Actif", default=True)
     sort_order   = models.PositiveSmallIntegerField("Ordre d'affichage", default=0)
 

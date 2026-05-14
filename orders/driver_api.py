@@ -197,3 +197,25 @@ def driver_confirm_delivery(request, order_id):
         return Response({'success': True, 'wa_client': wa_link})
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_driver_dropoff(request, order_id):
+    """POST /api/driver/orders/<id>/dropoff/ — livreur dépose au pressing"""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        from partners.models import DeliveryPartner
+        driver = DeliveryPartner.objects.get(id=payload['did'])
+    except Exception:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    try:
+        order = Order.objects.get(id=order_id)
+        notes = order.notes or ''
+        order.notes = notes + f'\nDEPOSE_PRESSING:{driver.name}'
+        order.save(update_fields=['notes', 'updated_at'])
+        return Response({'success': True, 'message': 'Dépôt au pressing confirmé'})
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

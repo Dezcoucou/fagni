@@ -272,11 +272,23 @@ def api_create_order(request):
     )
     delivery_date = pickup_date + timedelta(days=2)
 
-    # Frais FAGNI : 10% avec minimum 500 FCFA
-    bag_price   = int(BAG_PRICING[bag_size]['price'])
-    raw_fee     = int(bag_price * 0.10)
-    service_fee = max(500, raw_fee)
-    total       = bag_price + service_fee
+    # Pricing depuis DB (source de vérité)
+    from orders.models import PricingConfig
+    from orders.pricing_engine import calculate_order as _calc
+
+    try:
+        config = PricingConfig.objects.get(bag_size=bag_size, is_active=True)
+        pressing_amount = config.pressing_amount
+        delivery_fee_amount = config.delivery_fee
+    except Exception:
+        # Fallback si pas de config
+        pressing_amount = int(BAG_PRICING[bag_size]['price'])
+        delivery_fee_amount = 2000
+
+    _pricing    = _calc(pressing_amount, delivery_fee_amount)
+    bag_price   = _pricing['total_client']
+    service_fee = _pricing['service_fee']
+    total       = _pricing['total_client']
 
     notes_parts = []
     if articles:
@@ -285,9 +297,8 @@ def api_create_order(request):
         notes_parts.append(f"Creneau: {pickup_slot}")
 
     try:
-        # Calcul financier via pricing engine
-        from orders.pricing_engine import calculate_order
-        pricing = calculate_order(total, 2000)
+        # Calcul financier — déjà fait via PricingConfig
+        pricing = _pricing
 
         order = Order.objects.create(
             customer=customer,

@@ -4181,7 +4181,9 @@ class PricingConfig(models.Model):
         choices=[('small','Petit sac'),('medium','Sac moyen'),('large','Grand sac')],
         unique=True
     )
-    pressing_amount = models.PositiveIntegerField("Prix pressing (FCFA)", default=5000)
+    pressing_amount      = models.PositiveIntegerField("Prix pressing (FCFA)", default=5000)
+    commission_rate      = models.DecimalField("Commission FAGNI (%)", max_digits=5, decimal_places=2, default=30.00)
+    partner_rate         = models.DecimalField("Part pressing (%)", max_digits=5, decimal_places=2, default=70.00)
     delivery_fee    = models.PositiveIntegerField("Frais livraison (FCFA)", default=2000)
     is_active       = models.BooleanField("Actif", default=True)
     label           = models.CharField("Label affiché", max_length=50, blank=True)

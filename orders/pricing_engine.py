@@ -18,7 +18,7 @@ COMMISSION_LIVRAISON  = Decimal('0.30')   # 30% sur frais livraison
 PART_LIVREUR          = Decimal('0.70')   # 70% des frais livraison au livreur
 
 
-def calculate_order(pressing_amount, delivery_fee=2000):
+def calculate_order(pressing_amount, delivery_fee=2000, commission_rate=None, partner_rate=None):
     """
     Calcul complet d'une commande FAGNI.
 
@@ -32,8 +32,12 @@ def calculate_order(pressing_amount, delivery_fee=2000):
     pressing   = d(pressing_amount)
     livraison  = d(delivery_fee)
 
+    # Taux paramétrables ou taux par défaut
+    taux_commission = Decimal(str(commission_rate)) / 100 if commission_rate else COMMISSION_PRESSING
+    taux_partner    = Decimal(str(partner_rate)) / 100 if partner_rate else (1 - COMMISSION_PRESSING)
+
     # Commission pressing
-    commission_pressing = (pressing * COMMISSION_PRESSING).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+    commission_pressing = (pressing * taux_commission).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
     part_pressing       = pressing - commission_pressing
 
     # Service fee

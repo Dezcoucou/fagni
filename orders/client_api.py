@@ -252,6 +252,14 @@ def api_create_order(request):
     pickup_addr   = (request.data.get('pickup_address') or '').strip()
     pickup_lat    = request.data.get('pickup_lat')
     pickup_lng    = request.data.get('pickup_lng')
+
+    # Vérification zone de livraison
+    if not is_in_delivery_zone(pickup_lat, pickup_lng):
+        return Response({
+            'error': 'zone_unavailable',
+            'message': 'Désolé, FAGNI n'est pas encore disponible dans votre zone. Nous arrivons bientôt à Riviera 3 !',
+            'zones_disponibles': ['Riviera 3', 'Cocody', 'Riviera']
+        }, status=400)
     pickup_slot   = (request.data.get('pickup_slot') or '').strip()
     articles      = request.data.get('articles', [])
 

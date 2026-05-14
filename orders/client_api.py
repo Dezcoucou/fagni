@@ -584,6 +584,8 @@ def api_articles(request):
             'slots':      art.slots,
             'weight_kg':  float(art.weight_kg),
             'max_qty':    art.max_quantity,
+            'sur_devis':  art.sur_devis,
+            'prix_unitaire': art.prix_unitaire,
         })
 
     # Bags depuis PricingConfig

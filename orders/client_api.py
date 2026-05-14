@@ -243,6 +243,18 @@ def api_order_detail(request, order_id):
 @api_view(['POST'])
 @authentication_classes([ClientAuth])
 @permission_classes([])
+
+def is_in_delivery_zone(lat, lng):
+    """Zone pilote FAGNI — Riviera 3, Cocody, Abidjan"""
+    if not lat or not lng:
+        return True
+    try:
+        lat = float(lat)
+        lng = float(lng)
+        return 5.30 <= lat <= 5.45 and -4.02 <= lng <= -3.90
+    except:
+        return True
+
 def api_create_order(request):
     """POST /api/client/orders/create/"""
     from orders.utils.pricing import BAG_PRICING

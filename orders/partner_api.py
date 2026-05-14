@@ -95,6 +95,13 @@ def partner_update_status(request, order_id):
     if new_status not in ALLOWED:
         return Response({'error': f'Statut invalide. Choix: {ALLOWED}'}, status=400)
 
+    # Bloquer si livreur n'a pas encore déposé
+    if new_status == 'in_progress' and 'DEPOSE_PRESSING' not in (order.notes or ''):
+        return Response({
+            'error': 'depot_requis',
+            'message': 'Le livreur doit confirmer le depot avant que vous puissiez confirmer la reception.'
+        }, status=400)
+
     order.status = new_status
     order.save(update_fields=['status', 'updated_at'])
     return Response({'success': True, 'status': new_status, 'code': order.code})

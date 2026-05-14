@@ -80,7 +80,7 @@ def ops_dashboard(request):
             'status':         o.status,
             'payment_status': o.payment_status,
             'service_type':   o.service_type or 'pressing',
-            'total':          float(o.total or 0),
+            'total':          float(o.total_client_ttc or o.total or 0),
             'bag_size':       o.bag_size or '',
             'customer_name':  o.customer.name if o.customer else '—',
             'customer_phone': o.customer.phone if o.customer else '—',

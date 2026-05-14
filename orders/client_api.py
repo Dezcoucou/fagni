@@ -248,6 +248,16 @@ def api_create_order(request):
     from orders.utils.pricing import BAG_PRICING
     from datetime import date, time as dtime, timedelta
 
+    # Authentification manuelle
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        import jwt
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        from orders.models import Customer
+        customer = Customer.objects.get(id=payload['cid'])
+    except Exception:
+        return Response({'error': 'Non autorisé'}, status=401)
+
     bag_size      = (request.data.get('bag_size') or '').strip()
     pickup_addr   = (request.data.get('pickup_address') or '').strip()
     pickup_lat    = request.data.get('pickup_lat')
@@ -266,7 +276,6 @@ def api_create_order(request):
     if bag_size not in BAG_PRICING:
         return Response({'error': 'Taille de sac invalide'}, status=400)
 
-    customer = request.user
     today    = date.today()
 
     slot_map = {

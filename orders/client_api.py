@@ -240,9 +240,6 @@ def api_order_detail(request, order_id):
 
 
 
-@api_view(['POST'])
-@authentication_classes([ClientAuth])
-@permission_classes([])
 
 def is_in_delivery_zone(lat, lng):
     """Zone pilote FAGNI — Riviera 3, Cocody, Abidjan"""

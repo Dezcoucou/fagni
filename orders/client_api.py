@@ -59,7 +59,7 @@ def _items_sum_annotation():
     )
 
 def _order_to_dict(o):
-    total = float(o.total_client_ttc or getattr(o, 'total', 0) or getattr(o, 'items_total', 0) or 0)
+    total = float(o.total_client_ttc or 0) or float(getattr(o, 'total', 0) or 0) or float(getattr(o, 'items_total', 0) or 0)
     return {
         'id':             o.id,
         'code':           o.code or str(o.id),
@@ -211,7 +211,7 @@ def api_order_detail(request, order_id):
     if not order:
         return Response({'error': 'Commande introuvable'}, status=404)
 
-    total = float(order.total_client_ttc or getattr(order,'total',0) or order.items_total or 0)
+    total = float(order.total_client_ttc or 0) or float(getattr(order,'total',0) or 0) or float(getattr(order,'items_total',0) or 0)
     amount_paid = float(getattr(order, 'amount_paid', 0) or 0)
 
     items = []

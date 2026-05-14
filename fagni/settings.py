@@ -55,7 +55,13 @@ if _env_hosts:
 if os.environ.get("DJANGO_DEBUG_ALLOW_ALL_HOSTS") == "1":
     ALLOWED_HOSTS = ["*"]
 
-CSRF_TRUSTED_ORIGINS = [SITE_BASE_URL] if SITE_BASE_URL.startswith("https://") else []
+CSRF_TRUSTED_ORIGINS = [
+    "https://fagni-client.vercel.app",
+    "https://fagni-ops.vercel.app",
+    "https://fagni-driver.vercel.app",
+    "https://fagni-partner.vercel.app",
+    "https://fagni-api.onrender.com",
+] + ([SITE_BASE_URL] if SITE_BASE_URL.startswith("https://") else [])
 # Pour les QR codes FAGNI (tickets PDF)
 FAGNI_QR_BASE_URL = SITE_BASE_URL
 # ========================

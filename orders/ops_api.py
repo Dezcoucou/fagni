@@ -243,6 +243,8 @@ def ops_add_partner(request):
             wave_number=request.data.get('wave_number','').strip(),
             city=request.data.get('city','Abidjan').strip(),
             address=request.data.get('address','').strip(),
+            lat=request.data.get('lat') or None,
+            lng=request.data.get('lng') or None,
             is_active=True
         )
         return Response({'success': True, 'id': partner.id, 'name': partner.name})

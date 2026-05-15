@@ -32,7 +32,7 @@ def driver_login(request):
         {'did': driver.id, 'name': driver.name},
         settings.SECRET_KEY, algorithm='HS256'
     )
-        return Response({
+    return Response({
         'access': token,
         'driver': {
             'id': driver.id,

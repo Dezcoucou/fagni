@@ -50,50 +50,52 @@ def driver_missions(request):
     try:
         driver = _get_driver(request)
     except:
-    return Response({'error': 'Non autorisé'}, status=401)
+        return Response({'error': 'Non autorisé'}, status=401)
 
     from orders.models import Order
 
-    # Missions directement depuis les commandes
-        # Missions collecte (pickup_driver)
+    # Missions collecte
     pickup_orders = Order.objects.filter(
-            pickup_driver=driver,
-            status__in=['pending']
-        ).select_related('customer').order_by('-created_at')[:10]
+        pickup_driver=driver,
+        status__in=['pending']
+    ).select_related('customer', 'laundry_partner').order_by('-created_at')[:10]
 
-        # Missions livraison (delivery_partner)
+    # Missions livraison
     delivery_orders = Order.objects.filter(
-            delivery_partner=driver,
-            status__in=['in_progress','done']
-        ).select_related('customer').order_by('-created_at')[:10]
+        delivery_partner=driver,
+        status__in=['in_progress', 'done']
+    ).select_related('customer', 'laundry_partner').order_by('-created_at')[:10]
 
-    orders = list(pickup_orders) + list(delivery_orders)
+    pickup_list = list(pickup_orders)
+    delivery_list = list(delivery_orders)
+    all_orders = pickup_list + delivery_list
 
     result = []
-    for o in orders:
-            result.append({
-                'mission_id':   o.id,
-                'order_id':     o.id,
-                'order_code':   o.code or str(o.id),
-                'mission_type': 'pickup' if o in list(pickup_orders) else 'delivery',
-                'status':       'assigned',
-                'zone':           (o.pickup_address or '').split(',')[0] if o.pickup_address else 'Abidjan',
-                'pickup_address':  o.pickup_address or '',
-                'partner_address': o.laundry_partner.address if o.laundry_partner else '',
-                'partner_name':    o.laundry_partner.name if o.laundry_partner else '',
-                'partner_lat':     float(o.laundry_partner.lat) if o.laundry_partner and o.laundry_partner.lat else None,
-                'partner_lng':     float(o.laundry_partner.lng) if o.laundry_partner and o.laundry_partner.lng else None,
-                'delivery_address': o.pickup_address or '',
-                'delivery_lat':    float(o.pickup_lat) if o.pickup_lat else None,
-                'delivery_lng':    float(o.pickup_lng) if o.pickup_lng else None,
-                'pickup_lat':    float(o.pickup_lat) if o.pickup_lat else None,
-                'pickup_lng':    float(o.pickup_lng) if o.pickup_lng else None,
-                'bag_size':     o.bag_size or '',
-                'order_status': o.status,
-                'created_at':   o.created_at.isoformat() if o.created_at else None,
-            })
-    return Response({'missions': result, 'driver': driver.name})
+    for o in all_orders:
+        is_pickup = o in pickup_list
+        result.append({
+            'mission_id':      o.id,
+            'order_id':        o.id,
+            'order_code':      o.code or str(o.id),
+            'mission_type':    'pickup' if is_pickup else 'delivery',
+            'status':          'assigned',
+            'zone':            (o.pickup_address or '').split(',')[0] if o.pickup_address else 'Abidjan',
+            'pickup_address':  o.pickup_address or '',
+            'partner_name':    o.laundry_partner.name if o.laundry_partner else '',
+            'partner_address': o.laundry_partner.address if o.laundry_partner else '',
+            'partner_lat':     float(o.laundry_partner.lat) if o.laundry_partner and o.laundry_partner.lat else None,
+            'partner_lng':     float(o.laundry_partner.lng) if o.laundry_partner and o.laundry_partner.lng else None,
+            'delivery_address': o.pickup_address or '',
+            'delivery_lat':    float(o.pickup_lat) if o.pickup_lat else None,
+            'delivery_lng':    float(o.pickup_lng) if o.pickup_lng else None,
+            'pickup_lat':      float(o.pickup_lat) if o.pickup_lat else None,
+            'pickup_lng':      float(o.pickup_lng) if o.pickup_lng else None,
+            'bag_size':        o.bag_size or '',
+            'order_status':    o.status,
+            'created_at':      o.created_at.isoformat() if o.created_at else None,
+        })
 
+    return Response({'missions': result, 'driver': driver.name})
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

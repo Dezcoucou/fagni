@@ -885,3 +885,4 @@ def api_wallet(request):
         })
     except Exception as e:
         return Response({'balance': 0.0, 'currency': 'FCFA', 'transactions': [], 'error': str(e)})
+# force deploy Fri May 15 08:18:07 AM CEST 2026

@@ -53,42 +53,8 @@ def driver_missions(request):
         return Response({'error': 'Non autorisé'}, status=401)
 
     from orders.models import Order
-    from logistics.models import Mission
 
-    # Missions actives assignées à ce livreur
-    try:
-        missions = Mission.objects.filter(
-            driver=driver,
-            status__in=['assigned','in_progress','pending']
-        ).select_related('order','order__customer').order_by('created_at')[:20]
-
-        result = []
-        for m in missions:
-            o = m.order
-            result.append({
-                'mission_id':   m.id,
-                'order_id':     o.id,
-                'order_code':   o.code or str(o.id),
-                'mission_type': m.leg_type if hasattr(m,'leg_type') else 'pickup',
-                'status':       m.status,
-                'zone':           (o.pickup_address or '').split(',')[0] if o.pickup_address else 'Abidjan',
-                'pickup_address':  o.pickup_address or '',
-                'partner_address': o.laundry_partner.address if o.laundry_partner else '',
-                'partner_name':    o.laundry_partner.name if o.laundry_partner else '',
-                'partner_lat':     float(o.laundry_partner.lat) if o.laundry_partner and o.laundry_partner.lat else None,
-                'partner_lng':     float(o.laundry_partner.lng) if o.laundry_partner and o.laundry_partner.lng else None,
-                'delivery_address': o.pickup_address or '',
-                'delivery_lat':    float(o.pickup_lat) if o.pickup_lat else None,
-                'delivery_lng':    float(o.pickup_lng) if o.pickup_lng else None,
-                'pickup_lat':    float(o.pickup_lat) if o.pickup_lat else None,
-                'pickup_lng':    float(o.pickup_lng) if o.pickup_lng else None,
-                'bag_size':     o.bag_size or '',
-                'order_status': o.status,
-                'created_at':   m.created_at.isoformat() if m.created_at else None,
-            })
-        return Response({'missions': result, 'driver': driver.name})
-    except Exception as e:
-        # Si pas de table Mission, retourner commandes directement
+    # Missions directement depuis les commandes
         # Missions collecte (pickup_driver)
         pickup_orders = Order.objects.filter(
             pickup_driver=driver,

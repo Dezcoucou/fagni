@@ -19,14 +19,14 @@ def driver_login(request):
     """POST /api/driver/login/ — {phone}"""
     phone = (request.data.get('phone') or '').strip()
     if not phone:
-        return Response({'error': 'Numéro requis'}, status=400)
+    return Response({'error': 'Numéro requis'}, status=400)
     try:
         from partners.models import DeliveryPartner
         driver = DeliveryPartner.objects.filter(phone=phone, is_active=True).first()
         if not driver:
             raise Exception('not found')
     except:
-        return Response({'error': 'Livreur non trouvé'}, status=404)
+    return Response({'error': 'Livreur non trouvé'}, status=404)
 
     token = jwt.encode(
         {'did': driver.id, 'name': driver.name},
@@ -50,27 +50,27 @@ def driver_missions(request):
     try:
         driver = _get_driver(request)
     except:
-        return Response({'error': 'Non autorisé'}, status=401)
+    return Response({'error': 'Non autorisé'}, status=401)
 
     from orders.models import Order
 
     # Missions directement depuis les commandes
         # Missions collecte (pickup_driver)
-        pickup_orders = Order.objects.filter(
+    pickup_orders = Order.objects.filter(
             pickup_driver=driver,
             status__in=['pending']
         ).select_related('customer').order_by('-created_at')[:10]
 
         # Missions livraison (delivery_partner)
-        delivery_orders = Order.objects.filter(
+    delivery_orders = Order.objects.filter(
             delivery_partner=driver,
             status__in=['in_progress','done']
         ).select_related('customer').order_by('-created_at')[:10]
 
-        orders = list(pickup_orders) + list(delivery_orders)
+    orders = list(pickup_orders) + list(delivery_orders)
 
-        result = []
-        for o in orders:
+    result = []
+    for o in orders:
             result.append({
                 'mission_id':   o.id,
                 'order_id':     o.id,
@@ -92,7 +92,7 @@ def driver_missions(request):
                 'order_status': o.status,
                 'created_at':   o.created_at.isoformat() if o.created_at else None,
             })
-        return Response({'missions': result, 'driver': driver.name})
+    return Response({'missions': result, 'driver': driver.name})
 
 
 @api_view(['POST'])
@@ -102,7 +102,7 @@ def driver_confirm_pickup(request, order_id):
     try:
         driver = _get_driver(request)
     except:
-        return Response({'error': 'Non autorisé'}, status=401)
+    return Response({'error': 'Non autorisé'}, status=401)
 
     from orders.models import Order, OrderEvidencePhoto
     try:
@@ -133,13 +133,13 @@ def driver_confirm_pickup(request, order_id):
         else:
             wa_link = ''
 
-        return Response({
+    return Response({
             'success': True,
             'wa_client': wa_link,
             'message': f'Collecte confirmée — {articles_count} articles'
         })
     except Exception as e:
-        return Response({'error': str(e)}, status=400)
+    return Response({'error': str(e)}, status=400)
 
 
 @api_view(['POST'])
@@ -149,7 +149,7 @@ def driver_confirm_delivery(request, order_id):
     try:
         driver = _get_driver(request)
     except:
-        return Response({'error': 'Non autorisé'}, status=401)
+    return Response({'error': 'Non autorisé'}, status=401)
 
     from orders.models import Order
     try:
@@ -174,9 +174,9 @@ def driver_confirm_delivery(request, order_id):
             encoded = msg.replace(' ','%20').replace('\n','%0A')
             wa_link = f"https://wa.me/{p}?text={encoded}"
 
-        return Response({'success': True, 'wa_client': wa_link})
+    return Response({'success': True, 'wa_client': wa_link})
     except Exception as e:
-        return Response({'error': str(e)}, status=400)
+    return Response({'error': str(e)}, status=400)
 
 
 @api_view(['POST'])
@@ -189,13 +189,13 @@ def api_driver_dropoff(request, order_id):
         from partners.models import DeliveryPartner
         driver = DeliveryPartner.objects.get(id=payload['did'])
     except Exception:
-        return Response({'error': 'Non autorisé'}, status=401)
+    return Response({'error': 'Non autorisé'}, status=401)
 
     try:
         order = Order.objects.get(id=order_id)
         notes = order.notes or ''
         order.notes = notes + f'\nDEPOSE_PRESSING:{driver.name}'
         order.save(update_fields=['notes', 'updated_at'])
-        return Response({'success': True, 'message': 'Dépôt au pressing confirmé'})
+    return Response({'success': True, 'message': 'Dépôt au pressing confirmé'})
     except Exception as e:
-        return Response({'error': str(e)}, status=400)
+    return Response({'error': str(e)}, status=400)

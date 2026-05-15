@@ -104,7 +104,7 @@ def driver_confirm_pickup(request, order_id):
     try:
         driver = _get_driver(request)
     except:
-    return Response({'error': 'Non autorisé'}, status=401)
+        return Response({'error': 'Non autorisé'}, status=401)
 
     from orders.models import Order, OrderEvidencePhoto
     try:
@@ -151,7 +151,7 @@ def driver_confirm_delivery(request, order_id):
     try:
         driver = _get_driver(request)
     except:
-    return Response({'error': 'Non autorisé'}, status=401)
+        return Response({'error': 'Non autorisé'}, status=401)
 
     from orders.models import Order
     try:

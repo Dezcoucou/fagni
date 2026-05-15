@@ -32,7 +32,7 @@ def driver_login(request):
         {'did': driver.id, 'name': driver.name},
         settings.SECRET_KEY, algorithm='HS256'
     )
-    return Response({
+        return Response({
         'access': token,
         'driver': {
             'id': driver.id,
@@ -95,7 +95,7 @@ def driver_missions(request):
             'created_at':      o.created_at.isoformat() if o.created_at else None,
         })
 
-    return Response({'missions': result, 'driver': driver.name})
+        return Response({'missions': result, 'driver': driver.name})
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -176,7 +176,7 @@ def driver_confirm_delivery(request, order_id):
             encoded = msg.replace(' ','%20').replace('\n','%0A')
             wa_link = f"https://wa.me/{p}?text={encoded}"
 
-    return Response({'success': True, 'wa_client': wa_link})
+        return Response({'success': True, 'wa_client': wa_link})
     except Exception as e:
     return Response({'error': str(e)}, status=400)
 
@@ -198,6 +198,6 @@ def api_driver_dropoff(request, order_id):
         notes = order.notes or ''
         order.notes = notes + f'\nDEPOSE_PRESSING:{driver.name}'
         order.save(update_fields=['notes', 'updated_at'])
-    return Response({'success': True, 'message': 'Dépôt au pressing confirmé'})
+        return Response({'success': True, 'message': 'Dépôt au pressing confirmé'})
     except Exception as e:
     return Response({'error': str(e)}, status=400)

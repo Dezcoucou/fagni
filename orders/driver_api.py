@@ -191,7 +191,7 @@ def api_driver_dropoff(request, order_id):
         from partners.models import DeliveryPartner
         driver = DeliveryPartner.objects.get(id=payload['did'])
     except Exception:
-    return Response({'error': 'Non autorisé'}, status=401)
+        return Response({'error': 'Non autorisé'}, status=401)
 
     try:
         order = Order.objects.get(id=order_id)
@@ -200,4 +200,4 @@ def api_driver_dropoff(request, order_id):
         order.save(update_fields=['notes', 'updated_at'])
         return Response({'success': True, 'message': 'Dépôt au pressing confirmé'})
     except Exception as e:
-    return Response({'error': str(e)}, status=400)
+        return Response({'error': str(e)}, status=400)

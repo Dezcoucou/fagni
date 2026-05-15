@@ -19,14 +19,14 @@ def driver_login(request):
     """POST /api/driver/login/ — {phone}"""
     phone = (request.data.get('phone') or '').strip()
     if not phone:
-    return Response({'error': 'Numéro requis'}, status=400)
+        return Response({'error': 'Numéro requis'}, status=400)
     try:
         from partners.models import DeliveryPartner
         driver = DeliveryPartner.objects.filter(phone=phone, is_active=True).first()
         if not driver:
             raise Exception('not found')
     except:
-    return Response({'error': 'Livreur non trouvé'}, status=404)
+        return Response({'error': 'Livreur non trouvé'}, status=404)
 
     token = jwt.encode(
         {'did': driver.id, 'name': driver.name},

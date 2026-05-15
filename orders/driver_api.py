@@ -178,7 +178,7 @@ def driver_confirm_delivery(request, order_id):
 
         return Response({'success': True, 'wa_client': wa_link})
     except Exception as e:
-    return Response({'error': str(e)}, status=400)
+        return Response({'error': str(e)}, status=400)
 
 
 @api_view(['POST'])

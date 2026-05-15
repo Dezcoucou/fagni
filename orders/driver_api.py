@@ -135,13 +135,13 @@ def driver_confirm_pickup(request, order_id):
         else:
             wa_link = ''
 
-    return Response({
+        return Response({
             'success': True,
             'wa_client': wa_link,
             'message': f'Collecte confirmée — {articles_count} articles'
         })
     except Exception as e:
-    return Response({'error': str(e)}, status=400)
+        return Response({'error': str(e)}, status=400)
 
 
 @api_view(['POST'])

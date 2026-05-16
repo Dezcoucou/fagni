@@ -1,3 +1,4 @@
+import os
 import jwt
 from decimal import Decimal
 from datetime import datetime, timedelta
@@ -886,3 +887,48 @@ def api_wallet(request):
     except Exception as e:
         return Response({'balance': 0.0, 'currency': 'FCFA', 'transactions': [], 'error': str(e)})
 # force deploy Fri May 15 08:18:07 AM CEST 2026
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
+def api_chatbot(request):
+    """POST /api/client/chatbot/ — proxy vers Claude API"""
+    import requests as req
+
+    messages = request.data.get('messages', [])
+    if not messages:
+        return Response({'error': 'Messages requis'}, status=400)
+
+    ANTHROPIC_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+    if not ANTHROPIC_KEY:
+        return Response({'error': 'Service non disponible'}, status=503)
+
+    SYSTEM = """Tu es l'assistant virtuel de FAGNI, plateforme de blanchisserie à domicile à Abidjan.
+Zone : Riviera 3, Cocody, Riviera. Délai : 48-72h.
+Prix : Petit sac 7 250 FCFA, Moyen 10 400 FCFA, Grand 14 600 FCFA.
+Articles refusés : sous-vêtements, chaussettes.
+Articles sur devis : costume, boubou, kaba, agbada, robe longue, manteau, veste, drap.
+OPS WhatsApp : +225 01 42 29 99 49. Réponds en français, sois chaleureux et concis."""
+
+    try:
+        resp = req.post(
+            'https://api.anthropic.com/v1/messages',
+            headers={
+                'x-api-key': ANTHROPIC_KEY,
+                'anthropic-version': '2023-06-01',
+                'content-type': 'application/json'
+            },
+            json={
+                'model': 'claude-haiku-4-5-20251001',
+                'max_tokens': 500,
+                'system': SYSTEM,
+                'messages': messages
+            },
+            timeout=30
+        )
+        data = resp.json()
+        text = data.get('content', [{}])[0].get('text', 'Désolé, contactez OPS.')
+        return Response({'reply': text})
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)

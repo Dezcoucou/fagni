@@ -2,7 +2,7 @@ from orders.partner_api import partner_login, partner_orders, partner_update_sta
 from orders.ops_api import ops_login, ops_dashboard, ops_assign_partner, ops_update_status, ops_assign_driver, ops_mark_paid, ops_add_partner, ops_add_driver, ops_list_partners
 from orders.driver_api import api_driver_dropoff, driver_login, driver_missions, driver_confirm_pickup, driver_confirm_delivery
 from orders.photo_api import driver_upload_photo, partner_upload_photo, order_photos
-from orders.client_api import api_login, api_home, api_orders, api_order_detail, api_pricing_bags, api_create_order, api_articles, api_wallet, api_parrainage, api_rate_order, api_register, api_report_litige, api_pricing_detail, api_order_tracking, api_cancel_order
+from orders.client_api import api_chatbot, api_login, api_home, api_orders, api_order_detail, api_pricing_bags, api_create_order, api_articles, api_wallet, api_parrainage, api_rate_order, api_register, api_report_litige, api_pricing_detail, api_order_tracking, api_cancel_order
 from django.contrib import admin
 from django.urls import path, include
 from fagni.views import home, landing_riviera3
@@ -14,6 +14,7 @@ urlpatterns = [
     # ── API CLIENT FAGNI ──────────────────────────────────
     path("api/client/auth/login/",    api_login,    name="api-client-login"),
     path("api/client/auth/register/", api_register, name="api-client-register"),
+    path("api/client/chatbot/", api_chatbot, name="chatbot"),
     path("api/client/home/",       api_home,   name="api-client-home"),
     path("api/client/orders/",     api_orders,       name="api-client-orders"),
     path("api/client/orders/<int:order_id>/", api_order_detail, name="api-client-order-detail"),

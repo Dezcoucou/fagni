@@ -270,6 +270,8 @@ def ops_add_driver(request):
             vehicle_type=request.data.get('vehicle_type','moto').strip(),
             city=request.data.get('city','Abidjan').strip(),
             is_active=True
+            remuneration_collecte=int(request.data.get('remuneration_collecte', 1000) or 1000),
+            remuneration_livraison=int(request.data.get('remuneration_livraison', 1000) or 1000),
         )
         return Response({'success': True, 'id': driver.id, 'name': driver.name})
     except Exception as e:

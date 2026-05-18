@@ -352,3 +352,32 @@ def api_ops_paiements(request):
         'total_a_payer': total_a_payer,
         'nb_commandes_done': nb_done,
     })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_ops_enregistrer_paiement(request):
+    """POST /api/ops/paiements/enregistrer/ — enregistrer un paiement effectué"""
+    from orders.models import Paiement
+
+    partenaire_type = request.data.get('partenaire_type')
+    partenaire_id   = request.data.get('partenaire_id')
+    partenaire_nom  = request.data.get('partenaire_nom')
+    montant         = request.data.get('montant', 0)
+    nb_commandes    = request.data.get('nb_commandes', 0)
+    wave_number     = request.data.get('wave_number', '')
+    note            = request.data.get('note', '')
+
+    try:
+        paiement = Paiement.objects.create(
+            partenaire_type=partenaire_type,
+            partenaire_id=partenaire_id,
+            partenaire_nom=partenaire_nom,
+            montant=montant,
+            nb_commandes=nb_commandes,
+            wave_number=wave_number,
+            note=note,
+        )
+        return Response({'success': True, 'paiement_id': paiement.id})
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

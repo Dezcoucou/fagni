@@ -385,3 +385,34 @@ def api_ops_enregistrer_paiement(request):
         return Response({'success': True, 'paiement_id': paiement.id})
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_ops_revenus(request):
+    """GET /api/ops/revenus/ — revenus FAGNI"""
+    from orders.models import Order
+    from django.db.models import Sum
+    from datetime import datetime, timedelta
+
+    today = datetime.now().date()
+    debut_semaine = today - timedelta(days=today.weekday())
+    debut_mois = today.replace(day=1)
+
+    def stats(qs):
+        return {
+            'nb': qs.count(),
+            'total_client': int(qs.aggregate(s=Sum('total_client_ttc'))['s'] or 0),
+            'revenus_fagni': int(qs.aggregate(s=Sum('fagni_revenue_ht'))['s'] or 0),
+            'paye_pressing': int(qs.aggregate(s=Sum('amount_laundry_partner'))['s'] or 0),
+        }
+
+    done = Order.objects.filter(status='done')
+
+    return Response({
+        'total':        stats(done),
+        'semaine':      stats(done.filter(created_at__date__gte=debut_semaine)),
+        'mois':         stats(done.filter(created_at__date__gte=debut_mois)),
+        'en_attente':   Order.objects.filter(status='pending').count(),
+        'en_cours':     Order.objects.filter(status='in_progress').count(),
+    })

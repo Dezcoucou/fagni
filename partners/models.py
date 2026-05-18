@@ -30,6 +30,8 @@ class PartnerBase(models.Model):
     )
 
     city = models.CharField("Ville / Zone", max_length=120, blank=True)
+    remuneration_collecte  = models.PositiveIntegerField("Rémunération collecte (FCFA)", default=1000)
+    remuneration_livraison = models.PositiveIntegerField("Rémunération livraison (FCFA)", default=1000)
     wave_number = models.CharField("Numéro Wave", max_length=20, blank=True)
     notes = models.TextField("Notes internes", blank=True)
     is_active = models.BooleanField("Actif", default=True)

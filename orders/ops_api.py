@@ -416,3 +416,70 @@ def api_ops_revenus(request):
         'en_attente':   Order.objects.filter(status='pending').count(),
         'en_cours':     Order.objects.filter(status='in_progress').count(),
     })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_ops_rapport_hebdo(request):
+    """GET /api/ops/rapport/hebdo/ — rapport de la semaine"""
+    from orders.models import Order, Paiement
+    from partners.models import LaundryPartner, DeliveryPartner
+    from django.db.models import Sum, Count
+    from datetime import datetime, timedelta
+
+    today = datetime.now().date()
+    debut_semaine = today - timedelta(days=today.weekday())
+    fin_semaine = debut_semaine + timedelta(days=6)
+
+    commandes_semaine = Order.objects.filter(
+        created_at__date__gte=debut_semaine
+    )
+    livrees_semaine = commandes_semaine.filter(status='done')
+
+    total_encaisse = int(livrees_semaine.aggregate(
+        s=Sum('total_client_ttc'))['s'] or 0)
+    revenu_fagni = int(livrees_semaine.aggregate(
+        s=Sum('fagni_revenue_ht'))['s'] or 0)
+    paye_pressing = int(livrees_semaine.aggregate(
+        s=Sum('amount_laundry_partner'))['s'] or 0)
+
+    # Paiements effectués cette semaine
+    paiements = Paiement.objects.filter(
+        created_at__date__gte=debut_semaine
+    )
+    total_paye = int(paiements.aggregate(s=Sum('montant'))['s'] or 0)
+
+    # Message WhatsApp rapport
+    msg = f"""RAPPORT HEBDOMADAIRE FAGNI
+Semaine du {debut_semaine.strftime('%d/%m')} au {fin_semaine.strftime('%d/%m/%Y')}
+
+COMMANDES :
+- Nouvelles : {commandes_semaine.count()}
+- Livrees : {livrees_semaine.count()}
+- En attente : {Order.objects.filter(status='pending').count()}
+
+FINANCIER :
+- Encaisse clients : {total_encaisse:,} FCFA
+- Revenu FAGNI : {revenu_fagni:,} FCFA
+- Paye pressings : {paye_pressing:,} FCFA
+- Deja paye : {total_paye:,} FCFA
+- Reste a payer : {(paye_pressing - total_paye):,} FCFA
+
+Connecte-toi sur fagni-ops.vercel.app"""
+
+    import urllib.parse
+    wa_link = f"https://wa.me/2250142299949?text={urllib.parse.quote(msg)}"
+
+    return Response({
+        'semaine': str(debut_semaine),
+        'commandes_nouvelles': commandes_semaine.count(),
+        'commandes_livrees': livrees_semaine.count(),
+        'en_attente': Order.objects.filter(status='pending').count(),
+        'total_encaisse': total_encaisse,
+        'revenu_fagni': revenu_fagni,
+        'paye_pressing': paye_pressing,
+        'total_paye': total_paye,
+        'reste_a_payer': paye_pressing - total_paye,
+        'wa_link': wa_link,
+        'message': msg,
+    })

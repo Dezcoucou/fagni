@@ -362,6 +362,17 @@ def api_create_order(request):
                 order_data[field] = value
 
         order = Order.objects.create(**order_data)
+        # Notification WhatsApp OPS
+        try:
+            import urllib.request, urllib.parse
+            ops_num = "2250142299949"
+            msg = f"🆕 Nouvelle commande FAGNI\n\nCode : {order.code}\nClient : {customer.name}\nSac : {bag_size}\nTotal : {total:,} FCFA\nAdresse : {pickup_addr}\n\nConnecte-toi sur fagni-ops.vercel.app"
+            wa_url = f"https://wa.me/{ops_num}?text={urllib.parse.quote(msg)}"
+            order.notes = (order.notes or '') + f'\nWA_OPS:{wa_url}'
+            order.save(update_fields=['notes'])
+        except:
+            pass
+
         return Response({
             'order_id':      order.id,
             'code':          order.code or str(order.id),

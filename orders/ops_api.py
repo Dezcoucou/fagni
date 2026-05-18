@@ -293,3 +293,62 @@ def ops_list_partners(request):
         'id','name','phone','city','vehicle_type'
     ))
     return Response({'partners': partners, 'drivers': drivers})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_ops_paiements(request):
+    """GET /api/ops/paiements/ — cumul gains pressings et livreurs"""
+    from partners.models import LaundryPartner, DeliveryPartner
+    from orders.models import Order
+    from django.db.models import Sum, Count
+
+    # Pressings
+    pressings_data = []
+    for p in LaundryPartner.objects.filter(is_active=True):
+        commandes = Order.objects.filter(
+            laundry_partner=p,
+            status='done'
+        )
+        nb = commandes.count()
+        total_client = commandes.aggregate(s=Sum('total_client_ttc'))['s'] or 0
+        a_payer = commandes.aggregate(s=Sum('amount_laundry_partner'))['s'] or 0
+        pressings_data.append({
+            'id': p.id,
+            'name': p.name,
+            'phone': p.phone or '',
+            'wave_number': getattr(p, 'wave_number', '') or '',
+            'nb_commandes': nb,
+            'total_client': int(total_client),
+            'a_payer': int(a_payer),
+            'deja_paye': 0,
+        })
+
+    # Livreurs
+    livreurs_data = []
+    for d in DeliveryPartner.objects.filter(is_active=True):
+        missions = Order.objects.filter(
+            pickup_driver=d,
+            status='done'
+        )
+        nb = missions.count()
+        a_payer = nb * 1500  # 1 500 FCFA par mission par défaut
+        livreurs_data.append({
+            'id': d.id,
+            'name': d.name,
+            'phone': d.phone or '',
+            'wave_number': getattr(d, 'wave_number', '') or '',
+            'nb_missions': nb,
+            'a_payer': int(a_payer),
+            'deja_paye': 0,
+        })
+
+    total_a_payer = sum(p['a_payer'] for p in pressings_data) + sum(l['a_payer'] for l in livreurs_data)
+    nb_done = Order.objects.filter(status='done').count()
+
+    return Response({
+        'pressings': pressings_data,
+        'livreurs': livreurs_data,
+        'total_a_payer': total_a_payer,
+        'nb_commandes_done': nb_done,
+    })

@@ -4232,3 +4232,24 @@ class ArticleConfig(models.Model):
 
     def __str__(self):
         return f"{self.emoji} {self.label} ({self.category})"
+
+
+class Paiement(models.Model):
+    """Historique des paiements aux partenaires"""
+    TYPES = [('pressing', 'Pressing'), ('livreur', 'Livreur')]
+    
+    partenaire_type = models.CharField(max_length=20, choices=TYPES)
+    partenaire_id   = models.PositiveIntegerField()
+    partenaire_nom  = models.CharField(max_length=200)
+    montant         = models.PositiveIntegerField()
+    nb_commandes    = models.PositiveIntegerField(default=0)
+    wave_number     = models.CharField(max_length=20, blank=True)
+    note            = models.TextField(blank=True)
+    created_at      = models.DateTimeField(auto_now_add=True)
+    created_by      = models.CharField(max_length=100, default='OPS')
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.partenaire_nom} — {self.montant} FCFA — {self.created_at.strftime('%d/%m/%Y')}"

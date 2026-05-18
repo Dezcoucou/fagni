@@ -331,8 +331,12 @@ def api_ops_paiements(request):
             pickup_driver=d,
             status='done'
         )
-        nb = missions.count()
-        a_payer = nb * 1500  # 1 500 FCFA par mission par défaut
+        missions_collecte  = Order.objects.filter(pickup_driver=d, status='done').count()
+        missions_livraison = Order.objects.filter(delivery_partner=d, status='done').count()
+        nb = missions_collecte + missions_livraison
+        remun_collecte  = getattr(d, 'remuneration_collecte', 1000) or 1000
+        remun_livraison = getattr(d, 'remuneration_livraison', 1000) or 1000
+        a_payer = (missions_collecte * remun_collecte) + (missions_livraison * remun_livraison)
         livreurs_data.append({
             'id': d.id,
             'name': d.name,

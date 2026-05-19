@@ -54,20 +54,19 @@ def driver_missions(request):
 
     from orders.models import Order
 
-    # Missions collecte
+    # Toutes les commandes assignées à ce livreur
     pickup_orders = Order.objects.filter(
-        pickup_driver=driver,
-        status__in=['pending']
-    ).select_related('customer', 'laundry_partner').order_by('-created_at')[:10]
+        pickup_driver=driver
+    ).exclude(status='done').select_related('customer', 'laundry_partner').order_by('-created_at')[:10]
 
-    # Missions livraison
     delivery_orders = Order.objects.filter(
-        delivery_partner=driver,
-        status__in=['in_progress', 'done']
-    ).select_related('customer', 'laundry_partner').order_by('-created_at')[:10]
+        delivery_partner=driver
+    ).exclude(status='done').select_related('customer', 'laundry_partner').order_by('-created_at')[:10]
 
-    pickup_list = list(pickup_orders)
-    delivery_list = list(delivery_orders)
+    pickup_list  = list(pickup_orders)
+    # Éviter les doublons si même commande assignée aux deux
+    delivery_ids = {o.id for o in pickup_list}
+    delivery_list = [o for o in list(delivery_orders) if o.id not in delivery_ids]
     all_orders = pickup_list + delivery_list
 
     result = []

@@ -302,20 +302,13 @@ def api_create_order(request):
     )
     delivery_date = pickup_date + timedelta(days=2)
 
-    # Pricing depuis DB (source de vérité)
-    from orders.models import PricingConfig
-    from orders.pricing_engine import calculate_order as _calc
+    # Pricing v2.0 — source de vérité
+    from orders.pricing_engine import calculate_order as _calc, BAG_CONFIG
 
-    try:
-        config = PricingConfig.objects.get(bag_size=bag_size, is_active=True)
-        pressing_amount = config.pressing_amount
-        delivery_fee_amount = config.delivery_fee
-    except Exception:
-        # Fallback si pas de config
-        pressing_amount = int(BAG_PRICING[bag_size]['price'])
-        delivery_fee_amount = 2000
+    if bag_size not in BAG_CONFIG:
+        return Response({'error': 'Taille de sac invalide'}, status=400)
 
-    _pricing    = _calc(pressing_amount, delivery_fee_amount)
+    _pricing    = _calc(bag_size)
     bag_price   = _pricing['total_client']
     service_fee = _pricing['service_fee']
     total       = _pricing['total_client']

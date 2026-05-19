@@ -745,3 +745,167 @@ def api_score_livreur(request, driver_id):
             'revenus':    score_revenus,
         }
     })
+
+
+# ============================================================
+# PARRAINAGE FAGNI
+# ============================================================
+
+import random
+import string
+
+def generer_code():
+    """Générer un code parrainage unique."""
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_creer_parrainage(request):
+    """POST /api/parrainage/creer/ — créer un lien de parrainage"""
+    from orders.models import Parrainage
+
+    parrain_type = request.data.get('parrain_type')
+    parrain_id   = request.data.get('parrain_id')
+    parrain_nom  = request.data.get('parrain_nom')
+
+    if not all([parrain_type, parrain_id, parrain_nom]):
+        return Response({'error': 'Données manquantes'}, status=400)
+
+    # Vérifier si un parrainage existe déjà pour ce parrain
+    existing = Parrainage.objects.filter(
+        parrain_type=parrain_type,
+        parrain_id=parrain_id,
+        statut='invite'
+    ).first()
+
+    if existing:
+        return Response({
+            'code':     existing.code_parrainage,
+            'wa_link':  f"https://wa.me/?text=Rejoins FAGNI avec mon code {existing.code_parrainage} ! Blanchisserie à domicile à Abidjan. Télécharge l'app : fagni-client.vercel.app",
+            'message':  'Lien existant récupéré'
+        })
+
+    # Récompenses selon type
+    REMUNERATIONS = {
+        'client':   {'parrain': 500,  'filleul': 500,  'actions': 1},
+        'livreur':  {'parrain': 2000, 'filleul': 0,    'actions': 10},
+        'pressing': {'parrain': 5000, 'filleul': 0,    'actions': 10},
+    }
+    remun = REMUNERATIONS.get(parrain_type, {'parrain': 500, 'filleul': 0, 'actions': 10})
+
+    # Générer code unique
+    code = generer_code()
+    while Parrainage.objects.filter(code_parrainage=code).exists():
+        code = generer_code()
+
+    parrainage = Parrainage.objects.create(
+        parrain_type=parrain_type,
+        parrain_id=parrain_id,
+        parrain_nom=parrain_nom,
+        filleul_type=parrain_type,
+        code_parrainage=code,
+        actions_requises=remun['actions'],
+        remuneration_parrain=remun['parrain'],
+        remuneration_filleul=remun['filleul'],
+        score_bonus=10,
+        cash_active=False,
+    )
+
+    wa_text = f"Rejoins FAGNI avec mon code {code} ! Blanchisserie à domicile à Abidjan. Télécharge l'app : fagni-client.vercel.app"
+
+    return Response({
+        'code':    code,
+        'wa_link': f"https://wa.me/?text={wa_text}",
+        'remuneration_parrain': remun['parrain'],
+        'remuneration_filleul': remun['filleul'],
+        'actions_requises':     remun['actions'],
+        'cash_active':          False,
+        'message': 'Code parrainage créé'
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_stats_parrainage(request, parrain_type, parrain_id):
+    """GET /api/parrainage/stats/<type>/<id>/ — stats parrainage"""
+    from orders.models import Parrainage
+
+    parrainages = Parrainage.objects.filter(
+        parrain_type=parrain_type,
+        parrain_id=parrain_id
+    )
+
+    total_invites  = parrainages.count()
+    total_actifs   = parrainages.filter(statut='actif').count()
+    total_payes    = parrainages.filter(statut='paye').count()
+    score_gagne    = total_actifs * 10
+    cash_gagne     = sum(p.remuneration_parrain for p in parrainages.filter(statut__in=['actif','paye'], cash_paye=True))
+    cash_en_attente= sum(p.remuneration_parrain for p in parrainages.filter(statut='actif', cash_paye=False))
+
+    # Code parrainage principal
+    premier = parrainages.first()
+    code    = premier.code_parrainage if premier else None
+    wa_link = f"https://wa.me/?text=Rejoins FAGNI avec mon code {code} ! fagni-client.vercel.app" if code else None
+
+    return Response({
+        'parrain_type':    parrain_type,
+        'parrain_id':      parrain_id,
+        'code':            code,
+        'wa_link':         wa_link,
+        'stats': {
+            'total_invites':   total_invites,
+            'total_actifs':    total_actifs,
+            'total_payes':     total_payes,
+            'score_gagne':     score_gagne,
+            'cash_gagne':      cash_gagne,
+            'cash_en_attente': cash_en_attente,
+        },
+        'filleuls': list(parrainages.values(
+            'filleul_nom', 'filleul_phone', 'statut',
+            'nb_actions', 'actions_requises', 'created_at'
+        )),
+        'cash_active': False,
+        'message_cash': f"Récompenses cash activées quand FAGNI atteint 100 commandes/mois. Actuellement : {from_orders_count()} commandes/mois",
+    })
+
+
+def from_orders_count():
+    from orders.models import Order
+    from datetime import datetime, timedelta
+    debut = datetime.now().date().replace(day=1)
+    return Order.objects.filter(created_at__date__gte=debut).count()
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_valider_code_parrainage(request):
+    """POST /api/parrainage/valider/ — filleul utilise un code"""
+    from orders.models import Parrainage
+
+    code         = request.data.get('code', '').upper().strip()
+    filleul_nom  = request.data.get('filleul_nom', '')
+    filleul_phone= request.data.get('filleul_phone', '')
+    filleul_id   = request.data.get('filleul_id')
+
+    try:
+        p = Parrainage.objects.get(code_parrainage=code)
+    except Parrainage.DoesNotExist:
+        return Response({'error': 'Code invalide'}, status=404)
+
+    if p.statut != 'invite':
+        return Response({'error': 'Code déjà utilisé'}, status=400)
+
+    p.filleul_nom   = filleul_nom
+    p.filleul_phone = filleul_phone
+    p.filleul_id    = filleul_id
+    p.statut        = 'inscrit'
+    p.save()
+
+    return Response({
+        'success': True,
+        'parrain_nom': p.parrain_nom,
+        'remuneration_filleul': p.remuneration_filleul,
+        'actions_requises': p.actions_requises,
+        'message': f"Code validé ! Effectue {p.actions_requises} commandes pour activer la récompense."
+    })

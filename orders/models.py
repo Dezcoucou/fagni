@@ -4253,3 +4253,53 @@ class Paiement(models.Model):
 
     def __str__(self):
         return f"{self.partenaire_nom} — {self.montant} FCFA — {self.created_at.strftime('%d/%m/%Y')}"
+
+
+class Parrainage(models.Model):
+    """Système de parrainage FAGNI"""
+    TYPES = [
+        ('client',   'Client → Client'),
+        ('livreur',  'Livreur → Livreur'),
+        ('pressing', 'Pressing → Pressing'),
+    ]
+    STATUTS = [
+        ('invite',  'Invité'),
+        ('inscrit', 'Inscrit'),
+        ('actif',   'Actif — récompense déclenchée'),
+        ('paye',    'Payé'),
+    ]
+
+    # Parrain
+    parrain_type = models.CharField(max_length=20, choices=TYPES)
+    parrain_id   = models.PositiveIntegerField()
+    parrain_nom  = models.CharField(max_length=200)
+
+    # Filleul
+    filleul_type = models.CharField(max_length=20, choices=TYPES)
+    filleul_id   = models.PositiveIntegerField(null=True, blank=True)
+    filleul_nom  = models.CharField(max_length=200, blank=True)
+    filleul_phone= models.CharField(max_length=20, blank=True)
+
+    # Lien unique
+    code_parrainage = models.CharField(max_length=20, unique=True)
+
+    # Suivi
+    statut           = models.CharField(max_length=20, choices=STATUTS, default='invite')
+    nb_actions       = models.PositiveIntegerField(default=0)  # missions ou commandes
+    actions_requises = models.PositiveIntegerField(default=10) # 10 missions/commandes
+    score_bonus      = models.PositiveIntegerField(default=10) # pts score au parrain
+
+    # Récompense cash (activée après 100 commandes/mois FAGNI)
+    remuneration_parrain  = models.PositiveIntegerField(default=0)
+    remuneration_filleul  = models.PositiveIntegerField(default=0)
+    cash_active           = models.BooleanField(default=False)
+    cash_paye             = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.parrain_nom} → {self.filleul_nom or 'En attente'} ({self.statut})"

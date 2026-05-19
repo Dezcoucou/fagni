@@ -552,6 +552,15 @@ def api_pricing_detail(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def api_pricing_bags(request):
+    """GET /api/client/pricing/bags/ — prix des sacs v2.0"""
+    from orders.pricing_engine import get_bag_pricing, BAG_CONFIG
+    pricing = get_bag_pricing()
+    return Response(pricing)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_pricing_bags_old(request):
     """GET /api/client/pricing/bags/ — prix depuis la DB"""
     from orders.models import PricingConfig
     from orders.pricing_engine import calculate_order

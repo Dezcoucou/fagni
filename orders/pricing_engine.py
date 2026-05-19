@@ -1,134 +1,96 @@
 """
-FAGNI Pricing Engine v1.0
-Source of truth unique pour tous les calculs financiers.
-NE JAMAIS calculer les marges dans le frontend.
+FAGNI Pricing Engine v2.0
+Modèle : prix à l'article — 200 FCFA pressing, prix fixe client par sac
 """
 from decimal import Decimal, ROUND_HALF_UP
 
 
 def d(val):
-    """Convertir en Decimal propre."""
     return Decimal(str(val or 0)).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 
 
-# Taux officiels FAGNI
-COMMISSION_PRESSING   = Decimal('0.30')   # 30% sur prestation pressing
-SERVICE_FEE_RATE      = Decimal('0.05')   # 5% service fee client
-COMMISSION_LIVRAISON  = Decimal('0.30')   # 30% sur frais livraison
-PART_LIVREUR          = Decimal('0.70')   # 70% des frais livraison au livreur
+PRIX_ARTICLE_PRESSING  = 200
+TAUX_LIVREUR           = Decimal('0.70')
+TAUX_FAGNI_LIVRAISON   = Decimal('0.30')
+SERVICE_FEE_MIN        = 500
+
+BAG_CONFIG = {
+    'small':  {'label': 'Petit sac',  'articles': 15, 'prix_client': 9000,  'delivery': 2000, 'poids_kg': 5},
+    'medium': {'label': 'Sac moyen',  'articles': 25, 'prix_client': 13500, 'delivery': 2000, 'poids_kg': 10},
+    'large':  {'label': 'Grand sac',  'articles': 50, 'prix_client': 25000, 'delivery': 2000, 'poids_kg': 15},
+}
 
 
-def calculate_order(pressing_amount, delivery_fee=2000, commission_rate=None, partner_rate=None):
-    """
-    Calcul complet d'une commande FAGNI.
+def calculate_order(bag_size='small', nb_articles=None, delivery_fee=None):
+    config        = BAG_CONFIG.get(bag_size, BAG_CONFIG['small'])
+    articles      = nb_articles if nb_articles else config['articles']
+    total_client  = d(config['prix_client'])
+    livraison     = d(delivery_fee if delivery_fee else config['delivery'])
 
-    Args:
-        pressing_amount : Prix de la prestation pressing (FCFA)
-        delivery_fee    : Frais de livraison facturés au client (défaut 2000 FCFA)
+    part_livreur    = (livraison * TAUX_LIVREUR).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+    marge_livraison = livraison - part_livreur
+    part_pressing   = d(articles * PRIX_ARTICLE_PRESSING)
 
-    Returns:
-        dict avec tous les montants décomposés
-    """
-    pressing   = d(pressing_amount)
-    livraison  = d(delivery_fee)
+    sous_total  = (total_client / Decimal('1.05')).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+    service_fee = total_client - sous_total
+    if service_fee < d(SERVICE_FEE_MIN):
+        service_fee = d(SERVICE_FEE_MIN)
 
-    # Taux paramétrables ou taux par défaut
-    taux_commission = Decimal(str(commission_rate)) / 100 if commission_rate else COMMISSION_PRESSING
-    taux_partner    = Decimal(str(partner_rate)) / 100 if partner_rate else (1 - COMMISSION_PRESSING)
-
-    # Commission pressing
-    commission_pressing = (pressing * taux_commission).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
-    part_pressing       = pressing - commission_pressing
-
-    # Service fee
-    service_fee = (pressing * SERVICE_FEE_RATE).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
-
-    # Livraison
-    part_livreur       = (livraison * PART_LIVREUR).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
-    marge_livraison    = livraison - part_livreur
-
-    # Totaux
-    total_client = pressing + livraison + service_fee
-    total_fagni  = commission_pressing + marge_livraison + service_fee
-    total_ops    = pressing + livraison  # ce que FAGNI encaisse avant redistribution
+    marge_pressing = total_client - part_pressing - livraison - service_fee
+    total_fagni    = marge_pressing + marge_livraison + service_fee
 
     return {
-        # Ce que le client paie
-        'total_client':         int(total_client),
-        'pressing_amount':      int(pressing),
-        'delivery_fee':         int(livraison),
-        'service_fee':          int(service_fee),
-
-        # Ce que FAGNI redistribue
-        'part_pressing':        int(part_pressing),
-        'part_livreur':         int(part_livreur),
-
-        # Revenus FAGNI
-        'commission_pressing':  int(commission_pressing),
-        'marge_livraison':      int(marge_livraison),
-        'total_fagni':          int(total_fagni),
-
-        # Taux appliqués
-        'taux_commission':      float(COMMISSION_PRESSING),
-        'taux_service_fee':     float(SERVICE_FEE_RATE),
-        'taux_livraison':       float(COMMISSION_LIVRAISON),
+        'total_client':      int(total_client),
+        'delivery_fee':      int(livraison),
+        'service_fee':       int(service_fee),
+        'part_pressing':     int(part_pressing),
+        'part_livreur':      int(part_livreur),
+        'marge_pressing':    int(marge_pressing),
+        'marge_livraison':   int(marge_livraison),
+        'total_fagni':       int(total_fagni),
+        'fagni_revenue_ht':  int(total_fagni),
+        'bag_size':          bag_size,
+        'bag_label':         config['label'],
+        'nb_articles':       articles,
+        'prix_article_client': int((total_client - livraison - service_fee) / articles),
+        # Compatibilité ancien code
+        'total_client_ttc':  int(total_client),
+        'amount_laundry_partner': int(part_pressing),
+        'amount_driver_partner':  int(part_livreur),
+        'commission_pressing':    int(marge_pressing),
+        'service_fee_amount':     int(service_fee),
     }
 
 
-def calculate_bag_pricing(bag_size, zone='standard'):
-    """
-    Prix par défaut selon la taille du sac.
-    Modifiable via admin Django plus tard.
-    """
-    BAG_PRICES = {
-        'small':  5000,
-        'medium': 8000,
-        'large':  12000,
-    }
-    DELIVERY_FEES = {
-        'standard': 2000,
-        'express':  3500,
-        'premium':  5000,
-    }
-    pressing_amount = BAG_PRICES.get(bag_size, 5000)
-    delivery_fee    = DELIVERY_FEES.get(zone, 2000)
-    return calculate_order(pressing_amount, delivery_fee)
-
-
-def calculate_mlm_commissions(fagni_revenue, levels=None):
-    """
-    Calcul des commissions MLM sur le service fee FAGNI.
-    levels: [0.30, 0.15, 0.05] = N1 30%, N2 15%, N3 5%
-    """
-    if levels is None:
-        levels = [Decimal('0.30'), Decimal('0.15'), Decimal('0.05')]
-
-    fagni = d(fagni_revenue)
-    commissions = []
-    for i, rate in enumerate(levels):
-        amount = (fagni * rate).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
-        commissions.append({
-            'niveau':    i + 1,
-            'taux':      float(rate),
-            'montant':   int(amount),
-        })
-    return commissions
+def get_bag_pricing():
+    result = {}
+    for size, config in BAG_CONFIG.items():
+        p = calculate_order(size)
+        result[size] = {
+            'label':       config['label'],
+            'articles':    config['articles'],
+            'poids_kg':    config['poids_kg'],
+            'prix_client': config['prix_client'],
+            'delivery_fee': config['delivery'],
+            'service_fee': p['service_fee'],
+            'part_pressing': p['part_pressing'],
+            'part_livreur':  p['part_livreur'],
+            'total_fagni':   p['total_fagni'],
+        }
+    return result
 
 
 def format_receipt(pricing):
-    """
-    Générer un récapitulatif lisible pour WhatsApp.
-    """
     return (
         f"🧾 Récapitulatif FAGNI\n"
         f"━━━━━━━━━━━━━━\n"
-        f"🧺 Pressing     : {pricing['pressing_amount']:,} FCFA\n"
-        f"🚗 Livraison    : {pricing['delivery_fee']:,} FCFA\n"
-        f"⚡ Service fee  : {pricing['service_fee']:,} FCFA\n"
+        f"🧺 {pricing['bag_label']} ({pricing['nb_articles']} articles)\n"
+        f"🚗 Livraison AR  : {pricing['delivery_fee']:,} FCFA\n"
+        f"⚡ Service fee   : {pricing['service_fee']:,} FCFA\n"
         f"━━━━━━━━━━━━━━\n"
-        f"💰 TOTAL        : {pricing['total_client']:,} FCFA\n"
+        f"💰 TOTAL         : {pricing['total_client']:,} FCFA\n"
     )
 
 
-# Alias pour compatibilité avec le code existant
-compute_order_pricing = calculate_order
+calculate_bag_pricing  = lambda bag_size, zone='standard': calculate_order(bag_size)
+compute_order_pricing  = calculate_order

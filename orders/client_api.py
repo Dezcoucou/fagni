@@ -212,7 +212,13 @@ def api_order_detail(request, order_id):
     if not order:
         return Response({'error': 'Commande introuvable'}, status=404)
 
-    total = float(order.total_client_ttc or 0) or float(getattr(order,'total',0) or 0) or float(getattr(order,'items_total',0) or 0)
+    # Calculer le vrai total depuis pricing engine si total_client_ttc manque
+    _total_raw = float(order.total_client_ttc or 0) or float(getattr(order,'total',0) or 0)
+    if _total_raw == 0 and order.bag_size:
+        from orders.pricing_engine import calculate_order as _recalc, BAG_CONFIG
+        _nb = getattr(order, 'nb_articles', None) or BAG_CONFIG.get(order.bag_size, {}).get('max_items', 15)
+        _total_raw = _recalc(_nb, order.bag_size)['total_client']
+    total = _total_raw
     amount_paid = float(getattr(order, 'amount_paid', 0) or 0)
 
     items = []
@@ -619,7 +625,7 @@ def api_articles(request):
             'pressing':    config.pressing_amount,
             'delivery':    config.delivery_fee,
             'service_fee': pricing['service_fee'],
-            'max_items':   {'small':15,'medium':25,'large':40}.get(config.bag_size, 15),
+            'max_items':   {'small':15,'medium':25,'large':50}.get(config.bag_size, 15),
             'max_weight_kg': {'small':5,'medium':10,'large':15}.get(config.bag_size, 5),
         }
 

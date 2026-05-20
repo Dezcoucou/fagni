@@ -230,15 +230,48 @@ def api_order_detail(request, order_id):
             'unit_price': float(getattr(item, 'unit_price', 0) or 0),
         })
 
+    # Lien Wave paiement
+    import urllib.parse
+    wave_number_fagni = "0748643892"
+    remaining = max(0, total - amount_paid)
+    wave_msg = f"Paiement FAGNI commande {order.code} — {int(remaining):,} FCFA"
+    wave_link = f"https://pay.wave.com/m/M_OfAgT8X_IT4/{int(remaining)}/?message={urllib.parse.quote(wave_msg)}" if remaining > 0 else None
+
+    # Statut livraison détaillé
+    status_map = {
+        'pending':     {'label': 'En attente', 'emoji': '⏳', 'step': 1},
+        'assigned':    {'label': 'Livreur assigné', 'emoji': '🛵', 'step': 2},
+        'in_progress': {'label': 'Collecte en cours', 'emoji': '📦', 'step': 3},
+        'at_pressing': {'label': 'Au pressing', 'emoji': '🧺', 'step': 4},
+        'ready':       {'label': 'Prêt pour livraison', 'emoji': '✅', 'step': 5},
+        'delivering':  {'label': 'En livraison', 'emoji': '🚀', 'step': 6},
+        'done':        {'label': 'Livré', 'emoji': '🎉', 'step': 7},
+        'canceled':    {'label': 'Annulé', 'emoji': '❌', 'step': 0},
+    }
+    status_info = status_map.get(order.status, {'label': order.status, 'emoji': '📋', 'step': 0})
+
+    # Vérifier si déjà noté
+    try:
+        from orders.models import OrderRating
+        already_rated = OrderRating.objects.filter(order=order).exists()
+    except:
+        already_rated = False
+
     return Response({
         'id':             order.id,
         'code':           order.code or str(order.id),
         'status':         order.status,
+        'status_label':   status_info['label'],
+        'status_emoji':   status_info['emoji'],
+        'status_step':    status_info['step'],
         'payment_status': getattr(order, 'payment_status', 'unpaid'),
         'service_type':   getattr(order, 'service_type', None) or 'FAGNI',
         'total':          total,
         'amount_paid':    amount_paid,
-        'remaining':      max(0, total - amount_paid),
+        'remaining':      remaining,
+        'wave_link':      wave_link,
+        'can_rate':       order.status == 'done' and not already_rated,
+        'already_rated':  already_rated,
         'created_at':     order.created_at.isoformat() if order.created_at else None,
         'items':          items,
     })
@@ -957,3 +990,70 @@ OPS WhatsApp : +225 01 42 29 99 49. Réponds en français, sois chaleureux et co
         return Response({'reply': text})
     except Exception as e:
         return Response({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
+def api_rate_order(request, order_id):
+    """POST /api/client/orders/<id>/rate/ — noter une commande"""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        import jwt
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        from orders.models import Customer
+        customer = Customer.objects.get(id=payload['cid'])
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    try:
+        from orders.models import Order, OrderRating
+        order = Order.objects.get(id=order_id, customer=customer)
+
+        if order.status != 'done':
+            return Response({'error': 'Commande non livrée'}, status=400)
+
+        score   = int(request.data.get('score', 5))
+        comment = request.data.get('comment', '')
+
+        rating, created = OrderRating.objects.update_or_create(
+            order=order,
+            defaults={'score': score, 'comment': comment}
+        )
+        return Response({
+            'success': True,
+            'score': score,
+            'message': 'Merci pour votre avis !'
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
+def api_welcome_notification(request):
+    """POST /api/client/welcome/ — message bienvenue WhatsApp"""
+    import urllib.parse
+    phone = request.data.get('phone', '')
+    name  = request.data.get('name', 'Client')
+
+    if not phone:
+        return Response({'error': 'Phone requis'}, status=400)
+
+    msg = f"""Bienvenue chez FAGNI {name} ! 🎉
+
+Votre blanchisserie à domicile à Abidjan.
+
+🧺 Comment commander :
+→ fagni-client.vercel.app
+
+💰 Tarif : 500 FCFA/article
+🚗 Livraison : 2 000 FCFA
+⏱️ Délai : 48-72 heures
+
+Des questions ? Écrivez-nous ici !
+⚡ FAGNI — Riviera 3, Abidjan"""
+
+    wa_link = f"https://wa.me/2250142299949?text={urllib.parse.quote(msg)}"
+    return Response({'success': True, 'wa_link': wa_link})

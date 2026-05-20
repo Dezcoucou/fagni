@@ -924,6 +924,25 @@ def api_valider_code_parrainage(request):
 # WALLET — DISPATCH AUTOMATIQUE APRÈS COMMANDE LIVRÉE
 # ============================================================
 
+def notify_client_whatsapp(order, message):
+    """Envoyer notification WhatsApp au client."""
+    import urllib.parse
+    try:
+        phone = order.customer.phone if order.customer else None
+        if not phone:
+            return None
+        # Nettoyer le numéro
+        phone = phone.replace('+', '').replace(' ', '').replace('-', '')
+        if phone.startswith('0'):
+            phone = '225' + phone[1:]
+        elif not phone.startswith('225'):
+            phone = '225' + phone
+        wa_link = f"https://wa.me/{phone}?text={urllib.parse.quote(message)}"
+        return wa_link
+    except:
+        return None
+
+
 def dispatch_wallet_after_order(order):
     """
     Crédite automatiquement les wallets pressing et livreur

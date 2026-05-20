@@ -258,7 +258,6 @@ def is_in_delivery_zone(lat, lng):
 @authentication_classes([])
 def api_create_order(request):
     """POST /api/client/orders/create/"""
-    from orders.utils.pricing import BAG_PRICING
     from datetime import date, time as dtime, timedelta
 
     # Authentification manuelle
@@ -286,8 +285,7 @@ def api_create_order(request):
     pickup_slot   = (request.data.get('pickup_slot') or '').strip()
     articles      = request.data.get('articles', [])
 
-    if bag_size not in BAG_PRICING:
-        return Response({'error': 'Taille de sac invalide'}, status=400)
+
 
     today    = date.today()
 

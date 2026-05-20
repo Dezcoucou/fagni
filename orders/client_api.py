@@ -351,7 +351,7 @@ def api_create_order(request):
         financial_fields = {
             'delivery_fee':           pricing['delivery_fee'],
             'commission_delivery_ht': pricing['marge_livraison'],
-            'commission_laundry_ht':  pricing['commission_pressing'],
+            'commission_laundry_ht':  pricing['marge_pressing'],
             'amount_driver_partner':  pricing['part_livreur'],
             'amount_laundry_partner': pricing['part_pressing'],
             'fagni_revenue_ht':       pricing['total_fagni'],

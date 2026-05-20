@@ -1,5 +1,5 @@
 from orders.partner_api import partner_login, partner_orders, partner_update_status
-from orders.ops_api import api_ops_paiements, api_ops_enregistrer_paiement, api_ops_revenus, api_ops_rapport_hebdo, api_score_pressing, api_score_livreur, api_creer_parrainage, api_stats_parrainage, api_valider_code_parrainage, ops_login, ops_dashboard, ops_assign_partner, ops_update_status, ops_assign_driver, ops_mark_paid, ops_add_partner, ops_add_driver, ops_list_partners
+from orders.ops_api import api_wallet_solde, api_wallet_retrait, api_ops_paiements, api_ops_enregistrer_paiement, api_ops_revenus, api_ops_rapport_hebdo, api_score_pressing, api_score_livreur, api_creer_parrainage, api_stats_parrainage, api_valider_code_parrainage, ops_login, ops_dashboard, ops_assign_partner, ops_update_status, ops_assign_driver, ops_mark_paid, ops_add_partner, ops_add_driver, ops_list_partners
 from orders.driver_api import api_driver_dropoff, driver_login, driver_missions, driver_confirm_pickup, driver_confirm_delivery
 from orders.photo_api import driver_upload_photo, partner_upload_photo, order_photos
 from orders.client_api import api_chatbot, api_login, api_home, api_orders, api_order_detail, api_pricing_bags, api_create_order, api_articles, api_wallet, api_parrainage, api_rate_order, api_register, api_report_litige, api_pricing_detail, api_order_tracking, api_cancel_order
@@ -32,6 +32,8 @@ urlpatterns = [
     path("api/partner/orders/",             partner_orders,        name="api-partner-orders"),
     path("api/partner/orders/<int:order_id>/status/", partner_update_status, name="api-partner-status"),
     path("api/ops/login/",                        ops_login,          name="api-ops-login"),
+    path("api/wallet/solde/", api_wallet_solde, name="wallet-solde"),
+    path("api/wallet/retrait/", api_wallet_retrait, name="wallet-retrait"),
     path("api/parrainage/creer/", api_creer_parrainage, name="parrainage-creer"),
     path("api/parrainage/valider/", api_valider_code_parrainage, name="parrainage-valider"),
     path("api/parrainage/stats/<str:parrain_type>/<int:parrain_id>/", api_stats_parrainage, name="parrainage-stats"),

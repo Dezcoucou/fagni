@@ -355,8 +355,9 @@ def api_ops_paiements(request):
     # Retraits en attente
     from orders.models import Paiement
     retraits = list(Paiement.objects.filter(
-        note__contains='DEMANDE_RETRAIT',
-        cash_paye=False
+        note__contains='DEMANDE_RETRAIT'
+    ).exclude(
+        note__contains='valide'
     ).values('id','partenaire_nom','montant','wave_number','created_at'))
 
     return Response({
@@ -1070,7 +1071,6 @@ def api_wallet_retrait(request):
             montant=montant,
             wave_number=wave_number or '',
             note='DEMANDE_RETRAIT — En attente validation OPS',
-            cash_paye=False,
         )
 
         # Lien WhatsApp OPS pour notifier

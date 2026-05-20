@@ -909,3 +909,174 @@ def api_valider_code_parrainage(request):
         'actions_requises': p.actions_requises,
         'message': f"Code validé ! Effectue {p.actions_requises} commandes pour activer la récompense."
     })
+
+
+# ============================================================
+# WALLET — DISPATCH AUTOMATIQUE APRÈS COMMANDE LIVRÉE
+# ============================================================
+
+def dispatch_wallet_after_order(order):
+    """
+    Crédite automatiquement les wallets pressing et livreur
+    après qu'une commande est marquée comme livrée.
+    """
+    from wallets.models import Wallet, WalletTransaction
+    from orders.pricing_engine import calculate_order
+
+    try:
+        # Calculer les montants
+        nb_articles = order.nb_articles or 15
+        pricing = calculate_order(nb_articles, order.bag_size or 'small')
+
+        # 1. Créditer le wallet du pressing
+        if order.laundry_partner:
+            try:
+                wallet_pressing, _ = Wallet.objects.get_or_create(
+                    laundry_partner=order.laundry_partner,
+                    defaults={'currency': 'XOF', 'balance': 0}
+                )
+                montant_pressing = pricing['part_pressing']
+                wallet_pressing.balance += montant_pressing
+                wallet_pressing.save(update_fields=['balance', 'updated_at'])
+                WalletTransaction.objects.create(
+                    wallet=wallet_pressing,
+                    order=order,
+                    type='payout',
+                    direction='credit',
+                    amount=montant_pressing,
+                    description=f"Commande {order.code} — {nb_articles} articles × 200 FCFA",
+                )
+            except Exception as e:
+                print(f"Erreur wallet pressing: {e}")
+
+        # 2. Créditer le wallet du livreur
+        if order.pickup_driver or order.delivery_partner:
+            driver = order.pickup_driver or order.delivery_partner
+            try:
+                wallet_livreur, _ = Wallet.objects.get_or_create(
+                    delivery_partner=driver,
+                    defaults={'currency': 'XOF', 'balance': 0}
+                )
+                remun_c = getattr(driver, 'remuneration_collecte', 1000) or 1000
+                remun_l = getattr(driver, 'remuneration_livraison', 1000) or 1000
+                montant_livreur = remun_c + remun_l
+                wallet_livreur.balance += montant_livreur
+                wallet_livreur.save(update_fields=['balance', 'updated_at'])
+                WalletTransaction.objects.create(
+                    wallet=wallet_livreur,
+                    order=order,
+                    type='payout',
+                    direction='credit',
+                    amount=montant_livreur,
+                    description=f"Mission {order.code} — collecte + livraison",
+                )
+            except Exception as e:
+                print(f"Erreur wallet livreur: {e}")
+
+        return True
+    except Exception as e:
+        print(f"Erreur dispatch wallet: {e}")
+        return False
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_wallet_solde(request):
+    """POST /api/wallet/solde/ — solde wallet partenaire ou livreur"""
+    from wallets.models import Wallet, WalletTransaction
+
+    partner_type = request.data.get('partner_type')
+    partner_id   = request.data.get('partner_id')
+
+    try:
+        if partner_type == 'pressing':
+            from partners.models import LaundryPartner
+            p = LaundryPartner.objects.get(id=partner_id)
+            wallet, _ = Wallet.objects.get_or_create(
+                laundry_partner=p,
+                defaults={'currency': 'XOF', 'balance': 0}
+            )
+        elif partner_type == 'livreur':
+            from partners.models import DeliveryPartner
+            d = DeliveryPartner.objects.get(id=partner_id)
+            wallet, _ = Wallet.objects.get_or_create(
+                delivery_partner=d,
+                defaults={'currency': 'XOF', 'balance': 0}
+            )
+        else:
+            return Response({'error': 'Type invalide'}, status=400)
+
+        transactions = WalletTransaction.objects.filter(
+            wallet=wallet
+        ).order_by('-created_at')[:20]
+
+        return Response({
+            'solde': float(wallet.balance),
+            'currency': wallet.currency,
+            'transactions': [{
+                'date':        t.created_at.strftime('%d/%m/%Y %H:%M'),
+                'type':        t.type,
+                'direction':   t.direction,
+                'montant':     float(t.amount),
+                'description': t.description or '',
+            } for t in transactions]
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_wallet_retrait(request):
+    """POST /api/wallet/retrait/ — demande de retrait partenaire"""
+    from wallets.models import Wallet
+    from orders.models import Paiement
+
+    partner_type = request.data.get('partner_type')
+    partner_id   = request.data.get('partner_id')
+    partner_nom  = request.data.get('partner_nom', '')
+    montant      = int(request.data.get('montant', 0))
+    wave_number  = request.data.get('wave_number', '')
+
+    if montant < 500:
+        return Response({'error': 'Montant minimum 500 FCFA'}, status=400)
+
+    try:
+        if partner_type == 'pressing':
+            from partners.models import LaundryPartner
+            p = LaundryPartner.objects.get(id=partner_id)
+            wallet = Wallet.objects.get(laundry_partner=p)
+        else:
+            from partners.models import DeliveryPartner
+            d = DeliveryPartner.objects.get(id=partner_id)
+            wallet = Wallet.objects.get(delivery_partner=d)
+
+        if float(wallet.balance) < montant:
+            return Response({'error': 'Solde insuffisant'}, status=400)
+
+        # Créer demande de retrait dans Paiement (en attente OPS)
+        paiement = Paiement.objects.create(
+            partenaire_type=partner_type,
+            partenaire_id=partner_id,
+            partenaire_nom=partner_nom,
+            montant=montant,
+            wave_number=wave_number or '',
+            note='DEMANDE_RETRAIT — En attente validation OPS',
+            cash_paye=False,
+        )
+
+        # Lien WhatsApp OPS pour notifier
+        import urllib.parse
+        msg = f"Demande retrait FAGNI\n{partner_nom}\nMontant : {montant:,} FCFA\nWave : {wave_number}\nA valider sur fagni-ops.vercel.app"
+        wa_link = f"https://wa.me/2250142299949?text={urllib.parse.quote(msg)}"
+
+        return Response({
+            'success': True,
+            'paiement_id': paiement.id,
+            'montant': montant,
+            'solde_actuel': float(wallet.balance),
+            'wa_link': wa_link,
+            'message': f'Demande de {montant:,} FCFA enregistree. OPS vous paiera sous 24-48h.'
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

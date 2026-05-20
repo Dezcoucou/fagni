@@ -352,11 +352,19 @@ def api_ops_paiements(request):
     total_a_payer = sum(p['a_payer'] for p in pressings_data) + sum(l['a_payer'] for l in livreurs_data)
     nb_done = Order.objects.filter(status='done').count()
 
+    # Retraits en attente
+    from orders.models import Paiement
+    retraits = list(Paiement.objects.filter(
+        note__contains='DEMANDE_RETRAIT',
+        cash_paye=False
+    ).values('id','partenaire_nom','montant','wave_number','created_at'))
+
     return Response({
         'pressings': pressings_data,
         'livreurs': livreurs_data,
         'total_a_payer': total_a_payer,
         'nb_commandes_done': nb_done,
+        'retraits': retraits,
     })
 
 

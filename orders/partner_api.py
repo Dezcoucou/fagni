@@ -105,3 +105,42 @@ def partner_update_status(request, order_id):
     order.status = new_status
     order.save(update_fields=['status', 'updated_at'])
     return Response({'success': True, 'status': new_status, 'code': order.code})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def partner_refuse_order(request, order_id):
+    """POST /api/partner/orders/<id>/refuse/ — pressing refuse une commande"""
+    try:
+        driver = _get_partner(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    try:
+        from orders.models import Order
+        import urllib.parse
+
+        order = Order.objects.get(id=order_id, laundry_partner=driver)
+
+        if order.status not in ['pending', 'assigned']:
+            return Response({'error': 'Commande ne peut pas être refusée'}, status=400)
+
+        raison = request.data.get('raison', 'Capacité insuffisante')
+
+        # Notifier OPS
+        msg = f"⚠️ PRESSING REFUSE commande\n\nCode : {order.code}\nPressing : {driver.name}\nRaison : {raison}\n\nAction requise : réassigner un autre pressing\nfagni-ops.vercel.app"
+        wa_link = f"https://wa.me/2250142299949?text={urllib.parse.quote(msg)}"
+
+        # Marquer comme en attente réassignation
+        order.laundry_partner = None
+        order.status = 'pending'
+        order.notes = (order.notes or '') + f'\nREFUS_PRESSING:{driver.name}:{raison}'
+        order.save(update_fields=['laundry_partner', 'status', 'notes', 'updated_at'])
+
+        return Response({
+            'success': True,
+            'wa_ops': wa_link,
+            'message': 'Commande refusée — OPS notifié'
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

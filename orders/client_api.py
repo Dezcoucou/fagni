@@ -249,7 +249,7 @@ def api_order_detail(request, order_id):
     wave_msg = f"Paiement FAGNI commande {order.code} — {int(remaining):,} FCFA"
     # Lien Wave CI — format standard pour paiement marchand
     wave_number = "0748643892"
-    wave_link = f"https://wa.me/2250142299949?text={urllib.parse.quote(f'Paiement Wave FAGNI commande {order.code} — {int(remaining):,} FCFA. Envoi vers {wave_number}')}" if remaining > 0 else None
+    wave_link = f"https://pay.wave.com/m/M_ci_8SO-R9nJg71k/c/ci/?amount={int(remaining)}" if remaining > 0 else None
 
     # Statut livraison détaillé
     status_map = {

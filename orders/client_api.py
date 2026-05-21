@@ -795,6 +795,48 @@ def api_order_tracking(request, order_id):
             eta_label = "Livré avec succès"
             eta_desc  = "Merci de nous faire confiance"
 
+        # DeliveryLegs — statuts temps réel
+        from orders.models import DeliveryLeg, OrderEvidencePhoto
+
+        legs_data = []
+        legs = DeliveryLeg.objects.filter(order=order).order_by('created_at')
+
+        JOURS3  = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche']
+        MOIS3   = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc']
+
+        def fmt_dt(dt):
+            if not dt: return None
+            from django.utils import timezone as tz
+            local = dt
+            h, m = local.hour, local.minute
+            label = "aujourd'hui" if local.date() == now.date() else f"{JOURS3[local.weekday()]} {local.day} {MOIS3[local.month-1]}"
+            return f"{label} à {h:02d}h{m:02d}"
+
+        for leg in legs:
+            photos = []
+            for ep in OrderEvidencePhoto.objects.filter(leg=leg).order_by('created_at'):
+                url = ep.image.url if ep.image and hasattr(ep.image, 'url') else None
+                if url:
+                    photos.append({
+                        'kind':    ep.kind,
+                        'url':     url,
+                        'caption': ep.caption or '',
+                        'at':      fmt_dt(ep.created_at),
+                    })
+
+            legs_data.append({
+                'id':         leg.id,
+                'type':       leg.leg_type,
+                'status':     leg.status,
+                'started_at': fmt_dt(leg.started_at),
+                'done_at':    fmt_dt(leg.finished_at),
+                'photos':     photos,
+                'driver':     {
+                    'initials': leg.driver.name[0].upper() if leg.driver and leg.driver.name else 'L',
+                    'vehicle':  leg.driver.vehicle_type or 'moto' if leg.driver else 'moto',
+                } if leg.driver else None,
+            })
+
         # Réassurance
         reassurance = [
             {"icon": "🔒", "text": "Vos vêtements sont sécurisés"},
@@ -828,6 +870,7 @@ def api_order_tracking(request, order_id):
             'eta_label':       eta_label,
             'eta_desc':        eta_desc,
             'reassurance':     reassurance,
+            'legs':            legs_data,
         })
     except Exception as e:
         return Response({'error': str(e)}, status=404)

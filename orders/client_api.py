@@ -766,6 +766,9 @@ def api_order_tracking(request, order_id):
         # ETA selon statut
         from datetime import timedelta
         from django.utils import timezone
+        import locale
+        try: locale.setlocale(locale.LC_TIME, 'fr_FR.UTF-8')
+        except: pass
         now = timezone.now()
         eta_label = None
         eta_desc  = None
@@ -774,14 +777,18 @@ def api_order_tracking(request, order_id):
             eta_label = "Collecte prévue"
             pickup_date = getattr(order, 'pickup_scheduled_date', None)
             if pickup_date:
-                eta_desc = pickup_date.strftime('%A %d %B') if hasattr(pickup_date, 'strftime') else str(pickup_date)
+                JOURS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche']
+                MOIS  = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc']
+                eta_desc = f"{JOURS[pickup_date.weekday()]} {pickup_date.day} {MOIS[pickup_date.month-1]}" if hasattr(pickup_date, 'weekday') else str(pickup_date)
             else:
                 eta_desc = "Selon votre créneau choisi"
         elif status in ['in_progress', 'assigned']:
             eta_label = "Retour prévu"
             delivery_date = getattr(order, 'delivery_scheduled_date', None)
             if delivery_date:
-                eta_desc = delivery_date.strftime('%A %d %B') if hasattr(delivery_date, 'strftime') else str(delivery_date)
+                JOURS2 = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche']
+                MOIS2  = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc']
+                eta_desc = f"{JOURS2[delivery_date.weekday()]} {delivery_date.day} {MOIS2[delivery_date.month-1]}" if hasattr(delivery_date, 'weekday') else str(delivery_date)
             else:
                 eta_desc = "Dans 48-72 heures"
         elif status == 'done':

@@ -815,14 +815,18 @@ def api_order_tracking(request, order_id):
         for leg in legs:
             photos = []
             for ep in OrderEvidencePhoto.objects.filter(leg=leg).order_by('created_at'):
-                url = ep.image.url if ep.image and hasattr(ep.image, 'url') else None
-                if url:
-                    photos.append({
-                        'kind':    ep.kind,
-                        'url':     url,
-                        'caption': ep.caption or '',
-                        'at':      fmt_dt(ep.created_at),
-                    })
+                try:
+                    url = ep.image.url if ep.image and hasattr(ep.image, 'url') else None
+                    # En prod Render : disque éphémère → photos non servies
+                    # On garde le metadata mais pas l'URL
+                    if url and not url.startswith('/media/'):
+                        photos.append({
+                            'kind':    ep.kind,
+                            'url':     url,
+                            'caption': ep.caption or '',
+                            'at':      fmt_dt(ep.created_at),
+                        })
+                except: pass
 
             legs_data.append({
                 'id':         leg.id,

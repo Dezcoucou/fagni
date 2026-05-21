@@ -763,19 +763,64 @@ def api_order_tracking(request, order_id):
                     articles_count = int(line.split(':')[1].split(' ')[0])
                 except: pass
 
+        # ETA selon statut
+        from datetime import timedelta
+        from django.utils import timezone
+        now = timezone.now()
+        eta_label = None
+        eta_desc  = None
+
+        if status == 'pending':
+            eta_label = "Collecte prévue"
+            pickup_date = getattr(order, 'pickup_scheduled_date', None)
+            if pickup_date:
+                eta_desc = pickup_date.strftime('%A %d %B') if hasattr(pickup_date, 'strftime') else str(pickup_date)
+            else:
+                eta_desc = "Selon votre créneau choisi"
+        elif status in ['in_progress', 'assigned']:
+            eta_label = "Retour prévu"
+            delivery_date = getattr(order, 'delivery_scheduled_date', None)
+            if delivery_date:
+                eta_desc = delivery_date.strftime('%A %d %B') if hasattr(delivery_date, 'strftime') else str(delivery_date)
+            else:
+                eta_desc = "Dans 48-72 heures"
+        elif status == 'done':
+            eta_label = "Livré avec succès"
+            eta_desc  = "Merci de nous faire confiance"
+
+        # Réassurance
+        reassurance = [
+            {"icon": "🔒", "text": "Vos vêtements sont sécurisés"},
+            {"icon": "📸", "text": "Photos prises à chaque étape"},
+            {"icon": "✅", "text": "Pressing partenaire vérifié FAGNI"},
+            {"icon": "💰", "text": "Paiement uniquement à la livraison"},
+        ]
+
+        # Pressing info
+        pressing_info = None
+        if order.laundry_partner:
+            pressing_info = {
+                'name':     order.laundry_partner.name,
+                'initials': order.laundry_partner.name[0].upper() if order.laundry_partner.name else 'P',
+            }
+
         return Response({
-            'order_id':       order.id,
-            'code':           order.code or str(order.id),
-            'status':         status,
-            'payment_status': payment,
-            'bag_size':       order.bag_size or '',
-            'total':          float(order.total or 0),
-            'steps':          steps,
-            'pickup_driver':  pickup_driver,
+            'order_id':        order.id,
+            'code':            order.code or str(order.id),
+            'status':          status,
+            'payment_status':  payment,
+            'bag_size':        order.bag_size or '',
+            'total':           float(order.total or 0),
+            'steps':           steps,
+            'pickup_driver':   pickup_driver,
             'delivery_driver': delivery_driver,
-            'articles_count': articles_count,
-            'has_partner':    order.laundry_partner_id is not None,
-            'created_at':     order.created_at.isoformat() if order.created_at else None,
+            'articles_count':  articles_count,
+            'has_partner':     order.laundry_partner_id is not None,
+            'pressing_info':   pressing_info,
+            'created_at':      order.created_at.isoformat() if order.created_at else None,
+            'eta_label':       eta_label,
+            'eta_desc':        eta_desc,
+            'reassurance':     reassurance,
         })
     except Exception as e:
         return Response({'error': str(e)}, status=404)

@@ -821,16 +821,20 @@ class LogisticsConfig(models.Model):
 # =====================
 #  COMMANDE
 # =====================
-PAYMENT_STATUS_PENDING = "pending"
+PAYMENT_STATUS_PENDING  = "pending"
 PAYMENT_STATUS_DECLARED = "declared"
-PAYMENT_STATUS_PARTIAL = "partial"
-PAYMENT_STATUS_PAID = "paid"
+PAYMENT_STATUS_PARTIAL  = "partial"
+PAYMENT_STATUS_PAID     = "paid"
+PAYMENT_STATUS_AWAITING = "awaiting_payment"
+PAYMENT_STATUS_FAILED   = "failed"
 
 PAYMENT_STATUS_CHOICES = [
-    (PAYMENT_STATUS_PENDING, "En attente"),
+    (PAYMENT_STATUS_PENDING,  "En attente"),
     (PAYMENT_STATUS_DECLARED, "Déclaré"),
-    (PAYMENT_STATUS_PARTIAL, "Partiel"),
-    (PAYMENT_STATUS_PAID, "Payé"),
+    (PAYMENT_STATUS_PARTIAL,  "Partiel"),
+    (PAYMENT_STATUS_PAID,     "Payé"),
+    (PAYMENT_STATUS_AWAITING, "Attente paiement"),
+    (PAYMENT_STATUS_FAILED,   "Échoué"),
 ]
 
 PAYMENT_VERIFICATION_NONE = "none"
@@ -1119,6 +1123,9 @@ class Order(models.Model):
         verbose_name="Statut paiement"
     )
 
+
+    articles_count      = models.IntegerField(default=0, verbose_name="Nb articles réels")
+    payment_expires_at  = models.DateTimeField(null=True, blank=True, verbose_name="Expiration paiement")
 
     payment_verification_status = models.CharField(
         max_length=20,

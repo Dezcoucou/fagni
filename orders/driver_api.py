@@ -177,7 +177,8 @@ def driver_confirm_pickup(request, order_id):
             'wave_link':      wave_link_url,
         })
     except Exception as e:
-        return Response({'error': str(e)}, status=400)
+        import traceback
+        return Response({'error': str(e), 'traceback': traceback.format_exc()}, status=400)
 
 
 @api_view(['POST'])

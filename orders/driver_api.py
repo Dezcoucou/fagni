@@ -120,7 +120,9 @@ def driver_confirm_pickup(request, order_id):
         client_phone = order.customer.phone if order.customer else ''
         if client_phone:
             p = client_phone.replace(' ','').replace('-','')
-            if not p.startswith('+'): p = '225' + p.lstrip('0')
+            if p.startswith('+'): p = p.lstrip('+')
+            elif p.startswith('0'): p = '225' + p
+            else: p = '225' + p
             bag = {'small':'Petit sac','medium':'Sac moyen','large':'Grand sac'}.get(order.bag_size or '','Sac')
             msg = (
                 f"Bonjour ! Votre collecte FAGNI est confirmée.\n"
@@ -165,7 +167,9 @@ def driver_confirm_delivery(request, order_id):
         wa_link = ''
         if client_phone:
             p = client_phone.replace(' ','').replace('-','')
-            if not p.startswith('+'): p = '225' + p.lstrip('0')
+            if p.startswith('+'): p = p.lstrip('+')
+            elif p.startswith('0'): p = '225' + p
+            else: p = '225' + p
             msg = (
                 f"Bonjour ! Vos vêtements FAGNI ont été livrés.\n"
                 f"Commande : {order.code}\n"

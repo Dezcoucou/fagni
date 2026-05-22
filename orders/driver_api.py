@@ -154,9 +154,16 @@ def driver_confirm_pickup(request, order_id):
             payment_status     = 'awaiting_payment',
             payment_expires_at = expires_at,
         )
-        # wave_link via update séparé si le champ existe
+        # wave_link stocké dans notes pour compatibilité
         try:
-            _Order.objects.filter(pk=order.pk).update(wave_link=wave_link_url)
+            from orders.models import Order as _O2
+            o2 = _O2.objects.get(pk=order.pk)
+            notes = o2.notes or ''
+            # Supprimer ancien wave_link si présent
+            import re
+            notes = re.sub(r'WAVE_LINK:[^\s|]*', '', notes).strip()
+            notes = (notes + f' | WAVE_LINK:{wave_link_url}').strip(' |')
+            _O2.objects.filter(pk=order.pk).update(notes=notes)
         except Exception:
             pass
 

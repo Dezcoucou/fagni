@@ -47,10 +47,19 @@ def partner_orders(request):
         return Response({'error': 'Non autorisé'}, status=401)
 
     from orders.models import Order
+    import re, ast
     status_filter = request.GET.get('status', '')
     qs = Order.objects.filter(laundry_partner=partner).order_by('-created_at')
     if status_filter:
         qs = qs.filter(status=status_filter)
+
+    def _count_articles(o):
+        try:
+            m = re.search(r'Articles: (\[.*?\])', (o.notes or '').replace('\n',' '))
+            if m:
+                return sum(int(a.get('quantity') or a.get('qty') or 1) for a in ast.literal_eval(m.group(1)))
+        except: pass
+        return o.items.count()
 
     orders = []
     for o in qs[:50]:
@@ -64,6 +73,7 @@ def partner_orders(request):
             'bag_size':       o.bag_size or '',
             'created_at':     o.created_at.isoformat() if o.created_at else None,
             'zone':           o.pickup_address.split(',')[0] if o.pickup_address else '—',
+            'articles_count': _count_articles(o),
         })
 
     stats = {
@@ -85,6 +95,7 @@ def partner_update_status(request, order_id):
         return Response({'error': 'Non autorisé'}, status=401)
 
     from orders.models import Order
+    import re, ast
     try:
         order = Order.objects.get(id=order_id, laundry_partner=partner)
     except Exception:
@@ -118,6 +129,7 @@ def partner_refuse_order(request, order_id):
 
     try:
         from orders.models import Order
+    import re, ast
         import urllib.parse
 
         order = Order.objects.get(id=order_id, laundry_partner=driver)

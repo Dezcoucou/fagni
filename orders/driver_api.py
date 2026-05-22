@@ -174,7 +174,7 @@ def driver_confirm_pickup(request, order_id):
             'total':          pricing['total'],
             'articles_count': articles_count,
             'payment_status': 'awaiting_payment',
-            'wave_link':      order.wave_link,
+            'wave_link':      wave_link_url,
         })
     except Exception as e:
         return Response({'error': str(e)}, status=400)

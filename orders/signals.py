@@ -282,7 +282,7 @@ def notify_partner_on_assignment(sender, instance, created, **kwargs):
 
         phone = partner.phone.replace(' ', '').replace('-', '')
         if not phone.startswith('+'):
-            phone = '225' + phone.lstrip('0')
+            phone = '225' + phone if phone.startswith('0') else '225' + phone.lstrip('+')
 
         code = instance.code or str(instance.id)
         bag = {'small': 'Petit sac', 'medium': 'Sac moyen', 'large': 'Grand sac'}.get(

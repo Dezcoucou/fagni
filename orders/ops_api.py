@@ -57,7 +57,7 @@ def ops_dashboard(request):
         # Générer lien WhatsApp client
         client_phone = phone.replace(' ','').replace('-','')
         if client_phone and not client_phone.startswith('+'):
-            client_phone = '225' + client_phone.lstrip('0')
+            client_phone = '225' + client_phone if client_phone.startswith('0') else '225' + client_phone.lstrip('+')
 
         wa_client = ''
         if client_phone:
@@ -69,7 +69,7 @@ def ops_dashboard(request):
         if partner and partner.phone:
             p_phone = partner.phone.replace(' ','').replace('-','')
             if not p_phone.startswith('+'):
-                p_phone = '225' + p_phone.lstrip('0')
+                p_phone = '225' + p_phone if p_phone.startswith('0') else '225' + p_phone.lstrip('+')
             bag = {'small':'Petit sac','medium':'Sac moyen','large':'Grand sac'}.get(o.bag_size or '','Sac')
             msg2 = f"Bonjour {partner.name} ! Nouvelle commande FAGNI {o.code} - {bag}. Le livreur arrive."
             wa_partner = f"https://wa.me/{p_phone}?text={msg2.replace(' ','%20')}"

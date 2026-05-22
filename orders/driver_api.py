@@ -136,10 +136,35 @@ def driver_confirm_pickup(request, order_id):
         else:
             wa_link = ''
 
+        # Recalculer le total depuis les articles réels
+        from orders.pricing import calculate_order_total
+        from django.utils import timezone
+        pricing = calculate_order_total(articles_count)
+
+        order.articles_count     = articles_count
+        order.total_client_ttc   = pricing['total']
+        order.delivery_fee       = pricing['delivery_fee']
+        order.service_fee        = pricing['service_fee']
+        order.payment_status     = 'awaiting_payment'
+        order.payment_expires_at = timezone.now() + timezone.timedelta(hours=24)
+
+        # Générer lien Wave avec montant réel
+        import urllib.parse
+        wave_msg = f"Paiement FAGNI commande {order.code} — {pricing['total']:,} FCFA"
+        order.wave_link = f"https://pay.wave.com/m/M_ci_8SO-R9nJg71k/c/ci/?amount={pricing['total']}"
+        order.save(update_fields=[
+            'articles_count', 'total_client_ttc', 'delivery_fee',
+            'service_fee', 'payment_status', 'payment_expires_at', 'wave_link'
+        ])
+
         return Response({
-            'success': True,
-            'wa_client': wa_link,
-            'message': f'Collecte confirmée — {articles_count} articles'
+            'success':        True,
+            'wa_client':      wa_link,
+            'message':        f'Collecte confirmée — {articles_count} articles',
+            'total':          pricing['total'],
+            'articles_count': articles_count,
+            'payment_status': 'awaiting_payment',
+            'wave_link':      order.wave_link,
         })
     except Exception as e:
         return Response({'error': str(e)}, status=400)

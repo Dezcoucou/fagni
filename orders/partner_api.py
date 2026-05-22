@@ -106,6 +106,15 @@ def partner_update_status(request, order_id):
     if new_status not in ALLOWED:
         return Response({'error': f'Statut invalide. Choix: {ALLOWED}'}, status=400)
 
+    # CRITIQUE — Bloquer si paiement non reçu
+    if new_status in ['in_progress', 'done']:
+        if order.payment_status not in ['paid', 'partial']:
+            return Response({
+                'error': 'paiement_requis',
+                'message': 'Paiement client requis avant traitement.',
+                'payment_status': order.payment_status,
+            }, status=400)
+
     # Bloquer si livreur n'a pas encore déposé
     if new_status == 'in_progress' and 'DEPOSE_PRESSING' not in (order.notes or ''):
         return Response({

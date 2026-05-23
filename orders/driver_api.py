@@ -94,7 +94,7 @@ def driver_missions(request):
             'created_at':      o.created_at.isoformat() if o.created_at else None,
         })
 
-        return Response({'missions': result, 'driver': driver.name})
+    return Response({'missions': result, 'driver': driver.name})
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

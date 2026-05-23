@@ -23,11 +23,15 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "0.0.0.0",
-    "100.115.92.198",  # ton IP actuelle (Chromebook)
-    "dezcoucou80.pythonanywhere.com",
-    "fagni-t1s8.onrender.com",
-    "fagni-1-32kx.onrender.com",
+    "fagni-api.onrender.com",
+    "web-production-f88c.up.railway.app",
+    "*.railway.app",
+    "*.onrender.com",
 ]
+# Ajouter hosts depuis variable d'environnement
+_env_hosts = (os.getenv("ALLOWED_HOSTS", "") or "").strip()
+if _env_hosts:
+    ALLOWED_HOSTS += [h.strip() for h in _env_hosts.split(",") if h.strip()]
 
 # Ajoute automatiquement le host de SITE_BASE_URL (si défini)
 from urllib.parse import urlparse

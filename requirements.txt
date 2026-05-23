@@ -81,7 +81,6 @@ twilio==9.10.4
 types-PyYAML==6.0.12.20250915
 typing_extensions==4.15.0
 urllib3==2.5.0
-weasyprint==66.0
 webencodings==0.5.1
 whitenoise==6.6.0
 yarl==1.23.0

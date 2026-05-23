@@ -66,7 +66,7 @@ urlpatterns = [
     path("dashboard/", include("dashboard.urls")),
     path("orders/", include(("orders.urls", "orders"), namespace="orders")),
     path("mlm/", include(("mlm.urls", "mlm"), namespace="mlm")),
-    path('favicon.ico', RedirectView.as_view(url=staticfiles_storage.url('favicon.ico'))),
+    path('favicon.ico', RedirectView.as_view(url='/static/favicon.ico')),
 ]
 
 # Dev media files

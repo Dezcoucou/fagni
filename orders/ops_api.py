@@ -94,19 +94,45 @@ def ops_dashboard(request):
             'delivery_driver_id':   o.delivery_partner.id if o.delivery_partner else None,
             'pickup_driver_name':   o.pickup_driver.name if o.pickup_driver else None,
             'pickup_driver_id':     o.pickup_driver.id if o.pickup_driver else None,
-            'created_at':     o.created_at.isoformat() if o.created_at else None,
+            'created_at':        o.created_at.isoformat() if o.created_at else None,
+            'margin_net':        o.margin_net or 0,
+            'profitability_score': float(o.profitability_score or 0),
+            'profitability_label': o.profitability_label or '',
+            'cost_driver_pickup':  o.cost_driver_pickup or 0,
+            'cost_driver_delivery': o.cost_driver_delivery or 0,
+            'cost_pressing':       o.cost_pressing or 0,
         })
 
     # Stats globales
+    from django.db.models import Sum, Avg, Count
     all_orders = Order.objects.all()
+    done_orders = all_orders.filter(status='done')
+
+    marge_totale = done_orders.aggregate(t=Sum('margin_net'))['t'] or 0
+    marge_moy    = done_orders.aggregate(t=Avg('margin_net'))['t'] or 0
+    score_moy    = done_orders.aggregate(t=Avg('profitability_score'))['t'] or 0
+
+    from orders.models import FagniEvent
+    from django.utils import timezone
+    today = timezone.now().date()
+
     stats = {
-        'total':       all_orders.count(),
-        'pending':     all_orders.filter(status='pending').count(),
-        'in_progress': all_orders.filter(status='in_progress').count(),
-        'done':        all_orders.filter(status='done').count(),
-        'unpaid':      all_orders.filter(payment_status='unpaid').count(),
-        'revenue':     float(all_orders.filter(payment_status='paid').aggregate(
-            t=__import__('django.db.models',fromlist=['Sum']).Sum('total'))['t'] or 0),
+        'total':            all_orders.count(),
+        'pending':          all_orders.filter(status='pending').count(),
+        'in_progress':      all_orders.filter(status='in_progress').count(),
+        'done':             done_orders.count(),
+        'unpaid':           all_orders.filter(payment_status='unpaid').count(),
+        'revenue':          float(all_orders.filter(payment_status='paid').aggregate(
+                                t=Sum('total'))['t'] or 0),
+        'marge_totale':     int(marge_totale),
+        'marge_moyenne':    int(marge_moy),
+        'score_moyen':      round(float(score_moy), 1),
+        'rentables':        all_orders.filter(profitability_label='rentable').count(),
+        'limites':          all_orders.filter(profitability_label='limite').count(),
+        'a_perte':          all_orders.filter(profitability_label='a_perte').count(),
+        'events_today':     FagniEvent.objects.filter(
+                                created_at__date=today).count(),
+        'events_total':     FagniEvent.objects.count(),
     }
 
     # Partenaires pour filtre

@@ -146,14 +146,40 @@ def driver_confirm_pickup(request, order_id):
 
         # Utiliser queryset.update() pour bypasser le payment guard
         from orders.models import Order as _Order
+        from orders.pricing_engine import calculate_order as _calc_engine
+        _pe = _calc_engine(articles_count)
+        _margin = _pe['total_fagni']
+        _total  = pricing['total'] or 1
+        _score  = round(_margin / _total * 100, 2)
+        _label  = ('rentable' if _score >= 30 else 'limite' if _score >= 15 else 'a_perte')
         _Order.objects.filter(pk=order.pk).update(
-            articles_count     = articles_count,
-            total_client_ttc   = pricing['total'],
-            delivery_fee       = pricing['delivery_fee'],
-            service_fee        = pricing['service_fee'],
-            payment_status     = 'awaiting_payment',
-            payment_expires_at = expires_at,
+            articles_count       = articles_count,
+            total_client_ttc     = pricing['total'],
+            delivery_fee         = pricing['delivery_fee'],
+            service_fee          = pricing['service_fee'],
+            payment_status       = 'awaiting_payment',
+            payment_expires_at   = expires_at,
+            cost_driver_pickup   = _pe['part_livreur'] // 2,
+            cost_driver_delivery = _pe['part_livreur'] - _pe['part_livreur'] // 2,
+            cost_pressing        = _pe['part_pressing'],
+            margin_net           = _margin,
+            profitability_score  = _score,
+            profitability_label  = _label,
         )
+
+        # Event logging LOT1
+        try:
+            from orders.models import log_event
+            log_event(
+                "pickup.done", order=order,
+                actor_type="driver", actor_id=driver.id,
+                articles_count=articles_count,
+                total=pricing['total'],
+                margin_net=_margin,
+                profitability_label=_label,
+            )
+        except Exception:
+            pass
         # wave_link stocké dans notes pour compatibilité
         try:
             from orders.models import Order as _O2
@@ -197,6 +223,17 @@ def driver_confirm_delivery(request, order_id):
         notes = order.notes or ''
         order.notes = notes + f'\nLIVRAISON:Confirmée par livreur {driver.name}'
         order.save(update_fields=['status', 'notes', 'updated_at'])
+
+        # Event logging LOT1
+        try:
+            from orders.models import log_event
+            log_event(
+                "delivery.done", order=order,
+                actor_type="driver", actor_id=driver.id,
+                driver_name=driver.name,
+            )
+        except Exception:
+            pass
 
         # WhatsApp client — livraison confirmée
         client_phone = order.customer.phone if order.customer else ''

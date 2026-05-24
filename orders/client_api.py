@@ -413,7 +413,41 @@ def api_create_order(request):
             if hasattr(Order, field):
                 order_data[field] = value
 
+        # Champs rentabilité LOT1
+        pricing_part_livreur = int(_pricing.get('part_livreur', 0))
+        order_data.update({
+            'cost_driver_pickup':   pricing_part_livreur // 2,
+            'cost_driver_delivery': pricing_part_livreur - (pricing_part_livreur // 2),
+            'cost_pressing':        int(_pricing.get('part_pressing', 0)),
+            'margin_net':           int(_pricing.get('total_fagni', 0)),
+        })
+
+        # Score rentabilité
+        total_c = int(_pricing.get('total_client', 1)) or 1
+        margin  = order_data['margin_net']
+        score   = round(margin / total_c * 100, 2)
+        order_data['profitability_score'] = score
+        order_data['profitability_label'] = (
+            'rentable' if score >= 30 else
+            'limite'   if score >= 15 else
+            'a_perte'
+        )
+
         order = Order.objects.create(**order_data)
+
+        # Event logging LOT1
+        try:
+            from orders.models import log_event
+            log_event(
+                "order.created", order=order,
+                actor_type="client", actor_id=customer.id,
+                total=int(total), articles=nb_articles,
+                bag_size=bag_size, margin_net=margin,
+                profitability_label=order_data['profitability_label'],
+            )
+        except Exception:
+            pass
+
         # Notification WhatsApp OPS
         try:
             import urllib.request, urllib.parse

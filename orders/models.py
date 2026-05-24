@@ -1127,6 +1127,16 @@ class Order(models.Model):
     articles_count      = models.IntegerField(default=0, verbose_name="Nb articles réels")
     payment_expires_at  = models.DateTimeField(null=True, blank=True, verbose_name="Expiration paiement")
 
+    # ── Rentabilité pilote (LOT1) ─────────────────────────────────
+    cost_driver_pickup   = models.IntegerField(default=0, verbose_name="Coût livreur collecte (FCFA)")
+    cost_driver_delivery = models.IntegerField(default=0, verbose_name="Coût livreur livraison (FCFA)")
+    cost_pressing        = models.IntegerField(default=0, verbose_name="Coût pressing (FCFA)")
+    margin_net           = models.IntegerField(default=0, verbose_name="Marge nette FAGNI (FCFA)")
+    profitability_score  = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="Score rentabilité (%)")
+    profitability_label  = models.CharField(max_length=20, null=True, blank=True,
+        choices=[("rentable","Rentable"),("limite","Limite"),("a_perte","À perte")],
+        verbose_name="Rentabilité")
+
     payment_verification_status = models.CharField(
         max_length=20,
         choices=PAYMENT_VERIFICATION_STATUS_CHOICES,
@@ -4310,3 +4320,72 @@ class Parrainage(models.Model):
 
     def __str__(self):
         return f"{self.parrain_nom} → {self.filleul_nom or 'En attente'} ({self.statut})"
+
+
+# ═══════════════════════════════════════════════════════════
+# FagniEvent — Event logging pilote (LOT 1)
+# ═══════════════════════════════════════════════════════════
+class FagniEvent(models.Model):
+    """Log de tous les événements FAGNI pour analyse future."""
+
+    EVENT_TYPES = [
+        ("order.created",       "Commande créée"),
+        ("payment.paid",        "Paiement reçu"),
+        ("pickup.assigned",     "Livreur collecte assigné"),
+        ("pickup.started",      "Collecte démarrée"),
+        ("pickup.done",         "Collecte confirmée"),
+        ("pressing.received",   "Pressing reçu"),
+        ("pressing.done",       "Pressing terminé"),
+        ("delivery.assigned",   "Livreur livraison assigné"),
+        ("delivery.started",    "Livraison démarrée"),
+        ("delivery.done",       "Livraison confirmée"),
+        ("order.cancelled",     "Commande annulée"),
+        ("incident.reported",   "Incident signalé"),
+    ]
+
+    ACTOR_TYPES = [
+        ("client",  "Client"),
+        ("driver",  "Livreur"),
+        ("partner", "Pressing"),
+        ("ops",     "OPS"),
+        ("system",  "Système"),
+    ]
+
+    order      = models.ForeignKey(
+        "Order", on_delete=models.CASCADE,
+        related_name="events", null=True, blank=True,
+        verbose_name="Commande"
+    )
+    event_type = models.CharField(max_length=60, choices=EVENT_TYPES, verbose_name="Événement", db_index=True)
+    actor_type = models.CharField(max_length=20, choices=ACTOR_TYPES, default="system")
+    actor_id   = models.IntegerField(null=True, blank=True)
+    payload_json = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = "Événement FAGNI"
+        verbose_name_plural = "Événements FAGNI"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.event_type} — order#{self.order_id} — {self.created_at:%Y-%m-%d %H:%M}"
+
+
+def log_event(event_type, order=None, actor_type="system", actor_id=None, **payload):
+    """
+    Helper global pour logger un événement FAGNI.
+    
+    Usage:
+        log_event("order.created", order=order, actor_type="client", actor_id=customer.id, total=7500)
+        log_event("pickup.done", order=order, actor_type="driver", actor_id=driver.id, articles_count=10)
+    """
+    try:
+        FagniEvent.objects.create(
+            order=order,
+            event_type=event_type,
+            actor_type=actor_type,
+            actor_id=actor_id,
+            payload_json=payload,
+        )
+    except Exception:
+        pass  # Ne jamais bloquer le flux principal pour un log

@@ -261,6 +261,17 @@ def order_post_save_trigger_payouts_when_paid(sender, instance: Order, created=F
         became_paid = (new_ps == "paid" and old_ps != "paid")
         if became_paid:
             _schedule_payouts_for_paid_order(int(instance.pk))
+            # Event logging LOT1
+            try:
+                from orders.models import log_event
+                log_event(
+                    "payment.paid", order=instance,
+                    actor_type="system", actor_id=None,
+                    amount=float(getattr(instance, 'amount_paid', 0) or 0),
+                    channel=getattr(instance, 'payment_declared_channel', '') or 'wave',
+                )
+            except Exception:
+                pass
     except Exception:
         pass
 

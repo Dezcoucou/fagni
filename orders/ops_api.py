@@ -184,9 +184,25 @@ def ops_assign_driver(request, order_id):
         if driver_type == 'pickup':
             order.pickup_driver = driver
             order.save(update_fields=['pickup_driver', 'updated_at'])
+            event_type = 'pickup.assigned'
         else:
             order.delivery_partner = driver
             order.save(update_fields=['delivery_partner', 'updated_at'])
+            event_type = 'delivery.assigned'
+
+        # Event logging LOT1
+        try:
+            from orders.models import log_event
+            log_event(
+                event_type, order=order,
+                actor_type="ops", actor_id=None,
+                driver_id=driver.id if driver else None,
+                driver_name=driver.name if driver else None,
+                driver_type=driver_type,
+            )
+        except Exception:
+            pass
+
         return Response({'success': True, 'driver': driver.name if driver else None, 'type': driver_type})
     except Exception as e:
         return Response({'error': str(e)}, status=400)
@@ -216,6 +232,20 @@ def ops_mark_paid(request, order_id):
             'payment_declared_channel', 'payment_declared_reference',
             'updated_at'
         ])
+
+        # Event logging LOT1
+        try:
+            from orders.models import log_event
+            log_event(
+                "payment.paid", order=order,
+                actor_type="ops", actor_id=None,
+                amount=float(order.total or 0),
+                channel=channel,
+                reference=reference,
+            )
+        except Exception:
+            pass
+
         return Response({
             'success': True,
             'payment_status': 'paid',

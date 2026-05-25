@@ -270,6 +270,7 @@ def api_driver_dropoff(request, order_id):
         return Response({'error': 'Non autorisé'}, status=401)
 
     try:
+        from orders.models import Order
         order = Order.objects.get(id=order_id)
         notes = order.notes or ''
         order.notes = notes + f'\nDEPOSE_PRESSING:{driver.name}'

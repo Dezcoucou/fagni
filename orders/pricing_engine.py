@@ -16,15 +16,17 @@ def d(val):
     return Decimal(str(val or 0)).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 
 
-# Taux officiels FAGNI v3.0
+# Taux officiels FAGNI v3.1 — Modèle pilote
 PRIX_ARTICLE_CLIENT   = 500   # FCFA — ce que le client paie par article
 PRIX_ARTICLE_PRESSING = 200   # FCFA — ce que le pressing reçoit
 MARGE_FAGNI_ARTICLE   = 300   # FCFA — marge FAGNI par article
-TAUX_LIVREUR          = Decimal('0.70')  # 70% livraison au livreur
-TAUX_FAGNI_LIVRAISON  = Decimal('0.30')  # 30% livraison à FAGNI
+REMUNERATION_COLLECTE = 1200  # FCFA — livreur collecte
+REMUNERATION_LIVRAISON= 1200  # FCFA — livreur livraison
+TAUX_LIVREUR          = Decimal('0.70')  # legacy — gardé pour compatibilité
+TAUX_FAGNI_LIVRAISON  = Decimal('0.30')  # legacy — gardé pour compatibilité
 SERVICE_FEE_RATE      = Decimal('0.05')  # 5% du sous-total
 SERVICE_FEE_MIN       = 500             # Minimum 500 FCFA
-DELIVERY_FEE          = 2000            # Livraison AR fixe
+DELIVERY_FEE          = 2000            # Livraison AR fixe client
 ECART_ABSORBE         = 3              # Écart articles absorbé par FAGNI
 
 # Configuration des sacs — repères UX uniquement
@@ -86,9 +88,8 @@ def calculate_order(nb_articles, bag_size='small', delivery_fee=None):
     total_client = sous_total + service_fee
 
     # Livraison
-    part_livreur    = (livraison * TAUX_LIVREUR).quantize(
-        Decimal('1'), rounding=ROUND_HALF_UP)
-    marge_livraison = livraison - part_livreur
+    part_livreur    = d(REMUNERATION_COLLECTE + REMUNERATION_LIVRAISON)
+    marge_livraison = livraison - d(REMUNERATION_COLLECTE)
 
     # Total FAGNI
     total_fagni = marge_pressing + marge_livraison + service_fee
@@ -112,6 +113,8 @@ def calculate_order(nb_articles, bag_size='small', delivery_fee=None):
         'amount_laundry_partner': int(part_pressing),
         'part_livreur':          int(part_livreur),
         'amount_driver_partner': int(part_livreur),
+        'remuneration_collecte': REMUNERATION_COLLECTE,
+        'remuneration_livraison': REMUNERATION_LIVRAISON,
 
         # Revenus FAGNI
         'marge_pressing':        int(marge_pressing),

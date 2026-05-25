@@ -6,6 +6,40 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 
+
+def _credit_driver_wallet(driver, amount_fcfa, order, description):
+    """
+    Crédite le wallet livreur : 80% disponible + 20% bonus sécurité.
+    Crée le wallet si inexistant.
+    """
+    try:
+        from wallets.models import Wallet
+        from decimal import Decimal
+        
+        wallet, created = Wallet.objects.get_or_create(
+            delivery_partner=driver,
+            defaults={
+                'owner_type': 'driver',
+                'currency': 'XOF',
+                'balance': Decimal('0.00'),
+                'balance_securite': Decimal('0.00'),
+            }
+        )
+        
+        amount = Decimal(str(amount_fcfa))
+        disponible = (amount * Decimal('0.80')).quantize(Decimal('1'))
+        securite   = amount - disponible
+        
+        # Créditer balance disponible
+        wallet.balance += disponible
+        wallet.balance_securite += securite
+        wallet.save(update_fields=['balance', 'balance_securite', 'updated_at'])
+        
+        return {'disponible': int(disponible), 'securite': int(securite)}
+    except Exception as e:
+        return None
+
+
 def _get_driver(request):
     token = request.headers.get('Authorization','').replace('Bearer ','')
     payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
@@ -180,6 +214,12 @@ def driver_confirm_pickup(request, order_id):
             )
         except Exception:
             pass
+
+        # Wallet livreur — collecte 1200 FCFA
+        _wallet_result = _credit_driver_wallet(
+            driver, 1200, order,
+            f"Collecte commande {order.code}"
+        )
         # wave_link stocké dans notes pour compatibilité
         try:
             from orders.models import Order as _O2
@@ -234,6 +274,12 @@ def driver_confirm_delivery(request, order_id):
             )
         except Exception:
             pass
+
+        # Wallet livreur — livraison 1200 FCFA
+        _credit_driver_wallet(
+            driver, 1200, order,
+            f"Livraison commande {order.code}"
+        )
 
         # WhatsApp client — livraison confirmée
         client_phone = order.customer.phone if order.customer else ''

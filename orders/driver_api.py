@@ -7,7 +7,7 @@ from rest_framework.response import Response
 
 
 
-def _credit_driver_wallet(driver, amount_fcfa, order, description):
+def credit_wallet(driver, amount_fcfa, order, description):
     """
     Crédite le wallet livreur : 80% disponible + 20% bonus sécurité.
     Crée le wallet si inexistant.
@@ -216,7 +216,7 @@ def driver_confirm_pickup(request, order_id):
             pass
 
         # Wallet livreur — collecte 1200 FCFA
-        _wallet_result = _credit_driver_wallet(
+        _wallet_result = credit_wallet(
             driver, 1200, order,
             f"Collecte commande {order.code}"
         )
@@ -276,7 +276,7 @@ def driver_confirm_delivery(request, order_id):
             pass
 
         # Wallet livreur — livraison 1200 FCFA
-        _credit_driver_wallet(
+        credit_wallet(
             driver, 1200, order,
             f"Livraison commande {order.code}"
         )

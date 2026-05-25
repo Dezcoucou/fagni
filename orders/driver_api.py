@@ -324,3 +324,65 @@ def api_driver_dropoff(request, order_id):
         return Response({'success': True, 'message': 'Dépôt au pressing confirmé'})
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def driver_wallet(request):
+    """GET /api/driver/wallet/ — solde et historique du livreur"""
+    try:
+        driver = _get_driver(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    try:
+        from wallets.models import Wallet
+        from django.utils import timezone
+        from datetime import timedelta
+
+        # Wallet du livreur
+        wallet, _ = Wallet.objects.get_or_create(
+            delivery_partner=driver,
+            owner_type='driver',
+            defaults={'currency': 'XOF'}
+        )
+
+        # Prochain déblocage = lundi prochain
+        today = timezone.now()
+        days_ahead = 7 - today.weekday() if today.weekday() != 0 else 7
+        lundi = today + timedelta(days=days_ahead)
+
+        # Transactions récentes depuis les notes order
+        from orders.models import Order
+        orders_done = Order.objects.filter(
+            pickup_driver=driver
+        ).order_by('-updated_at')[:10]
+
+        transactions = []
+        for o in orders_done:
+            if o.cost_driver_pickup > 0:
+                transactions.append({
+                    'description': f'Collecte commande {o.code}',
+                    'montant': o.cost_driver_pickup,
+                    'disponible': int(o.cost_driver_pickup * 0.8),
+                    'securite': int(o.cost_driver_pickup * 0.2),
+                    'date': o.updated_at.strftime('%d/%m/%Y %H:%M') if o.updated_at else '',
+                })
+            if o.cost_driver_delivery > 0:
+                transactions.append({
+                    'description': f'Livraison commande {o.code}',
+                    'montant': o.cost_driver_delivery,
+                    'disponible': int(o.cost_driver_delivery * 0.8),
+                    'securite': int(o.cost_driver_delivery * 0.2),
+                    'date': o.updated_at.strftime('%d/%m/%Y %H:%M') if o.updated_at else '',
+                })
+
+        return Response({
+            'balance':             float(wallet.balance),
+            'balance_securite':    float(wallet.balance_securite),
+            'total':               float(wallet.balance + wallet.balance_securite),
+            'prochain_deblocage':  lundi.strftime('lundi %d/%m'),
+            'transactions':        transactions[:10],
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

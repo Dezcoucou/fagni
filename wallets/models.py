@@ -95,6 +95,13 @@ class Wallet(models.Model):
         default=Decimal("0.00"),
     )
 
+    balance_securite = models.DecimalField(
+        "Bonus sécurité (libéré lundi)",
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+    )
+
     created_at = models.DateTimeField("Créé le", auto_now_add=True)
     updated_at = models.DateTimeField("Mis à jour le", auto_now=True)
 

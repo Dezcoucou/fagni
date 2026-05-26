@@ -166,3 +166,26 @@ class RelayPointPartner(PartnerBase):
         if self.city:
             return f"{self.name} - {self.city} (Point relais)"
         return f"{self.name} (Point relais)"
+
+
+class PartnerScoreHistory(models.Model):
+    """
+    Historique des Partner Scores FAGNI.
+    Permet de tracer l'évolution dans le temps.
+    """
+    partner      = models.ForeignKey(LaundryPartner, on_delete=models.CASCADE, related_name='score_history')
+    score        = models.PositiveIntegerField("Score total")
+    level        = models.CharField("Niveau", max_length=10)
+    score_delai  = models.PositiveIntegerField(default=0)
+    score_litiges= models.PositiveIntegerField(default=0)
+    score_dispo  = models.PositiveIntegerField(default=0)
+    score_refus  = models.PositiveIntegerField(default=0)
+    computed_at  = models.DateTimeField("Calculé le", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Historique score partenaire"
+        verbose_name_plural = "Historiques scores partenaires"
+        ordering = ["-computed_at"]
+
+    def __str__(self):
+        return f"{self.partner.name} — {self.score}pts ({self.level}) — {self.computed_at:%d/%m/%Y}"

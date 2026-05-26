@@ -103,6 +103,18 @@ def recompute_partner_score(partner):
         ]
     )
 
+    # Sauvegarder dans l'historique
+    from partners.models import PartnerScoreHistory
+    PartnerScoreHistory.objects.create(
+        partner       = partner,
+        score         = total,
+        level         = partner.level,
+        score_delai   = score_delai,
+        score_litiges = score_litiges,
+        score_dispo   = score_dispo,
+        score_refus   = score_refus,
+    )
+
     return partner
 
 

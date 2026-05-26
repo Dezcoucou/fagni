@@ -185,8 +185,8 @@ def ops_assign_partner(request, order_id):
         order = Order.objects.get(id=order_id)
         partner_id = request.data.get('partner_id')
         partner = LaundryPartner.objects.get(id=partner_id) if partner_id else None
-        order.laundry_partner = partner
-        order.save(update_fields=['laundry_partner', 'updated_at'])
+        order.laundry_partner_id = partner.id if partner else None
+        order.save(update_fields=['laundry_partner_id'])
         return Response({'success': True, 'partner': partner.name if partner else None})
     except Exception as e:
         return Response({'error': str(e)}, status=400)

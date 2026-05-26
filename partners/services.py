@@ -141,3 +141,107 @@ def get_partner_payment_label(partner):
     if days == 3:
         return "Paiement sous 3 jours"
     return "Paiement hebdomadaire"
+
+
+# ══════════════════════════════════════════════════════
+# AUTO SCORING ENGINE v1 — FAGNI
+# ══════════════════════════════════════════════════════
+
+PENALTIES = {
+    'retard_48h':      -10,
+    'litige_client':   -15,
+    'refus_commande':   -5,
+    'scelle_manquant': -20,
+}
+
+BONUSES = {
+    'semaine_sans_incident': +10,
+    'commande_parfaite':      +5,
+}
+
+def _clamp(value, min_val=0, max_val=100):
+    return max(min_val, min(max_val, value))
+
+def apply_partner_penalty(partner, reason, order=None):
+    """
+    Applique une pénalité au Partner Score.
+    Enregistre dans PartnerScoreHistory.
+    """
+    from django.utils import timezone
+    from partners.models import PartnerScoreHistory
+
+    delta = PENALTIES.get(reason, -5)
+    previous = partner.partner_score
+    partner.partner_score = _clamp(previous + delta)
+    partner.update_level()
+    partner.score_updated_at = timezone.now()
+    partner.save(update_fields=['partner_score', 'level', 'score_updated_at'])
+
+    PartnerScoreHistory.objects.create(
+        partner       = partner,
+        score         = partner.partner_score,
+        level         = partner.level,
+        score_delai   = partner.score_delai,
+        score_litiges = partner.score_litiges,
+        score_dispo   = partner.score_dispo,
+        score_refus   = partner.score_refus,
+    )
+
+    return {
+        'partner':   partner.name,
+        'reason':    reason,
+        'delta':     delta,
+        'previous':  previous,
+        'new_score': partner.partner_score,
+        'level':     partner.level,
+        'badge':     get_partner_badge(partner),
+    }
+
+
+def apply_partner_bonus(partner, reason, order=None):
+    """
+    Applique un bonus au Partner Score.
+    Enregistre dans PartnerScoreHistory.
+    """
+    from django.utils import timezone
+    from partners.models import PartnerScoreHistory
+
+    delta = BONUSES.get(reason, +5)
+    previous = partner.partner_score
+    partner.partner_score = _clamp(previous + delta)
+    partner.update_level()
+    partner.score_updated_at = timezone.now()
+    partner.save(update_fields=['partner_score', 'level', 'score_updated_at'])
+
+    PartnerScoreHistory.objects.create(
+        partner       = partner,
+        score         = partner.partner_score,
+        level         = partner.level,
+        score_delai   = partner.score_delai,
+        score_litiges = partner.score_litiges,
+        score_dispo   = partner.score_dispo,
+        score_refus   = partner.score_refus,
+    )
+
+    return {
+        'partner':   partner.name,
+        'reason':    reason,
+        'delta':     delta,
+        'previous':  previous,
+        'new_score': partner.partner_score,
+        'level':     partner.level,
+        'badge':     get_partner_badge(partner),
+    }
+
+
+def get_partner_badge(partner):
+    """Retourne le badge couleur OPS selon le score."""
+    score = partner.partner_score
+    if score >= 80:
+        return {'emoji': '🟢', 'label': 'Excellent', 'color': '#1B7A4E'}
+    elif score >= 60:
+        return {'emoji': '🟡', 'label': 'Correct',   'color': '#C9A84C'}
+    elif score >= 40:
+        return {'emoji': '🟠', 'label': 'Attention', 'color': '#E67E22'}
+    else:
+        return {'emoji': '🔴', 'label': 'Critique',  'color': '#C0392B'}

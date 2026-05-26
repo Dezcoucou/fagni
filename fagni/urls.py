@@ -1,5 +1,5 @@
 from orders.partner_api import partner_refuse_order, partner_login, partner_orders, partner_update_status
-from orders.ops_api import api_wallet_solde, api_wallet_retrait, api_ops_paiements, api_ops_enregistrer_paiement, api_ops_revenus, api_ops_rapport_hebdo, api_score_pressing, api_score_livreur, api_creer_parrainage, api_stats_parrainage, api_valider_code_parrainage, ops_login, ops_dashboard, ops_assign_partner, ops_update_status, ops_assign_driver, ops_mark_paid, ops_add_partner, ops_add_driver, ops_list_partners
+from orders.ops_api import api_wallet_solde, api_partner_penalty, api_partner_bonus, api_partner_score_history, api_wallet_retrait, api_ops_paiements, api_ops_enregistrer_paiement, api_ops_revenus, api_ops_rapport_hebdo, api_score_pressing, api_score_livreur, api_creer_parrainage, api_stats_parrainage, api_valider_code_parrainage, ops_login, ops_dashboard, ops_assign_partner, ops_update_status, ops_assign_driver, ops_mark_paid, ops_add_partner, ops_add_driver, ops_list_partners
 from orders.driver_api import api_driver_dropoff, driver_login, driver_missions, driver_confirm_pickup, driver_confirm_delivery, driver_wallet
 from orders.photo_api import driver_upload_photo, partner_upload_photo, order_photos
 from orders.client_api import api_chatbot, api_login, api_home, api_orders, api_order_detail, api_pricing_bags, api_create_order, api_articles, api_wallet, api_parrainage, api_rate_order, api_register, api_report_litige, api_pricing_detail, api_order_tracking, api_cancel_order
@@ -50,6 +50,9 @@ urlpatterns = [
     path("api/ops/orders/<int:order_id>/mark-paid/",    ops_mark_paid,    name="api-ops-mark-paid"),
     path("api/ops/partners/",      ops_list_partners, name="api-ops-partners"),
     path("api/ops/partners/add/",  ops_add_partner,   name="api-ops-add-partner"),
+    path("api/ops/partners/<int:partner_id>/penalty/",      api_partner_penalty,       name="api-partner-penalty"),
+    path("api/ops/partners/<int:partner_id>/bonus/",        api_partner_bonus,         name="api-partner-bonus"),
+    path("api/ops/partners/<int:partner_id>/score-history/",api_partner_score_history, name="api-partner-score-history"),
     path("api/ops/drivers/add/",   ops_add_driver,    name="api-ops-add-driver"),
     path("api/driver/login/",                          driver_login,            name="api-driver-login"),
     path("api/driver/missions/",                       driver_missions,         name="api-driver-missions"),

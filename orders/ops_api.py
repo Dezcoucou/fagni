@@ -299,8 +299,9 @@ def ops_add_partner(request):
             wave_number=request.data.get('wave_number','').strip(),
             city=request.data.get('city','Abidjan').strip(),
             address=request.data.get('address','').strip(),
-            lat=request.data.get('lat') or None,
-            lng=request.data.get('lng') or None,
+            partner_type=request.data.get('partner_type','blanchisserie').strip(),
+            latitude=request.data.get('lat') or None,
+            longitude=request.data.get('lng') or None,
             is_active=True
         )
         return Response({'success': True, 'id': partner.id, 'name': partner.name})
@@ -345,7 +346,9 @@ def ops_list_partners(request):
 
     from partners.models import LaundryPartner, DeliveryPartner
     partners = list(LaundryPartner.objects.filter(is_active=True).values(
-        'id','name','phone','city','address'
+        'id','name','phone','city','address','wave_number',
+        'partner_type','partner_score','level',
+        'score_delai','score_litiges','score_dispo','score_refus'
     ))
     drivers = list(DeliveryPartner.objects.filter(is_active=True).values(
         'id','name','phone','city','vehicle_type'
@@ -683,69 +686,6 @@ def api_score_livreur(request, driver_id):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
-def api_score_pressing(request, partner_id):
-    """GET /api/ops/score/pressing/<id>/ — score pressing"""
-    from partners.models import LaundryPartner
-    from orders.models import Order
-    from django.db.models import Avg, Count
-
-    try:
-        partner = LaundryPartner.objects.get(id=partner_id)
-    except:
-        return Response({'error': 'Pressing non trouvé'}, status=404)
-
-    commandes = Order.objects.filter(laundry_partner=partner)
-    total = commandes.count()
-    done = commandes.filter(status='done').count()
-    litiges = commandes.filter(status='litige').count()
-
-    # Semaines actives
-    from django.db.models.functions import TruncWeek
-    semaines = commandes.filter(status='done').annotate(
-        week=TruncWeek('created_at')
-    ).values('week').distinct().count()
-
-    # CA total
-    from django.db.models import Sum
-    ca = int(commandes.filter(status='done').aggregate(
-        s=Sum('amount_laundry_partner'))['s'] or 0)
-
-    # Calcul score /100
-    score_volume    = min(30, done * 1)        # 1 pt par commande, max 30
-    score_regularite = min(20, semaines * 2)   # 2 pts par semaine, max 20
-    score_qualite   = max(0, 30 - litiges * 5) # -5 pts par litige, max 30
-    score_ca        = min(20, ca // 50000)     # 1 pt par 50k FCFA, max 20
-    score_total     = score_volume + score_regularite + score_qualite + score_ca
-
-    # Niveau
-    if score_total >= 80: niveau, badge = "Gold", "🥇"
-    elif score_total >= 50: niveau, badge = "Silver", "🥈"
-    elif score_total >= 20: niveau, badge = "Bronze", "🥉"
-    else: niveau, badge = "Débutant", "⭐"
-
-    return Response({
-        'partner_id':    partner.id,
-        'partner_name':  partner.name,
-        'score':         score_total,
-        'niveau':        niveau,
-        'badge':         badge,
-        'details': {
-            'commandes_total':  total,
-            'commandes_done':   done,
-            'litiges':          litiges,
-            'semaines_actives': semaines,
-            'ca_total':         ca,
-        },
-        'score_detail': {
-            'volume':     score_volume,
-            'regularite': score_regularite,
-            'qualite':    score_qualite,
-            'ca':         score_ca,
-        }
-    })
-
-
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def api_score_livreur(request, driver_id):

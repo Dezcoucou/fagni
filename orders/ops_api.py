@@ -1136,3 +1136,93 @@ def api_wallet_retrait(request):
         })
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_partner_penalty(request, partner_id):
+    """POST /api/ops/partners/<id>/penalty/ — {reason}"""
+    try:
+        _check_ops(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    from partners.models import LaundryPartner
+    from partners.services import apply_partner_penalty, PENALTIES
+
+    try:
+        partner = LaundryPartner.objects.get(id=partner_id)
+    except LaundryPartner.DoesNotExist:
+        return Response({'error': 'Partenaire introuvable'}, status=404)
+
+    reason = request.data.get('reason', '')
+    if reason not in PENALTIES:
+        return Response({
+            'error': 'Raison invalide',
+            'valid_reasons': list(PENALTIES.keys())
+        }, status=400)
+
+    result = apply_partner_penalty(partner, reason)
+    return Response({'success': True, **result})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_partner_bonus(request, partner_id):
+    """POST /api/ops/partners/<id>/bonus/ — {reason}"""
+    try:
+        _check_ops(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    from partners.models import LaundryPartner
+    from partners.services import apply_partner_bonus, BONUSES
+
+    try:
+        partner = LaundryPartner.objects.get(id=partner_id)
+    except LaundryPartner.DoesNotExist:
+        return Response({'error': 'Partenaire introuvable'}, status=404)
+
+    reason = request.data.get('reason', '')
+    if reason not in BONUSES:
+        return Response({
+            'error': 'Raison invalide',
+            'valid_reasons': list(BONUSES.keys())
+        }, status=400)
+
+    result = apply_partner_bonus(partner, reason)
+    return Response({'success': True, **result})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_partner_score_history(request, partner_id):
+    """GET /api/ops/partners/<id>/score-history/ — historique 30 derniers"""
+    try:
+        _check_ops(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    from partners.models import LaundryPartner, PartnerScoreHistory
+    from partners.services import get_partner_badge
+
+    try:
+        partner = LaundryPartner.objects.get(id=partner_id)
+    except LaundryPartner.DoesNotExist:
+        return Response({'error': 'Partenaire introuvable'}, status=404)
+
+    history = PartnerScoreHistory.objects.filter(
+        partner=partner
+    ).order_by('-computed_at')[:30]
+
+    return Response({
+        'partner_id':    partner.id,
+        'partner_name':  partner.name,
+        'current_score': partner.partner_score,
+        'current_level': partner.level,
+        'badge':         get_partner_badge(partner),
+        'history': list(history.values(
+            'score', 'level', 'score_delai', 'score_litiges',
+            'score_dispo', 'score_refus', 'computed_at'
+        ))
+    })

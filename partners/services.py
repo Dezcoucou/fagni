@@ -104,3 +104,28 @@ def recompute_partner_score(partner):
     )
 
     return partner
+
+
+def get_partner_payment_delay_days(partner):
+    """
+    Délai de paiement partenaire selon niveau FAGNI.
+    Gold   : 2 jours
+    Silver : 3 jours
+    Bronze : 7 jours
+    """
+    level = getattr(partner, "level", "bronze") or "bronze"
+
+    if level == "gold":
+        return 2
+    if level == "silver":
+        return 3
+    return 7
+
+
+def get_partner_payment_label(partner):
+    days = get_partner_payment_delay_days(partner)
+    if days == 2:
+        return "Paiement sous 48h"
+    if days == 3:
+        return "Paiement sous 3 jours"
+    return "Paiement hebdomadaire"

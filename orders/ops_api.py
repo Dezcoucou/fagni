@@ -38,6 +38,7 @@ def ops_dashboard(request):
 
     from orders.models import Order
     from partners.models import LaundryPartner
+    from partners.services import get_partner_payment_delay_days, get_partner_payment_label
 
     # Filtres
     status = request.GET.get('status', '')
@@ -136,24 +137,30 @@ def ops_dashboard(request):
     }
 
     # Partenaires pour filtre
-    partners = list(
+    partners_qs = (
         LaundryPartner.objects
         .filter(is_active=True)
         .order_by('-partner_score', 'name')
-        .values(
-            'id',
-            'name',
-            'phone',
-            'wave_number',
-            'partner_type',
-            'partner_score',
-            'level',
-            'score_delai',
-            'score_litiges',
-            'score_dispo',
-            'score_refus',
-        )
     )
+
+    partners = []
+
+    for ptn in partners_qs:
+        partners.append({
+            'id': ptn.id,
+            'name': ptn.name,
+            'phone': ptn.phone,
+            'wave_number': ptn.wave_number,
+            'partner_type': ptn.partner_type,
+            'partner_score': ptn.partner_score,
+            'level': ptn.level,
+            'score_delai': ptn.score_delai,
+            'score_litiges': ptn.score_litiges,
+            'score_dispo': ptn.score_dispo,
+            'score_refus': ptn.score_refus,
+            'payment_delay_days': get_partner_payment_delay_days(ptn),
+            'payment_label': get_partner_payment_label(ptn),
+        })
 
     # Livreurs
     from partners.models import DeliveryPartner

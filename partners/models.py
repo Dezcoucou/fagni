@@ -46,8 +46,57 @@ class PartnerBase(models.Model):
 
 class LaundryPartner(PartnerBase):
     """
-    Partenaire blanchisserie FAGNI.
+    Partenaire blanchisserie / pressing FAGNI.
     """
+    PARTNER_TYPE_CHOICES = [
+        ("blanchisserie", "Blanchisserie"),
+        ("pressing",      "Pressing premium"),
+    ]
+    LEVEL_CHOICES = [
+        ("bronze", "🥉 Bronze"),
+        ("silver", "🥈 Silver"),
+        ("gold",   "🥇 Gold"),
+    ]
+
+    partner_type = models.CharField(
+        "Type de partenaire",
+        max_length=20,
+        choices=PARTNER_TYPE_CHOICES,
+        default="blanchisserie",
+    )
+    partner_score = models.PositiveIntegerField(
+        "Partner Score",
+        default=100,
+        help_text="Score automatique sur 100 pts (délai 40 + litiges 30 + dispo 20 + refus 10)"
+    )
+    level = models.CharField(
+        "Niveau",
+        max_length=10,
+        choices=LEVEL_CHOICES,
+        default="bronze",
+    )
+    score_delai      = models.PositiveIntegerField("Score délai (sur 40)",    default=40)
+    score_litiges    = models.PositiveIntegerField("Score litiges (sur 30)",   default=30)
+    score_dispo      = models.PositiveIntegerField("Score disponibilité (sur 20)", default=20)
+    score_refus      = models.PositiveIntegerField("Score refus (sur 10)",     default=10)
+    score_updated_at = models.DateTimeField("Score mis à jour le", null=True, blank=True)
+
+    def update_level(self):
+        if self.partner_score >= 80:
+            self.level = "gold"
+        elif self.partner_score >= 60:
+            self.level = "silver"
+        else:
+            self.level = "bronze"
+
+    def recalculate_score(self):
+        self.partner_score = (
+            self.score_delai +
+            self.score_litiges +
+            self.score_dispo +
+            self.score_refus
+        )
+        self.update_level()
 
     class Meta:
         verbose_name = "Blanchisserie partenaire"

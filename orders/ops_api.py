@@ -136,7 +136,24 @@ def ops_dashboard(request):
     }
 
     # Partenaires pour filtre
-    partners = list(LaundryPartner.objects.filter(is_active=True).values('id','name','phone','wave_number'))
+    partners = list(
+        LaundryPartner.objects
+        .filter(is_active=True)
+        .order_by('-partner_score', 'name')
+        .values(
+            'id',
+            'name',
+            'phone',
+            'wave_number',
+            'partner_type',
+            'partner_score',
+            'level',
+            'score_delai',
+            'score_litiges',
+            'score_dispo',
+            'score_refus',
+        )
+    )
 
     # Livreurs
     from partners.models import DeliveryPartner

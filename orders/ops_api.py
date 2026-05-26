@@ -210,6 +210,15 @@ def ops_update_status(request, order_id):
             return Response({'error': 'Statut invalide'}, status=400)
         order.status = new_status
         order.save(update_fields=['status','updated_at'])
+
+        # Recalcul Partner Score si statut terminal
+        if new_status in ('done', 'canceled') and order.laundry_partner_id:
+            try:
+                from partners.services import recompute_partner_score
+                recompute_partner_score(order.laundry_partner)
+            except Exception:
+                pass  # Score non bloquant
+
         return Response({'success': True, 'status': new_status})
     except Exception as e:
         return Response({'error': str(e)}, status=400)

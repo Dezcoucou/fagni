@@ -1067,8 +1067,21 @@ def api_wallet_solde(request):
             wallet=wallet
         ).order_by('-created_at')[:20]
 
+        # Pending OPS pour pressing
+        pending_ops_total = 0
+        pending_ops_orders = []
+        if partner_type == 'pressing':
+            from orders.models import Order
+            credited_ids = set(wallet.transactions.filter(order_id__isnull=False).values_list('order_id', flat=True))
+            for o in Order.objects.filter(laundry_partner_id=partner_id, status='done').order_by('-updated_at')[:30]:
+                if o.id in credited_ids: continue
+                amt = float(getattr(o,'amount_laundry_partner',0) or 0)
+                if amt <= 0: continue
+                pending_ops_total += amt
+                pending_ops_orders.append({'code': getattr(o,'code','') or f'Commande #{o.id}', 'amount': amt})
+
         return Response({
-            'solde': float(wallet.balance),
+            'solde': float(wallet.balance), 'pending_ops_total': pending_ops_total, 'pending_ops_orders': pending_ops_orders[:5],
             'currency': wallet.currency,
             'transactions': [{
                 'date':        t.created_at.strftime('%d/%m/%Y %H:%M'),

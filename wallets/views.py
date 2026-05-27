@@ -156,6 +156,36 @@ def driver_wallet_dashboard(request):
     # GET : affichage des infos
     tx_qs = wallet.transactions.all().order_by("-created_at")[:50]
 
+    # MVP terrain : gains livreur en attente OPS
+    from orders.models import DeliveryLeg
+    done_legs = DeliveryLeg.objects.filter(
+        driver=driver,
+        status="done",
+    ).select_related("order").order_by("-finished_at", "-updated_at")[:50]
+
+    credited_leg_ids = set(
+        wallet.transactions.filter(leg_id__isnull=False)
+        .values_list("leg_id", flat=True)
+    )
+
+    pending_ops_orders = []
+    pending_ops_total = Decimal("0.00")
+
+    for leg in done_legs:
+        if leg.id in credited_leg_ids:
+            continue
+        amount = Decimal(str(getattr(leg, "driver_amount", 0) or 0))
+        if amount <= 0:
+            continue
+        pending_ops_total += amount
+        pending_ops_orders.append({
+            "id": getattr(leg.order, "id", None),
+            "code": getattr(leg.order, "code", "") or f"Commande #{getattr(leg.order, 'id', '')}",
+            "amount": amount,
+            "status_label": "En attente OPS",
+            "leg_type": leg.leg_type,
+        })
+
     now = timezone.now()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     month_in_qs = wallet.transactions.filter(created_at__gte=month_start, direction="in")
@@ -178,6 +208,8 @@ def driver_wallet_dashboard(request):
         "selected_driver_id": selected_driver_id,
         "total_credited": total_credited,
         "total_debited": total_debited,
+        "pending_ops_total": pending_ops_total,
+        "pending_ops_orders": pending_ops_orders,
     }
     return render(request, "orders/driver_wallet.html", context)
 
@@ -247,6 +279,37 @@ def laundry_wallet_dashboard(request):
     # GET
     tx_qs = wallet.transactions.all().order_by("-created_at")[:50]
 
+    # MVP terrain : gains blanchisseur en attente OPS
+    # Commandes prêtes mais pas encore créditées dans le wallet.
+    from orders.models import Order
+    completed_orders = Order.objects.filter(
+        laundry_partner=laundry,
+        wash_complete_time__isnull=False,
+    ).order_by("-updated_at")[:50]
+
+    credited_order_ids = set(
+        wallet.transactions.filter(order_id__isnull=False)
+        .values_list("order_id", flat=True)
+    )
+
+    pending_ops_orders = []
+    pending_ops_total = Decimal("0.00")
+
+    for o in completed_orders:
+        if o.id in credited_order_ids:
+            continue
+        amount = Decimal(str(getattr(o, "amount_laundry_partner", 0) or 0))
+        if amount <= 0:
+            continue
+        pending_ops_total += amount
+        pending_ops_orders.append({
+            "id": o.id,
+            "code": getattr(o, "code", "") or f"Commande #{o.id}",
+            "amount": amount,
+            "status_label": "En attente OPS",
+            "updated_at": getattr(o, "updated_at", None),
+        })
+
     now = timezone.now()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     month_in_qs = wallet.transactions.filter(created_at__gte=month_start, direction="in")
@@ -269,5 +332,7 @@ def laundry_wallet_dashboard(request):
         "selected_laundry_id": selected_laundry_id,
         "total_credited": total_credited,
         "total_debited": total_debited,
+        "pending_ops_total": pending_ops_total,
+        "pending_ops_orders": pending_ops_orders,
     }
     return render(request, "orders/laundry_wallet.html", context)

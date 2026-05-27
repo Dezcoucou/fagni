@@ -666,7 +666,7 @@ def api_score_livreur(request, driver_id):
         return Response({'error': 'Livreur non trouvé'}, status=404)
 
     collectes = Order.objects.filter(pickup_driver=driver, status='done').count()
-    livraisons = Order.objects.filter(delivery_partner=driver, status='done').count()
+    livraisons = Order.objects.filter(pickup_driver=driver, status='done', cost_driver_delivery__gt=0).count()
     total_missions = collectes + livraisons
     litiges = Order.objects.filter(
         pickup_driver=driver, status='litige'
@@ -719,78 +719,6 @@ def api_score_livreur(request, driver_id):
 
 
 @api_view(['GET'])
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def api_score_livreur(request, driver_id):
-    """GET /api/ops/score/livreur/<id>/ — score livreur"""
-    from partners.models import DeliveryPartner
-    from orders.models import Order
-    from django.db.models import Sum
-
-    try:
-        driver = DeliveryPartner.objects.get(id=driver_id)
-    except:
-        return Response({'error': 'Livreur non trouvé'}, status=404)
-
-    collectes = Order.objects.filter(pickup_driver=driver, status='done').count()
-    livraisons = Order.objects.filter(delivery_partner=driver, status='done').count()
-    total_missions = collectes + livraisons
-    litiges = Order.objects.filter(
-        pickup_driver=driver, status='litige'
-    ).count()
-
-    # Semaines actives
-    from django.db.models.functions import TruncWeek
-    semaines = Order.objects.filter(
-        pickup_driver=driver, status='done'
-    ).annotate(week=TruncWeek('created_at')).values('week').distinct().count()
-
-    # Revenus
-    remun_c = getattr(driver, 'remuneration_collecte', 1000) or 1000
-    remun_l = getattr(driver, 'remuneration_livraison', 1000) or 1000
-    revenus = (collectes * remun_c) + (livraisons * remun_l)
-
-    # Score /100
-    score_volume    = min(30, total_missions * 1)
-    score_regularite = min(20, semaines * 2)
-    score_qualite   = max(0, 30 - litiges * 5)
-    score_revenus   = min(20, revenus // 25000)
-    score_total     = score_volume + score_regularite + score_qualite + score_revenus
-
-    if score_total >= 80: niveau, badge = "Gold", "🥇"
-    elif score_total >= 50: niveau, badge = "Silver", "🥈"
-    elif score_total >= 20: niveau, badge = "Bronze", "🥉"
-    else: niveau, badge = "Débutant", "⭐"
-
-    return Response({
-        'driver_id':   driver.id,
-        'driver_name': driver.name,
-        'score':       score_total,
-        'niveau':      niveau,
-        'badge':       badge,
-        'details': {
-            'collectes':        collectes,
-            'livraisons':       livraisons,
-            'total_missions':   total_missions,
-            'litiges':          litiges,
-            'semaines_actives': semaines,
-            'revenus_total':    revenus,
-        },
-        'score_detail': {
-            'volume':     score_volume,
-            'regularite': score_regularite,
-            'qualite':    score_qualite,
-            'revenus':    score_revenus,
-        }
-    })
-
-
-# ============================================================
-# PARRAINAGE FAGNI
-# ============================================================
-
-import random
-import string
 
 def generer_code():
     """Générer un code parrainage unique."""

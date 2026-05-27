@@ -388,93 +388,6 @@ def api_driver_dropoff(request, order_id):
         return Response({'error': str(e)}, status=400)
 
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def driver_wallet(request):
-    """GET /api/driver/wallet/ — solde + ledger réel du livreur"""
-    try:
-        driver = _get_driver(request)
-    except Exception:
-        return Response({'error': 'Non autorisé'}, status=401)
-
-    try:
-        from decimal import Decimal
-        from wallets.models import Wallet
-        from django.utils import timezone
-        from datetime import timedelta
-
-        wallet, _ = Wallet.objects.get_or_create(
-            delivery_partner=driver,
-            owner_type='driver',
-            defaults={'currency': 'XOF'}
-        )
-
-        today = timezone.now()
-        days_ahead = 7 - today.weekday() if today.weekday() != 0 else 7
-        lundi = today + timedelta(days=days_ahead)
-
-        txs = wallet.transactions.select_related('order', 'leg').order_by('-created_at')[:20]
-
-        transactions = []
-        for tx in txs:
-            raw_desc = tx.description or ''
-            disponible = 0
-            securite = 0
-
-            # Extraction depuis description V2 si présente
-            # "disponible=960 | securite=240"
-            try:
-                for part in raw_desc.split('|'):
-                    part = part.strip()
-                    if part.startswith('disponible='):
-                        disponible = int(part.split('=')[1])
-                    if part.startswith('securite='):
-                        securite = int(part.split('=')[1])
-            except Exception:
-                pass
-
-            # Fallback ancien historique : 80/20 théorique
-            if disponible == 0 and securite == 0 and tx.direction == 'in':
-                disponible = int(Decimal(tx.amount) * Decimal('0.80'))
-                securite = int(Decimal(tx.amount) - Decimal(disponible))
-
-            order_code = ''
-            if getattr(tx, 'order_id', None) and tx.order:
-                order_code = tx.order.code or str(tx.order_id)
-
-            transactions.append({
-                'id': tx.id,
-                'type': tx.type,
-                'direction': tx.direction,
-                'description': raw_desc,
-                'order_code': order_code,
-                'montant': int(tx.amount),
-                'disponible': disponible,
-                'securite': securite,
-                'idempotency_key': tx.idempotency_key or '',
-                'date': tx.created_at.strftime('%d/%m/%Y %H:%M') if tx.created_at else '',
-            })
-
-        balance = wallet.balance or Decimal('0.00')
-        balance_securite = wallet.balance_securite or Decimal('0.00')
-        wallet_total = balance + balance_securite
-
-        return Response({
-            'balance': float(balance),
-            'balance_securite': float(balance_securite),
-            'wallet_total': float(wallet_total),
-            'total': float(wallet_total),  # compat frontend ancien
-            'prochain_deblocage': lundi.strftime('lundi %d/%m'),
-            'bonus_securite_label': f"{int(balance_securite)} FCFA seront libérés lundi si semaine sans incident",
-            'withdraw_minimum': 3000,
-            'currency': wallet.currency,
-            'transactions': transactions,
-        })
-
-    except Exception as e:
-        return Response({'error': str(e)}, status=400)
-
-from django.conf import settings
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -913,12 +826,49 @@ def driver_wallet(request):
                     'date': o.updated_at.strftime('%d/%m/%Y %H:%M') if o.updated_at else '',
                 })
 
+        # MVP terrain : missions terminées mais non encore créditées dans le wallet
+        from orders.models import DeliveryLeg
+        credited_leg_ids = set(
+            wallet.transactions.filter(leg_id__isnull=False)
+            .values_list("leg_id", flat=True)
+        )
+
+        pending_ops_total = 0
+        pending_ops_missions = []
+        done_legs = (
+            DeliveryLeg.objects
+            .filter(driver=driver, status="done")
+            .select_related("order")
+            .order_by("-finished_at")[:50]
+        )
+
+        for leg in done_legs:
+            if leg.id in credited_leg_ids:
+                continue
+            amount = int(getattr(leg, "driver_amount", 0) or 0)
+            if amount <= 0:
+                continue
+            pending_ops_total += amount
+            order = getattr(leg, "order", None)
+            pending_ops_missions.append({
+                "order_id": getattr(order, "id", None),
+                "code": getattr(order, "code", "") or f"Commande #{getattr(order, 'id', '')}",
+                "leg_type": leg.leg_type,
+                "amount": amount,
+                "status": "pending_ops",
+                "label": "En attente OPS",
+            })
+
         return Response({
-            'balance':             float(wallet.balance),
-            'balance_securite':    float(wallet.balance_securite),
-            'total':               float(wallet.balance + wallet.balance_securite),
-            'prochain_deblocage':  lundi.strftime('lundi %d/%m'),
-            'transactions':        transactions[:10],
+            "balance": float(wallet.balance),
+            "balance_securite": float(wallet.balance_securite),
+            "total": float(wallet.balance + wallet.balance_securite),
+            "pending_ops_total": pending_ops_total,
+            "pending_ops_missions": pending_ops_missions[:10],
+            "available_label": "Disponible",
+            "pending_label": "En attente OPS",
+            "prochain_deblocage": lundi.strftime("lundi %d/%m"),
+            "transactions": transactions[:10],
         })
     except Exception as e:
         return Response({'error': str(e)}, status=400)

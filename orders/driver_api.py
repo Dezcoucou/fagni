@@ -872,3 +872,64 @@ def driver_wallet(request):
         })
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def driver_toggle_status(request):
+    """POST /api/driver/status/ — {is_online: true/false}"""
+    try:
+        driver = _get_driver(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    try:
+        from django.utils import timezone
+        is_online = request.data.get('is_online', False)
+        driver.is_online = bool(is_online)
+        driver.went_online_at = timezone.now() if is_online else None
+        driver.save(update_fields=['is_online', 'went_online_at'])
+
+        return Response({
+            'success': True,
+            'is_online': driver.is_online,
+            'message': 'En ligne ✅' if driver.is_online else 'Hors ligne',
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def driver_pending_mission(request):
+    """GET /api/driver/pending/ — mission assignée en attente d'acceptation"""
+    try:
+        driver = _get_driver(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    try:
+        from orders.models import Order
+        # Commande assignée au driver mais pas encore confirmée
+        order = Order.objects.filter(
+            pickup_driver=driver,
+            status='pending'
+        ).order_by('-created_at').first()
+
+        if not order:
+            return Response({'mission': None})
+
+        return Response({
+            'mission': {
+                'id': order.id,
+                'code': order.code or f'#{order.id}',
+                'bag_size': order.bag_size,
+                'pickup_address': order.pickup_address or '',
+                'zone': order.zone or '',
+                'total': float(order.total or 0),
+                'created_at': order.created_at.strftime('%d/%m %H:%M') if order.created_at else '',
+                'gain_collecte': getattr(driver, 'remuneration_collecte', 1200),
+            }
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

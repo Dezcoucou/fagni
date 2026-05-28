@@ -124,6 +124,15 @@ class DeliveryPartner(PartnerBase):
         blank=True,
     )
 
+    is_online = models.BooleanField(
+        "En ligne",
+        default=False,
+        help_text="Le livreur est disponible pour recevoir des missions"
+    )
+    went_online_at = models.DateTimeField(
+        "En ligne depuis", null=True, blank=True
+    )
+
     class Meta:
         verbose_name = "Livreur partenaire"
         verbose_name_plural = "Livreurs partenaires"

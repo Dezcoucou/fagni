@@ -1205,9 +1205,11 @@ Votre blanchisserie à domicile à Abidjan.
 🧺 Comment commander :
 → fagni-client.vercel.app
 
-💰 Tarif : 500 FCFA/article
-🚗 Livraison : 2 000 FCFA
-⏱️ Délai : 48-72 heures
+💰 Tarifs :
+   Petit sac (5 pièces) : 7 250 FCFA
+   Sac moyen (10 pièces) : 10 400 FCFA
+   Grand sac (10+) : 14 600 FCFA
+⏱️ Délai : 48h
 
 Des questions ? Écrivez-nous ici !
 ⚡ FAGNI — Riviera 3, Abidjan"""

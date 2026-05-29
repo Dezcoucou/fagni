@@ -1,3 +1,4 @@
+import os
 """API Livreur FAGNI"""
 import jwt
 from django.conf import settings
@@ -931,5 +932,45 @@ def driver_pending_mission(request):
                 'gain_collecte': int(getattr(order, 'cost_driver_pickup', 0) or getattr(driver, 'remuneration_collecte', 1200)),
             }
         })
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def driver_copilote(request):
+    """POST /api/driver/copilote/ — {messages: [], driver_name: str}"""
+    try:
+        driver = _get_driver(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    try:
+        import anthropic
+        messages = request.data.get('messages', [])
+        
+        client = anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY', ''))
+        
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=800,
+            system=f"""Tu es le Copilote FAGNI, assistant IA pour les livreurs du service pressing à domicile à Abidjan.
+Le livreur s'appelle {driver.name}.
+
+CONTEXTE FAGNI :
+- Wallet : 80% disponible + 20% bonus sécurité libéré le lundi si semaine sans incident
+- Niveaux : Bronze (0-60pts) → Silver (60-80pts) → Gold (80-100pts)
+- Missions : collecte client → dépôt pressing → livraison retour
+- Photos obligatoires avant collecte + après livraison
+- Scellé FAGNI numéroté obligatoire sur chaque sac
+- OPS joignable : +225 01 42 29 99 49
+- Paiement via Wave uniquement
+- En cas de client absent : appeler OPS, ne pas laisser le sac
+
+Réponds en français, court et pratique. Utilise des emojis. Sois encourageant.""",
+            messages=messages
+        )
+        
+        return Response({'reply': response.content[0].text})
     except Exception as e:
         return Response({'error': str(e)}, status=400)

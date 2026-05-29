@@ -928,7 +928,7 @@ def driver_pending_mission(request):
                 'zone': getattr(order, 'zone', '') or getattr(order, 'pickup_zone', '') or '',
                 'total': float(order.total or 0),
                 'created_at': order.created_at.strftime('%d/%m %H:%M') if order.created_at else '',
-                'gain_collecte': getattr(driver, 'remuneration_collecte', 1200),
+                'gain_collecte': int(getattr(order, 'cost_driver_pickup', 0) or getattr(driver, 'remuneration_collecte', 1200)),
             }
         })
     except Exception as e:

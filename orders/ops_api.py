@@ -164,7 +164,7 @@ def ops_dashboard(request):
 
     # Livreurs
     from partners.models import DeliveryPartner
-    drivers = list(DeliveryPartner.objects.filter(is_active=True).values('id','name','phone','wave_number'))
+    drivers = list(DeliveryPartner.objects.filter(is_active=True).values('id','name','phone','wave_number','is_online'))
 
     return Response({'orders': orders, 'stats': stats, 'partners': partners, 'drivers': drivers})
 

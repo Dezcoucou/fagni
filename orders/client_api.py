@@ -1205,10 +1205,8 @@ Votre blanchisserie à domicile à Abidjan.
 🧺 Comment commander :
 → fagni-client.vercel.app
 
-💰 Tarifs :
-   Petit sac (5 pièces) : 7 250 FCFA
-   Sac moyen (10 pièces) : 10 400 FCFA
-   Grand sac (10+) : 14 600 FCFA
+💰 Tarif : 500 FCFA/article + 2 000 FCFA livraison AR
+📌 Prix confirmé au comptage à la collecte
 ⏱️ Délai : 48h
 
 Des questions ? Écrivez-nous ici !

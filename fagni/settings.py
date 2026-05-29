@@ -1,5 +1,8 @@
 import os
 import dj_database_url
+from pathlib import Path as _Path
+from dotenv import load_dotenv
+load_dotenv(_Path(__file__).parent.parent / '.env')
 from pathlib import Path
 from decimal import Decimal
 
@@ -151,7 +154,7 @@ if DATABASE_URL:
     DATABASES = {
         "default": dj_database_url.parse(
             DATABASE_URL,
-            conn_max_age=int(os.getenv("DB_CONN_MAX_AGE", "600")),
+            conn_max_age=0,
             ssl_require=(os.getenv("DB_SSL_REQUIRE", "1") == "1"),
         )
     }

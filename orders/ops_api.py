@@ -242,7 +242,8 @@ def ops_assign_driver(request, order_id):
         driver_type = request.data.get('driver_type', 'delivery')
         if driver_type == 'pickup':
             order.pickup_driver = driver
-            order.save(update_fields=['pickup_driver', 'updated_at'])
+            order.cost_driver_pickup = getattr(driver, 'remuneration_collecte', 1200) or 1200
+            order.save(update_fields=['pickup_driver', 'cost_driver_pickup', 'updated_at'])
             event_type = 'pickup.assigned'
         else:
             order.delivery_partner = driver
@@ -384,7 +385,7 @@ def ops_list_partners(request):
         'score_delai','score_litiges','score_dispo','score_refus'
     ))
     drivers = list(DeliveryPartner.objects.filter(is_active=True).values(
-        'id','name','phone','city','vehicle_type'
+        'id','name','phone','city','vehicle_type','is_online'
     ))
     return Response({'partners': partners, 'drivers': drivers})
 

@@ -695,23 +695,14 @@ def api_articles(request):
             'prix_unitaire': art.prix_unitaire,
         })
 
-    # Bags depuis PricingConfig
-    pricing_configs = PricingConfig.objects.filter(is_active=True).order_by('pressing_amount')
-    bags = {}
-    for config in pricing_configs:
-        pricing = calculate_order(config.pressing_amount, config.delivery_fee)
-        bags[config.bag_size] = {
-            'label':       config.label,
-            'price':       pricing['total_client'],
-            'pressing':    config.pressing_amount,
-            'delivery':    config.delivery_fee,
-            'service_fee': pricing['service_fee'],
-            'max_items':   {'small':15,'medium':25,'large':50}.get(config.bag_size, 15),
-            'max_weight_kg': {'small':5,'medium':10,'large':15}.get(config.bag_size, 5),
-        }
-
+    # Bags — Modèle B estimation visuelle
+    bags = {
+        'small':  {'label':'Petit sac',  'emoji':'🧳','max_items':15,'prix_article_client':500,'delivery_fee':2000,'description':'Idéal pour 1-5 pièces'},
+        'medium': {'label':'Sac moyen',  'emoji':'🎒','max_items':25,'prix_article_client':500,'delivery_fee':2000,'description':'Idéal pour 5-15 pièces'},
+        'large':  {'label':'Grand sac',  'emoji':'👜','max_items':50,'prix_article_client':500,'delivery_fee':2000,'description':'Famille — 15+ pièces'},
+    }
     return Response({
-        'bags':    bags,
+        'bags': bags,
         'catalog': list(catalog.values()),
     })
 
@@ -1121,7 +1112,7 @@ def api_chatbot(request):
 
     SYSTEM = """Tu es l'assistant virtuel de FAGNI, plateforme de blanchisserie à domicile à Abidjan.
 Zone : Riviera 3, Cocody, Riviera. Délai : 48-72h.
-Prix : Petit sac 7 250 FCFA, Moyen 10 400 FCFA, Grand 14 600 FCFA.
+Prix : 500 FCFA/article + 2 000 FCFA livraison AR. Le sac est une estimation visuelle — prix confirmé au comptage à la collecte.
 Articles refusés : sous-vêtements, chaussettes.
 Articles sur devis : costume, boubou, kaba, agbada, robe longue, manteau, veste, drap.
 OPS WhatsApp : +225 01 42 29 99 49. Réponds en français, sois chaleureux et concis."""

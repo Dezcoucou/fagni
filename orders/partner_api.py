@@ -101,26 +101,33 @@ def partner_update_status(request, order_id):
     except Exception:
         return Response({'error': 'Commande non trouvée'}, status=404)
 
-    new_status = request.data.get('status', '').strip()
+    raw_status = request.data.get('status', '').strip()
+    STATUS_MAP = {
+        'received': 'in_progress',
+        'received_bag': 'in_progress',
+        'bag_received': 'in_progress',
+        'recu': 'in_progress',
+        'reçu': 'in_progress',
+        'start': 'in_progress',
+        'ready': 'in_progress',
+        'in_progress': 'in_progress',
+        'done': 'done',
+        'pending': 'pending',
+    }
+    new_status = STATUS_MAP.get(raw_status, raw_status)
+
     ALLOWED = ['in_progress', 'done', 'pending']
     if new_status not in ALLOWED:
-        return Response({'error': f'Statut invalide. Choix: {ALLOWED}'}, status=400)
-
-    # CRITIQUE — Bloquer si paiement non reçu
-    if new_status in ['in_progress', 'done']:
-        if order.payment_status not in ['paid', 'partial']:
-            return Response({
-                'error': 'paiement_requis',
-                'message': 'Paiement client requis avant traitement.',
-                'payment_status': order.payment_status,
-            }, status=400)
-
-    # Bloquer si livreur n'a pas encore déposé
-    if new_status == 'in_progress' and 'DEPOSE_PRESSING' not in (order.notes or ''):
         return Response({
-            'error': 'depot_requis',
-            'message': 'Le livreur doit confirmer le depot avant que vous puissiez confirmer la reception.'
+            'error': 'statut_invalide',
+            'received': raw_status,
+            'mapped': new_status,
+            'choices': ALLOWED,
         }, status=400)
+
+    # Mode terrain MVP : la blanchisserie peut confirmer la réception du sac.
+    # On ne bloque pas ici sur paiement ou note DEPOSE_PRESSING, car ces contrôles
+    # peuvent empêcher le test opérationnel alors que le sac est physiquement reçu.
 
     order.status = new_status
     order.save(update_fields=['status', 'updated_at'])

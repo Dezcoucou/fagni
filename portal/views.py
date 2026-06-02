@@ -171,9 +171,9 @@ def public_create_order(request):
         if delivery_partner:
             order.delivery_partner = delivery_partner
 
-        # 7) Calcul livraison
+        # 7) Modèle pressing pilote FAGNI : livraison aller-retour fixe facturée au client
         if order.laundry_partner:
-            order.delivery_fee = order.compute_delivery_fee()
+            order.delivery_fee = 2000
 
         # 8) Sauvegarde finale (total + service_fee + signaux)
         order.save()

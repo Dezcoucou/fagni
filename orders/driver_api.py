@@ -39,8 +39,33 @@ def credit_wallet(driver, amount_fcfa, order, description):
             mission_type = "mission"
             tx_label = "MISSION"
 
-        # Idempotence forte : même driver + même commande + même type mission = crédit unique
-        idempotency_key = f"driver:{driver.id}:order:{order_id}:mission:{mission_type}:pilot_v2"
+        # Idempotence forte V3 : chaque crédit est rattaché à la DeliveryLeg réelle.
+        # pickup   -> DeliveryLeg leg_type="pickup"
+        # delivery -> DeliveryLeg leg_type="return"
+        leg = None
+        leg_type = None
+        if mission_type == "pickup":
+            leg_type = "pickup"
+        elif mission_type == "delivery":
+            leg_type = "return"
+
+        if leg_type and order_id:
+            try:
+                from orders.models import DeliveryLeg
+                leg = (
+                    DeliveryLeg.objects
+                    .filter(order=order, leg_type=leg_type)
+                    .order_by("-id")
+                    .first()
+                )
+            except Exception:
+                leg = None
+
+        if leg is not None:
+            idempotency_key = f"driver:{driver.id}:leg:{leg.id}:pilot_v2"
+        else:
+            # Fallback compatibilité si aucune jambe n'existe encore
+            idempotency_key = f"driver:{driver.id}:order:{order_id}:mission:{mission_type}:pilot_v2"
 
         with transaction.atomic():
             wallet, _ = Wallet.objects.select_for_update().get_or_create(
@@ -87,7 +112,7 @@ def credit_wallet(driver, amount_fcfa, order, description):
             tx = WalletTransaction.create_tx(
                 wallet=wallet,
                 order=order,
-                leg=None,
+                leg=leg,
                 type=WalletTransaction.TxType.CREDIT,
                 direction=WalletTransaction.TxDirection.IN,
                 amount=amount,

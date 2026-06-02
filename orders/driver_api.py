@@ -974,3 +974,22 @@ Réponds en français, court et pratique. Utilise des emojis. Sois encourageant.
         return Response({'reply': response.content[0].text})
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_driver_profil_update(request):
+    """POST /api/driver/profil/update/ — mettre à jour wave_number"""
+    token = request.headers.get('Authorization','').replace('Bearer ','')
+    try:
+        import jwt
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        from partners.models import DeliveryPartner
+        driver = DeliveryPartner.objects.get(id=payload['driver_id'])
+        wave = request.data.get('wave_number','').strip()
+        if wave:
+            driver.wave_number = wave
+            driver.save(update_fields=['wave_number'])
+        return Response({'success': True, 'wave_number': driver.wave_number})
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

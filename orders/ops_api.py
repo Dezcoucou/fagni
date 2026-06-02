@@ -36,7 +36,7 @@ def ops_dashboard(request):
     except:
         return Response({'error': 'Non autorisé'}, status=401)
 
-    from orders.models import Order
+    from orders.models import Order, Paiement
     from partners.models import LaundryPartner
     from partners.services import get_partner_payment_delay_days, get_partner_payment_label
 
@@ -395,7 +395,7 @@ def ops_list_partners(request):
 def api_ops_paiements(request):
     """GET /api/ops/paiements/ — cumul gains pressings et livreurs"""
     from partners.models import LaundryPartner, DeliveryPartner
-    from orders.models import Order
+    from orders.models import Order, Paiement
     from django.db.models import Sum, Count
 
     # Pressings
@@ -416,7 +416,7 @@ def api_ops_paiements(request):
             'nb_commandes': nb,
             'total_client': int(total_client),
             'a_payer': int(a_payer),
-            'deja_paye': 0,
+            'deja_paye': int(Paiement.objects.filter(partenaire_id=p.id, partenaire_type='pressing').aggregate(s=Sum('montant'))['s'] or 0),
         })
 
     # Livreurs
@@ -439,7 +439,7 @@ def api_ops_paiements(request):
             'wave_number': getattr(d, 'wave_number', '') or '',
             'nb_missions': nb,
             'a_payer': int(a_payer),
-            'deja_paye': 0,
+            'deja_paye': int(Paiement.objects.filter(partenaire_id=d.id, partenaire_type='livreur').aggregate(s=Sum('montant'))['s'] or 0),
         })
 
     total_a_payer = sum(p['a_payer'] for p in pressings_data) + sum(l['a_payer'] for l in livreurs_data)

@@ -327,6 +327,12 @@ def ops_add_partner(request):
 
     try:
         from partners.models import LaundryPartner
+        import cloudinary.uploader as cu
+        def upload_p(b64, folder, pid):
+            if not b64: return ''
+            try: return cu.upload(b64, folder=folder, public_id=pid)['secure_url']
+            except: return ''
+
         partner = LaundryPartner.objects.create(
             name=request.data.get('name','').strip(),
             phone=request.data.get('phone','').strip(),
@@ -336,8 +342,11 @@ def ops_add_partner(request):
             partner_type=request.data.get('partner_type','blanchisserie').strip(),
             latitude=request.data.get('lat') or None,
             longitude=request.data.get('lng') or None,
+            rccm=request.data.get('rccm','').strip(),
             is_active=True
         )
+        partner.photo_facade_url = upload_p(request.data.get('photo_facade',''), 'partners/facade', f'partner_{partner.id}_facade')
+        partner.save(update_fields=['photo_facade_url','rccm'])
         return Response({'success': True, 'id': partner.id, 'name': partner.name})
     except Exception as e:
         return Response({'error': str(e)}, status=400)
@@ -354,6 +363,12 @@ def ops_add_driver(request):
 
     try:
         from partners.models import DeliveryPartner
+        import cloudinary.uploader as cu
+        def upload_photo(b64, folder, pid):
+            if not b64: return ''
+            try: return cu.upload(b64, folder=folder, public_id=pid)['secure_url']
+            except: return ''
+
         driver = DeliveryPartner.objects.create(
             name=request.data.get('name','').strip(),
             phone=request.data.get('phone','').strip(),
@@ -363,7 +378,11 @@ def ops_add_driver(request):
             is_active=True,
             remuneration_collecte=int(request.data.get('remuneration_collecte', 1000) or 1000),
             remuneration_livraison=int(request.data.get('remuneration_livraison', 1000) or 1000),
+            cni_number=request.data.get('cni_number','').strip(),
         )
+        driver.photo_cni_url = upload_photo(request.data.get('photo_cni',''), 'drivers/cni', f'driver_{driver.id}_cni')
+        driver.photo_profil_url = upload_photo(request.data.get('photo_profil',''), 'drivers/profil', f'driver_{driver.id}_profil')
+        driver.save(update_fields=['photo_cni_url','photo_profil_url','cni_number'])
         return Response({'success': True, 'id': driver.id, 'name': driver.name})
     except Exception as e:
         return Response({'error': str(e)}, status=400)

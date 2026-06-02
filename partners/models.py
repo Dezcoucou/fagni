@@ -98,6 +98,9 @@ class LaundryPartner(PartnerBase):
         )
         self.update_level()
 
+    rccm = models.CharField("RCCM", max_length=100, blank=True, default="")
+    photo_facade_url = models.URLField("Photo facade", blank=True, default="")
+
     class Meta:
         verbose_name = "Blanchisserie partenaire"
         verbose_name_plural = "Blanchisseries partenaires"
@@ -124,6 +127,9 @@ class DeliveryPartner(PartnerBase):
         blank=True,
     )
 
+    cni_number = models.CharField("Numéro CNI", max_length=50, blank=True, default='')
+    photo_cni_url = models.URLField("Photo CNI", blank=True, default='')
+    photo_profil_url = models.URLField("Photo profil", blank=True, default='')
     is_online = models.BooleanField(
         "En ligne",
         default=False,

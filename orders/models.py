@@ -194,10 +194,20 @@ def sync_delivery_legs_for_order(order):
         if leg_type == "return":
             desired_status = base_status_return
 
+        # Driver cible selon la jambe :
+        # - pickup : livreur de collecte
+        # - return : livreur de retour/livraison
+        # Les deux peuvent être différents.
+        target_driver_id = None
+        if leg_type == "pickup":
+            target_driver_id = getattr(order, "pickup_driver_id", None)
+        elif leg_type == "return":
+            target_driver_id = getattr(order, "delivery_partner_id", None)
+
         if leg:
             # ✅ Ne jamais écraser un driver existant par None
-            if getattr(order, "delivery_partner_id", None):
-                leg.driver_id = order.delivery_partner_id
+            if target_driver_id:
+                leg.driver_id = target_driver_id
 
             cur = (getattr(leg, "status", None) or "").lower()
 
@@ -266,23 +276,33 @@ def sync_delivery_legs_for_order(order):
             if status_changed:
                 update_fields.insert(0, "status")
 
-            if getattr(order, "delivery_partner_id", None):
+            if target_driver_id:
                 update_fields.insert(0, "driver")
 
             leg.save(update_fields=update_fields)
 
 
         else:
-            DeliveryLeg.objects.create(
+            leg, created = DeliveryLeg.objects.get_or_create(
                 order=order,
-                driver_id=getattr(order, "delivery_partner_id", None),
                 leg_type=leg_type,
-                status=desired_status,
-                distance_km=distance_one_way,
-                client_fee_share=client_part,
-                driver_amount=driver_part,
-                fagni_margin=margin_part,
+                defaults={
+                    "driver_id": target_driver_id,
+                    "status": desired_status,
+                    "distance_km": distance_one_way,
+                    "client_fee_share": client_part,
+                    "driver_amount": driver_part,
+                    "fagni_margin": margin_part,
+                },
             )
+            if not created:
+                if target_driver_id and not leg.driver_id:
+                    leg.driver_id = target_driver_id
+                leg.distance_km = distance_one_way
+                leg.client_fee_share = client_part
+                leg.driver_amount = driver_part
+                leg.fagni_margin = margin_part
+                leg.save(update_fields=["driver", "distance_km", "client_fee_share", "driver_amount", "fagni_margin"])
 
     # Après sync legs: aligner statut commande
     try:

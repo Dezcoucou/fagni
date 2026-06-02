@@ -5,7 +5,7 @@ Modèle hybride premium :
 - Facturation réelle à l'article : 500 FCFA/article client
 - Pressing reçoit : 200 FCFA/article
 - FAGNI marge pressing : 300 FCFA/article
-- Livraison AR : 2 000 FCFA (livreur 70%, FAGNI 30%)
+- Livraison AR : 2 000 FCFA (livreur 1 600, FAGNI 400)
 - Service fee : 5% du sous-total, min 500 FCFA
 - Écart ≤ 3 articles à la collecte → FAGNI absorbe
 """
@@ -20,8 +20,8 @@ def d(val):
 PRIX_ARTICLE_CLIENT   = 500   # FCFA — ce que le client paie par article
 PRIX_ARTICLE_PRESSING = 200   # FCFA — ce que le pressing reçoit
 MARGE_FAGNI_ARTICLE   = 300   # FCFA — marge FAGNI par article
-REMUNERATION_COLLECTE = 1200  # FCFA — livreur collecte
-REMUNERATION_LIVRAISON= 1200  # FCFA — livreur livraison
+REMUNERATION_COLLECTE = 800  # FCFA — livreur collecte
+REMUNERATION_LIVRAISON= 800  # FCFA — livreur livraison
 TAUX_LIVREUR          = Decimal('0.70')  # legacy — gardé pour compatibilité
 TAUX_FAGNI_LIVRAISON  = Decimal('0.30')  # legacy — gardé pour compatibilité
 SERVICE_FEE_RATE      = Decimal('0.05')  # 5% du sous-total
@@ -89,7 +89,7 @@ def calculate_order(nb_articles, bag_size='small', delivery_fee=None):
 
     # Livraison
     part_livreur    = d(REMUNERATION_COLLECTE + REMUNERATION_LIVRAISON)
-    marge_livraison = livraison - d(REMUNERATION_COLLECTE)
+    marge_livraison = livraison - part_livreur
 
     # Total FAGNI
     total_fagni = marge_pressing + marge_livraison + service_fee

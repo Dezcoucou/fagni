@@ -4907,16 +4907,10 @@ def detail(request, order_id):
     )
 
     if needs_delivery_recompute:
-        delivery_fee = order.compute_delivery_fee()
+        # Modèle pressing pilote FAGNI : livraison aller-retour fixe facturée au client
+        delivery_fee = decimal.Decimal("2000")
         order.delivery_fee = delivery_fee
-        order.save(
-            update_fields=[
-                "delivery_fee",
-                "distance_km",
-                "driver_logistic_cost",
-                "logistic_margin",
-            ]
-        )
+        order.save(update_fields=["delivery_fee"])
     else:
         if order.delivery_fee is not None:
             order.delivery_fee = decimal.Decimal(str(order.delivery_fee))
@@ -13927,7 +13921,7 @@ def laundry_order_detail(request, order_id):
         return redirect(f"{request.path}?laundry_id={laundry.id}")
 
 
-    return render(request, "orders/laundry_weighing.html", {
+    return render(request, "orders/laundry_order_detail.html", {
         "order": order,
         "laundry": laundry,
         "items": list(items),

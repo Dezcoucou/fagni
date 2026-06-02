@@ -514,7 +514,7 @@ def api_ops_revenus(request):
         return {
             'nb': qs.count(),
             'total_client': int(qs.aggregate(s=Sum('total_client_ttc'))['s'] or 0),
-            'revenus_fagni': int(qs.aggregate(s=Sum('fagni_revenue_ht'))['s'] or 0),
+            'revenus_fagni': int((qs.aggregate(e=Sum('total_client_ttc'))['e'] or 0) - (qs.aggregate(p=Sum('amount_laundry_partner'))['p'] or 0)),
             'paye_pressing': int(qs.aggregate(s=Sum('amount_laundry_partner'))['s'] or 0),
         }
 
@@ -549,8 +549,10 @@ def api_ops_rapport_hebdo(request):
 
     total_encaisse = int(livrees_semaine.aggregate(
         s=Sum('total_client_ttc'))['s'] or 0)
-    revenu_fagni = int(livrees_semaine.aggregate(
-        s=Sum('fagni_revenue_ht'))['s'] or 0)
+    # Revenu FAGNI = encaissé clients - part pressing
+    _enc = livrees_semaine.aggregate(s=Sum('total_client_ttc'))['s'] or 0
+    _press = livrees_semaine.aggregate(s=Sum('amount_laundry_partner'))['s'] or 0
+    revenu_fagni = int(_enc - _press)
     paye_pressing = int(livrees_semaine.aggregate(
         s=Sum('amount_laundry_partner'))['s'] or 0)
 

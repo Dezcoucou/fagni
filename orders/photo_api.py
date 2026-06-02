@@ -67,7 +67,10 @@ def driver_upload_photo(request, order_id):
 
         return Response({'success': True, 'url': url, 'type': photo_type})
     except Exception as e:
-        return Response({'error': str(e)}, status=400)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception("partner_upload_photo failed order_id=%s", order_id)
+        return Response({'error': 'upload_photo_failed', 'details': str(e)}, status=400)
 
 
 @api_view(['POST'])
@@ -82,19 +85,60 @@ def partner_upload_photo(request, order_id):
     try:
         from orders.models import Order
         order = Order.objects.get(id=order_id, laundry_partner=partner)
-        photo_data = request.data.get('photo', '')
-        photo_type = request.data.get('type', 'before')
+        photo_data = (
+            request.data.get('photo')
+            or request.data.get('image')
+            or request.data.get('file')
+            or request.data.get('photo_file')
+            or ''
+        )
+        photo_type = request.data.get('type') or request.data.get('photo_type') or 'before'
+
+        # Compatibilité multipart/form-data : fichier uploadé au lieu de base64
+        if not photo_data and request.FILES:
+            uploaded = (
+                request.FILES.get('photo')
+                or request.FILES.get('image')
+                or request.FILES.get('file')
+                or request.FILES.get('photo_file')
+            )
+            if uploaded:
+                import base64
+                raw = uploaded.read()
+                content_type = getattr(uploaded, 'content_type', None) or 'image/jpeg'
+                photo_data = 'data:%s;base64,%s' % (
+                    content_type,
+                    base64.b64encode(raw).decode('ascii')
+                )
 
         if not photo_data:
-            return Response({'error': 'Photo manquante'}, status=400)
+            return Response({
+                'error': 'photo_manquante',
+                'message': 'Aucune photo reçue. Champs acceptés: photo, image, file, photo_file.',
+                'data_keys': list(request.data.keys()),
+                'file_keys': list(request.FILES.keys()),
+            }, status=400)
 
-        public_id = f"order_{order_id}_{photo_type}_partner{partner.id}"
-        result = _upload_to_cloudinary(
-            photo_data,
-            f"orders/{order_id}",
-            public_id
-        )
-        url = result['secure_url']
+        # MVP terrain : stockage local si Cloudinary n'est pas configuré
+        import os, base64, uuid
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import default_storage
+
+        if isinstance(photo_data, str) and photo_data.startswith("data:"):
+            header, encoded = photo_data.split(",", 1)
+            ext = "jpg"
+            if "png" in header:
+                ext = "png"
+            elif "webp" in header:
+                ext = "webp"
+            raw = base64.b64decode(encoded)
+        else:
+            ext = "jpg"
+            raw = base64.b64decode(str(photo_data))
+
+        filename = f"orders/evidence/order_{order_id}_{photo_type}_partner{partner.id}_{uuid.uuid4().hex[:8]}.{ext}"
+        saved_path = default_storage.save(filename, ContentFile(raw))
+        url = default_storage.url(saved_path)
 
         notes = order.notes or ''
         tag = f'PHOTO_{photo_type.upper()}:{url}'
@@ -104,7 +148,10 @@ def partner_upload_photo(request, order_id):
 
         return Response({'success': True, 'url': url, 'type': photo_type})
     except Exception as e:
-        return Response({'error': str(e)}, status=400)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception("partner_upload_photo failed order_id=%s", order_id)
+        return Response({'error': 'upload_photo_failed', 'details': str(e)}, status=400)
 
 
 @api_view(['GET'])
@@ -132,4 +179,7 @@ def order_photos(request, order_id):
                     photos[key] = parts[1].strip()
         return Response({'order_id': order_id, 'photos': photos})
     except Exception as e:
-        return Response({'error': str(e)}, status=400)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception("partner_upload_photo failed order_id=%s", order_id)
+        return Response({'error': 'upload_photo_failed', 'details': str(e)}, status=400)

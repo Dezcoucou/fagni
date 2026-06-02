@@ -1196,3 +1196,82 @@ def api_partner_score_history(request, partner_id):
             'score_dispo', 'score_refus', 'computed_at'
         ))
     })
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def ops_order_detail(request, order_id):
+    """GET /api/ops/orders/<id>/ — fiche commande complète"""
+    try:
+        _check_ops(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+    try:
+        from orders.models import Order, OrderItem, OrderEvidencePhoto
+        o = Order.objects.select_related(
+            'customer','laundry_partner','pickup_driver','delivery_partner'
+        ).prefetch_related('items','evidence_photos').get(id=order_id)
+
+        # Articles
+        items = [{'designation':i.designation,'qty':i.quantity,
+                  'unit_price':float(i.unit_price),'total':float(i.total)}
+                 for i in o.items.all()]
+
+        # Photos par type
+        photos = {}
+        for p in o.evidence_photos.all().order_by('created_at'):
+            photos.setdefault(p.kind, []).append({
+                'url': p.image.url if p.image else '',
+                'actor': p.actor_type,
+                'caption': p.caption,
+                'created_at': p.created_at.strftime('%d/%m %H:%M'),
+            })
+
+        # Timeline
+        def fmt(dt): return dt.strftime('%d/%m %H:%M') if dt else None
+
+        return Response({
+            'id': o.id,
+            'code': o.code,
+            'status': o.status,
+            'created_at': fmt(o.created_at),
+            'client': {
+                'name': o.customer.name if o.customer else '',
+                'phone': o.customer.phone if o.customer else '',
+                'address': o.pickup_address or '',
+            },
+            'pressing': {
+                'name': o.laundry_partner.name if o.laundry_partner else '—',
+                'phone': o.laundry_partner.phone if o.laundry_partner else '',
+            },
+            'livreur_collecte': {
+                'name': o.pickup_driver.name if o.pickup_driver else '—',
+                'phone': o.pickup_driver.phone if o.pickup_driver else '',
+            },
+            'livreur_livraison': {
+                'name': o.delivery_partner.name if o.delivery_partner else '—',
+                'phone': o.delivery_partner.phone if o.delivery_partner else '',
+            },
+            'articles': items,
+            'articles_count': o.articles_count,
+            'financials': {
+                'total_client': float(o.total_client_ttc or 0),
+                'part_pressing': float(o.amount_laundry_partner or 0),
+                'livraison': float(o.delivery_fee or 0),
+                'cost_livreur': int(o.cost_driver_pickup or 0) + int(o.cost_driver_delivery or 0),
+                'marge_fagni': float(o.total_client_ttc or 0) - float(o.amount_laundry_partner or 0),
+            },
+            'timeline': {
+                'commande': fmt(o.created_at),
+                'collecte': fmt(o.pickup_time),
+                'depot_pressing': fmt(o.dropoff_time),
+                'lavage_termine': fmt(o.wash_complete_time),
+                'retour_livreur': fmt(o.return_time),
+                'livraison': fmt(o.delivered_time),
+            },
+            'photos': photos,
+            'notes': o.notes or '',
+        })
+    except Order.DoesNotExist:
+        return Response({'error': 'Commande introuvable'}, status=404)
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

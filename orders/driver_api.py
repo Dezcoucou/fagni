@@ -482,16 +482,16 @@ def driver_wallet(request):
                 transactions.append({
                     'description': f'Collecte commande {o.code}',
                     'montant': o.cost_driver_pickup,
-                    'disponible': int(o.cost_driver_pickup * 0.8),
-                    'securite': int(o.cost_driver_pickup * 0.2),
+                    'disponible': 700 if int(o.cost_driver_pickup) == 800 else int(o.cost_driver_pickup * 0.8),
+                    'securite': 125 if int(o.cost_driver_pickup) == 800 else int(o.cost_driver_pickup * 0.2),
                     'date': o.updated_at.strftime('%d/%m/%Y %H:%M') if o.updated_at else '',
                 })
             if o.cost_driver_delivery > 0:
                 transactions.append({
                     'description': f'Livraison commande {o.code}',
                     'montant': o.cost_driver_delivery,
-                    'disponible': int(o.cost_driver_delivery * 0.8),
-                    'securite': int(o.cost_driver_delivery * 0.2),
+                    'disponible': 700 if int(o.cost_driver_delivery) == 800 else int(o.cost_driver_delivery * 0.8),
+                    'securite': 125 if int(o.cost_driver_delivery) == 800 else int(o.cost_driver_delivery * 0.2),
                     'date': o.updated_at.strftime('%d/%m/%Y %H:%M') if o.updated_at else '',
                 })
 

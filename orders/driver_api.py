@@ -351,13 +351,32 @@ def driver_confirm_delivery(request, order_id):
     except:
         return Response({'error': 'Non autorisé'}, status=401)
 
-    from orders.models import Order
+    from orders.models import Order, DeliveryLeg, sync_order_status_from_legs
+    from django.utils import timezone
     try:
         order = Order.objects.get(id=order_id)
-        order.status = 'done'
+
+        # Ne jamais forcer order.status='done' directement.
+        # La commande devient done uniquement si pickup DONE + return DONE.
+        leg, _ = DeliveryLeg.objects.get_or_create(
+            order=order,
+            leg_type='return',
+            defaults={'driver': driver, 'status': 'pending'},
+        )
+        if not leg.driver_id:
+            leg.driver = driver
+        leg.status = 'done'
+        if hasattr(leg, 'finished_at'):
+            leg.finished_at = timezone.now()
+            leg.save(update_fields=['driver', 'status', 'finished_at'])
+        else:
+            leg.save(update_fields=['driver', 'status'])
+
         notes = order.notes or ''
         order.notes = notes + f'\nLIVRAISON:Confirmée par livreur {driver.name}'
-        order.save(update_fields=['status', 'notes', 'updated_at'])
+        order.save(update_fields=['notes', 'updated_at'])
+
+        sync_order_status_from_legs(order, save=True)
 
         # Event logging LOT1
         try:

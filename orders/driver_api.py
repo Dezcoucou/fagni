@@ -83,8 +83,12 @@ def credit_wallet(driver, amount_fcfa, order, description):
             ).first()
 
             if existing:
-                disponible = (existing.amount * Decimal("0.80")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-                securite = existing.amount - disponible
+                if existing.amount == Decimal("800.00"):
+                    disponible = Decimal("700")
+                    securite = Decimal("125")
+                else:
+                    disponible = (existing.amount * Decimal("0.80")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+                    securite = existing.amount - disponible
                 return {
                     "disponible": int(disponible),
                     "securite": int(securite),

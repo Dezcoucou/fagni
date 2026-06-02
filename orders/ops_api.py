@@ -480,12 +480,8 @@ def api_ops_enregistrer_paiement(request):
         # Si c'est une validation de retrait, mettre à jour le retrait existant
         if note == 'Retrait valide par OPS':
             Paiement.objects.filter(
-                partenaire_id=partenaire_id,
-                montant=montant,
-                note__contains='DEMANDE_RETRAIT'
-            ).exclude(note__contains='valide').update(
-                note='DEMANDE_RETRAIT valide par OPS'
-            )
+                id=partenaire_id
+            ).update(note='DEMANDE_RETRAIT valide par OPS')
             return Response({'success': True})
 
         paiement = Paiement.objects.create(

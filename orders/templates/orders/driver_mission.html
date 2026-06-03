@@ -439,27 +439,37 @@
           </div>
         {% endif %}
       </div>
-    </section>
-    <section class="card">
-      <h2 class="section-title">📦 Collecte / exécution terrain</h2>
-      <p class="section-sub">
-        Ce bloc devient le point central terrain. La saisie détaillée pourra être enrichie ici progressivement.
-      </p>
-      <div class="info-chips">
+      <section class="card">
+        <h2 class="section-title">📦 Parcours terrain</h2>
         {% if leg.leg_type == "pickup" %}
-          <span class="chip">🧺 Collecte client</span>
-          <span class="chip warn">À confirmer sur place</span>
+          <p class="section-sub">
+            Suis cet ordre sur place : compter, vérifier, sceller, photographier, puis faire valider par le client.
+          </p>
+          <div class="summary-list">
+            <div class="summary-item"><div class="summary-key">1. Articles</div><div class="summary-value">Compter les articles devant le client</div></div>
+            <div class="summary-item"><div class="summary-key">2. État</div><div class="summary-value">Vérifier l’état général et noter les anomalies</div></div>
+            <div class="summary-item"><div class="summary-key">3. Scellé</div><div class="summary-value">Fermer le sac avec le numéro de scellé FAGNI</div></div>
+            <div class="summary-item"><div class="summary-key">4. Photo</div><div class="summary-value">Prendre la photo du sac scellé</div></div>
+            <div class="summary-item"><div class="summary-key">5. Validation</div><div class="summary-value">Faire valider la collecte par le client</div></div>
+          </div>
         {% else %}
-          <span class="chip">🚚 Livraison client</span>
-          <span class="chip ok">Linge prêt / mission en cours</span>
+          <p class="section-sub">
+            Suis cet ordre : récupérer le linge prêt, livrer au client, photographier la remise, puis faire valider.
+          </p>
+          <div class="summary-list">
+            <div class="summary-item"><div class="summary-key">1. Récupération</div><div class="summary-value">Prendre le colis propre chez le pressing</div></div>
+            <div class="summary-item"><div class="summary-key">2. Livraison</div><div class="summary-value">Remettre le colis au client</div></div>
+            <div class="summary-item"><div class="summary-key">3. Photo</div><div class="summary-value">Prendre une preuve de remise</div></div>
+            <div class="summary-item"><div class="summary-key">4. Validation</div><div class="summary-value">Faire valider la livraison par le client</div></div>
+          </div>
         {% endif %}
-      </div>
-      {% if proof_url %}
-        <div style="margin-top:14px;">
-          <a href="{{ proof_url }}" class="btn btn-light">📝 Ouvrir saisie terrain / collecte</a>
-        </div>
-      {% endif %}
-    </section>
+
+        {% if proof_url %}
+          <div style="margin-top:14px;">
+            <a href="{{ proof_url }}" class="btn btn-light">📝 Ouvrir saisie terrain / preuves</a>
+          </div>
+        {% endif %}
+      </section>
     <section class="card">
       <h2 class="section-title">📸 Preuves photo</h2>
       <div class="proof-box">

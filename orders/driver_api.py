@@ -179,55 +179,59 @@ def driver_login(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def driver_missions(request):
-    """GET /api/driver/missions/ — missions du livreur"""
+    """GET /api/driver/missions/ — missions du livreur depuis DeliveryLeg."""
     try:
         driver = _get_driver(request)
-    except:
+    except Exception:
         return Response({'error': 'Non autorisé'}, status=401)
 
-    from orders.models import Order
+    from orders.models import DeliveryLeg
 
-    # Toutes les commandes assignées à ce livreur
-    pickup_orders = Order.objects.filter(
-        pickup_driver=driver
-    ).exclude(status='done').select_related('customer', 'laundry_partner').order_by('-created_at')[:10]
-
-    delivery_orders = Order.objects.filter(
-        delivery_partner=driver
-    ).exclude(status='done').select_related('customer', 'laundry_partner').order_by('-created_at')[:10]
-
-    pickup_list  = list(pickup_orders)
-    # Éviter les doublons si même commande assignée aux deux
-    delivery_ids = {o.id for o in pickup_list}
-    delivery_list = [o for o in list(delivery_orders) if o.id not in delivery_ids]
-    all_orders = pickup_list + delivery_list
+    legs = (
+        DeliveryLeg.objects
+        .select_related('order', 'order__customer', 'order__laundry_partner', 'driver')
+        .filter(driver=driver)
+        .exclude(status__in=['done', 'canceled'])
+        .order_by('id')[:20]
+    )
 
     result = []
-    for o in all_orders:
-        is_pickup = o in pickup_list
+    for leg in legs:
+        o = leg.order
+        customer = getattr(o, 'customer', None)
+        laundry = getattr(o, 'laundry_partner', None)
+
+        is_pickup = leg.leg_type == 'pickup'
+        pickup_address = getattr(o, 'pickup_address', '') or getattr(customer, 'address', '') or ''
+        delivery_address = getattr(o, 'delivery_address', '') or getattr(customer, 'address', '') or ''
+
         result.append({
-            'mission_id':      o.id,
+            'mission_id':      leg.id,
+            'leg_id':          leg.id,
             'order_id':        o.id,
             'order_code':      o.code or str(o.id),
             'mission_type':    'pickup' if is_pickup else 'delivery',
-            'status':          'assigned',
-            'zone':            (o.pickup_address or '').split(',')[0] if o.pickup_address else 'Abidjan',
-            'pickup_address':  o.pickup_address or '',
-            'partner_name':    o.laundry_partner.name if o.laundry_partner else '',
-            'partner_address': o.laundry_partner.address if o.laundry_partner else '',
-            'partner_lat':     float(getattr(o.laundry_partner, 'lat', None)) if o.laundry_partner and getattr(o.laundry_partner, 'lat', None) else None,
-            'partner_lng':     float(getattr(o.laundry_partner, 'lng', None)) if o.laundry_partner and getattr(o.laundry_partner, 'lng', None) else None,
-            'delivery_address': o.pickup_address or '',
-            'delivery_lat':    float(o.pickup_lat) if o.pickup_lat else None,
-            'delivery_lng':    float(o.pickup_lng) if o.pickup_lng else None,
-            'pickup_lat':      float(o.pickup_lat) if o.pickup_lat else None,
-            'pickup_lng':      float(o.pickup_lng) if o.pickup_lng else None,
-            'bag_size':        o.bag_size or '',
-            'order_status':    o.status,
-            'created_at':      o.created_at.isoformat() if o.created_at else None,
+            'leg_type':        leg.leg_type,
+            'status':          leg.status,
+            'zone':            (pickup_address or delivery_address or 'Abidjan').split(',')[0],
+            'pickup_address':  pickup_address,
+            'partner_name':    laundry.name if laundry else '',
+            'partner_address': laundry.address if laundry else '',
+            'partner_lat':     float(getattr(laundry, 'lat', None)) if laundry and getattr(laundry, 'lat', None) else None,
+            'partner_lng':     float(getattr(laundry, 'lng', None)) if laundry and getattr(laundry, 'lng', None) else None,
+            'delivery_address': delivery_address,
+            'delivery_lat':    float(getattr(o, 'delivery_lat', None)) if getattr(o, 'delivery_lat', None) else None,
+            'delivery_lng':    float(getattr(o, 'delivery_lng', None)) if getattr(o, 'delivery_lng', None) else None,
+            'pickup_lat':      float(getattr(o, 'pickup_lat', None)) if getattr(o, 'pickup_lat', None) else None,
+            'pickup_lng':      float(getattr(o, 'pickup_lng', None)) if getattr(o, 'pickup_lng', None) else None,
+            'bag_size':        getattr(o, 'bag_size', '') or '',
+            'order_status':    getattr(o, 'status', ''),
+            'driver_amount':   float(getattr(leg, 'driver_amount', 0) or 0),
+            'created_at':      o.created_at.isoformat() if getattr(o, 'created_at', None) else None,
         })
 
     return Response({'missions': result, 'driver': driver.name})
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -571,33 +575,51 @@ def driver_toggle_status(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def driver_pending_mission(request):
-    """GET /api/driver/pending/ — mission assignée en attente d'acceptation"""
+    """GET /api/driver/pending/ — première mission active du livreur depuis DeliveryLeg."""
     try:
         driver = _get_driver(request)
-    except:
+    except Exception:
         return Response({'error': 'Non autorisé'}, status=401)
 
     try:
-        from orders.models import Order
-        # Commande assignée au driver mais pas encore confirmée
-        order = Order.objects.filter(
-            pickup_driver=driver,
-            status='pending'
-        ).order_by('-created_at').first()
+        from orders.models import DeliveryLeg
 
-        if not order:
+        leg = (
+            DeliveryLeg.objects
+            .select_related('order', 'order__customer', 'order__laundry_partner', 'driver')
+            .filter(driver=driver, status__in=['pending', 'assigned', 'in_progress'])
+            .exclude(status='canceled')
+            .order_by('id')
+            .first()
+        )
+
+        if not leg:
             return Response({'mission': None})
+
+        order = leg.order
+        customer = getattr(order, 'customer', None)
+        pickup_address = getattr(order, 'pickup_address', '') or getattr(customer, 'address', '') or ''
+        delivery_address = getattr(order, 'delivery_address', '') or getattr(customer, 'address', '') or ''
+        is_pickup = leg.leg_type == 'pickup'
 
         return Response({
             'mission': {
-                'id': order.id,
+                'id': leg.id,
+                'leg_id': leg.id,
+                'order_id': order.id,
                 'code': order.code or f'#{order.id}',
-                'bag_size': order.bag_size,
-                'pickup_address': getattr(order, 'pickup_address', '') or getattr(order, 'pickup_addr', '') or '',
-                'zone': getattr(order, 'zone', '') or getattr(order, 'pickup_zone', '') or '',
-                'total': float(order.total or 0),
-                'created_at': order.created_at.strftime('%d/%m %H:%M') if order.created_at else '',
-                'gain_collecte': int(getattr(order, 'cost_driver_pickup', 0) or getattr(driver, 'remuneration_collecte', 800)),
+                'mission_type': 'pickup' if is_pickup else 'delivery',
+                'leg_type': leg.leg_type,
+                'status': leg.status,
+                'bag_size': getattr(order, 'bag_size', '') or '',
+                'pickup_address': pickup_address,
+                'delivery_address': delivery_address,
+                'zone': (pickup_address or delivery_address or 'Abidjan').split(',')[0],
+                'total': float(getattr(order, 'total_client_ttc', 0) or getattr(order, 'total', 0) or 0),
+                'created_at': order.created_at.strftime('%d/%m %H:%M') if getattr(order, 'created_at', None) else '',
+                'gain_collecte': int(getattr(leg, 'driver_amount', 0) or 0),  # compat ancien frontend
+                'gain_mission': int(getattr(leg, 'driver_amount', 0) or 0),
+                'driver_amount': float(getattr(leg, 'driver_amount', 0) or 0),
             }
         })
     except Exception as e:

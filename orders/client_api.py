@@ -295,16 +295,25 @@ def api_order_detail(request, order_id):
 
 
 
-def is_in_delivery_zone(lat, lng):
-    """Zone pilote FAGNI — Riviera 3, Cocody, Abidjan"""
-    if not lat or not lng:
+def is_in_delivery_zone(lat, lng, address=""):
+    """Zone pilote FAGNI — Riviera 3, Cocody, Abidjan.
+
+    Mode test temporaire : autorise Roussillon/Vaucluse/France pour tests à distance.
+    """
+    address = (address or "").lower()
+
+    if any(word in address for word in ["roussillon", "vaucluse", "france"]):
         return True
+
+    if not lat or not lng:
+        return False
+
     try:
         lat = float(lat)
         lng = float(lng)
         return 5.30 <= lat <= 5.45 and -4.02 <= lng <= -3.90
     except:
-        return True
+        return False
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -329,7 +338,7 @@ def api_create_order(request):
     pickup_lng    = request.data.get('pickup_lng')
 
     # Vérification zone de livraison
-    if not is_in_delivery_zone(pickup_lat, pickup_lng):
+    if not is_in_delivery_zone(pickup_lat, pickup_lng, pickup_addr):
         return Response({
             'error': 'zone_unavailable',
             'message': 'Désolé, FAGNI nest pas encore disponible dans votre zone. Nous arrivons bientot a Riviera 3 !',

@@ -240,14 +240,53 @@ def ops_assign_driver(request, order_id):
         driver_id = request.data.get('driver_id')
         driver = DeliveryPartner.objects.get(id=driver_id) if driver_id else None
         driver_type = request.data.get('driver_type', 'delivery')
+        from decimal import Decimal
+        from orders.models import DeliveryLeg, sync_delivery_legs_for_order
+
+        # Garantir l'existence des deux jambes avant assignation
+        sync_delivery_legs_for_order(order)
+
         if driver_type == 'pickup':
             order.pickup_driver = driver
-            order.cost_driver_pickup = getattr(driver, 'remuneration_collecte', 1200) or 1200
+            order.cost_driver_pickup = 800
             order.save(update_fields=['pickup_driver', 'cost_driver_pickup', 'updated_at'])
+
+            leg, _ = DeliveryLeg.objects.get_or_create(
+                order=order,
+                leg_type='pickup',
+                defaults={
+                    'driver': driver,
+                    'status': 'pending',
+                    'driver_amount': Decimal('800'),
+                }
+            )
+            leg.driver = driver
+            if leg.status == 'pending':
+                leg.status = 'assigned'
+            leg.driver_amount = Decimal('800')
+            leg.save(update_fields=['driver', 'status', 'driver_amount'])
+
             event_type = 'pickup.assigned'
         else:
             order.delivery_partner = driver
-            order.save(update_fields=['delivery_partner', 'updated_at'])
+            order.cost_driver_delivery = 800
+            order.save(update_fields=['delivery_partner', 'cost_driver_delivery', 'updated_at'])
+
+            leg, _ = DeliveryLeg.objects.get_or_create(
+                order=order,
+                leg_type='return',
+                defaults={
+                    'driver': driver,
+                    'status': 'pending',
+                    'driver_amount': Decimal('800'),
+                }
+            )
+            leg.driver = driver
+            if leg.status == 'pending':
+                leg.status = 'assigned'
+            leg.driver_amount = Decimal('800')
+            leg.save(update_fields=['driver', 'status', 'driver_amount'])
+
             event_type = 'delivery.assigned'
 
         # Event logging LOT1

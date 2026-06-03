@@ -426,6 +426,9 @@ def driver_delivery_proof(request, order_id):
         leg.client_signature = signature
         leg.client_signed_at = now
         leg.driver = driver
+        leg.status = 'done'
+        if hasattr(leg, 'finished_at'):
+            leg.finished_at = now
 
         try:
             if lat not in [None, '']:
@@ -442,13 +445,25 @@ def driver_delivery_proof(request, order_id):
             'client_signature',
             'client_signed_at',
             'driver',
+            'status',
             'delivered_lat',
             'delivered_lng',
         ])
 
+        try:
+            from orders.models import sync_order_status_from_legs
+            sync_order_status_from_legs(order, save=True)
+        except Exception:
+            pass
+
+        credit_wallet(
+            driver, 800, order,
+            f"Livraison commande {order.code}"
+        )
+
         return Response({
             'success': True,
-            'message': 'Preuve de livraison enregistrée',
+            'message': 'Preuve de livraison enregistrée et livraison confirmée',
             'delivery_otp_verified_at': leg.delivery_otp_verified_at.isoformat() if leg.delivery_otp_verified_at else None,
             'client_signed_at': leg.client_signed_at.isoformat() if leg.client_signed_at else None,
         })

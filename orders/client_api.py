@@ -727,6 +727,17 @@ def api_order_tracking(request, order_id):
         payment = order.payment_status
         notes   = order.notes or ''
 
+        # DeliveryLegs — source de vérité logistique
+        from orders.models import DeliveryLeg, OrderEvidencePhoto
+
+        pickup_leg = DeliveryLeg.objects.filter(order=order, leg_type='pickup').select_related('driver').first()
+        return_leg = DeliveryLeg.objects.filter(order=order, leg_type='return').select_related('driver').first()
+
+        pickup_done = bool(pickup_leg and pickup_leg.status == 'done')
+        return_done = bool(return_leg and return_leg.status == 'done')
+        pickup_active = bool(pickup_leg and pickup_leg.status in ['pending', 'assigned', 'in_progress'])
+        return_active = bool(return_leg and return_leg.status in ['pending', 'assigned', 'in_progress'])
+
         # Construire la timeline
         steps = [
             {
@@ -742,56 +753,56 @@ def api_order_tracking(request, order_id):
                 'label':   'Collecte en cours',
                 'desc':    'Le livreur se dirige vers vous',
                 'emoji':   '🛵',
-                'done':    status in ['in_progress', 'done'],
-                'active':  status == 'pending' and order.pickup_driver_id is not None,
+                'done':    pickup_done,
+                'active':  pickup_active and not pickup_done,
             },
             {
                 'id':      'pressing',
                 'label':   'Au pressing',
                 'desc':    'Vos vêtements sont en cours de traitement',
                 'emoji':   '🧺',
-                'done':    status in ['in_progress', 'done'],
-                'active':  status == 'in_progress',
+                'done':    pickup_done,
+                'active':  pickup_done and not return_done,
             },
             {
                 'id':      'ready',
                 'label':   'Prêt pour livraison',
                 'desc':    'Vos vêtements sont propres et prêts',
                 'emoji':   '✅',
-                'done':    status == 'done',
-                'active':  False,
+                'done':    bool(getattr(order, 'wash_complete_time', None)),
+                'active':  pickup_done and bool(getattr(order, 'wash_complete_time', None)) and not return_active and not return_done,
             },
             {
                 'id':      'delivery',
                 'label':   'Livraison en cours',
                 'desc':    'Le livreur arrive chez vous',
                 'emoji':   '🚗',
-                'done':    status == 'done' and 'LIVRAISON:Confirmée' in notes,
-                'active':  status == 'done' and order.delivery_partner_id is not None,
+                'done':    return_done,
+                'active':  return_active and not return_done,
             },
             {
                 'id':      'delivered',
                 'label':   'Livré',
                 'desc':    'Vos vêtements ont été livrés',
                 'emoji':   '🎉',
-                'done':    status == 'done' and 'LIVRAISON:Confirmée' in notes,
+                'done':    return_done,
                 'active':  False,
             },
         ]
 
-        # Infos livreur (anonymisé)
+        # Infos livreur (anonymisé) depuis DeliveryLeg
         pickup_driver = None
-        if order.pickup_driver:
+        if pickup_leg and pickup_leg.driver:
             pickup_driver = {
-                'vehicle': order.pickup_driver.vehicle_type or 'moto',
-                'initials': order.pickup_driver.name[0].upper() if order.pickup_driver.name else 'L',
+                'vehicle': pickup_leg.driver.vehicle_type or 'moto',
+                'initials': pickup_leg.driver.name[0].upper() if pickup_leg.driver.name else 'L',
             }
 
         delivery_driver = None
-        if order.delivery_partner:
+        if return_leg and return_leg.driver:
             delivery_driver = {
-                'vehicle': order.delivery_partner.vehicle_type or 'moto',
-                'initials': order.delivery_partner.name[0].upper() if order.delivery_partner.name else 'L',
+                'vehicle': return_leg.driver.vehicle_type or 'moto',
+                'initials': return_leg.driver.name[0].upper() if return_leg.driver.name else 'L',
             }
 
         # Articles collectés
@@ -845,7 +856,6 @@ def api_order_tracking(request, order_id):
             eta_desc  = "Merci de nous faire confiance"
 
         # DeliveryLegs — statuts temps réel
-        from orders.models import DeliveryLeg, OrderEvidencePhoto
 
         legs_data = []
         legs = DeliveryLeg.objects.filter(order=order).order_by('created_at')

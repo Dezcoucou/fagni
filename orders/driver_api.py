@@ -474,30 +474,41 @@ def driver_wallet(request):
         days_ahead = 7 - today.weekday() if today.weekday() != 0 else 7
         lundi = today + timedelta(days=days_ahead)
 
-        # Transactions récentes depuis les notes order
-        from orders.models import Order
-        orders_done = Order.objects.filter(
-            pickup_driver=driver
-        ).order_by('-updated_at')[:10]
+        # Historique réel depuis le ledger wallet
+        from wallets.models import WalletTransaction
+
+        recent_txs = (
+            WalletTransaction.objects
+            .filter(wallet=wallet, direction="in")
+            .select_related("order", "leg")
+            .order_by("-created_at")[:20]
+        )
 
         transactions = []
-        for o in orders_done:
-            if o.cost_driver_pickup > 0:
-                transactions.append({
-                    'description': f'Collecte commande {o.code}',
-                    'montant': o.cost_driver_pickup,
-                    'disponible': 700 if int(o.cost_driver_pickup) == 800 else int(o.cost_driver_pickup * 0.8),
-                    'securite': 125 if int(o.cost_driver_pickup) == 800 else int(o.cost_driver_pickup * 0.2),
-                    'date': o.updated_at.strftime('%d/%m/%Y %H:%M') if o.updated_at else '',
-                })
-            if o.cost_driver_delivery > 0:
-                transactions.append({
-                    'description': f'Livraison commande {o.code}',
-                    'montant': o.cost_driver_delivery,
-                    'disponible': 700 if int(o.cost_driver_delivery) == 800 else int(o.cost_driver_delivery * 0.8),
-                    'securite': 125 if int(o.cost_driver_delivery) == 800 else int(o.cost_driver_delivery * 0.2),
-                    'date': o.updated_at.strftime('%d/%m/%Y %H:%M') if o.updated_at else '',
-                })
+        for tx in recent_txs:
+            amount = int(tx.amount or 0)
+            if amount <= 0:
+                continue
+
+            if amount == 800:
+                disponible = 700
+                securite = 125
+            else:
+                disponible = int(amount * 0.8)
+                securite = amount - disponible
+
+            order = getattr(tx, "order", None)
+            leg = getattr(tx, "leg", None)
+            leg_type = getattr(leg, "leg_type", "") or ""
+            label = "Collecte" if leg_type == "pickup" else "Livraison" if leg_type == "return" else "Mission"
+
+            transactions.append({
+                'description': f'{label} commande {getattr(order, "code", "") or getattr(order, "id", "")}',
+                'montant': amount,
+                'disponible': disponible,
+                'securite': securite,
+                'date': tx.created_at.strftime('%d/%m/%Y %H:%M') if getattr(tx, "created_at", None) else '',
+            })
 
         # MVP terrain : missions terminées mais non encore créditées dans le wallet
         from orders.models import DeliveryLeg

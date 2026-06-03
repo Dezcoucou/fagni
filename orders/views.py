@@ -9105,12 +9105,12 @@ def driver_app_data(request):
 
     if not user.is_staff:
         if connected_driver:
-            qs = qs.filter(delivery_partner=connected_driver)
+            qs = qs.filter(legs__driver=connected_driver).distinct()
         else:
             qs = qs.none()
     else:
         if selected_driver_id:
-            qs = qs.filter(delivery_partner_id=selected_driver_id)
+            qs = qs.filter(legs__driver_id=selected_driver_id).distinct()
         else:
             qs = qs  # staff voit tout par défaut
 
@@ -11685,6 +11685,14 @@ def driver_leg_action(request, leg_id, action):
                 pass
 
         changed, msg = update_leg_status(leg=leg, action=action, user=request.user)
+
+        # Après chaque action livreur, le statut commande doit être recalculé
+        # depuis les DeliveryLeg, jamais forcé manuellement.
+        try:
+            from orders.models import sync_order_status_from_legs
+            sync_order_status_from_legs(order, save=True)
+        except Exception:
+            logger.exception("driver_leg_action: sync_order_status_from_legs failed (order_id=%s)", getattr(order, "id", None))
     except Exception:
         logger.exception("driver_leg_action: update_leg_status failed (leg_id=%s action=%s)", leg_id, action)
         messages.error(request, "Erreur interne : action impossible pour le moment.")
@@ -11742,18 +11750,27 @@ def driver_order_live_status(request, order_id):
         if driver_id:
             driver = DeliveryPartner.objects.filter(pk=driver_id).first()
         if not driver:
-            driver = getattr(order, "delivery_partner", None)
+            first_leg = DeliveryLeg.objects.filter(order=order, driver__isnull=False).select_related("driver").first()
+            driver = first_leg.driver if first_leg else getattr(order, "delivery_partner", None)
     else:
-        driver = getattr(order, "delivery_partner", None)
-        if not driver:
-            return HttpResponseForbidden("Commande non assignée à un livreur.")
+        # Source de vérité : le livreur doit être rattaché à au moins une DeliveryLeg de cette commande.
+        possible_driver = None
+        try:
+            possible_driver = _get_connected_driver(request)
+        except Exception:
+            possible_driver = None
 
-        if driver_id and str(driver.id) != str(driver_id):
+        if not possible_driver:
+            return HttpResponseForbidden("Livreur non connecté.")
+
+        has_leg = DeliveryLeg.objects.filter(order=order, driver=possible_driver).exists()
+        if not has_leg:
+            return HttpResponseForbidden("Accès refusé : aucune mission assignée à ce livreur.")
+
+        if driver_id and str(possible_driver.id) != str(driver_id):
             return HttpResponseForbidden("Accès refusé : driver_id invalide.")
 
-        dp_user = getattr(driver, "user", None)
-        if dp_user is not None and dp_user != request.user:
-            return HttpResponseForbidden("Accès refusé.")
+        driver = possible_driver
 
     # ---------------------------------------
     # 2) Legs : UNIQUEMENT ceux du driver cible
@@ -14419,8 +14436,10 @@ def driver_mission_v3(request, order_id):
     )
 
     if not getattr(request.user, "is_staff", False):
-        if getattr(order, "delivery_partner_id", None) and getattr(driver, "id", None) != getattr(order, "delivery_partner_id", None):
-            return HttpResponseForbidden("Accès refusé.")
+        # Source de vérité livreur : DeliveryLeg.driver, pas Order.delivery_partner.
+        has_leg = DeliveryLeg.objects.filter(order=order, driver=driver).exists()
+        if not has_leg:
+            return HttpResponseForbidden("Accès refusé : aucune mission assignée à ce livreur.")
 
     ctx = _build_driver_mission_context(request, driver, order=order)
     return render(request, "orders/driver_mission.html", ctx)

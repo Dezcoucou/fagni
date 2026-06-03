@@ -304,6 +304,31 @@ def driver_confirm_pickup(request, order_id):
             profitability_label  = _label,
         )
 
+        # Marquer la mission pickup comme terminée
+        try:
+            from orders.models import DeliveryLeg, sync_order_status_from_legs
+            pickup_leg = DeliveryLeg.objects.filter(
+                order=order,
+                leg_type='pickup',
+                driver=driver,
+            ).first() or DeliveryLeg.objects.filter(
+                order=order,
+                leg_type='pickup',
+            ).first()
+
+            if pickup_leg:
+                pickup_leg.driver = driver
+                pickup_leg.status = 'done'
+                if hasattr(pickup_leg, 'finished_at'):
+                    pickup_leg.finished_at = timezone.now()
+                    pickup_leg.save(update_fields=['driver', 'status', 'finished_at', 'updated_at'])
+                else:
+                    pickup_leg.save(update_fields=['driver', 'status', 'updated_at'])
+
+            sync_order_status_from_legs(order, save=True)
+        except Exception:
+            pass
+
         # Event logging LOT1
         try:
             from orders.models import log_event

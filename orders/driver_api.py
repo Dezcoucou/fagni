@@ -377,6 +377,87 @@ def driver_confirm_pickup(request, order_id):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+def driver_delivery_proof(request, order_id):
+    """POST /api/driver/orders/<id>/delivery-proof/ — OTP + signature client livraison."""
+    try:
+        driver = _get_driver(request)
+    except Exception:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    from django.utils import timezone
+    from orders.models import Order, DeliveryLeg
+
+    try:
+        order = Order.objects.get(id=order_id)
+        leg = DeliveryLeg.objects.filter(order=order, leg_type='return').first()
+
+        if not leg:
+            return Response({'error': 'Mission retour introuvable'}, status=404)
+
+        if leg.driver_id and leg.driver_id != driver.id:
+            return Response({'error': 'Mission affectée à un autre livreur'}, status=403)
+
+        otp = (request.data.get('otp') or '').strip()
+        signature = (request.data.get('signature') or '').strip()
+        lat = request.data.get('lat')
+        lng = request.data.get('lng')
+
+        if not otp or len(otp) < 4:
+            return Response({'error': 'OTP livraison requis'}, status=400)
+
+        if not signature:
+            return Response({'error': 'Signature client requise'}, status=400)
+
+        now = timezone.now()
+
+        # MVP : si aucun OTP n'existe encore, on accepte l'OTP saisi et on le stocke.
+        # Plus tard, on générera l'OTP côté client/serveur avant livraison.
+        if not leg.delivery_otp:
+            leg.delivery_otp = otp
+            leg.delivery_otp_expires_at = now + timezone.timedelta(minutes=30)
+
+        if leg.delivery_otp_expires_at and leg.delivery_otp_expires_at < now:
+            return Response({'error': 'OTP livraison expiré'}, status=400)
+
+        if str(leg.delivery_otp) != str(otp):
+            return Response({'error': 'OTP livraison incorrect'}, status=400)
+
+        leg.delivery_otp_verified_at = now
+        leg.client_signature = signature
+        leg.client_signed_at = now
+        leg.driver = driver
+
+        try:
+            if lat not in [None, '']:
+                leg.delivered_lat = float(lat)
+            if lng not in [None, '']:
+                leg.delivered_lng = float(lng)
+        except Exception:
+            pass
+
+        leg.save(update_fields=[
+            'delivery_otp',
+            'delivery_otp_expires_at',
+            'delivery_otp_verified_at',
+            'client_signature',
+            'client_signed_at',
+            'driver',
+            'delivered_lat',
+            'delivered_lng',
+        ])
+
+        return Response({
+            'success': True,
+            'message': 'Preuve de livraison enregistrée',
+            'delivery_otp_verified_at': leg.delivery_otp_verified_at.isoformat() if leg.delivery_otp_verified_at else None,
+            'client_signed_at': leg.client_signed_at.isoformat() if leg.client_signed_at else None,
+        })
+
+    except Exception as e:
+        import traceback
+        return Response({'error': str(e), 'traceback': traceback.format_exc()}, status=400)
+
+
 def driver_confirm_delivery(request, order_id):
     """POST /api/driver/orders/<id>/delivery/ — confirmer livraison"""
     try:

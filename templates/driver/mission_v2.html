@@ -809,8 +809,8 @@
                 </section>
                 <section class="card">
                     <div class="card-head">
-                        <h2 class="card-title">Preuve de livraison</h2>
-                        <div class="card-subtitle">Photo et note terrain.</div>
+                        <h2 class="card-title">Preuve terrain</h2>
+                        <div class="card-subtitle">Photo du sac scellé, article ou anomalie terrain.</div>
                     </div>
                     <div class="card-body">
                         <form method="post" action="{% url 'logistics:create_proof_v2' mission.id %}" enctype="multipart/form-data">
@@ -826,7 +826,7 @@
                                 </div>
                                 <div class="info-box" style="grid-column: 1 / -1;">
                                     <div class="label">Note terrain</div>
-                                    <textarea class="form-textarea" name="notes" rows="4" placeholder="Ex: Client présent, colis remis en main propre..."></textarea>
+                                    <textarea class="form-textarea" name="notes" rows="4" placeholder="Ex: 12 articles comptés, sac scellé, aucune anomalie..."></textarea>
                                 </div>
                             </div>
                             <div style="margin-top:12px;">

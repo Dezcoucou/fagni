@@ -321,9 +321,9 @@ def driver_confirm_pickup(request, order_id):
                 pickup_leg.status = 'done'
                 if hasattr(pickup_leg, 'finished_at'):
                     pickup_leg.finished_at = timezone.now()
-                    pickup_leg.save(update_fields=['driver', 'status', 'finished_at', 'updated_at'])
+                    pickup_leg.save(update_fields=['driver', 'status', 'finished_at'])
                 else:
-                    pickup_leg.save(update_fields=['driver', 'status', 'updated_at'])
+                    pickup_leg.save(update_fields=['driver', 'status'])
 
             sync_order_status_from_legs(order, save=True)
         except Exception:

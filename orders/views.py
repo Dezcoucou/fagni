@@ -1494,7 +1494,7 @@ def ops_dashboard(request):
 
     # applique le filtre driver si présent
     if selected_driver_id:
-        base_qs = base_qs.filter(delivery_partner_id=selected_driver_id)
+        base_qs = base_qs.filter(legs__driver_id=selected_driver_id).distinct()
 
     pending_qs = base_qs.filter(status="pending")
     in_progress_qs = base_qs.filter(status="in_progress")
@@ -1747,7 +1747,7 @@ def ops_dashboard(request):
         .order_by("-created_at")
     )
     if selected_driver_id:
-        scan_qs = scan_qs.filter(delivery_partner_id=selected_driver_id)
+        scan_qs = scan_qs.filter(legs__driver_id=selected_driver_id).distinct()
 
     scan_qs = scan_qs[:250]
 
@@ -2027,7 +2027,7 @@ def ops_planning(request):
         .order_by("-created_at")
     )
     if selected_driver_id:
-        qs = qs.filter(delivery_partner_id=selected_driver_id)
+        qs = qs.filter(legs__driver_id=selected_driver_id).distinct()
 
     now = timezone.now()
 
@@ -7885,7 +7885,7 @@ def driver_dashboard(request):
 
     # 4) Application éventuelle du filtre livreur
     if driver_id:
-        base_qs = base_qs.filter(delivery_partner_id=driver_id)
+        base_qs = base_qs.filter(legs__driver_id=driver_id).distinct()
 
     # 5) Ordre d'affichage : plus récentes d'abord
     orders_qs = base_qs.order_by("-created_at")
@@ -8006,7 +8006,7 @@ def _get_driver_app_context(request):
         # Le livreur ne voit QUE ses propres courses
         orders_qs = orders_qs.filter(delivery_partner=current_driver)
     elif selected_driver_id:
-        orders_qs = orders_qs.filter(delivery_partner_id=selected_driver_id)
+        orders_qs = orders_qs.filter(legs__driver_id=selected_driver_id).distinct()
 
     # Filtre par statut
     if status_filter == "active":
@@ -9489,7 +9489,7 @@ def driver_app_export_csv(request):
         # Mode LIVREUR : uniquement ses propres courses
         qs = qs.filter(delivery_partner=connected_driver)
     elif driver_id:
-        qs = qs.filter(delivery_partner_id=driver_id)
+        qs = qs.filter(legs__driver_id=driver_id).distinct()
 
     # --- Filtre statut (même logique que driver_app_data) ---
     if status_filter == "active":
@@ -9678,7 +9678,7 @@ def driver_app_export_xlsx(request):
     )
 
     if driver_id:
-        qs = qs.filter(delivery_partner_id=driver_id)
+        qs = qs.filter(legs__driver_id=driver_id).distinct()
 
     # Filtre statut (même logique que driver_app / driver_app_data / driver_orders_csv)
     if status_filter == "active":
@@ -10324,7 +10324,7 @@ def driver_kpi(request):
     ).all()
 
     if selected_driver_id:
-        orders_qs = orders_qs.filter(delivery_partner_id=selected_driver_id)
+        orders_qs = orders_qs.filter(legs__driver_id=selected_driver_id).distinct()
 
     if dt_start:
         orders_qs = orders_qs.filter(created_at__gte=dt_start)
@@ -10431,7 +10431,7 @@ def driver_orders_csv(request):
     ).all()
 
     if driver_id:
-        orders_qs = orders_qs.filter(delivery_partner_id=driver_id)
+        orders_qs = orders_qs.filter(legs__driver_id=driver_id).distinct()
 
     if status_filter == "active":
         orders_qs = orders_qs.filter(status__in=["pending", "in_progress"])

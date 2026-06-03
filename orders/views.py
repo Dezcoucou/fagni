@@ -1682,7 +1682,7 @@ def ops_dashboard(request):
     )
 
     if selected_driver_id:
-        weigh_qs = weigh_qs.filter(order__delivery_partner_id=selected_driver_id)
+        weigh_qs = weigh_qs.filter(order__legs__driver_id=selected_driver_id).distinct()
 
     weigh_qs = weigh_qs[:200]
 
@@ -8091,8 +8091,8 @@ def order_scan_redirect(request, order_code):
             "Aucun profil livreur associé à cet email (%s)." % user_email
         )
 
-    # 3) Vérifier que c'est bien SA course
-    if order.delivery_partner_id != delivery_partner.id:
+    # 3) Vérifier que c'est bien SA mission via DeliveryLeg
+    if not DeliveryLeg.objects.filter(order=order, driver=delivery_partner).exists():
         return HttpResponseForbidden("Vous n'êtes pas assigné à cette course.")
 
     # 4) Redirection vers sa page
@@ -8141,7 +8141,7 @@ def driver_order_timeline_action(request, order_id, action):
         except DeliveryPartner.DoesNotExist:
             return HttpResponseForbidden("Aucun profil livreur associé à cet email.")
 
-        if order.delivery_partner_id != delivery_partner.id:
+        if not DeliveryLeg.objects.filter(order=order, driver=delivery_partner).exists():
             return HttpResponseForbidden("Vous n'êtes pas assigné à cette course.")
 
     # --- Mapping action -> champ datetime ---
@@ -12381,9 +12381,9 @@ def driver_map_data(request):
 
 def _can_driver_touch_order(request, order):
     """
-    Sécurité MVP:
+    Sécurité livreur:
     - Autorise staff/superuser
-    - Autorise le livreur assigné (order.delivery_partner_id) si comparable à request.user.id
+    - Autorise uniquement un livreur rattaché à une DeliveryLeg de la commande
     """
     u = getattr(request, "user", None)
     if not u or not getattr(u, "is_authenticated", False):
@@ -12392,25 +12392,24 @@ def _can_driver_touch_order(request, order):
     if getattr(u, "is_superuser", False) or getattr(u, "is_staff", False):
         return True
 
-    order_driver_id = getattr(order, "delivery_partner_id", None)
-    user_id = getattr(u, "id", None)
+    try:
+        from partners.models import DeliveryPartner
+        user_email = (getattr(u, "email", "") or "").strip().lower()
+        driver = None
 
-    if order_driver_id and user_id:
-        try:
-            if int(order_driver_id) == int(user_id):
-                return True
-        except Exception:
-            pass
+        dp_id = getattr(u, "delivery_partner_id", None) or getattr(u, "driver_id", None)
+        if dp_id:
+            driver = DeliveryPartner.objects.filter(pk=dp_id).first()
 
-    dp_id = getattr(u, "delivery_partner_id", None) or getattr(u, "driver_id", None)
-    if order_driver_id and dp_id:
-        try:
-            if int(order_driver_id) == int(dp_id):
-                return True
-        except Exception:
-            pass
+        if not driver and user_email:
+            driver = DeliveryPartner.objects.filter(email__iexact=user_email).first()
 
-    return False
+        if not driver:
+            return False
+
+        return DeliveryLeg.objects.filter(order=order, driver=driver).exists()
+    except Exception:
+        return False
 
 
 def _sanitize_evidence_kind(kind, OrderEvidencePhoto):
@@ -12434,28 +12433,16 @@ def driver_weighing(request, order_id):
     order = get_object_or_404(Order, pk=order_id)
 
     
-    # 🔐 Sécurité: seul le livreur assigné (ou staff) peut accéder
-
-    # 🔓 MODE SOUPLE (fix accès pesée)
-    # On autorise l'accès si:
-    # - staff
-    # - OU livreur connecté (même si assignation imparfaite)
-    if not request.user.is_staff:
-        assigned_driver = getattr(order, "delivery_partner", None)
+    # 🔐 Sécurité: seul le livreur rattaché à une DeliveryLeg de la commande peut accéder
+    if not _can_driver_touch_order(request, order):
         user_driver_id = (
             getattr(request.user, "delivery_partner_id", None)
             or getattr(request.user, "driver_id", None)
             or (request.GET.get("driver_id") or "").strip()
             or (request.POST.get("driver_id") or "").strip()
         )
-
-        if assigned_driver and user_driver_id:
-            try:
-                if str(assigned_driver.id) != str(user_driver_id):
-                    messages.warning(request, "Cette course ne t'est pas assignée.")
-                    return redirect(reverse("orders:driver_app") + (f"?driver_id={user_driver_id}" if user_driver_id else ""))
-            except Exception:
-                pass
+        messages.warning(request, "Cette course ne t'est pas assignée.")
+        return redirect(reverse("orders:driver_app") + (f"?driver_id={user_driver_id}" if user_driver_id else ""))
 
 
     ow, _created = OrderWeighing.objects.get_or_create(order=order)
@@ -12606,22 +12593,15 @@ def driver_evidence_upload(request, order_id):
 
     order = get_object_or_404(Order, pk=order_id)
 
-    # 🔓 MODE SOUPLE (aligné sur driver_weighing)
-    if not request.user.is_staff:
-        assigned_driver = getattr(order, "delivery_partner", None)
+    # 🔐 Sécurité: preuve autorisée uniquement pour un livreur rattaché à une DeliveryLeg de la commande
+    if not _can_driver_touch_order(request, order):
         user_driver_id = (
             getattr(request.user, "delivery_partner_id", None)
             or getattr(request.user, "driver_id", None)
             or (request.POST.get("driver_id") or request.GET.get("driver_id") or "").strip()
         )
-
-        if assigned_driver and user_driver_id:
-            try:
-                if str(assigned_driver.id) != str(user_driver_id):
-                    messages.warning(request, "Cette course ne t'est pas assignée.")
-                    return redirect(reverse("orders:driver_app") + (f"?driver_id={user_driver_id}" if user_driver_id else ""))
-            except Exception:
-                pass
+        messages.warning(request, "Cette course ne t'est pas assignée.")
+        return redirect(reverse("orders:driver_app") + (f"?driver_id={user_driver_id}" if user_driver_id else ""))
 
     kind = _sanitize_evidence_kind(request.POST.get("kind"), OrderEvidencePhoto)
     caption = (request.POST.get("caption") or "").strip()

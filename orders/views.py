@@ -8004,7 +8004,7 @@ def _get_driver_app_context(request):
     # Filtre par livreur
     if driver_mode and current_driver:
         # Le livreur ne voit QUE ses propres courses
-        orders_qs = orders_qs.filter(delivery_partner=current_driver)
+        orders_qs = orders_qs.filter(legs__driver=current_driver).distinct()
     elif selected_driver_id:
         orders_qs = orders_qs.filter(legs__driver_id=selected_driver_id).distinct()
 
@@ -9487,7 +9487,7 @@ def driver_app_export_csv(request):
     # --- Filtre livreur ---
     if connected_driver and not user.is_staff:
         # Mode LIVREUR : uniquement ses propres courses
-        qs = qs.filter(delivery_partner=connected_driver)
+        qs = qs.filter(legs__driver=connected_driver).distinct()
     elif driver_id:
         qs = qs.filter(legs__driver_id=driver_id).distinct()
 
@@ -10024,7 +10024,7 @@ def driver_me_app(request):
 
     qs = (
         Order.objects
-        .filter(delivery_partner=driver)
+        .filter(legs__driver=driver).distinct()
         .select_related("customer", "laundry_partner", "delivery_partner")
         .order_by("-created_at")
     )
@@ -10125,7 +10125,7 @@ def driver_hub(request):
 
     qs = (
         Order.objects
-        .filter(delivery_partner=connected_driver)
+        .filter(legs__driver=connected_driver).distinct()
         .select_related("customer", "laundry_partner", "delivery_partner")
         .prefetch_related("items")
         .order_by("-created_at")
@@ -12235,7 +12235,7 @@ def driver_map(request):
     for d in drivers_qs:
         # Commandes de la semaine pour ce livreur
         week_orders = Order.objects.filter(
-            delivery_partner=d,
+            legs__driver=d,
             created_at__date__gte=start_week,
             created_at__date__lte=today,
         )
@@ -12318,7 +12318,7 @@ def driver_map_data(request):
 
     for d in drivers_qs:
         week_orders = Order.objects.filter(
-            delivery_partner=d,
+            legs__driver=d,
             created_at__date__gte=start_week,
             created_at__date__lte=today,
         )
@@ -12328,7 +12328,7 @@ def driver_map_data(request):
 
         # Dernière commande active (optionnel, utile OPS)
         active_order = (
-            Order.objects.filter(delivery_partner=d, status__in=["pending", "in_progress"])
+            Order.objects.filter(legs__driver=d, status__in=["pending", "in_progress"]).distinct()
             .order_by("-created_at")
             .first()
         )

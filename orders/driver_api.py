@@ -410,17 +410,14 @@ def driver_delivery_proof(request, order_id):
 
         now = timezone.now()
 
-        # MVP : si aucun OTP n'existe encore, on accepte l'OTP saisi et on le stocke.
-        # Plus tard, on générera l'OTP côté client/serveur avant livraison.
+        # MVP pilote : le code saisi sert de preuve simple côté client.
+        # Tant que l'OTP n'est pas généré côté client/serveur, on ne bloque pas par expiration.
         if not leg.delivery_otp:
             leg.delivery_otp = otp
-            leg.delivery_otp_expires_at = now + timezone.timedelta(minutes=30)
-
-        if leg.delivery_otp_expires_at and leg.delivery_otp_expires_at < now:
-            return Response({'error': 'OTP livraison expiré'}, status=400)
+            leg.delivery_otp_expires_at = now + timezone.timedelta(days=7)
 
         if str(leg.delivery_otp) != str(otp):
-            return Response({'error': 'OTP livraison incorrect'}, status=400)
+            return Response({'error': 'Code client incorrect'}, status=400)
 
         leg.delivery_otp_verified_at = now
         leg.client_signature = signature

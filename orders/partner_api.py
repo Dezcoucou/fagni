@@ -172,3 +172,50 @@ def partner_refuse_order(request, order_id):
         })
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def partner_order_detail(request, order_id):
+    """GET /api/partner/orders/<id>/ — C8: bon de travail complet"""
+    try:
+        partner = _get_partner(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
+
+    from orders.models import Order, OrderItem
+    try:
+        order = Order.objects.prefetch_related('items').get(
+            id=order_id, laundry_partner=partner
+        )
+
+        # Articles a traiter
+        items = []
+        for item in order.items.all():
+            items.append({
+                'designation': item.designation,
+                'quantity': item.quantity,
+                'unit_price': float(item.unit_price or 0),
+                'total': float(item.total or 0),
+                'service_type': getattr(item, 'service_type', 'pressing'),
+            })
+
+        # Si pas d'items en DB, extraire des notes (legacy)
+        if not items and order.articles_count:
+            items = [{'designation': 'Articles divers', 'quantity': order.articles_count, 'unit_price': 500, 'total': order.articles_count * 500}]
+
+        return Response({
+            'id': order.id,
+            'code': order.code,
+            'status': order.status,
+            'created_at': order.created_at.isoformat() if order.created_at else None,
+            'dropoff_time': order.dropoff_time.isoformat() if order.dropoff_time else None,
+            'articles_count': order.articles_count or len(items),
+            'items': items,
+            'montant_pressing': float(order.amount_laundry_partner or 0),
+            'instructions': order.notes or '',
+            'client_zone': order.pickup_address.split(',')[0] if order.pickup_address else 'Abidjan',
+        })
+    except Order.DoesNotExist:
+        return Response({'error': 'Commande introuvable'}, status=404)
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

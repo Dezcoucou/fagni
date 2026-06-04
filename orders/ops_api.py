@@ -248,8 +248,10 @@ def ops_assign_driver(request, order_id):
 
         if driver_type == 'pickup':
             order.pickup_driver = driver
+            # C4 — En pilote, le livreur retour = livreur collecte
+            order.delivery_partner = driver
             order.cost_driver_pickup = 800
-            order.save(update_fields=['pickup_driver', 'cost_driver_pickup', 'updated_at'])
+            order.save(update_fields=['pickup_driver', 'delivery_partner', 'cost_driver_pickup', 'updated_at'])
 
             leg, _ = DeliveryLeg.objects.get_or_create(
                 order=order,
@@ -267,6 +269,15 @@ def ops_assign_driver(request, order_id):
             leg.save(update_fields=['driver', 'status', 'driver_amount'])
 
             event_type = 'pickup.assigned'
+            # C4 — Assigner aussi le leg return au même livreur
+            ret_leg, _ = DeliveryLeg.objects.get_or_create(
+                order=order, leg_type="return",
+                defaults={"driver": driver, "status": "pending", "driver_amount": Decimal("800")}
+            )
+            if ret_leg.status == "pending":
+                ret_leg.driver = driver
+                ret_leg.driver_amount = Decimal("800")
+                ret_leg.save(update_fields=["driver", "driver_amount"])
         else:
             order.delivery_partner = driver
             order.cost_driver_delivery = 800

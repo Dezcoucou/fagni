@@ -352,55 +352,56 @@ def driver_confirm_pickup(request, order_id):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def driver_delivery_proof(request, order_id):
-    """POST /api/driver/orders/<id>/delivery-proof/ — OTP + signature client livraison."""
+    """POST /api/driver/orders/<id>/delivery-proof/
+    C2 — Sans OTP. Preuve = photo + prenom client + GPS.
+    """
     try:
         driver = _get_driver(request)
     except Exception:
-        return Response({'error': 'Non autorisé'}, status=401)
+        return Response({'error': 'Non autorise'}, status=401)
 
     from django.utils import timezone
-    from orders.models import Order, DeliveryLeg
-
+    from orders.models import Order, DeliveryLeg, OrderEvidencePhoto
     try:
         order = Order.objects.get(id=order_id)
         leg = DeliveryLeg.objects.filter(order=order, leg_type='return').first()
-
         if not leg:
             return Response({'error': 'Mission retour introuvable'}, status=404)
-
         if leg.driver_id and leg.driver_id != driver.id:
-            return Response({'error': 'Mission affectée à un autre livreur'}, status=403)
+            return Response({'error': 'Mission affectee a un autre livreur'}, status=403)
 
-        otp = (request.data.get('otp') or '').strip()
-        signature = (request.data.get('signature') or '').strip()
+        client_name = (request.data.get('client_name') or '').strip()
+        photo_b64   = (request.data.get('photo') or '').strip()
         lat = request.data.get('lat')
         lng = request.data.get('lng')
 
-        if not otp or len(otp) < 4:
-            return Response({'error': 'OTP livraison requis'}, status=400)
-
-        if not signature:
-            return Response({'error': 'Signature client requise'}, status=400)
+        if not client_name:
+            return Response({'error': 'Prenom/nom du client requis'}, status=400)
+        if not photo_b64:
+            return Response({'error': 'Photo de remise obligatoire'}, status=400)
 
         now = timezone.now()
 
-        # MVP pilote : le code saisi sert de preuve simple côté client.
-        # Tant que l'OTP n'est pas généré côté client/serveur, on ne bloque pas par expiration.
-        if not leg.delivery_otp:
-            leg.delivery_otp = otp
-            leg.delivery_otp_expires_at = now + timezone.timedelta(days=7)
+        try:
+            import cloudinary.uploader as cu
+            result = cu.upload(photo_b64, folder='orders/delivery', public_id=f'delivery_{order.id}_{int(now.timestamp())}')
+            photo_url = result.get('secure_url', '')
+            OrderEvidencePhoto.objects.create(
+                order=order, leg=leg,
+                actor_type='driver', actor_id=driver.id,
+                kind='delivery_to_client',
+                image=photo_url,
+                caption=f'Remis a : {client_name}',
+            )
+        except Exception:
+            pass
 
-        if str(leg.delivery_otp) != str(otp):
-            return Response({'error': 'Code client incorrect'}, status=400)
-
-        leg.delivery_otp_verified_at = now
-        leg.client_signature = signature
+        leg.client_signature = client_name
         leg.client_signed_at = now
         leg.driver = driver
         leg.status = 'done'
         if hasattr(leg, 'finished_at'):
             leg.finished_at = now
-
         try:
             if lat not in [None, '']:
                 leg.delivered_lat = float(lat)
@@ -409,40 +410,27 @@ def driver_delivery_proof(request, order_id):
         except Exception:
             pass
 
-        leg.save(update_fields=[
-            'delivery_otp',
-            'delivery_otp_expires_at',
-            'delivery_otp_verified_at',
-            'client_signature',
-            'client_signed_at',
-            'driver',
-            'status',
-            'delivered_lat',
-            'delivered_lng',
-        ])
+        update_fields = ['client_signature', 'client_signed_at', 'driver', 'status']
+        if hasattr(leg, 'finished_at'): update_fields.append('finished_at')
+        if hasattr(leg, 'delivered_lat'): update_fields += ['delivered_lat', 'delivered_lng']
+        leg.save(update_fields=update_fields)
 
-        try:
-            from orders.models import sync_order_status_from_legs
-            sync_order_status_from_legs(order, save=True)
-        except Exception:
-            pass
+        from orders.models import sync_order_status_from_legs
+        Order.objects.filter(pk=order.pk).update(delivered_time=now)
+        sync_order_status_from_legs(order, save=True)
 
-        credit_wallet(
-            driver, _pickup_amount, order,
-            f"Livraison commande {order.code}"
-        )
+        _delivery_amount = int(getattr(order, 'cost_driver_delivery', 800) or 800)
+        credit_wallet(driver, _delivery_amount, order, f"Livraison commande {order.code}")
 
         return Response({
             'success': True,
-            'message': 'Preuve de livraison enregistrée et livraison confirmée',
-            'delivery_otp_verified_at': leg.delivery_otp_verified_at.isoformat() if leg.delivery_otp_verified_at else None,
-            'client_signed_at': leg.client_signed_at.isoformat() if leg.client_signed_at else None,
+            'message': f'Livraison confirmee — remis a {client_name}',
+            'client_name': client_name,
+            'delivered_time': now.isoformat(),
         })
-
     except Exception as e:
         import traceback
         return Response({'error': str(e), 'traceback': traceback.format_exc()}, status=400)
-
 
 def driver_confirm_delivery(request, order_id):
     """POST /api/driver/orders/<id>/delivery/ — confirmer livraison"""

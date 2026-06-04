@@ -328,17 +328,6 @@ def driver_confirm_pickup(request, order_id):
             _OW.objects.filter(pk=order.pk).update(driver_wallet_credited=True)
         except Exception:
             pass
-        try:
-            from orders.models import Order as _O2
-            o2 = _O2.objects.get(pk=order.pk)
-            notes = o2.notes or ''
-            # Supprimer ancien wave_link si présent
-            import re
-            notes = re.sub(r'WAVE_LINK:[^\s|]*', '', notes).strip()
-            notes = (notes + f' | WAVE_LINK:{wave_link_url}').strip(' |')
-            _O2.objects.filter(pk=order.pk).update(notes=notes)
-        except Exception:
-            pass
 
         return Response({
             'success':        True,

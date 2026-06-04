@@ -324,6 +324,11 @@ def driver_confirm_pickup(request, order_id):
         )
         # wave_link stocké dans notes pour compatibilité
         try:
+            from orders.models import Order as _OW
+            _OW.objects.filter(pk=order.pk).update(driver_wallet_credited=True)
+        except Exception:
+            pass
+        try:
             from orders.models import Order as _O2
             o2 = _O2.objects.get(pk=order.pk)
             notes = o2.notes or ''
@@ -422,6 +427,11 @@ def driver_delivery_proof(request, order_id):
         _delivery_amount = int(getattr(order, 'cost_driver_delivery', 800) or 800)
         credit_wallet(driver, _delivery_amount, order, f"Livraison commande {order.code}")
 
+        try:
+            from orders.models import Order as _OW
+            _OW.objects.filter(pk=order.pk).update(driver_wallet_credited=True)
+        except Exception:
+            pass
         return Response({
             'success': True,
             'message': f'Livraison confirmee — remis a {client_name}',
@@ -483,6 +493,11 @@ def driver_confirm_delivery(request, order_id):
             f"Livraison commande {order.code}"
         )
 
+        try:
+            from orders.models import Order as _OW
+            _OW.objects.filter(pk=order.pk).update(driver_wallet_credited=True)
+        except Exception:
+            pass
         # WhatsApp client — livraison confirmée
         client_phone = order.customer.phone if order.customer else ''
         wa_link = ''

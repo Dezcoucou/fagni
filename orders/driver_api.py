@@ -508,24 +508,66 @@ def driver_confirm_delivery(request, order_id):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_driver_dropoff(request, order_id):
-    """POST /api/driver/orders/<id>/dropoff/ — livreur dépose au pressing"""
-    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    """POST /api/driver/orders/<id>/dropoff/ — C5 : livreur depose au pressing"""
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-        from partners.models import DeliveryPartner
-        driver = DeliveryPartner.objects.get(id=payload['did'])
+        driver = _get_driver(request)
     except Exception:
-        return Response({'error': 'Non autorisé'}, status=401)
+        return Response({'error': 'Non autorise'}, status=401)
 
+    from django.utils import timezone
+    from orders.models import Order, DeliveryLeg, OrderEvidencePhoto, sync_order_status_from_legs
     try:
-        from orders.models import Order
         order = Order.objects.get(id=order_id)
+        now = timezone.now()
+        photo_b64 = (request.data.get('photo') or '').strip()
+
+        # C5 — dropoff_time obligatoire
+        Order.objects.filter(pk=order.pk).update(dropoff_time=now)
+
+        # Photo dépôt pressing (obligatoire)
+        if photo_b64:
+            try:
+                import cloudinary.uploader as cu
+                result = cu.upload(photo_b64, folder='orders/dropoff', public_id=f'dropoff_{order.id}_{int(now.timestamp())}')
+                OrderEvidencePhoto.objects.create(
+                    order=order,
+                    actor_type='driver',
+                    actor_id=driver.id,
+                    kind='dropoff_to_laundry',
+                    image=result.get('secure_url', ''),
+                    caption=f'Depose par {driver.name}',
+                )
+            except Exception:
+                pass
+
+        # Marquer leg pickup done
+        pickup_leg = DeliveryLeg.objects.filter(
+            order=order, leg_type='pickup'
+        ).first()
+        if pickup_leg and pickup_leg.status != 'done':
+            pickup_leg.driver = driver
+            pickup_leg.status = 'done'
+            if hasattr(pickup_leg, 'finished_at'):
+                pickup_leg.finished_at = now
+            pickup_leg.save(update_fields=['driver', 'status'] + (['finished_at'] if hasattr(pickup_leg, 'finished_at') else []))
+
+        sync_order_status_from_legs(order, save=True)
+
+        # Note dans la commande
         notes = order.notes or ''
-        order.notes = notes + f'\nDEPOSE_PRESSING:{driver.name}'
-        order.save(update_fields=['notes', 'updated_at'])
-        return Response({'success': True, 'message': 'Dépôt au pressing confirmé'})
+        Order.objects.filter(pk=order.pk).update(
+            notes=notes + f'\nDEPOSE_PRESSING:{driver.name} {now.strftime("%d/%m %H:%M")}'
+        )
+
+        return Response({
+            'success': True,
+            'message': 'Depot au pressing confirme',
+            'dropoff_time': now.isoformat(),
+        })
     except Exception as e:
-        return Response({'error': str(e)}, status=400)
+        import traceback
+        return Response({'error': str(e), 'traceback': traceback.format_exc()}, status=400)
+
 
 
 @api_view(['GET'])

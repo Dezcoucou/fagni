@@ -316,18 +316,9 @@ def driver_confirm_pickup(request, order_id):
         except Exception:
             pass
 
-        # Wallet livreur — collecte 800 FCFA
-        _pickup_amount = int(getattr(order, "cost_driver_pickup", 800) or 800)
-        _wallet_result = credit_wallet(
-            driver, _pickup_amount, order,
-            f"Collecte commande {order.code}"
-        )
+        # Payout différé : aucun crédit wallet à la collecte.
+        # Crédit déclenché uniquement après order.done + payment_status=paid.
         # wave_link stocké dans notes pour compatibilité
-        try:
-            from orders.models import Order as _OW
-            _OW.objects.filter(pk=order.pk).update(driver_wallet_credited=True)
-        except Exception:
-            pass
 
         return Response({
             'success':        True,
@@ -413,14 +404,8 @@ def driver_delivery_proof(request, order_id):
         Order.objects.filter(pk=order.pk).update(delivered_time=now)
         sync_order_status_from_legs(order, save=True)
 
-        _delivery_amount = int(getattr(order, 'cost_driver_delivery', 800) or 800)
-        credit_wallet(driver, _delivery_amount, order, f"Livraison commande {order.code}")
-
-        try:
-            from orders.models import Order as _OW
-            _OW.objects.filter(pk=order.pk).update(driver_wallet_credited=True)
-        except Exception:
-            pass
+        # Payout différé : aucun crédit wallet à la livraison.
+        # Crédit déclenché uniquement après order.done + payment_status=paid.
         return Response({
             'success': True,
             'message': f'Livraison confirmee — remis a {client_name}',
@@ -476,17 +461,8 @@ def driver_confirm_delivery(request, order_id):
         except Exception:
             pass
 
-        # Wallet livreur — livraison 800 FCFA
-        credit_wallet(
-            driver, int(getattr(order, "cost_driver_delivery", 800) or 800), order,
-            f"Livraison commande {order.code}"
-        )
-
-        try:
-            from orders.models import Order as _OW
-            _OW.objects.filter(pk=order.pk).update(driver_wallet_credited=True)
-        except Exception:
-            pass
+        # Payout différé : aucun crédit wallet direct ici.
+        # Crédit déclenché uniquement après order.done + payment_status=paid.
         # WhatsApp client — livraison confirmée
         client_phone = order.customer.phone if order.customer else ''
         wa_link = ''

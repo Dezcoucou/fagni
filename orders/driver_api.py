@@ -489,7 +489,7 @@ def driver_confirm_delivery(request, order_id):
 
         # Wallet livreur — livraison 800 FCFA
         credit_wallet(
-            driver, _pickup_amount, order,
+            driver, int(getattr(order, "cost_driver_delivery", 800) or 800), order,
             f"Livraison commande {order.code}"
         )
 

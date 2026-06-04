@@ -273,36 +273,12 @@ def driver_confirm_pickup(request, order_id):
         else:
             wa_link = ''
 
-        # Recalculer le total depuis les articles réels
-        from orders.pricing import calculate_order_total
-        from django.utils import timezone
-        pricing = calculate_order_total(articles_count)
-
-        wave_link_url = f"https://pay.wave.com/m/M_ci_8SO-R9nJg71k/c/ci/?amount={pricing['total']}"
-        expires_at = timezone.now() + timezone.timedelta(hours=24)
-
-        # Utiliser queryset.update() pour bypasser le payment guard
         from orders.models import Order as _Order
-        from orders.pricing_engine import calculate_order as _calc_engine
-        _pe = _calc_engine(articles_count)
-        _margin = _pe['total_fagni']
-        _total  = pricing['total'] or 1
-        _score  = round(_margin / _total * 100, 2)
-        _label  = ('rentable' if _score >= 30 else 'limite' if _score >= 15 else 'a_perte')
+        # C1 — Prix verrouillé à la création. articles_count = traçabilité uniquement.
         _Order.objects.filter(pk=order.pk).update(
-            articles_count       = articles_count,
-            total_client_ttc     = pricing['total'],
-            delivery_fee         = pricing['delivery_fee'],
-            service_fee          = pricing['service_fee'],
-            payment_status       = 'awaiting_payment',
-            payment_expires_at   = expires_at,
-            cost_driver_pickup   = _pe['part_livreur'] // 2,
-            cost_driver_delivery = _pe['part_livreur'] - _pe['part_livreur'] // 2,
-            cost_pressing        = _pe['part_pressing'],
-            margin_net           = _margin,
-            profitability_score  = _score,
-            profitability_label  = _label,
+            articles_count=articles_count,
         )
+
 
         # Marquer la mission pickup comme terminée
         try:
@@ -336,16 +312,14 @@ def driver_confirm_pickup(request, order_id):
                 "pickup.done", order=order,
                 actor_type="driver", actor_id=driver.id,
                 articles_count=articles_count,
-                total=pricing['total'],
-                margin_net=_margin,
-                profitability_label=_label,
             )
         except Exception:
             pass
 
         # Wallet livreur — collecte 800 FCFA
+        _pickup_amount = int(getattr(order, "cost_driver_pickup", 800) or 800)
         _wallet_result = credit_wallet(
-            driver, 800, order,
+            driver, _pickup_amount, order,
             f"Collecte commande {order.code}"
         )
         # wave_link stocké dans notes pour compatibilité
@@ -367,7 +341,7 @@ def driver_confirm_pickup(request, order_id):
             'message':        f'Collecte confirmée — {articles_count} articles',
             'total':          pricing['total'],
             'articles_count': articles_count,
-            'payment_status': 'awaiting_payment',
+        'payment_status': order.payment_status,
             'wave_link':      wave_link_url,
         })
     except Exception as e:
@@ -454,7 +428,7 @@ def driver_delivery_proof(request, order_id):
             pass
 
         credit_wallet(
-            driver, 800, order,
+            driver, _pickup_amount, order,
             f"Livraison commande {order.code}"
         )
 
@@ -517,7 +491,7 @@ def driver_confirm_delivery(request, order_id):
 
         # Wallet livreur — livraison 800 FCFA
         credit_wallet(
-            driver, 800, order,
+            driver, _pickup_amount, order,
             f"Livraison commande {order.code}"
         )
 

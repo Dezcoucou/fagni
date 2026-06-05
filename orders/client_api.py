@@ -363,10 +363,13 @@ def api_create_order(request):
     delivery_date = pickup_date + timedelta(days=2)
 
     # Pricing v3.0 — source de vérité
-    from orders.pricing_engine import calculate_order as _calc, BAG_CONFIG
+    from orders.config_models import GlobalPricingSettings
+    from decimal import Decimal as _D
+    _cfg = GlobalPricingSettings.get_solo()
+    _pa = _D('500')
+    _df = _D(str(_cfg.delivery_fixed_fee or 2000))
+    _cp = _D(str(_cfg.laundry_commission_percent or 40)) / 100
 
-    if bag_size not in BAG_CONFIG:
-        return Response({'error': 'Taille de sac invalide'}, status=400)
 
     # Compter les articles réels déclarés par le client
     nb_articles = 0
@@ -374,11 +377,12 @@ def api_create_order(request):
         for a in articles:
             nb_articles += int(a.get('quantity', 1))
     if nb_articles == 0:
-        nb_articles = BAG_CONFIG[bag_size]['max_items']
+        nb_articles = 5
 
-    _pricing    = _calc(nb_articles, bag_size)
-    bag_price   = _pricing['total_client']
-    service_fee = _pricing['service_fee']
+    _ta = _pa * nb_articles
+    _pricing = {'total_client':float(_ta+_df),'delivery_fee':float(_df),'service_fee':0,'part_pressing':float(_ta*_cp),'part_livreur':float(_df*_D('0.80')),'marge_pressing':float(_ta*_cp),'marge_livraison':float(_df*_D('0.20')),'total_fagni':float(_ta*(1-_cp))}
+    bag_price = float(_ta + _df)
+    service_fee = _D('0')
     total       = _pricing['total_client']
 
     notes_parts = []
@@ -446,6 +450,16 @@ def api_create_order(request):
         )
 
         order = Order.objects.create(**order_data)
+        try:
+            from orders.models import OrderItem
+            if articles:
+                for a in articles:
+                    _qty=int(a.get('quantity',1))
+                    _des=str(a.get('name',a.get('designation','Article')))
+                    OrderItem.objects.create(order=order,designation=_des,quantity=_qty,unit_price=500,total=_qty*500)
+            elif nb_articles>0:
+                OrderItem.objects.create(order=order,designation='Articles pressing',quantity=nb_articles,unit_price=500,total=nb_articles*500)
+        except Exception: pass
 
         # Event logging LOT1
         try:

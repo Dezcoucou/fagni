@@ -353,6 +353,9 @@ def driver_delivery_proof(request, order_id):
             return Response({'error': 'Mission retour introuvable'}, status=404)
         if leg.driver_id and leg.driver_id != driver.id:
             return Response({'error': 'Mission affectee a un autre livreur'}, status=403)
+        from orders.models import DeliveryLeg as _DL
+        if not _DL.objects.filter(order=order, leg_type="pickup", status="done").exists():
+            return Response({"error": "Collecte non confirmee dabord"}, status=400)
 
         client_name = (request.data.get('client_name') or '').strip()
         photo_b64   = (request.data.get('photo') or '').strip()

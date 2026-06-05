@@ -362,7 +362,7 @@ def driver_delivery_proof(request, order_id):
         if not client_name:
             return Response({'error': 'Prenom/nom du client requis'}, status=400)
         if not photo_b64:
-            return Response({'error': 'Photo de remise obligatoire'}, status=400)
+            pass  # Photo optionnelle en pilote
 
         now = timezone.now()
 

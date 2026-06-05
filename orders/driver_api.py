@@ -324,7 +324,7 @@ def driver_confirm_pickup(request, order_id):
             'success':        True,
             'wa_client':      wa_link,
             'message':        f'Collecte confirmée — {articles_count} articles',
-            'total':          pricing['total'],
+            'total': float(getattr(order, 'total_client_ttc', 0) or 0),
             'articles_count': articles_count,
         'payment_status': order.payment_status,
         })

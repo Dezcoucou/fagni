@@ -327,7 +327,6 @@ def driver_confirm_pickup(request, order_id):
             'total':          pricing['total'],
             'articles_count': articles_count,
         'payment_status': order.payment_status,
-            'wave_link':      wave_link_url,
         })
     except Exception as e:
         import traceback

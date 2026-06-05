@@ -455,7 +455,14 @@ def api_create_order(request):
             if articles:
                 for a in articles:
                     _qty=int(a.get('quantity',1))
-                    _des=str(a.get('name',a.get('designation','Article')))
+                    _aid=str(a.get('id',''))
+                    _des=str(a.get('name',a.get('designation','')))
+                    if not _des and _aid:
+                        try:
+                            from orders.models import ArticleConfig
+                            _des = ArticleConfig.objects.get(article_id=_aid).label
+                        except: _des = f'Article {_aid}'
+                    if not _des: _des = 'Article'
                     OrderItem.objects.create(order=order,designation=_des,quantity=_qty,unit_price=500,total=_qty*500)
             elif nb_articles>0:
                 OrderItem.objects.create(order=order,designation='Articles pressing',quantity=nb_articles,unit_price=500,total=nb_articles*500)

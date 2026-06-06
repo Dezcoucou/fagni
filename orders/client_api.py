@@ -214,22 +214,6 @@ def api_order_detail(request, order_id):
 
     # Calculer le vrai total depuis pricing engine si total_client_ttc manque
     _total_raw = float(order.total_client_ttc or 0) or float(getattr(order,'total',0) or 0)
-    # Recalculer depuis les articles dans notes si total semble incorrect
-    notes_order = order.notes or ''
-    import re as _re, ast as _ast
-    _arts_match = _re.search(r"Articles: (\[.*?\])", notes_order.replace("\n"," "))
-    if _arts_match:
-        try:
-            _arts = _ast.literal_eval(_arts_match.group(1))
-            _nb = sum(int(a.get('quantity') or a.get('qty') or 1) for a in _arts)
-            if _nb > 0:
-                from orders.pricing_engine import calculate_order as _recalc
-                _total_raw = _recalc(_nb, order.bag_size or 'small')['total_client']
-        except: pass
-    elif _total_raw == 0 and order.bag_size:
-        from orders.pricing_engine import calculate_order as _recalc, BAG_CONFIG
-        _nb = BAG_CONFIG.get(order.bag_size, {}).get('max_items', 15)
-        _total_raw = _recalc(_nb, order.bag_size)['total_client']
     total = _total_raw
     amount_paid = float(getattr(order, 'amount_paid', 0) or 0)
 

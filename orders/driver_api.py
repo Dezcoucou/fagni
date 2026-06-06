@@ -714,7 +714,7 @@ def driver_pending_mission(request):
         leg = (
             DeliveryLeg.objects
             .select_related('order', 'order__customer', 'order__laundry_partner', 'driver')
-            .filter(driver=driver, status__in=['pending', 'assigned', 'in_progress'])
+            .filter(driver=driver, status__in=['assigned', 'in_progress'])
             .exclude(status='canceled')
             .order_by('id')
             .first()

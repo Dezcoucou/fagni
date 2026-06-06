@@ -246,6 +246,17 @@ def driver_confirm_pickup(request, order_id):
     try:
         order = Order.objects.get(id=order_id)
         articles_count = request.data.get('articles_count', 0)
+        try: articles_count = int(articles_count)
+        except: articles_count = 0
+        # Controle divergence articles
+        expected = sum(it.quantity for it in order.items.all()) or int(order.articles_count or 0)
+        count_diff = articles_count - expected
+        if expected > 0 and abs(count_diff) > 0:
+            alert_msg = f'⚠️ ECART ARTICLES #{order.code}: attendu {expected}, collecté {articles_count} (diff: {count_diff:+d})'
+            order.notes = (order.notes or '') + f'\n{alert_msg}'
+            order.save(update_fields=['notes','updated_at'])
+            if count_diff > 0:
+                return Response({'error': 'ecart_articles', 'message': f'Tu as compté {articles_count} articles mais la commande en prévoit {expected}. Contacte OPS.', 'expected': expected, 'actual': articles_count}, status=400)
         notes = request.data.get('notes', '')
 
         # Mettre à jour les notes avec le compte articles

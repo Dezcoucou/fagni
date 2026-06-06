@@ -243,15 +243,12 @@ def ops_assign_driver(request, order_id):
         from decimal import Decimal
         from orders.models import DeliveryLeg, sync_delivery_legs_for_order
 
-        # Garantir l'existence des deux jambes avant assignation
-        sync_delivery_legs_for_order(order)
+        # C4b: ne PAS creer leg return ici
 
         if driver_type == 'pickup':
             order.pickup_driver = driver
-            # C4 — En pilote, le livreur retour = livreur collecte
-            order.delivery_partner = driver
             order.cost_driver_pickup = 800
-            order.save(update_fields=['pickup_driver', 'delivery_partner', 'cost_driver_pickup', 'updated_at'])
+            order.save(update_fields=['pickup_driver', 'cost_driver_pickup', 'updated_at'])
 
             leg, _ = DeliveryLeg.objects.get_or_create(
                 order=order,
@@ -270,7 +267,6 @@ def ops_assign_driver(request, order_id):
 
             event_type = 'pickup.assigned'
         else:
-            order.delivery_partner = driver
             order.cost_driver_delivery = 800
             order.save(update_fields=['delivery_partner', 'cost_driver_delivery', 'updated_at'])
 
@@ -1338,7 +1334,6 @@ def ops_assign_return_driver(request, order_id):
             leg.status = "assigned"
             leg.driver_amount = Decimal("800")
             leg.save(update_fields=["driver", "status", "driver_amount"])
-        order.delivery_partner = driver
         order.cost_driver_delivery = 800
         order.save(update_fields=["delivery_partner", "cost_driver_delivery", "updated_at"])
         return Response({"success": True, "message": f"Livreur retour {driver.name} assigne"})

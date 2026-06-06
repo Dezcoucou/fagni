@@ -1323,6 +1323,8 @@ def ops_assign_return_driver(request, order_id):
     from decimal import Decimal
     try:
         order = Order.objects.get(id=order_id)
+        if not order.wash_complete_time:
+            return Response({"error": "Pressing doit marquer PRET avant"}, status=400)
         driver_id = request.data.get("driver_id")
         driver = DeliveryPartner.objects.get(id=driver_id)
         leg, created = DeliveryLeg.objects.get_or_create(

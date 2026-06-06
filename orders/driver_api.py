@@ -210,6 +210,7 @@ def driver_missions(request):
             'leg_id':          leg.id,
             'order_id':        o.id,
             'order_code':      o.code or str(o.id),
+            'articles_count': sum(it.quantity for it in o.items.all()) or int(o.articles_count or 0),
             'mission_type':    'pickup' if is_pickup else 'delivery',
             'leg_type':        leg.leg_type,
             'status':          leg.status,

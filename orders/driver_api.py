@@ -191,7 +191,7 @@ def driver_missions(request):
         DeliveryLeg.objects
         .select_related('order', 'order__customer', 'order__laundry_partner', 'driver')
         .filter(driver=driver)
-        .exclude(status__in=['done', 'canceled'])
+        .exclude(status__in=['done', 'canceled', 'pending'])
         .order_by('id')[:20]
     )
 

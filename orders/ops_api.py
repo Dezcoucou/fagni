@@ -269,15 +269,6 @@ def ops_assign_driver(request, order_id):
             leg.save(update_fields=['driver', 'status', 'driver_amount'])
 
             event_type = 'pickup.assigned'
-            # C4 — Assigner aussi le leg return au même livreur
-            ret_leg, _ = DeliveryLeg.objects.get_or_create(
-                order=order, leg_type="return",
-                defaults={"driver": driver, "status": "pending", "driver_amount": Decimal("800")}
-            )
-            if ret_leg.status == "pending":
-                ret_leg.driver = driver
-                ret_leg.driver_amount = Decimal("800")
-                ret_leg.save(update_fields=["driver", "driver_amount"])
         else:
             order.delivery_partner = driver
             order.cost_driver_delivery = 800
@@ -1322,3 +1313,34 @@ def ops_order_detail(request, order_id):
         return Response({'error': 'Commande introuvable'}, status=404)
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def ops_assign_return_driver(request, order_id):
+    """POST /api/ops/orders/<id>/assign-return-driver/ — assigner livreur retour apres pressing PRET"""
+    try:
+        _check_ops(request)
+    except:
+        return Response({"error": "Non autorise"}, status=401)
+    from orders.models import Order, DeliveryLeg
+    from partners.models import DeliveryPartner
+    from decimal import Decimal
+    try:
+        order = Order.objects.get(id=order_id)
+        driver_id = request.data.get("driver_id")
+        driver = DeliveryPartner.objects.get(id=driver_id)
+        leg, created = DeliveryLeg.objects.get_or_create(
+            order=order, leg_type="return",
+            defaults={"status": "pending", "driver_amount": Decimal("800")}
+        )
+        if leg.status not in ("assigned", "in_progress", "done"):
+            leg.driver = driver
+            leg.status = "assigned"
+            leg.driver_amount = Decimal("800")
+            leg.save(update_fields=["driver", "status", "driver_amount"])
+        order.delivery_partner = driver
+        order.cost_driver_delivery = 800
+        order.save(update_fields=["delivery_partner", "cost_driver_delivery", "updated_at"])
+        return Response({"success": True, "message": f"Livreur retour {driver.name} assigne"})
+    except Exception as e:
+        return Response({"error": str(e)}, status=400)

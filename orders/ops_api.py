@@ -80,6 +80,7 @@ def ops_dashboard(request):
             'code':           o.code or str(o.id),
             'status':         o.status,
             'payment_status': o.payment_status,
+            'lavage_termine': o.wash_complete_time.isoformat() if o.wash_complete_time else None,
             'service_type':   o.service_type or 'pressing',
             'total':          float(o.total_client_ttc or o.total or 0),
             'bag_size':       o.bag_size or '',

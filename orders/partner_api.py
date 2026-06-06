@@ -131,6 +131,14 @@ def partner_update_status(request, order_id):
 
     order.status = new_status
     order.save(update_fields=['status', 'updated_at'])
+    if raw_status in ('ready', 'done') or new_status == 'done':
+        from django.utils import timezone
+        from orders.models import DeliveryLeg
+        Order.objects.filter(pk=order.pk).update(wash_complete_time=timezone.now())
+        DeliveryLeg.objects.get_or_create(
+            order=order, leg_type='return',
+            defaults={'status': 'pending', 'driver_amount': 800}
+        )
     return Response({'success': True, 'status': new_status, 'code': order.code})
 
 

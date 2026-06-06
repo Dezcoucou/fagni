@@ -317,6 +317,8 @@ def ops_mark_paid(request, order_id):
     from orders.models import Order
     try:
         order = Order.objects.get(id=order_id)
+        if order.status not in ("done"):
+            return Response({"error": "Paiement impossible — commande non livrée", "status": order.status}, status=400)
         channel = request.data.get('channel', 'wave')
         reference = (request.data.get('reference') or '').strip()
 

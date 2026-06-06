@@ -8,7 +8,7 @@ from rest_framework.response import Response
 
 def credit_wallet(driver, amount_fcfa, order, description):
     """
-    Crédite le wallet livreur selon le modèle Fonds Sécurité FAGNI : 700 FCFA disponible + 125 FCFA sécurité sur une mission de 800 FCFA.
+    Crédite le wallet livreur selon le modèle Fonds Sécurité FAGNI : disponible = montant - 100 FCFA | sécurité = 125 FCFA (100F livreur + 25F FAGNI).
 
     Version ledger V2 :
     - atomique

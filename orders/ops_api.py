@@ -1115,6 +1115,8 @@ def api_wallet_retrait(request):
             d = DeliveryPartner.objects.get(id=partner_id)
             wallet = Wallet.objects.get(delivery_partner=d)
 
+        frais = 100 if montant < 3000 else 0
+        montant_net = montant - frais
         if float(wallet.balance) < montant:
             return Response({'error': 'Solde insuffisant'}, status=400)
 
@@ -1137,6 +1139,7 @@ def api_wallet_retrait(request):
             'success': True,
             'paiement_id': paiement.id,
             'montant': montant,
+            'frais': frais, 'montant_net': montant_net,
             'solde_actuel': float(wallet.balance),
             'wa_link': wa_link,
             'message': f'Demande de {montant:,} FCFA enregistree. OPS vous paiera sous 24-48h.'

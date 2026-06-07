@@ -83,9 +83,9 @@ def credit_wallet(driver, amount_fcfa, order, description):
             ).first()
 
             if existing:
-                if existing.amount == Decimal("800.00"):
-                    disponible = Decimal("700")
-                    securite = Decimal("125")
+                if existing.amount >= Decimal("125.00"):
+                    disponible = existing.amount - Decimal("100.00")
+                    securite = Decimal("125.00")
                 else:
                     disponible = (existing.amount * Decimal("0.80")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
                     securite = existing.amount - disponible
@@ -97,14 +97,15 @@ def credit_wallet(driver, amount_fcfa, order, description):
                     "idempotency_key": idempotency_key,
                 }
 
-            # Modèle Fonds Sécurité FAGNI V1 :
-            # Sur 800 FCFA par tronçon :
-            # - 700 FCFA disponibles immédiatement
-            # - 100 FCFA épargne sécurité livreur
+            # Modèle Fonds Sécurité & Solidarité FAGNI :
+            # Pour toute mission >= 125 FCFA :
+            # - 100 FCFA cotisation sécurité livreur
             # - 25 FCFA abondement FAGNI
-            if amount == Decimal("800.00"):
-                disponible = Decimal("700")
-                securite = Decimal("125")
+            # - disponible = montant mission - 100 FCFA
+            # - sécurité = 125 FCFA
+            if amount >= Decimal("125.00"):
+                disponible = amount - Decimal("100.00")
+                securite = Decimal("125.00")
             else:
                 disponible = (amount * Decimal("0.80")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
                 securite = amount - disponible
@@ -606,8 +607,8 @@ def driver_wallet(request):
             if amount <= 0:
                 continue
 
-            if amount == 800:
-                disponible = 700
+            if amount >= 125:
+                disponible = amount - 100
                 securite = 125
             else:
                 disponible = int(amount * 0.8)

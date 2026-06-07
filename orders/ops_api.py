@@ -301,6 +301,34 @@ def ops_assign_driver(request, order_id):
         except Exception:
             pass
 
+        # FGP — Cotisation Fonds Garantie Partenaire (version legere)
+        try:
+            from wallets.models import Wallet, WalletTransaction as WT
+            from decimal import Decimal
+            from django.db import transaction as _tx
+            pressing = order.laundry_partner
+            if pressing and order.amount_laundry_partner:
+                ikey_fgp = f"fgp:cotisation:{order.id}"
+                if not WT.objects.filter(idempotency_key=ikey_fgp).exists():
+                    cotisation = Decimal("50")
+                    with _tx.atomic():
+                        w, _ = Wallet.objects.select_for_update().get_or_create(
+                            owner_type="laundry", laundry_partner=pressing,
+                            currency="XOF", defaults={})
+                        if w.balance >= cotisation:
+                            w.balance = (w.balance - cotisation).quantize(Decimal("0.01"))
+                            w.save(update_fields=["balance", "updated_at"])
+                            WT.objects.create(
+                                wallet=w, order=order, leg=None,
+                                type="debit", direction="out", amount=cotisation,
+                                description=f"[FGP_COTISATION] commande {order.code} | 50F cotisation + 25F abondement FAGNI",
+                                idempotency_key=ikey_fgp, allow_orphan=True)
+                        log_event("fgp.cotisation", order=order,
+                            actor_type="system", actor_id="mark_paid",
+                            data={"pressing_id": pressing.id, "cotisation": 50, "abondement_fagni": 25})
+        except Exception as _e:
+            import logging; logging.getLogger("fagni.fgp").warning(f"FGP failed: {_e}")
+
         return Response({'success': True, 'driver': driver.name if driver else None, 'type': driver_type})
     except Exception as e:
         return Response({'error': str(e)}, status=400)

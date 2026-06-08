@@ -625,6 +625,7 @@ def driver_wallet(request):
                 'disponible': disponible,
                 'securite': securite,
                 'date': tx.created_at.strftime('%d/%m/%Y %H:%M') if getattr(tx, "created_at", None) else '',
+            'direction': getattr(tx, 'direction', 'in'),
             })
 
         # MVP terrain : missions terminées mais non encore créditées dans le wallet

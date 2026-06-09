@@ -301,12 +301,13 @@ def ops_assign_driver(request, order_id):
         except Exception:
             pass
 
-        # FGP — Cotisation Fonds Garantie Partenaire (version legere)
+        # FGP — DESACTIVE PILOTE (activation apres 5 pressings + 200 commandes)
+        # FGP — Cotisation Fonds Garantie Partenaire (version legere) — DESACTIVE
         try:
             from wallets.models import Wallet, WalletTransaction as WT
             from decimal import Decimal
             from django.db import transaction as _tx
-            pressing = order.laundry_partner
+            pressing = None  # FGP DESACTIVE PILOTE
             if pressing and order.amount_laundry_partner:
                 ikey_fgp = f"fgp:cotisation:{order.id}"
                 if not WT.objects.filter(idempotency_key=ikey_fgp).exists():

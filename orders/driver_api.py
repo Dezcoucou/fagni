@@ -83,12 +83,9 @@ def credit_wallet(driver, amount_fcfa, order, description):
             ).first()
 
             if existing:
-                if existing.amount >= Decimal("125.00"):
-                    disponible = existing.amount - Decimal("100.00")
-                    securite = Decimal("125.00")
-                else:
-                    disponible = (existing.amount * Decimal("0.80")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-                    securite = existing.amount - disponible
+                # PILOTE : FSS desactive - 100% disponible
+                disponible = existing.amount.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+                securite = Decimal("0")
                 return {
                     "disponible": int(disponible),
                     "securite": int(securite),
@@ -103,12 +100,10 @@ def credit_wallet(driver, amount_fcfa, order, description):
             # - 25 FCFA abondement FAGNI
             # - disponible = montant mission - 100 FCFA
             # - sécurité = 125 FCFA
-            if amount >= Decimal("125.00"):
-                disponible = amount - Decimal("100.00")
-                securite = Decimal("125.00")
-            else:
-                disponible = (amount * Decimal("0.80")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-                securite = amount - disponible
+            # PILOTE : FSS desactive - 100% remuneration
+            # Activation : 10 livreurs + 100 commandes
+            disponible = amount.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+            securite = Decimal("0")
 
             wallet.balance = (wallet.balance + disponible).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             wallet.balance_securite = (wallet.balance_securite + securite).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)

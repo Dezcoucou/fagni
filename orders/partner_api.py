@@ -39,6 +39,17 @@ def partner_login(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+
+def _get_photos_from_notes(notes):
+    result = {}
+    for raw in (notes or '').split('\n'):
+        if raw.startswith('PHOTO_'):
+            parts = raw.split(':', 1)
+            if len(parts) == 2:
+                key = parts[0].replace('PHOTO_', '').lower()
+                result[key] = parts[1].strip()
+    return result
+
 def partner_orders(request):
     """GET /api/partner/orders/ — commandes assignées"""
     try:
@@ -74,7 +85,7 @@ def partner_orders(request):
             'created_at':     o.created_at.isoformat() if o.created_at else None,
             'zone':           o.pickup_address.split(',')[0] if o.pickup_address else '—',
             'articles_count': _count_articles(o),
-        'photos': [{'photo_type': p.photo_type, 'photo_data': p.photo_data} for p in o.photos.all()],
+        'photos': _get_photos_from_notes(o.notes),
         })
 
     stats = {

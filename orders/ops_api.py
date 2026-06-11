@@ -222,6 +222,8 @@ def ops_assign_partner(request, order_id):
         partner = LaundryPartner.objects.get(id=partner_id) if partner_id else None
         order.laundry_partner_id = partner.id if partner else None
         order.save(update_fields=['laundry_partner_id'])
+        if partner:
+            _send_notif_pressing(order)
         return Response({'success': True, 'partner': partner.name if partner else None})
     except Exception as e:
         return Response({'error': str(e)}, status=400)
@@ -245,6 +247,8 @@ def ops_update_status(request, order_id):
             return Response({'error': 'Statut invalide'}, status=400)
         order.status = new_status
         order.save(update_fields=['status','updated_at'])
+        if new_status == 'delivering':
+            _send_notif_client_livraison(order)
 
         # Recalcul Partner Score si statut terminal
         if new_status in ('done', 'canceled') and order.laundry_partner_id:
@@ -301,6 +305,7 @@ def ops_assign_driver(request, order_id):
             leg.save(update_fields=['driver', 'status', 'driver_amount'])
 
             event_type = 'pickup.assigned'
+            _send_notif_mission(order, driver)
         else:
             order.cost_driver_delivery = 800
             order.save(update_fields=['delivery_partner', 'cost_driver_delivery', 'updated_at'])
@@ -321,6 +326,7 @@ def ops_assign_driver(request, order_id):
             leg.save(update_fields=['driver', 'status', 'driver_amount'])
 
             event_type = 'delivery.assigned'
+        _send_notif_mission(order, driver)
 
         # Event logging LOT1
         try:

@@ -4428,3 +4428,22 @@ class FCMToken(models.Model):
 
     def __str__(self):
         return f"FCM {self.user_type} #{self.user_id}"
+
+
+# =====================
+# Photos commandes pressing
+# =====================
+class OrderPhoto(models.Model):
+    PHOTO_TYPES = [('before','Avant traitement'),('after','Après traitement')]
+    order = models.ForeignKey('orders.Order', on_delete=models.CASCADE, related_name='photos')
+    photo_type = models.CharField(max_length=10, choices=PHOTO_TYPES)
+    photo_data = models.TextField(blank=True)
+    uploaded_by = models.CharField(max_length=20, default='partner')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [('order', 'photo_type')]
+        verbose_name = 'Photo commande'
+
+    def __str__(self):
+        return f"Photo {self.photo_type} - commande {self.order_id}"

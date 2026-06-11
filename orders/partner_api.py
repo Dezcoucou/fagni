@@ -227,3 +227,26 @@ def partner_order_detail(request, order_id):
         return Response({'error': 'Commande introuvable'}, status=404)
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def partner_upload_photo(request, order_id):
+    try:
+        partner = _get_partner(request)
+    except:
+        return Response({'error': 'Non autorise'}, status=401)
+    try:
+        from orders.models import Order, OrderPhoto
+        order = Order.objects.get(id=order_id, laundry_partner=partner)
+        photo_data = request.data.get('photo', '')
+        photo_type = request.data.get('type', 'before')
+        if not photo_data:
+            return Response({'error': 'Photo manquante'}, status=400)
+        # Sauvegarder en base
+        OrderPhoto.objects.update_or_create(
+            order=order, photo_type=photo_type,
+            defaults={'photo_data': photo_data[:500000], 'uploaded_by': 'partner'}
+        )
+        return Response({'success': True, 'type': photo_type})
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

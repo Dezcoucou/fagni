@@ -116,7 +116,7 @@ def partner_update_status(request, order_id):
     }
     new_status = STATUS_MAP.get(raw_status, raw_status)
 
-    ALLOWED = ['in_progress', 'done', 'pending']
+    ALLOWED = ['in_progress', 'done', 'pending', 'ready']
     if new_status not in ALLOWED:
         return Response({
             'error': 'statut_invalide',

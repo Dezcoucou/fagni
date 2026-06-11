@@ -807,3 +807,21 @@ def api_driver_profil_update(request):
         return Response({'success': True, 'wave_number': driver.wave_number})
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def save_fcm_token(request):
+    try:
+        token = request.data.get('token')
+        user_type = request.data.get('user_type', 'driver')
+        user_id = request.data.get('user_id')
+        if not token:
+            return Response({'error': 'token requis'}, status=400)
+        from orders.models import FCMToken
+        FCMToken.objects.update_or_create(
+            user_type=user_type, user_id=user_id,
+            defaults={'token': token}
+        )
+        return Response({'ok': True})
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)

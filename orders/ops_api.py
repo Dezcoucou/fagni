@@ -1,3 +1,37 @@
+
+def _send_notif_mission(order, driver):
+    try:
+        from orders.models import FCMToken
+        from fagni.notifications import notif_mission_assignee
+        t = FCMToken.objects.filter(user_type='driver', user_id=driver.id).first()
+        if t:
+            notif_mission_assignee(t.token, getattr(order, 'code', str(order.id)))
+    except Exception as e:
+        print(f"[NOTIF] mission: {e}")
+
+def _send_notif_pressing(order):
+    try:
+        from orders.models import FCMToken
+        from fagni.notifications import notif_pressing_commande
+        partner = getattr(order, 'laundry_partner', None)
+        if partner:
+            t = FCMToken.objects.filter(user_type='partner', user_id=partner.id).first()
+            if t:
+                notif_pressing_commande(t.token, getattr(order, 'code', str(order.id)))
+    except Exception as e:
+        print(f"[NOTIF] pressing: {e}")
+
+def _send_notif_client_livraison(order):
+    try:
+        from orders.models import FCMToken
+        from fagni.notifications import notif_client_livraison
+        customer = getattr(order, 'customer', None)
+        if customer:
+            t = FCMToken.objects.filter(user_type='client', user_id=customer.id).first()
+            if t:
+                notif_client_livraison(t.token, getattr(order, 'code', str(order.id)))
+    except Exception as e:
+        print(f"[NOTIF] client livraison: {e}")
 """API Opérateur FAGNI — Dashboard de pilotage"""
 import jwt
 from django.conf import settings

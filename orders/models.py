@@ -4409,3 +4409,22 @@ def log_event(event_type, order=None, actor_type="system", actor_id=None, **payl
         )
     except Exception:
         pass  # Ne jamais bloquer le flux principal pour un log
+
+
+# =====================
+# FCM Push Notifications
+# =====================
+class FCMToken(models.Model):
+    USER_TYPES = [('client','Client'),('driver','Livreur'),('partner','Pressing'),('ops','OPS')]
+    user_type = models.CharField(max_length=20, choices=USER_TYPES)
+    user_id = models.IntegerField()
+    token = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [('user_type', 'user_id')]
+        verbose_name = 'Token FCM'
+
+    def __str__(self):
+        return f"FCM {self.user_type} #{self.user_id}"

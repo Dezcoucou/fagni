@@ -37,16 +37,14 @@ def partner_login(request):
     })
 
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
 
 def _get_photos_from_notes(notes):
     result = {}
-    for raw in (notes or '').split('\n'):
-        if raw.startswith('PHOTO_'):
-            parts = raw.split(':', 1)
+    for raw in (notes or "").split("\n"):
+        if raw.startswith("PHOTO_"):
+            parts = raw.split(":", 1)
             if len(parts) == 2:
-                key = parts[0].replace('PHOTO_', '').lower()
+                key = parts[0].replace("PHOTO_", "").lower()
                 result[key] = parts[1].strip()
     return result
 

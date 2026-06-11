@@ -109,7 +109,7 @@ def partner_update_status(request, order_id):
         'recu': 'in_progress',
         'reçu': 'in_progress',
         'start': 'in_progress',
-        'ready': 'in_progress',
+        'ready': 'ready',
         'in_progress': 'in_progress',
         'done': 'done',
         'pending': 'pending',

@@ -48,6 +48,8 @@ def _get_photos_from_notes(notes):
                 result[key] = parts[1].strip()
     return result
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def partner_orders(request):
     """GET /api/partner/orders/ — commandes assignées"""
     try:

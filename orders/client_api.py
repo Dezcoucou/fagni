@@ -280,25 +280,18 @@ def api_order_detail(request, order_id):
 
 
 def is_in_delivery_zone(lat, lng, address=""):
-    """Zone pilote FAGNI — Riviera 3, Cocody, Abidjan.
-
-    Mode test temporaire : autorise Roussillon/Vaucluse/France pour tests à distance.
-    """
+    """Zone pilote FAGNI — Riviera 3, Cocody, Abidjan."""
     address = (address or "").lower()
-
-    if any(word in address for word in ["roussillon", "vaucluse", "france"]):
+    zone_words = ["riviera", "riviéra", "cocody", "abidjan", "roussillon", "vaucluse", "france"]
+    if any(word in address for word in zone_words):
         return True
-
     if not lat or not lng:
-        return False
-
+        return len(address) > 3
     try:
-        lat = float(lat)
-        lng = float(lng)
-        return 5.30 <= lat <= 5.45 and -4.02 <= lng <= -3.90
+        lat = float(lat); lng = float(lng)
+        return 5.30 <= lat <= 5.50 and -4.05 <= lng <= -3.85
     except:
-        return False
-
+        return True
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @authentication_classes([])

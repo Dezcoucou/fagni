@@ -74,6 +74,7 @@ def partner_orders(request):
             'created_at':     o.created_at.isoformat() if o.created_at else None,
             'zone':           o.pickup_address.split(',')[0] if o.pickup_address else '—',
             'articles_count': _count_articles(o),
+        'photos': [{'photo_type': p.photo_type, 'photo_data': p.photo_data} for p in o.photos.all()],
         })
 
     stats = {

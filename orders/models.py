@@ -82,8 +82,13 @@ def sync_delivery_legs_for_order(order):
 
     legs_data = [
         ("pickup", client_share_1, driver_share_1, margin_share_1),
-        ("return", client_share_2, driver_share_2, margin_share_2),
     ]
+
+    # 🔒 Workflow pilote :
+    # ne pas créer la jambe retour avant que le pressing ait marqué la commande PRÊTE.
+    # Si une jambe retour existe déjà, on la conserve pour compatibilité/historique.
+    if getattr(order, "wash_complete_time", None) or DeliveryLeg.objects.filter(order=order, leg_type="return").exists():
+        legs_data.append(("return", client_share_2, driver_share_2, margin_share_2))
 
     _status_rank = {"done": 5, "in_progress": 4, "assigned": 3, "pending": 2, "canceled": 1}
 

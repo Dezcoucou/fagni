@@ -49,7 +49,6 @@ def _get_photos_from_notes(notes):
     return result
 
 @api_view(["GET"])
-@api_view(["GET"])
 @permission_classes([AllowAny])
 def partner_orders(request):
     """GET /api/partner/orders/ — commandes assignées"""

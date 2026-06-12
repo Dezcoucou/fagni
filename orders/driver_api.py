@@ -288,8 +288,9 @@ def driver_confirm_pickup(request, order_id):
         )
 
 
-        # Marquer la mission pickup comme terminée
+        # Marquer la mission pickup comme collectée chez le client
         try:
+            from django.utils import timezone
             from orders.models import DeliveryLeg, sync_order_status_from_legs
             pickup_leg = DeliveryLeg.objects.filter(
                 order=order,
@@ -301,13 +302,17 @@ def driver_confirm_pickup(request, order_id):
             ).first()
 
             if pickup_leg:
+                now = timezone.now()
                 pickup_leg.driver = driver
-                pickup_leg.status = 'done'
-                if hasattr(pickup_leg, 'finished_at'):
-                    pickup_leg.finished_at = timezone.now()
-                    pickup_leg.save(update_fields=['driver', 'status', 'finished_at'])
+                pickup_leg.status = 'in_progress'
+                if hasattr(pickup_leg, 'started_at'):
+                    pickup_leg.started_at = now
+                    pickup_leg.save(update_fields=['driver', 'status', 'started_at'])
                 else:
                     pickup_leg.save(update_fields=['driver', 'status'])
+
+                # Horodatage collecte client
+                Order.objects.filter(pk=order.pk).update(pickup_time=now)
 
             sync_order_status_from_legs(order, save=True)
         except Exception:
@@ -508,6 +513,15 @@ def api_driver_dropoff(request, order_id):
     from orders.models import Order, DeliveryLeg, OrderEvidencePhoto, sync_order_status_from_legs
     try:
         order = Order.objects.get(id=order_id)
+
+        # 🔒 Garde-fou métier : impossible de déposer au pressing
+        # si aucun pressing n'est assigné à la commande.
+        if not getattr(order, 'laundry_partner_id', None):
+            return Response({
+                'error': 'pressing_non_assigne',
+                'message': 'Impossible de déposer : aucun pressing n’est assigné à cette commande.'
+            }, status=400)
+
         now = timezone.now()
         photo_b64 = (request.data.get('photo') or '').strip()
 

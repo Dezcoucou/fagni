@@ -307,6 +307,12 @@ def ops_assign_driver(request, order_id):
             event_type = 'pickup.assigned'
             _send_notif_mission(order, driver)
         else:
+            # Sécurité workflow : le retour ne peut être assigné qu'après pressing PRÊT.
+            # L'assignation retour officielle passe par ops_assign_return_driver().
+            if not order.wash_complete_time:
+                return Response({'error': 'Retour impossible : pressing pas encore PRÊT'}, status=400)
+
+            order.delivery_partner = driver
             order.cost_driver_delivery = 800
             order.save(update_fields=['delivery_partner', 'cost_driver_delivery', 'updated_at'])
 

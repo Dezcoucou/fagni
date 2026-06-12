@@ -2168,8 +2168,8 @@ def ops_update_step(request, order_id, action):
     if already_done and action != "wash_done":
         messages.warning(request, f"Déjà fait : {label}.")
         return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}")
-    # 🔒 Garde-fou métier : dépôt pressing interdit sans pressing assigné
-    if action == "dropoff" and not getattr(order, "laundry_partner_id", None):
+    # 🔒 Garde-fou métier : les étapes liées au pressing exigent un pressing assigné
+    if action in {"dropoff", "wash_done", "return"} and not getattr(order, "laundry_partner_id", None):
         messages.error(request, "Impossible : aucun pressing n’est assigné à cette commande.")
         return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}")
 

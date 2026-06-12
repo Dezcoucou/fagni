@@ -1411,6 +1411,7 @@ def ops_assign_return_driver(request, order_id):
             leg.status = "assigned"
             leg.driver_amount = Decimal("800")
             leg.save(update_fields=["driver", "status", "driver_amount"])
+        order.delivery_partner = driver
         order.cost_driver_delivery = 800
         order.save(update_fields=["delivery_partner", "cost_driver_delivery", "updated_at"])
         return Response({"success": True, "message": f"Livreur retour {driver.name} assigne"})

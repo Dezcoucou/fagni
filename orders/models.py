@@ -1593,10 +1593,19 @@ class Order(models.Model):
                 pass
         else:
             self.delivery_fee = data.get('delivery_fee_client', Decimal('0'))
-            self.driver_logistic_cost = data.get('delivery_cost_driver', Decimal('0'))
-            self.amount_driver_partner = data.get('amount_driver', data.get('delivery_cost_driver', Decimal('0')))
+
+            # 🔒 Verrou pilote livreur :
+            # si amount_driver_partner existe déjà, ne jamais le recalculer.
+            # Source de vérité : client_api à la création = 1600 FCFA.
+            existing_driver_total = Decimal(str(getattr(self, "amount_driver_partner", 0) or 0))
+            if existing_driver_total > 0:
+                self.driver_logistic_cost = existing_driver_total
+            else:
+                self.driver_logistic_cost = data.get('delivery_cost_driver', Decimal('0'))
+                self.amount_driver_partner = data.get('amount_driver', data.get('delivery_cost_driver', Decimal('0')))
+
             try:
-                margin_delivery = data.get('margin_delivery', 0)
+                margin_delivery = self.delivery_fee - Decimal(str(getattr(self, "amount_driver_partner", 0) or 0))
                 self.logistic_margin = int(margin_delivery)
             except Exception:
                 self.logistic_margin = 0
@@ -1613,7 +1622,11 @@ class Order(models.Model):
         ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
         # 6) Total TTC client (OFFICIEL)
-        self.total_client_ttc = data.get("total_client_ttc", data.get("total_ttc_client", Decimal("0")))
+        # 🔒 Verrou pilote : une fois créé, le prix client ne doit jamais être recalculé
+        # par update_financials(). Le prix affiché au client reste la source de vérité.
+        existing_total = Decimal(str(getattr(self, "total_client_ttc", 0) or 0))
+        if existing_total <= 0:
+            self.total_client_ttc = data.get("total_client_ttc", data.get("total_ttc_client", Decimal("0")))
 
         # ✅ Compat : ancien champ total = total client TTC
         self.total = self.total_client_ttc

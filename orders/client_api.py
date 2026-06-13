@@ -366,7 +366,7 @@ def api_create_order(request):
     _sf_raw = _ta * _D('0.05')  # 5% du montant pressing
     _sf = max(_D('500'), _sf_raw)  # minimum 500 FCFA
     _total = _ta + _df + _sf
-    _pricing = {'total_client':float(_total),'delivery_fee':float(_df),'service_fee':float(_sf),'part_pressing':float(_ta*(1-_cp)),'part_livreur':float(_df*_D('0.70')),'marge_pressing':float(_ta*_cp),'marge_livraison':float(_df*_D('0.30')),'total_fagni':float(_ta*_cp+_sf+_df*_D('0.30'))}
+    _pricing = {'total_client':float(_total),'delivery_fee':float(_df),'service_fee':float(_sf),'part_pressing':float(_ta*(1-_cp)),'part_livreur':float(_df*_D('0.80')),'marge_pressing':float(_ta*_cp),'marge_livraison':float(_df*_D('0.20')),'total_fagni':float(_ta*_cp+_sf+_df*_D('0.20'))}
     bag_price = float(_ta + _df + _sf)
     service_fee = _sf
     total       = _pricing['total_client']

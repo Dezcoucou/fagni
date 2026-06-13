@@ -355,11 +355,11 @@ def distribute_order_revenues(
 
     # 4.c Wallet interne FAGNI (revenu plateforme)
     internal_wallet = get_or_create_internal_wallet()
-    if fagni_ttc > 0:
+    if fagni_ht > 0:
         txs["internal"] = credit_wallet(
             internal_wallet,
-            fagni_ttc,
-            description=f"Commande {order.code} – revenu FAGNI TTC",
+            fagni_ht,
+            description=f"Commande {order.code} – revenu FAGNI",
             order=order,
             tx_type="credit",
             idempotency_key=f"internal:{order.id}",

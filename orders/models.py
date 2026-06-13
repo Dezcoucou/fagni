@@ -1619,7 +1619,13 @@ class Order(models.Model):
         self.commission_delivery_ht = data.get("commission_delivery_ht", self.amount_driver_partner)
 
         # 5) FAGNI
-        self.fagni_revenue_ht = data.get("fagni_revenue_ht", Decimal("0"))
+        # Source finale : champs réellement verrouillés après lock_pool
+        # pour éviter un écart entre marge livraison calculée et marge livraison réelle.
+        self.fagni_revenue_ht = (
+            Decimal(str(getattr(self, "commission_laundry_ht", 0) or 0))
+            + Decimal(str(getattr(self, "logistic_margin", 0) or 0))
+            + Decimal(str(getattr(self, "service_fee", 0) or 0))
+        ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
         self.vat_fagni = data.get("vat_fagni", Decimal("0"))
 
         self.fagni_revenue_ttc = (

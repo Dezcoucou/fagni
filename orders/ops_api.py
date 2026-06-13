@@ -247,9 +247,6 @@ def ops_update_status(request, order_id):
             return Response({'error': 'Statut invalide'}, status=400)
         order.status = new_status
         order.save(update_fields=['status','updated_at'])
-        if new_status == 'delivering':
-            _send_notif_client_livraison(order)
-
         # Recalcul Partner Score si statut terminal
         if new_status in ('done', 'canceled') and order.laundry_partner_id:
             try:
@@ -332,6 +329,7 @@ def ops_assign_driver(request, order_id):
             leg.save(update_fields=['driver', 'status', 'driver_amount'])
 
             event_type = 'delivery.assigned'
+            _send_notif_client_livraison(order)
         _send_notif_mission(order, driver)
 
         # Event logging LOT1

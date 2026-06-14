@@ -1418,6 +1418,11 @@ def ops_assign_return_driver(request, order_id):
         order.delivery_partner = driver
         order.cost_driver_delivery = 800
         order.save(update_fields=["delivery_partner", "cost_driver_delivery", "updated_at"])
+
+        # Notifications retour : livreur + client
+        _send_notif_mission(order, driver)
+        _send_notif_client_livraison(order)
+
         return Response({"success": True, "message": f"Livreur retour {driver.name} assigne"})
     except Exception as e:
         return Response({"error": str(e)}, status=400)

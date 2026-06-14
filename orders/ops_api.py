@@ -1,4 +1,17 @@
 
+def _send_notif_ops(order, title="FAGNI OPS", body=None):
+    try:
+        from orders.models import FCMToken
+        from fagni.notifications import send_push
+        code = getattr(order, 'code', str(getattr(order, 'id', '')))
+        body = body or f"Commande {code} à traiter"
+        tokens = FCMToken.objects.filter(user_type='ops')
+        for t in tokens:
+            send_push(t.token, title, body, {"type": "ops", "order_id": getattr(order, "id", ""), "order_code": code})
+    except Exception as e:
+        print(f"[NOTIF] ops: {e}")
+
+
 def _send_notif_mission(order, driver):
     try:
         from orders.models import FCMToken
@@ -224,6 +237,7 @@ def ops_assign_partner(request, order_id):
         order.save(update_fields=['laundry_partner_id'])
         if partner:
             _send_notif_pressing(order)
+            _send_notif_ops(order, "Pressing assigné", f"Commande {order.code} assignée à {partner.name}")
         return Response({'success': True, 'partner': partner.name if partner else None})
     except Exception as e:
         return Response({'error': str(e)}, status=400)

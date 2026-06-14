@@ -479,6 +479,23 @@ def api_create_order(request):
         except:
             pass
 
+        # Notification push OPS
+        try:
+            from orders.models import FCMToken
+            from fagni.notifications import send_push
+
+            title = "Nouvelle commande FAGNI"
+            body = f"{order.code} - {customer.name} - {total:,} FCFA"
+            for t in FCMToken.objects.filter(user_type="ops"):
+                send_push(
+                    t.token,
+                    title,
+                    body,
+                    {"type": "ops_new_order", "order_id": order.id, "order_code": order.code or str(order.id)}
+                )
+        except Exception as e:
+            print(f"[NOTIF] ops new order: {e}")
+
         return Response({
             'order_id':      order.id,
             'code':          order.code or str(order.id),

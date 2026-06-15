@@ -149,7 +149,27 @@
     }
   }
 
-  registerClientFCM();
+
+  function injectFagniNotifButton(){
+    if (document.getElementById("fagni-enable-notifs")) return;
+    const btn = document.createElement("button");
+    btn.id = "fagni-enable-notifs";
+    btn.type = "button";
+    btn.textContent = "🔔 Activer les notifications";
+    btn.style.cssText = "position:fixed;left:14px;right:14px;bottom:86px;z-index:9999;padding:13px 16px;border:0;border-radius:18px;background:#C9A84C;color:#0A1628;font-weight:900;box-shadow:0 12px 30px rgba(0,0,0,.25);";
+    btn.addEventListener("click", async function(){
+      await registerClientFCM();
+      btn.remove();
+    });
+    document.body.appendChild(btn);
+  }
+
+  if (Notification.permission === "granted") {
+    registerClientFCM();
+  } else if (Notification.permission === "default") {
+    injectFagniNotifButton();
+  }
+
 })();
 </script>
 

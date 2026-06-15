@@ -832,6 +832,14 @@ def save_fcm_token(request):
         if not token:
             return Response({'error': 'token requis'}, status=400)
         from orders.models import FCMToken
+
+        # Un même appareil/token ne doit pas être attaché à plusieurs profils.
+        # Sinon Firebase reçoit plusieurs envois vers le même téléphone.
+        FCMToken.objects.filter(token=token).exclude(
+            user_type=user_type,
+            user_id=user_id
+        ).delete()
+
         FCMToken.objects.update_or_create(
             user_type=user_type, user_id=user_id,
             defaults={'token': token}

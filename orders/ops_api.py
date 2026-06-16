@@ -289,62 +289,41 @@ def ops_assign_driver(request, order_id):
         order = Order.objects.get(id=order_id)
         driver_id = request.data.get('driver_id')
         driver = DeliveryPartner.objects.get(id=driver_id) if driver_id else None
-        driver_type = request.data.get('driver_type', 'delivery')
+        driver_type = request.data.get('driver_type', 'pickup')
         from decimal import Decimal
         from orders.models import DeliveryLeg, sync_delivery_legs_for_order
 
-        # C4b: ne PAS creer leg return ici
+        # Verrou pilote : cet endpoint est reserve a la collecte.
+        # Le retour officiel passe par /assign-return-driver/ apres pressing PRET.
+        if driver_type != 'pickup':
+            return Response({
+                'error': 'Endpoint reserve a la collecte. Utiliser assign-return-driver pour le retour.'
+            }, status=400)
 
-        if driver_type == 'pickup':
-            order.pickup_driver = driver
-            order.cost_driver_pickup = 800
-            order.save(update_fields=['pickup_driver', 'cost_driver_pickup', 'updated_at'])
+        order.pickup_driver = driver
+        order.cost_driver_pickup = 800
+        order.save(update_fields=['pickup_driver', 'cost_driver_pickup', 'updated_at'])
 
-            leg, _ = DeliveryLeg.objects.get_or_create(
-                order=order,
-                leg_type='pickup',
-                defaults={
-                    'driver': driver,
-                    'status': 'pending',
-                    'driver_amount': Decimal('800'),
-                }
-            )
-            leg.driver = driver
-            if leg.status == 'pending':
-                leg.status = 'assigned'
-            leg.driver_amount = Decimal('800')
-            leg.save(update_fields=['driver', 'status', 'driver_amount'])
+        leg, _ = DeliveryLeg.objects.get_or_create(
+            order=order,
+            leg_type='pickup',
+            defaults={
+                'driver': driver,
+                'status': 'pending',
+                'driver_amount': Decimal('800'),
+            }
+        )
+        assigned_now = False
+        leg.driver = driver
+        if leg.status == 'pending':
+            leg.status = 'assigned'
+            assigned_now = True
+        leg.driver_amount = Decimal('800')
+        leg.save(update_fields=['driver', 'status', 'driver_amount'])
 
-            event_type = 'pickup.assigned'
+        event_type = 'pickup.assigned'
+        if assigned_now:
             _send_notif_mission(order, driver)
-        else:
-            # Sécurité workflow : le retour ne peut être assigné qu'après pressing PRÊT.
-            # L'assignation retour officielle passe par ops_assign_return_driver().
-            if not order.wash_complete_time:
-                return Response({'error': 'Retour impossible : pressing pas encore PRÊT'}, status=400)
-
-            order.delivery_partner = driver
-            order.cost_driver_delivery = 800
-            order.save(update_fields=['delivery_partner', 'cost_driver_delivery', 'updated_at'])
-
-            leg, _ = DeliveryLeg.objects.get_or_create(
-                order=order,
-                leg_type='return',
-                defaults={
-                    'driver': driver,
-                    'status': 'pending',
-                    'driver_amount': Decimal('800'),
-                }
-            )
-            leg.driver = driver
-            if leg.status == 'pending':
-                leg.status = 'assigned'
-            leg.driver_amount = Decimal('800')
-            leg.save(update_fields=['driver', 'status', 'driver_amount'])
-
-            event_type = 'delivery.assigned'
-            _send_notif_client_livraison(order)
-        _send_notif_mission(order, driver)
 
         # Event logging LOT1
         try:
@@ -1424,18 +1403,22 @@ def ops_assign_return_driver(request, order_id):
             order=order, leg_type="return",
             defaults={"status": "pending", "driver_amount": Decimal("800")}
         )
+        assigned_now = False
         if leg.status not in ("assigned", "in_progress", "done"):
             leg.driver = driver
             leg.status = "assigned"
             leg.driver_amount = Decimal("800")
             leg.save(update_fields=["driver", "status", "driver_amount"])
+            assigned_now = True
+
         order.delivery_partner = driver
         order.cost_driver_delivery = 800
         order.save(update_fields=["delivery_partner", "cost_driver_delivery", "updated_at"])
 
-        # Notifications retour : livreur + client
-        _send_notif_mission(order, driver)
-        _send_notif_client_livraison(order)
+        # Notifications retour : une seule fois, uniquement lors de l'assignation effective.
+        if assigned_now:
+            _send_notif_mission(order, driver)
+            _send_notif_client_livraison(order)
 
         return Response({"success": True, "message": f"Livreur retour {driver.name} assigne"})
     except Exception as e:

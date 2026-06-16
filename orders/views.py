@@ -13845,6 +13845,19 @@ def laundry_order_detail(request, order_id):
                     else:
                         order.save(update_fields=["wash_complete_time"])
 
+                    try:
+                        from orders.models import log_event
+                        log_event(
+                            "pressing.ready",
+                            order=order,
+                            actor_type="partner",
+                            actor_id=laundry.id,
+                            partner_id=laundry.id,
+                            partner_name=getattr(laundry, "name", ""),
+                        )
+                    except Exception:
+                        pass
+
                     # ✅ Dès que c'est "Prêt", on crée/active la mission RETOUR
                     DeliveryLeg.objects.get_or_create(
                         order=order,

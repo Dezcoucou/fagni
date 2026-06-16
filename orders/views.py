@@ -13130,8 +13130,30 @@ def client_new_order_step3(request, order_id: int):
     error = None
     selected_bag_size = getattr(order, "bag_size", None) or "medium"
     bag_rules_confirmed = bool(request.session.get(f"client_bag_rules_confirmed_{order.id}", False))
+    cgu_accepted = bool(request.session.get(f"client_cgu_accepted_{order.id}", False))
 
     if request.method == "POST":
+        accepted_cgu = (request.POST.get("accepted_cgu") or "").strip() == "1"
+
+        if not accepted_cgu:
+            error = "Merci d'accepter les Conditions Générales d'Utilisation FAGNI avant de continuer."
+        else:
+            if not cgu_accepted:
+                try:
+                    from orders.models import log_event
+                    log_event(
+                        "cgu.accepted",
+                        order=order,
+                        actor_type="client",
+                        actor_id=order.customer_id,
+                        cgu_version="1.3",
+                        source="client_new_order_step3",
+                    )
+                except Exception:
+                    pass
+            request.session[f"client_cgu_accepted_{order.id}"] = True
+
+    if request.method == "POST" and not error:
         if pricing_mode == "bag":
             bag_size = (request.POST.get("bag_size") or "").strip().lower()
             confirm_rules = (request.POST.get("confirm_bag_rules") or "").strip()
@@ -13275,6 +13297,7 @@ def client_new_order_step3(request, order_id: int):
         "qty_by_service": qty_by_service,
         "selected_bag_size": selected_bag_size,
         "bag_rules_confirmed": bag_rules_confirmed,
+        "cgu_accepted": cgu_accepted,
         "error": error,
     })
 

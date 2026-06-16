@@ -13133,27 +13133,6 @@ def client_new_order_step3(request, order_id: int):
     cgu_accepted = bool(request.session.get(f"client_cgu_accepted_{order.id}", False))
 
     if request.method == "POST":
-        accepted_cgu = (request.POST.get("accepted_cgu") or "").strip() == "1"
-
-        if not accepted_cgu:
-            error = "Merci d'accepter les Conditions Générales d'Utilisation FAGNI avant de continuer."
-        else:
-            if not cgu_accepted:
-                try:
-                    from orders.models import log_event
-                    log_event(
-                        "cgu.accepted",
-                        order=order,
-                        actor_type="client",
-                        actor_id=order.customer_id,
-                        cgu_version="1.3",
-                        source="client_new_order_step3",
-                    )
-                except Exception:
-                    pass
-            request.session[f"client_cgu_accepted_{order.id}"] = True
-
-    if request.method == "POST" and not error:
         if pricing_mode == "bag":
             bag_size = (request.POST.get("bag_size") or "").strip().lower()
             confirm_rules = (request.POST.get("confirm_bag_rules") or "").strip()
@@ -13405,6 +13384,30 @@ def client_new_order_step4(request, order_id: int):
         return redirect("orders:client_new_order_step3", order_id=order.id)
 
     if request.method == "POST":
+        accepted_cgu = (request.POST.get("accepted_cgu") or "").strip() == "1"
+        if not accepted_cgu:
+            try:
+                from django.contrib import messages
+                messages.error(request, "Merci d'accepter les Conditions Générales d'Utilisation FAGNI avant de confirmer la commande.")
+            except Exception:
+                pass
+            return redirect("orders:client_new_order_step4", order_id=order.id)
+
+        if not bool(request.session.get(f"client_cgu_accepted_{order.id}", False)):
+            try:
+                from orders.models import log_event
+                log_event(
+                    "cgu.accepted",
+                    order=order,
+                    actor_type="client",
+                    actor_id=order.customer_id,
+                    cgu_version="1.3",
+                    source="client_new_order_step4",
+                )
+            except Exception:
+                pass
+        request.session[f"client_cgu_accepted_{order.id}"] = True
+
         if not is_bag_mode:
             # --- Garde-fou item: refuse confirmation si total prestations = 0 ---
             try:
@@ -13605,6 +13608,8 @@ def client_new_order_step4(request, order_id: int):
             return redirect("orders:client_order_pay_wave_page", order_id=order.id)
         return redirect("orders:client_order_detail", order_id=order.id)
 
+    cgu_accepted = bool(request.session.get(f"client_cgu_accepted_{order.id}", False))
+
     return render(request, "orders/client_new_order_step4.html", {
         "display_summary": display_summary,
         "finance_summary": finance_summary,
@@ -13613,6 +13618,7 @@ def client_new_order_step4(request, order_id: int):
         "is_bag_mode": is_bag_mode,
         "bag_size": bag_size,
         "bag_label": display_summary.get("bag_label", "Sac moyen"),
+        "cgu_accepted": cgu_accepted,
         "bag_base_price": bag_price_map.get(bag_size, 10000),
         "amounts": amounts,
         "finance_breakdown": finance_breakdown,

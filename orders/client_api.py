@@ -323,7 +323,7 @@ def api_create_order(request):
         return Response({
             'error': 'cgu_required',
             'message': "Merci d'accepter les Conditions Générales d'Utilisation FAGNI avant de confirmer la commande.",
-            'cgu_version': '1.3',
+            'cgu_version': '1.4',
         }, status=400)
 
     bag_size      = (request.data.get('bag_size') or '').strip()
@@ -472,7 +472,7 @@ def api_create_order(request):
             log_event(
                 "cgu.accepted", order=order,
                 actor_type="client", actor_id=customer.id,
-                cgu_version="1.3",
+                cgu_version="1.4",
                 source="api_create_order",
             )
             log_event(

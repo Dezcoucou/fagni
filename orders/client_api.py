@@ -315,6 +315,17 @@ def api_create_order(request):
     except Exception:
         return Response({'error': 'Non autorisé'}, status=401)
 
+    accepted_cgu = str(
+        request.data.get('accepted_cgu') or request.data.get('cgu_accepted') or ''
+    ).strip().lower()
+
+    if accepted_cgu not in ('1', 'true', 'yes', 'on'):
+        return Response({
+            'error': 'cgu_required',
+            'message': "Merci d'accepter les Conditions Générales d'Utilisation FAGNI avant de confirmer la commande.",
+            'cgu_version': '1.3',
+        }, status=400)
+
     bag_size      = (request.data.get('bag_size') or '').strip()
     pickup_addr   = (request.data.get('pickup_address') or '').strip()
     pickup_lat    = request.data.get('pickup_lat')
@@ -458,6 +469,12 @@ def api_create_order(request):
         # Event logging LOT1
         try:
             from orders.models import log_event
+            log_event(
+                "cgu.accepted", order=order,
+                actor_type="client", actor_id=customer.id,
+                cgu_version="1.3",
+                source="api_create_order",
+            )
             log_event(
                 "order.created", order=order,
                 actor_type="client", actor_id=customer.id,

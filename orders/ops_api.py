@@ -238,6 +238,18 @@ def ops_assign_partner(request, order_id):
         if partner:
             _send_notif_pressing(order)
             _send_notif_ops(order, "Pressing assigné", f"Commande {order.code} assignée à {partner.name}")
+            try:
+                from orders.models import log_event
+                log_event(
+                    "partner.assigned",
+                    order=order,
+                    actor_type="ops",
+                    actor_id=None,
+                    partner_id=partner.id,
+                    partner_name=partner.name,
+                )
+            except Exception:
+                pass
         return Response({'success': True, 'partner': partner.name if partner else None})
     except Exception as e:
         return Response({'error': str(e)}, status=400)
@@ -1419,6 +1431,18 @@ def ops_assign_return_driver(request, order_id):
         if assigned_now:
             _send_notif_mission(order, driver)
             _send_notif_client_livraison(order)
+            try:
+                from orders.models import log_event
+                log_event(
+                    "return.assigned",
+                    order=order,
+                    actor_type="ops",
+                    actor_id=None,
+                    driver_id=driver.id,
+                    driver_name=driver.name,
+                )
+            except Exception:
+                pass
 
         return Response({"success": True, "message": f"Livreur retour {driver.name} assigne"})
     except Exception as e:

@@ -211,6 +211,14 @@
               Après confirmation : paiement <strong>Wave</strong> si nécessaire.
             </div>
 
+              <label class="co-cgu-box">
+                <input type="checkbox" name="accepted_cgu" value="1" {% if cgu_accepted %}checked{% endif %} required>
+                <span>
+                  J'ai lu et j'accepte les Conditions Générales d'Utilisation FAGNI v1.3.
+                  <small>Les CGU encadrent les articles acceptés, les délais, les réclamations et les plafonds d'indemnisation.</small>
+                </span>
+              </label>
+
             <div class="co-side-actions">
               <a class="btn btn-light btn-block" href="{% url 'orders:client_new_order_step3' order.id %}">
                 ← Modifier {% if is_bag_mode %}le sac{% else %}les articles{% endif %}
@@ -242,6 +250,31 @@
 </div>
 
 <style>
+  .co-cgu-box{
+    display:flex;
+    gap:10px;
+    align-items:flex-start;
+    border:1px solid #E8EDF5;
+    border-radius:16px;
+    background:#fff;
+    padding:14px 16px;
+    margin:14px 0;
+    color:#1E3A5F;
+    font-weight:800;
+    line-height:1.35;
+  }
+
+  .co-cgu-box input{
+    margin-top:3px;
+  }
+
+  .co-cgu-box small{
+    display:block;
+    margin-top:4px;
+    color:#6B7280;
+    font-weight:600;
+  }
+
   .co-layout{
     display:grid;
     grid-template-columns:minmax(0,1.5fr) minmax(320px,.9fr);

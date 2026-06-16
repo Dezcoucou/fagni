@@ -71,6 +71,30 @@ def send_push(token, title, body, data=None):
         )
         return True
 
+    except messaging.UnregisteredError as e:
+        logger.warning(
+            "[FCM] unregistered token deleted | token=%s | title=%s | data=%s | error=%s",
+            _short_token(token),
+            title,
+            payload_data,
+            str(e),
+        )
+        try:
+            from orders.models import FCMToken
+            deleted, _ = FCMToken.objects.filter(token=token).delete()
+            logger.warning(
+                "[FCM] token cleanup | deleted=%s | token=%s",
+                deleted,
+                _short_token(token),
+            )
+        except Exception as cleanup_error:
+            logger.exception(
+                "[FCM] token cleanup failed | token=%s | error=%s",
+                _short_token(token),
+                str(cleanup_error),
+            )
+        return False
+
     except Exception as e:
         logger.exception(
             "[FCM] failed | token=%s | title=%s | data=%s | error=%s",

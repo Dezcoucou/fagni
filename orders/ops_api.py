@@ -237,7 +237,7 @@ def ops_assign_partner(request, order_id):
         order.save(update_fields=['laundry_partner_id'])
         if partner:
             _send_notif_pressing(order)
-            _send_notif_ops(order, "Pressing assigné", f"Commande {order.code} assignée à {partner.name}")
+            # Notification OPS supprimée ici : OPS vient déjà de faire l’action.
             try:
                 from orders.models import log_event
                 log_event(

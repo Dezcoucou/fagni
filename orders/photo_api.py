@@ -51,12 +51,20 @@ def driver_upload_photo(request, order_id):
             return Response({'error': 'Photo manquante'}, status=400)
 
         public_id = f"order_{order_id}_{photo_type}_driver{driver.id}"
-        result = _upload_to_cloudinary(
-            photo_data,
-            f"orders/{order_id}",
-            public_id
-        )
-        url = result['secure_url']
+        # Stockage local (Cloudinary non configuré en pilote)
+        import os, base64, uuid
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import default_storage
+        if isinstance(photo_data, str) and photo_data.startswith("data:"):
+            header, encoded = photo_data.split(",", 1)
+            ext = "png" if "png" in header else "webp" if "webp" in header else "jpg"
+            raw = base64.b64decode(encoded)
+        else:
+            ext = "jpg"
+            raw = base64.b64decode(str(photo_data))
+        filename = f"orders/evidence/order_{order_id}_{photo_type}_driver{driver.id}_{uuid.uuid4().hex[:8]}.{ext}"
+        saved_path = default_storage.save(filename, ContentFile(raw))
+        url = default_storage.url(saved_path)
 
         # Stocker l'URL dans les notes
         notes = order.notes or ''

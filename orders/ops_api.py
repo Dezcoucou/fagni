@@ -556,15 +556,11 @@ def api_ops_paiements(request):
     # Livreurs
     livreurs_data = []
     for d in DeliveryPartner.objects.filter(is_active=True):
-        missions = Order.objects.filter(
-            pickup_driver=d,
-            status='done'
-        )
-        missions_collecte  = Order.objects.filter(pickup_driver=d, status='done').count()
+        missions_collecte = Order.objects.filter(pickup_driver=d, status='done').count()
         missions_livraison = Order.objects.filter(delivery_partner=d, status='done').count()
         nb = missions_collecte + missions_livraison
-        remun_collecte  = getattr(d, 'remuneration_collecte', 1000) or 1000
-        remun_livraison = getattr(d, 'remuneration_livraison', 1000) or 1000
+        remun_collecte = getattr(d, 'remuneration_collecte', 800) or 800
+        remun_livraison = getattr(d, 'remuneration_livraison', 800) or 800
         a_payer = (missions_collecte * remun_collecte) + (missions_livraison * remun_livraison)
         livreurs_data.append({
             'id': d.id,

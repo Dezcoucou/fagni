@@ -149,6 +149,30 @@ class GlobalPricingSettings(SingletonModel):
         default=18.00,
         help_text="Taux de TVA appliqué sur les revenus FAGNI."
     )
+    # Paramètres FAGNI pilote
+    prix_article_fcfa = models.PositiveIntegerField(
+        default=500,
+        verbose_name="Prix par article (FCFA)",
+        help_text="Prix unitaire facturé au client par article"
+    )
+    driver_amount_per_leg = models.PositiveIntegerField(
+        default=800,
+        verbose_name="Rémunération livreur par tronçon (FCFA)",
+        help_text="Montant payé au livreur pour chaque collecte ou livraison"
+    )
+    wave_business_number = models.CharField(
+        max_length=20,
+        default="0748643892",
+        verbose_name="Numéro Wave Business",
+        help_text="Numéro Wave sur lequel les clients paient"
+    )
+    whatsapp_ops_number = models.CharField(
+        max_length=20,
+        default="0142299949",
+        verbose_name="Numéro WhatsApp OPS",
+        help_text="Numéro WhatsApp du coordinateur OPS"
+    )
+
     apply_vat_on_service_only = models.BooleanField(
         "Appliquer la TVA uniquement sur les revenus FAGNI",
         default=True,

@@ -313,7 +313,9 @@ def ops_assign_driver(request, order_id):
             }, status=400)
 
         order.pickup_driver = driver
-        order.cost_driver_pickup = 800
+        from orders.config_models import GlobalPricingSettings as _GPS
+        _driver_amt = _GPS.get_solo().driver_amount_per_leg
+        order.cost_driver_pickup = _driver_amt
         order.save(update_fields=['pickup_driver', 'cost_driver_pickup', 'updated_at'])
 
         leg, _ = DeliveryLeg.objects.get_or_create(
@@ -322,7 +324,7 @@ def ops_assign_driver(request, order_id):
             defaults={
                 'driver': driver,
                 'status': 'pending',
-                'driver_amount': Decimal('800'),
+                'driver_amount': Decimal(str(_driver_amt)),
             }
         )
         assigned_now = False
@@ -330,7 +332,7 @@ def ops_assign_driver(request, order_id):
         if leg.status == 'pending':
             leg.status = 'assigned'
             assigned_now = True
-        leg.driver_amount = Decimal('800')
+        leg.driver_amount = Decimal(str(_driver_amt))
         leg.save(update_fields=['driver', 'status', 'driver_amount'])
 
         event_type = 'pickup.assigned'
@@ -1409,18 +1411,18 @@ def ops_assign_return_driver(request, order_id):
         driver = DeliveryPartner.objects.get(id=driver_id)
         leg, created = DeliveryLeg.objects.get_or_create(
             order=order, leg_type="return",
-            defaults={"status": "pending", "driver_amount": Decimal("800")}
+            defaults={"status": "pending", "driver_amount": Decimal(str(_driver_amt))}
         )
         assigned_now = False
         if leg.status not in ("assigned", "in_progress", "done"):
             leg.driver = driver
             leg.status = "assigned"
-            leg.driver_amount = Decimal("800")
+            leg.driver_amount = Decimal(str(_driver_amt))
             leg.save(update_fields=["driver", "status", "driver_amount"])
             assigned_now = True
 
         order.delivery_partner = driver
-        order.cost_driver_delivery = 800
+        order.cost_driver_delivery = _driver_amt
         order.save(update_fields=["delivery_partner", "cost_driver_delivery", "updated_at"])
 
         # Notifications retour : une seule fois, uniquement lors de l'assignation effective.

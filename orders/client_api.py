@@ -360,7 +360,7 @@ def api_create_order(request):
     from orders.config_models import GlobalPricingSettings
     from decimal import Decimal as _D
     _cfg = GlobalPricingSettings.get_solo()
-    _pa = _D('500')
+    _pa = _D(str(_cfg.prix_article_fcfa or 500))
     _df = _D(str(_cfg.delivery_fixed_fee or 2000))
     _cp = _D(str(_cfg.laundry_commission_percent or 40)) / 100
 
@@ -461,9 +461,9 @@ def api_create_order(request):
                             _des = ArticleConfig.objects.get(article_id=_aid).label
                         except: _des = f'Article {_aid}'
                     if not _des: _des = 'Article'
-                    OrderItem.objects.create(order=order,designation=_des,quantity=_qty,unit_price=500,total=_qty*500)
+                    OrderItem.objects.create(order=order,designation=_des,quantity=_qty,unit_price=int(_pa),total=_qty*int(_pa))
             elif nb_articles>0:
-                OrderItem.objects.create(order=order,designation='Articles pressing',quantity=nb_articles,unit_price=500,total=nb_articles*500)
+                OrderItem.objects.create(order=order,designation='Articles pressing',quantity=nb_articles,unit_price=int(_pa),total=nb_articles*int(_pa))
         except Exception: pass
 
         # Event logging LOT1

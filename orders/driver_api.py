@@ -101,6 +101,8 @@ def credit_wallet(driver, amount_fcfa, order, description):
             # - disponible = montant mission - 100 FCFA
             # - sécurité = 125 FCFA
             # PILOTE : FSS desactive - 100% remuneration
+            from orders.config_models import GlobalPricingSettings
+            _cfg_d = GlobalPricingSettings.get_solo()
             # Activation : 10 livreurs + 100 commandes
             disponible = amount.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
             securite = Decimal("0")

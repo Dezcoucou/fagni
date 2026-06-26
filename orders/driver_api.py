@@ -433,6 +433,8 @@ def driver_delivery_proof(request, order_id):
         import traceback
         return Response({'error': str(e), 'traceback': traceback.format_exc()}, status=400)
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
 def driver_confirm_delivery(request, order_id):
     """POST /api/driver/orders/<id>/delivery/ — confirmer livraison"""
     try:

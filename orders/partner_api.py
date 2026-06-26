@@ -154,6 +154,17 @@ def partner_update_status(request, order_id):
             order=order, leg_type='return',
             defaults={'status': 'pending', 'driver_amount': _driver_amount}
         )
+    # Notifier le client que son linge est prêt
+    try:
+        from fagni.notifications import notif_client_pret
+        from orders.models import FCMToken
+        customer = getattr(order, 'customer', None)
+        if customer:
+            t = FCMToken.objects.filter(user_type='client', user_id=customer.id).first()
+            if t:
+                notif_client_pret(t.token, order.code or str(order.id))
+    except Exception:
+        pass
     return Response({'success': True, 'status': new_status, 'code': order.code})
 
 

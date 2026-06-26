@@ -145,11 +145,14 @@ def partner_update_status(request, order_id):
     order.save(update_fields=['status', 'updated_at'])
     if raw_status in ('ready', 'done') or new_status == 'done':
         from django.utils import timezone
+        from decimal import Decimal
         from orders.models import DeliveryLeg
+        from orders.config_models import GlobalPricingSettings
+        _driver_amount = Decimal(str(GlobalPricingSettings.get_solo().driver_amount_per_leg))
         Order.objects.filter(pk=order.pk).update(wash_complete_time=timezone.now())
         DeliveryLeg.objects.get_or_create(
             order=order, leg_type='return',
-            defaults={'status': 'pending', 'driver_amount': 800}
+            defaults={'status': 'pending', 'driver_amount': _driver_amount}
         )
     return Response({'success': True, 'status': new_status, 'code': order.code})
 

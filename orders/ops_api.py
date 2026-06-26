@@ -312,10 +312,10 @@ def ops_assign_driver(request, order_id):
                 'error': 'Endpoint reserve a la collecte. Utiliser assign-return-driver pour le retour.'
             }, status=400)
 
+        from orders.config_models import GlobalPricingSettings as _GPS1
+        _driver_amount_pickup = Decimal(str(_GPS1.get_solo().driver_amount_per_leg))
         order.pickup_driver = driver
-        from orders.config_models import GlobalPricingSettings as _GPS
-        _driver_amt = _GPS.get_solo().driver_amount_per_leg
-        order.cost_driver_pickup = _driver_amt
+        order.cost_driver_pickup = int(_driver_amount_pickup)
         order.save(update_fields=['pickup_driver', 'cost_driver_pickup', 'updated_at'])
 
         leg, _ = DeliveryLeg.objects.get_or_create(
@@ -324,15 +324,17 @@ def ops_assign_driver(request, order_id):
             defaults={
                 'driver': driver,
                 'status': 'pending',
-                'driver_amount': Decimal(str(_driver_amt)),
+                'driver_amount': _driver_amount_pickup,
             }
         )
         assigned_now = False
+        from orders.config_models import GlobalPricingSettings as _GPS3
+        _dap = Decimal(str(_GPS3.get_solo().driver_amount_per_leg))
         leg.driver = driver
         if leg.status == 'pending':
             leg.status = 'assigned'
             assigned_now = True
-        leg.driver_amount = Decimal(str(_driver_amt))
+        leg.driver_amount = _dap
         leg.save(update_fields=['driver', 'status', 'driver_amount'])
 
         event_type = 'pickup.assigned'
@@ -493,8 +495,8 @@ def ops_add_driver(request):
             vehicle_type=request.data.get('vehicle_type','moto').strip(),
             city=request.data.get('city','Abidjan').strip(),
             is_active=True,
-            remuneration_collecte=int(request.data.get('remuneration_collecte', 1000) or 1000),
-            remuneration_livraison=int(request.data.get('remuneration_livraison', 1000) or 1000),
+            remuneration_collecte=int(request.data.get('remuneration_collecte', 800) or 800),
+            remuneration_livraison=int(request.data.get('remuneration_livraison', 800) or 800),
             cni_number=request.data.get('cni_number','').strip(),
         )
         driver.photo_cni_url = upload_photo(request.data.get('photo_cni',''), 'drivers/cni', f'driver_{driver.id}_cni')
@@ -529,6 +531,10 @@ def ops_list_partners(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def api_ops_paiements(request):
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
     """GET /api/ops/paiements/ — cumul gains pressings et livreurs"""
     from partners.models import LaundryPartner, DeliveryPartner
     from orders.models import Order, Paiement
@@ -558,10 +564,10 @@ def api_ops_paiements(request):
     # Livreurs
     livreurs_data = []
     for d in DeliveryPartner.objects.filter(is_active=True):
-        missions_collecte = Order.objects.filter(pickup_driver=d, status='done').count()
+        missions_collecte  = Order.objects.filter(pickup_driver=d, status='done').count()
         missions_livraison = Order.objects.filter(delivery_partner=d, status='done').count()
         nb = missions_collecte + missions_livraison
-        remun_collecte = getattr(d, 'remuneration_collecte', 800) or 800
+        remun_collecte  = getattr(d, 'remuneration_collecte', 800) or 800
         remun_livraison = getattr(d, 'remuneration_livraison', 800) or 800
         a_payer = (missions_collecte * remun_collecte) + (missions_livraison * remun_livraison)
         livreurs_data.append({
@@ -577,13 +583,42 @@ def api_ops_paiements(request):
     total_a_payer = sum(p['a_payer'] for p in pressings_data) + sum(l['a_payer'] for l in livreurs_data)
     nb_done = Order.objects.filter(status='done').count()
 
-    # Retraits en attente
-    from orders.models import Paiement
-    retraits = list(Paiement.objects.filter(
-        note__contains='DEMANDE_RETRAIT'
-    ).exclude(
-        note__contains='valide'
-    ).values('id','partenaire_nom','montant','wave_number','created_at'))
+    # Retraits en attente — source de vérité : WithdrawalRequest
+    from wallets.models import WithdrawalRequest
+    wr_qs = WithdrawalRequest.objects.filter(
+        status='pending'
+    ).select_related('wallet__delivery_partner', 'wallet__laundry_partner')
+    retraits = []
+    for wr in wr_qs:
+        w = wr.wallet
+        nom = wr.get_beneficiary_display()
+        phone = ''
+        if getattr(w, 'delivery_partner_id', None):
+            phone = getattr(w.delivery_partner, 'phone', '') or ''
+        elif getattr(w, 'laundry_partner_id', None):
+            phone = getattr(w.laundry_partner, 'phone', '') or ''
+        retraits.append({
+            'id': wr.id,
+            'partenaire_nom': nom,
+            'montant': float(wr.amount),
+            'wave_number': phone,
+            'created_at': wr.created_at.isoformat() if wr.created_at else None,
+            'status': wr.status,
+        })
+
+    # Historique retraits (paid + rejected) — 20 derniers
+    historique = []
+    for wr in WithdrawalRequest.objects.filter(
+        status__in=['paid', 'rejected']
+    ).select_related('wallet__delivery_partner', 'wallet__laundry_partner').order_by('-created_at')[:20]:
+        historique.append({
+            'id': wr.id,
+            'partenaire_nom': wr.get_beneficiary_display(),
+            'montant': float(wr.amount),
+            'status': wr.status,
+            'created_at': wr.created_at.isoformat() if wr.created_at else None,
+            'processed_at': wr.processed_at.isoformat() if wr.processed_at else None,
+        })
 
     return Response({
         'pressings': pressings_data,
@@ -591,12 +626,17 @@ def api_ops_paiements(request):
         'total_a_payer': total_a_payer,
         'nb_commandes_done': nb_done,
         'retraits': retraits,
+        'historique_retraits': historique,
     })
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_ops_enregistrer_paiement(request):
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
     """POST /api/ops/paiements/enregistrer/ — enregistrer un paiement effectué"""
     from orders.models import Paiement
 
@@ -609,11 +649,13 @@ def api_ops_enregistrer_paiement(request):
     note            = request.data.get('note', '')
 
     try:
-        # Si c'est une validation de retrait, mettre à jour le retrait existant
+        # Si c'est une validation de retrait, mettre à jour WithdrawalRequest
         if note == 'Retrait valide par OPS':
-            Paiement.objects.filter(
-                id=partenaire_id
-            ).update(note='DEMANDE_RETRAIT valide par OPS')
+            from wallets.models import WithdrawalRequest
+            from django.utils import timezone
+            WithdrawalRequest.objects.filter(
+                id=partenaire_id, status='pending'
+            ).update(status='paid', processed_at=timezone.now())
             return Response({'success': True})
 
         paiement = Paiement.objects.create(
@@ -633,6 +675,10 @@ def api_ops_enregistrer_paiement(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def api_ops_revenus(request):
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
     """GET /api/ops/revenus/ — revenus FAGNI"""
     from orders.models import Order
     from django.db.models import Sum
@@ -664,6 +710,10 @@ def api_ops_revenus(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def api_ops_rapport_hebdo(request):
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
     """GET /api/ops/rapport/hebdo/ — rapport de la semaine"""
     from orders.models import Order, Paiement
     from partners.models import LaundryPartner, DeliveryPartner
@@ -730,9 +780,91 @@ Connecte-toi sur fagni-ops.vercel.app"""
     })
 
 
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_ops_wallets(request):
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
+    """GET /api/ops/wallets/ — soldes wallet réels de tous les partenaires"""
+    from wallets.models import Wallet
+    wallets_data = []
+    qs = Wallet.objects.filter(
+        owner_type__in=['driver', 'laundry']
+    ).select_related('delivery_partner', 'laundry_partner')
+    for w in qs:
+        if w.owner_type == 'driver' and w.delivery_partner:
+            p = w.delivery_partner
+            emoji = '🛵'
+            type_ = 'livreur'
+        elif w.owner_type == 'laundry' and w.laundry_partner:
+            p = w.laundry_partner
+            emoji = '🧺'
+            type_ = 'pressing'
+        else:
+            continue
+        wallets_data.append({
+            'nom': p.name,
+            'phone': p.phone or '',
+            'wave_number': getattr(p, 'wave_number', '') or '',
+            'emoji': emoji,
+            'type': type_,
+            'balance_disponible': float(w.balance or 0),
+            'balance_securite': float(w.balance_securite or 0),
+            'total': float((w.balance or 0) + (w.balance_securite or 0)),
+        })
+    return Response({'wallets': wallets_data})
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_ops_activite_jour(request):
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
+    """GET /api/ops/activite/jour/ — collectes et livraisons du jour (auto)"""
+    from orders.models import Order
+    from django.utils import timezone
+    from django.db.models import Avg
+    today = timezone.localdate()
+    collectes = Order.objects.filter(
+        pickup_driver__isnull=False,
+        status='done',
+        updated_at__date=today
+    ).count()
+    livraisons = Order.objects.filter(
+        delivery_partner__isnull=False,
+        status='done',
+        updated_at__date=today
+    ).count()
+    incidents = Order.objects.filter(
+        status='litige',
+        updated_at__date=today
+    ).count()
+    notes = Order.objects.filter(
+        rating__isnull=False,
+        updated_at__date=today
+    )
+    nb_notes = notes.count()
+    note_moyenne = notes.aggregate(m=Avg('rating'))['m'] or 0
+    return Response({
+        'collectes': collectes,
+        'livraisons': livraisons,
+        'incidents': incidents,
+        'nb_notes': nb_notes,
+        'note_moyenne': round(float(note_moyenne), 1),
+    })
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def api_score_pressing(request, partner_id):
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
     """GET /api/ops/score/pressing/<id>/ — score pressing"""
     from partners.models import LaundryPartner
     from orders.models import Order
@@ -797,6 +929,10 @@ def api_score_pressing(request, partner_id):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def api_score_livreur(request, driver_id):
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
     """GET /api/ops/score/livreur/<id>/ — score livreur"""
     from partners.models import DeliveryPartner
     from orders.models import Order
@@ -821,8 +957,8 @@ def api_score_livreur(request, driver_id):
     ).annotate(week=TruncWeek('created_at')).values('week').distinct().count()
 
     # Revenus
-    remun_c = getattr(driver, 'remuneration_collecte', 1000) or 1000
-    remun_l = getattr(driver, 'remuneration_livraison', 1000) or 1000
+    remun_c = getattr(driver, 'remuneration_collecte', 800) or 800
+    remun_l = getattr(driver, 'remuneration_livraison', 800) or 800
     revenus = (collectes * remun_c) + (livraisons * remun_l)
 
     # Score /100
@@ -1084,8 +1220,8 @@ def dispatch_wallet_after_order(order):
                     delivery_partner=driver,
                     defaults={'currency': 'XOF', 'balance': 0}
                 )
-                remun_c = getattr(driver, 'remuneration_collecte', 1000) or 1000
-                remun_l = getattr(driver, 'remuneration_livraison', 1000) or 1000
+                remun_c = getattr(driver, 'remuneration_collecte', 800) or 800
+                remun_l = getattr(driver, 'remuneration_livraison', 800) or 800
                 montant_livreur = remun_c + remun_l
                 wallet_livreur.balance += montant_livreur
                 wallet_livreur.save(update_fields=['balance', 'updated_at'])
@@ -1109,6 +1245,10 @@ def dispatch_wallet_after_order(order):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_wallet_solde(request):
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
     """POST /api/wallet/solde/ — solde wallet partenaire ou livreur"""
     from wallets.models import Wallet, WalletTransaction
 
@@ -1168,6 +1308,10 @@ def api_wallet_solde(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_wallet_retrait(request):
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
     """POST /api/wallet/retrait/ — demande de retrait partenaire"""
     from wallets.models import Wallet
     from orders.models import Paiement
@@ -1409,20 +1553,24 @@ def ops_assign_return_driver(request, order_id):
             return Response({"error": "Pressing doit marquer PRET avant"}, status=400)
         driver_id = request.data.get("driver_id")
         driver = DeliveryPartner.objects.get(id=driver_id)
+        from orders.config_models import GlobalPricingSettings as _GPS4
+        _dap_ret = Decimal(str(_GPS4.get_solo().driver_amount_per_leg))
         leg, created = DeliveryLeg.objects.get_or_create(
             order=order, leg_type="return",
-            defaults={"status": "pending", "driver_amount": Decimal(str(_driver_amt))}
+            defaults={"status": "pending", "driver_amount": _dap_ret}
         )
         assigned_now = False
         if leg.status not in ("assigned", "in_progress", "done"):
+            from orders.config_models import GlobalPricingSettings as _GPS2
+            _driver_amount_return = Decimal(str(_GPS2.get_solo().driver_amount_per_leg))
             leg.driver = driver
             leg.status = "assigned"
-            leg.driver_amount = Decimal(str(_driver_amt))
+            leg.driver_amount = _driver_amount_return
             leg.save(update_fields=["driver", "status", "driver_amount"])
             assigned_now = True
 
         order.delivery_partner = driver
-        order.cost_driver_delivery = _driver_amt
+        order.cost_driver_delivery = int(_driver_amount_return)
         order.save(update_fields=["delivery_partner", "cost_driver_delivery", "updated_at"])
 
         # Notifications retour : une seule fois, uniquement lors de l'assignation effective.

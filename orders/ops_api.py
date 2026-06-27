@@ -217,6 +217,58 @@ def ops_dashboard(request):
     return Response({'orders': orders, 'stats': stats, 'partners': partners, 'drivers': drivers})
 
 
+
+def _suggest_best_pressing(order):
+    """
+    Calcule et trie les pressings actifs par score composite :
+    - Distance Haversine client → pressing (60%)
+    - Partner score /100 (40%)
+    Retourne une liste de dicts avec pressing, distance_km, delivery_fee, score_composite.
+    """
+    from partners.models import LaundryPartner
+    from orders.utils.distances import haversine_distance_km
+    from orders.config_models import GlobalPricingSettings
+    from decimal import Decimal
+
+    cfg = GlobalPricingSettings.get_solo()
+    price_per_km = Decimal(str(cfg.delivery_price_per_km or 150))
+    min_fee = Decimal(str(cfg.delivery_min_fee or 2000))
+
+    client_lat = getattr(order, 'pickup_lat', None) or getattr(order, 'delivery_lat', None)
+    client_lng = getattr(order, 'pickup_lng', None) or getattr(order, 'delivery_lng', None)
+
+    pressings = LaundryPartner.objects.filter(is_active=True)
+    results = []
+
+    for p in pressings:
+        if not p.latitude or not p.longitude:
+            continue
+        dist = haversine_distance_km(client_lat, client_lng, float(p.latitude), float(p.longitude))
+        if dist is None:
+            continue
+        # delivery_fee = aller-retour avec plancher
+        fee = max(min_fee, dist * 2 * price_per_km)
+        fee = int(fee.quantize(Decimal('1')))
+        # Score composite : 60% distance (inversé), 40% partner_score
+        # Distance normalisée sur 10 km max
+        dist_score = max(0, 1 - float(dist) / 10) * 60
+        partner_score = float(p.partner_score or 0) / 100 * 40
+        composite = round(dist_score + partner_score, 2)
+        results.append({
+            'id': p.id,
+            'name': p.name,
+            'phone': p.phone or '',
+            'address': p.address or '',
+            'distance_km': float(dist),
+            'delivery_fee': fee,
+            'partner_score': p.partner_score or 0,
+            'level': p.level or 'bronze',
+            'composite_score': composite,
+        })
+
+    results.sort(key=lambda x: x['composite_score'], reverse=True)
+    return results[:3]
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def ops_assign_partner(request, order_id):
@@ -234,7 +286,35 @@ def ops_assign_partner(request, order_id):
         partner_id = request.data.get('partner_id')
         partner = LaundryPartner.objects.get(id=partner_id) if partner_id else None
         order.laundry_partner_id = partner.id if partner else None
-        order.save(update_fields=['laundry_partner_id'])
+
+        # Recalcul delivery_fee au km réel après assignation pressing
+        if partner and getattr(partner, 'latitude', None) and getattr(partner, 'longitude', None):
+            from orders.utils.distances import haversine_distance_km
+            from orders.config_models import GlobalPricingSettings
+            from decimal import Decimal as _D
+            _cfg = GlobalPricingSettings.get_solo()
+            _price_km = _D(str(_cfg.delivery_price_per_km or 150))
+            _min_fee = _D(str(_cfg.delivery_min_fee or 2000))
+            client_lat = order.pickup_lat or order.delivery_lat
+            client_lng = order.pickup_lng or order.delivery_lng
+            dist = haversine_distance_km(
+                client_lat, client_lng,
+                float(partner.latitude), float(partner.longitude)
+            )
+            if dist is not None:
+                fee = max(_min_fee, dist * 2 * _price_km)
+                fee_int = int(fee.quantize(_D('1')))
+                order.delivery_fee = fee_int
+                order.distance_km_pickup = dist
+                order.distance_km_delivery = dist
+                order.distance_km_total = dist * 2
+                order.distance_km = dist * 2
+
+        order.save(update_fields=[
+            'laundry_partner_id', 'delivery_fee',
+            'distance_km_pickup', 'distance_km_delivery',
+            'distance_km_total', 'distance_km'
+        ])
         if partner:
             _send_notif_pressing(order)
             # Notification OPS supprimée ici : OPS vient déjà de faire l’action.
@@ -254,6 +334,32 @@ def ops_assign_partner(request, order_id):
     except Exception as e:
         return Response({'error': str(e)}, status=400)
 
+
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def ops_suggest_pressing(request, order_id):
+    """GET /api/ops/orders/<id>/suggest-pressing/ — top 3 pressings suggérés"""
+    try:
+        _check_ops(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+    from orders.models import Order
+    try:
+        order = Order.objects.get(id=order_id)
+        suggestions = _suggest_best_pressing(order)
+        if not suggestions:
+            return Response({'error': 'Aucun pressing actif avec GPS disponible'}, status=404)
+        return Response({
+            'order_id': order_id,
+            'order_code': order.code,
+            'client_lat': order.pickup_lat,
+            'client_lng': order.pickup_lng,
+            'suggestions': suggestions,
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

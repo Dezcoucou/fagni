@@ -1284,69 +1284,6 @@ def notify_client_whatsapp(order, message):
         return None
 
 
-def dispatch_wallet_after_order(order):
-    """
-    Crédite automatiquement les wallets pressing et livreur
-    après qu'une commande est marquée comme livrée.
-    """
-    from wallets.models import Wallet, WalletTransaction
-    from orders.pricing_engine import calculate_order
-
-    try:
-        # Calculer les montants
-        nb_articles = order.nb_articles or 15
-        pricing = calculate_order(nb_articles, order.bag_size or 'small')
-
-        # 1. Créditer le wallet du pressing
-        if order.laundry_partner:
-            try:
-                wallet_pressing, _ = Wallet.objects.get_or_create(
-                    laundry_partner=order.laundry_partner,
-                    defaults={'currency': 'XOF', 'balance': 0}
-                )
-                montant_pressing = pricing['part_pressing']
-                wallet_pressing.balance += montant_pressing
-                wallet_pressing.save(update_fields=['balance', 'updated_at'])
-                WalletTransaction.objects.create(
-                    wallet=wallet_pressing,
-                    order=order,
-                    type='payout',
-                    direction='credit',
-                    amount=montant_pressing,
-                    description=f"Commande {order.code} — {nb_articles} articles × 200 FCFA",
-                )
-            except Exception as e:
-                print(f"Erreur wallet pressing: {e}")
-
-        # 2. Créditer le wallet du livreur
-        if order.pickup_driver or order.delivery_partner:
-            driver = order.pickup_driver or order.delivery_partner
-            try:
-                wallet_livreur, _ = Wallet.objects.get_or_create(
-                    delivery_partner=driver,
-                    defaults={'currency': 'XOF', 'balance': 0}
-                )
-                remun_c = getattr(driver, 'remuneration_collecte', 800) or 800
-                remun_l = getattr(driver, 'remuneration_livraison', 800) or 800
-                montant_livreur = remun_c + remun_l
-                wallet_livreur.balance += montant_livreur
-                wallet_livreur.save(update_fields=['balance', 'updated_at'])
-                WalletTransaction.objects.create(
-                    wallet=wallet_livreur,
-                    order=order,
-                    type='payout',
-                    direction='credit',
-                    amount=montant_livreur,
-                    description=f"Mission {order.code} — collecte + livraison",
-                )
-            except Exception as e:
-                print(f"Erreur wallet livreur: {e}")
-
-        return True
-    except Exception as e:
-        print(f"Erreur dispatch wallet: {e}")
-        return False
-
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

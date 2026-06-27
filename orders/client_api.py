@@ -1273,5 +1273,8 @@ Votre blanchisserie à domicile à Abidjan.
 Des questions ? Écrivez-nous ici !
 ⚡ FAGNI — Riviera 3, Abidjan"""
 
-    wa_link = f"https://wa.me/2250142299949?text={urllib.parse.quote(msg)}"
+    from orders.config_models import GlobalPricingSettings as _GPS_OPS2
+    _ops_raw2 = GlobalPricingSettings.get_solo().whatsapp_ops_number or "0142299949"
+    _ops_num2 = "225" + _ops_raw2.lstrip("0") if not _ops_raw2.startswith("225") else _ops_raw2
+    wa_link = f"https://wa.me/{_ops_num2}?text={urllib.parse.quote(msg)}"
     return Response({'success': True, 'wa_link': wa_link})

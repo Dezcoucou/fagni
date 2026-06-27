@@ -817,7 +817,7 @@ def api_driver_profil_update(request):
         import jwt
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
         from partners.models import DeliveryPartner
-        driver = DeliveryPartner.objects.get(id=payload['driver_id'])
+        driver = DeliveryPartner.objects.get(id=payload['did'])
         wave = request.data.get('wave_number','').strip()
         if wave:
             driver.wave_number = wave

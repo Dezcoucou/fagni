@@ -280,21 +280,27 @@ def api_order_detail(request, order_id):
 
 
 def is_in_delivery_zone(lat, lng, address=""):
-    """Zone pilote FAGNI — Riviera 3 uniquement."""
+    """Zone pilote FAGNI — Corridor Riviera (Riviera 2, 3, 4, Ciad)."""
     address = (address or "").lower()
-    # Mots-clés zone pilote stricte
-    zone_ok = ["riviera 3", "riviera3", "riviéra 3", "riviéra3"]
+    # Mots-clés corridor Riviera
+    zone_ok = [
+        "riviera 2", "riviera2", "riviéra 2", "riviéra2",
+        "riviera 3", "riviera3", "riviéra 3", "riviéra3",
+        "riviera 4", "riviera4", "riviéra 4", "riviéra4",
+        "riviera ciad", "riviéra ciad",
+        "riviera", "riviéra",
+    ]
     # Mots-clés test depuis France
     test_ok = ["roussillon", "vaucluse", "france"]
     if any(word in address for word in test_ok):
         return True
     if any(word in address for word in zone_ok):
         return True
-    # Coordonnees GPS zone Riviera 3 stricte
+    # Coordonnees GPS corridor Riviera
     if lat and lng:
         try:
             lat = float(lat); lng = float(lng)
-            return 5.355 <= lat <= 5.395 and -3.975 <= lng <= -3.930
+            return 5.310 <= lat <= 5.410 and -3.985 <= lng <= -3.920
         except:
             pass
     return False

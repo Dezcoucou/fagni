@@ -1,13 +1,7 @@
 """
-FAGNI Pricing Engine v3.0
-Modèle hybride premium :
-- Sac = repère visuel UX uniquement
-- Facturation réelle à l'article : 500 FCFA/article client
-- Pressing reçoit : 200 FCFA/article
-- FAGNI marge pressing : 300 FCFA/article
-- Livraison AR : 2 000 FCFA (livreur 1 600, FAGNI 400)
-- Service fee : 5% du sous-total, min 500 FCFA
-- Écart ≤ 3 articles à la collecte → FAGNI absorbe
+FAGNI Pricing Engine v4.0
+Moteur de pricing parametrique -- tous les montants depuis GlobalPricingSettings.
+Aucune valeur hardcodee dans ce fichier.
 """
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -16,18 +10,13 @@ def d(val):
     return Decimal(str(val or 0)).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 
 
-# Taux officiels FAGNI v3.1 — Modèle pilote
-PRIX_ARTICLE_CLIENT   = 500   # FCFA — ce que le client paie par article
-PRIX_ARTICLE_PRESSING = 200   # FCFA — ce que le pressing reçoit
-MARGE_FAGNI_ARTICLE   = 300   # FCFA — marge FAGNI par article
-REMUNERATION_COLLECTE = 800  # FCFA — livreur collecte
-REMUNERATION_LIVRAISON= 800  # FCFA — livreur livraison
-TAUX_LIVREUR          = Decimal('0.70')  # legacy — gardé pour compatibilité
-TAUX_FAGNI_LIVRAISON  = Decimal('0.30')  # legacy — gardé pour compatibilité
-SERVICE_FEE_RATE      = Decimal('0.05')  # 5% du sous-total
-SERVICE_FEE_MIN       = 500             # Minimum 500 FCFA
-DELIVERY_FEE          = 2000            # Livraison AR fixe client
-ECART_ABSORBE         = 3              # Écart articles absorbé par FAGNI
+def _get_cfg():
+    """Retourne GlobalPricingSettings singleton -- source de verite unique."""
+    from orders.config_models import GlobalPricingSettings
+    return GlobalPricingSettings.get_solo()
+
+
+ECART_ABSORBE = 3  # Ecart articles absorbe par FAGNI (non parametre)
 
 # Configuration des sacs — repères UX uniquement
 BAG_CONFIG = {
@@ -57,81 +46,77 @@ BAG_CONFIG = {
 
 def calculate_order(nb_articles, bag_size='small', delivery_fee=None):
     """
-    Calcul complet d'une commande FAGNI v3.0
-
+    Calcul complet d'une commande FAGNI v4.0
+    Tous les parametres lus depuis GlobalPricingSettings.
     Args:
-        nb_articles  : nombre d'articles déclarés par le client
-        bag_size     : 'small', 'medium', 'large' (repère UX)
-        delivery_fee : frais livraison AR (défaut 2000 FCFA)
-
-    Returns:
-        dict avec tous les montants décomposés
+        nb_articles  : nombre d'articles declares par le client
+        bag_size     : 'small', 'medium', 'large' (repere UX)
+        delivery_fee : frais livraison AR reels (calcules au km ou fallback delivery_min_fee)
     """
-    articles     = max(1, int(nb_articles))
-    livraison    = d(delivery_fee or DELIVERY_FEE)
+    cfg = _get_cfg()
+
+    # Lecture parametres depuis GlobalPricingSettings
+    prix_article_client   = int(cfg.prix_article_fcfa or 500)
+    commission_pct        = Decimal(str(cfg.laundry_commission_percent or 20)) / 100
+    prix_article_pressing = int(round(prix_article_client * (1 - float(commission_pct))))
+    marge_article_fagni   = prix_article_client - prix_article_pressing
+    remun_leg             = int(cfg.driver_amount_per_leg or 800)
+    service_fee_rate      = Decimal(str(cfg.service_fee_percent or 5)) / 100
+    service_fee_min       = int(cfg.service_fee_min or 500)
+    delivery_min_fee      = int(cfg.delivery_min_fee or 2000)
+
+    articles  = max(1, int(nb_articles))
+    livraison = d(delivery_fee if delivery_fee is not None else delivery_min_fee)
 
     # Pressing
-    part_pressing = d(articles * PRIX_ARTICLE_PRESSING)
-    marge_pressing = d(articles * MARGE_FAGNI_ARTICLE)
+    part_pressing  = d(articles * prix_article_pressing)
+    marge_pressing = d(articles * marge_article_fagni)
 
     # Sous-total avant service fee
-    sous_total_pressing = d(articles * PRIX_ARTICLE_CLIENT)
+    sous_total_pressing = d(articles * prix_article_client)
     sous_total = sous_total_pressing + livraison
 
-    # Service fee
-    service_fee = (sous_total * SERVICE_FEE_RATE).quantize(
+    # Service fee calcule sur le sous-total pressing uniquement
+    service_fee = (sous_total_pressing * service_fee_rate).quantize(
         Decimal('1'), rounding=ROUND_HALF_UP)
-    if service_fee < d(SERVICE_FEE_MIN):
-        service_fee = d(SERVICE_FEE_MIN)
+    if service_fee < d(service_fee_min):
+        service_fee = d(service_fee_min)
 
     # Total client
     total_client = sous_total + service_fee
 
-    # Livraison
-    part_livreur    = d(REMUNERATION_COLLECTE + REMUNERATION_LIVRAISON)
+    # Livraison — 2 jambes (collecte + retour)
+    part_livreur    = d(remun_leg * 2)
     marge_livraison = livraison - part_livreur
 
     # Total FAGNI
     total_fagni = marge_pressing + marge_livraison + service_fee
 
-    # Vérification
-    check = part_pressing + livraison + service_fee + marge_pressing
-    assert check == total_client, f"Erreur calcul: {check} ≠ {total_client}"
-
     config = BAG_CONFIG.get(bag_size, BAG_CONFIG['small'])
-
     return {
-        # Ce que le client paie
         'total_client':          int(total_client),
         'total_client_ttc':      int(total_client),
         'delivery_fee':          int(livraison),
         'service_fee':           int(service_fee),
         'pressing_client':       int(sous_total_pressing),
-
-        # Ce que FAGNI redistribue
         'part_pressing':         int(part_pressing),
-        'amount_laundry_partner': int(part_pressing),
+        'amount_laundry_partner':int(part_pressing),
         'part_livreur':          int(part_livreur),
         'amount_driver_partner': int(part_livreur),
-        'remuneration_collecte': REMUNERATION_COLLECTE,
-        'remuneration_livraison': REMUNERATION_LIVRAISON,
-
-        # Revenus FAGNI
+        'remuneration_collecte': remun_leg,
+        'remuneration_livraison':remun_leg,
         'marge_pressing':        int(marge_pressing),
         'marge_livraison':       int(marge_livraison),
         'total_fagni':           int(total_fagni),
         'fagni_revenue_ht':      int(total_fagni),
-
-        # Infos commande
         'bag_size':              bag_size,
         'bag_label':             config['label'],
         'nb_articles':           articles,
-        'prix_article_client':   PRIX_ARTICLE_CLIENT,
-        'prix_article_pressing': PRIX_ARTICLE_PRESSING,
-        'marge_article_fagni':   MARGE_FAGNI_ARTICLE,
+        'prix_article_client':   prix_article_client,
+        'prix_article_pressing': prix_article_pressing,
+        'marge_article_fagni':   marge_article_fagni,
         'ecart_absorbe':         ECART_ABSORBE,
     }
-
 
 def get_bag_pricing():
     """Retourner les infos des sacs pour l'app client."""

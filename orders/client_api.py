@@ -494,7 +494,8 @@ def api_create_order(request):
         # Notification WhatsApp OPS
         try:
             import urllib.request, urllib.parse
-            ops_num = "2250142299949"
+            _ops_raw = (GlobalPricingSettings.get_solo().whatsapp_ops_number or "0142299949").lstrip("0")
+            ops_num = "225" + _ops_raw if not _ops_raw.startswith("225") else _ops_raw
             msg = f"🆕 Nouvelle commande FAGNI\n\nCode : {order.code}\nClient : {customer.name}\nSac : {bag_size}\nTotal : {total:,} FCFA\nAdresse : {pickup_addr}\n\nConnecte-toi sur fagni-ops.vercel.app"
             wa_url = f"https://wa.me/{ops_num}?text={urllib.parse.quote(msg)}"
             order.notes = (order.notes or '') + f'\nWA_OPS:{wa_url}'

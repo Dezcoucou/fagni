@@ -312,7 +312,8 @@ def ops_assign_partner(request, order_id):
                 # Recalcul total client avec nouveau delivery_fee
                 try:
                     from orders.pricing_engine import calculate_order
-                    nb = order.articles_count or 1
+                    from django.db.models import Sum
+                    nb = order.items.aggregate(s=Sum('quantity'))['s'] or order.articles_count or 1
                     pricing = calculate_order(nb, order.bag_size or 'small', delivery_fee=fee_int)
                     order.total_client_ttc = pricing['total_client_ttc']
                     order.total = pricing['total_client']

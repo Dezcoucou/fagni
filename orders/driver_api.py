@@ -851,3 +851,25 @@ def save_fcm_token(request):
         return Response({'ok': True})
     except Exception as e:
         return Response({'error': str(e)}, status=500)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def driver_update_location(request):
+    """POST /api/driver/location/ — {lat, lng} mise a jour position GPS livreur"""
+    try:
+        driver = _get_driver(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
+    try:
+        lat = request.data.get('lat')
+        lng = request.data.get('lng')
+        if lat is None or lng is None:
+            return Response({'error': 'lat et lng requis'}, status=400)
+        from partners.models import DeliveryPartner
+        DeliveryPartner.objects.filter(pk=driver.pk).update(
+            latitude=float(lat),
+            longitude=float(lng),
+        )
+        return Response({'ok': True})
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

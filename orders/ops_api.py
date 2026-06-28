@@ -226,7 +226,7 @@ def _suggest_best_pressing(order):
     Retourne une liste de dicts avec pressing, distance_km, delivery_fee, score_composite.
     """
     from partners.models import LaundryPartner
-    from orders.utils.distances import haversine_distance_km
+    from orders.utils.distances import osrm_distance_km
     from orders.config_models import GlobalPricingSettings
     from decimal import Decimal
 
@@ -243,7 +243,7 @@ def _suggest_best_pressing(order):
     for p in pressings:
         if not p.latitude or not p.longitude:
             continue
-        dist = haversine_distance_km(client_lat, client_lng, float(p.latitude), float(p.longitude))
+        dist = osrm_distance_km(client_lat, client_lng, float(p.latitude), float(p.longitude))
         if dist is None:
             continue
         # delivery_fee = aller-retour avec plancher
@@ -289,7 +289,7 @@ def ops_assign_partner(request, order_id):
 
         # Recalcul delivery_fee au km réel après assignation pressing
         if partner and getattr(partner, 'latitude', None) and getattr(partner, 'longitude', None):
-            from orders.utils.distances import haversine_distance_km
+            from orders.utils.distances import osrm_distance_km
             from orders.config_models import GlobalPricingSettings
             from decimal import Decimal as _D
             _cfg = GlobalPricingSettings.get_solo()
@@ -297,7 +297,7 @@ def ops_assign_partner(request, order_id):
             _min_fee = _D(str(_cfg.delivery_min_fee or 2000))
             client_lat = order.pickup_lat or order.delivery_lat
             client_lng = order.pickup_lng or order.delivery_lng
-            dist = haversine_distance_km(
+            dist = osrm_distance_km(
                 client_lat, client_lng,
                 float(partner.latitude), float(partner.longitude)
             )
@@ -337,6 +337,81 @@ def ops_assign_partner(request, order_id):
 
 
 
+
+
+def _suggest_best_driver(order, leg_type="pickup"):
+    """
+    Suggere les 3 meilleurs livreurs disponibles par Proximi-Score :
+    - 50% distance routiere OSRM livreur -> point de collecte
+    - 30% driver_score
+    - 20% disponibilite (missions actives)
+    leg_type='pickup'  : point = adresse client
+    leg_type='return'  : point = adresse pressing
+    """
+    from partners.models import DeliveryPartner
+    from orders.utils.distances import osrm_distance_km
+    from orders.config_models import GlobalPricingSettings
+    from orders.models import DeliveryLeg
+    from decimal import Decimal
+
+    cfg = GlobalPricingSettings.get_solo()
+    price_per_km = Decimal(str(cfg.delivery_price_per_km or 200))
+    min_fee = Decimal(str(cfg.delivery_min_fee or 2000))
+    driver_share = Decimal(str(cfg.driver_share_ratio or 70)) / 100
+    min_leg = Decimal(str(cfg.driver_amount_per_leg or 800))
+
+    # Point de reference selon type de jambe
+    if leg_type == "pickup":
+        ref_lat = getattr(order, 'pickup_lat', None) or getattr(order, 'delivery_lat', None)
+        ref_lng = getattr(order, 'pickup_lng', None) or getattr(order, 'delivery_lng', None)
+    else:
+        pressing = getattr(order, 'laundry_partner', None)
+        ref_lat = float(pressing.latitude) if pressing and pressing.latitude else None
+        ref_lng = float(pressing.longitude) if pressing and pressing.longitude else None
+
+    if not ref_lat or not ref_lng:
+        return []
+
+    results = []
+    for d in DeliveryPartner.objects.filter(is_active=True, is_online=True):
+        if not d.latitude or not d.longitude:
+            continue
+        dist = osrm_distance_km(float(d.latitude), float(d.longitude), ref_lat, ref_lng)
+        if dist is None:
+            continue
+
+        # Missions actives
+        missions_actives = DeliveryLeg.objects.filter(
+            driver=d, status__in=["assigned", "in_progress"]
+        ).count()
+        if missions_actives >= 3:
+            continue  # Livreur surchargé
+
+        # Remunération dynamique par jambe
+        remun_leg = max(min_leg, dist * driver_share * price_per_km)
+        remun_leg = int(remun_leg.quantize(Decimal("1")))
+
+        # Score composite
+        dist_score = max(0, 1 - float(dist) / 5) * 50
+        driver_score_w = float(getattr(d, 'driver_score', 80) or 80) / 100 * 30
+        dispo_score = (1 - missions_actives / 3) * 20
+        composite = round(dist_score + driver_score_w + dispo_score, 2)
+
+        results.append({
+            'id': d.id,
+            'name': d.name,
+            'phone': d.phone or '',
+            'vehicle': d.vehicle_type or 'moto',
+            'distance_km': float(dist),
+            'remun_leg': remun_leg,
+            'missions_actives': missions_actives,
+            'is_online': d.is_online,
+            'composite_score': composite,
+        })
+
+    results.sort(key=lambda x: x['composite_score'], reverse=True)
+    return results[:3]
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def ops_suggest_pressing(request, order_id):
@@ -356,6 +431,32 @@ def ops_suggest_pressing(request, order_id):
             'order_code': order.code,
             'client_lat': order.pickup_lat,
             'client_lng': order.pickup_lng,
+            'suggestions': suggestions,
+        })
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
+
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def ops_suggest_driver(request, order_id):
+    """GET /api/ops/orders/<id>/suggest-driver/?leg=pickup|return"""
+    try:
+        _check_ops(request)
+    except:
+        return Response({'error': 'Non autorise'}, status=401)
+    from orders.models import Order
+    try:
+        order = Order.objects.get(id=order_id)
+        leg_type = request.GET.get('leg', 'pickup')
+        suggestions = _suggest_best_driver(order, leg_type=leg_type)
+        if not suggestions:
+            return Response({'error': 'Aucun livreur disponible avec GPS'}, status=404)
+        return Response({
+            'order_id': order_id,
+            'order_code': order.code,
+            'leg_type': leg_type,
             'suggestions': suggestions,
         })
     except Exception as e:

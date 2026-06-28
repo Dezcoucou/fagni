@@ -332,6 +332,23 @@ def ops_assign_partner(request, order_id):
         ])
         if partner:
             _send_notif_pressing(order)
+            # Notifier le client que son prix est confirmé
+            try:
+                from orders.models import FCMToken
+                from fagni.notifications import send_push
+                customer = getattr(order, 'customer', None)
+                if customer:
+                    t = FCMToken.objects.filter(user_type='client', user_id=customer.id).first()
+                    if t:
+                        total = int(getattr(order, 'total_client_ttc', 0) or 0)
+                        send_push(
+                            t.token,
+                            "Prix confirmé ✅",
+                            f"Votre commande {order.code} est confirmée — Total : {total:,} FCFA",
+                            {"type": "price_confirmed", "order_id": str(order.id), "total": str(total)}
+                        )
+            except Exception:
+                pass
             # Notification OPS supprimée ici : OPS vient déjà de faire l’action.
             try:
                 from orders.models import log_event

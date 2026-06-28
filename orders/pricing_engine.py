@@ -120,27 +120,35 @@ def calculate_order(nb_articles, bag_size='small', delivery_fee=None):
 
 def get_bag_pricing():
     """Retourner les infos des sacs pour l'app client."""
+    cfg = _get_cfg()
+    prix_article_client = int(cfg.prix_article_fcfa or 500)
+    delivery_min_fee = int(cfg.delivery_min_fee or 2000)
+    service_fee_rate = float(cfg.service_fee_percent or 5) / 100
+    service_fee_min = int(cfg.service_fee_min or 500)
+    commission_pct = float(cfg.laundry_commission_percent or 20) / 100
+    prix_article_pressing = int(round(prix_article_client * (1 - commission_pct)))
+
     result = {}
     for size, config in BAG_CONFIG.items():
-        # Exemple avec articles max
         p = calculate_order(config['max_items'], size)
         result[size] = {
-            'label':               config['label'],
-            'max_items':           config['max_items'],
-            'poids_kg':            config['poids_kg'],
-            'emoji':               config['emoji'],
-            'description':         config['description'],
-            'prix_article_client': PRIX_ARTICLE_CLIENT,
-            'prix_article_pressing': PRIX_ARTICLE_PRESSING,
-            'delivery_fee':        DELIVERY_FEE,
-            'service_fee_rate':    float(SERVICE_FEE_RATE),
-            'service_fee_min':     SERVICE_FEE_MIN,
+            'label': config['label'],
+            'max_items': config['max_items'],
+            'poids_kg': config['poids_kg'],
+            'emoji': config['emoji'],
+            'description': config['description'],
+            'prix_article_client': prix_article_client,
+            'prix_article_pressing': prix_article_pressing,
+            'delivery_fee': delivery_min_fee,
+            'service_fee_rate': service_fee_rate,
+            'service_fee_min': service_fee_min,
             'exemple_max': {
-                'nb_articles':  config['max_items'],
+                'nb_articles': config['max_items'],
                 'total_client': p['total_client'],
-                'service_fee':  p['service_fee'],
+                'service_fee': p['service_fee'],
             }
         }
+    return result
     return result
 
 

@@ -309,11 +309,26 @@ def ops_assign_partner(request, order_id):
                 order.distance_km_delivery = dist
                 order.distance_km_total = dist * 2
                 order.distance_km = dist * 2
+                # Recalcul total client avec nouveau delivery_fee
+                try:
+                    from orders.pricing_engine import calculate_order
+                    nb = order.articles_count or 1
+                    pricing = calculate_order(nb, order.bag_size or 'small', delivery_fee=fee_int)
+                    order.total_client_ttc = pricing['total_client_ttc']
+                    order.total = pricing['total_client']
+                    order.service_fee = pricing['service_fee']
+                    order.amount_laundry_partner = pricing['amount_laundry_partner']
+                    order.fagni_revenue_ht = pricing['fagni_revenue_ht']
+                    order.margin_net = pricing['total_fagni']
+                except Exception:
+                    pass
 
         order.save(update_fields=[
             'laundry_partner_id', 'delivery_fee',
             'distance_km_pickup', 'distance_km_delivery',
-            'distance_km_total', 'distance_km'
+            'distance_km_total', 'distance_km',
+            'total_client_ttc', 'total', 'service_fee',
+            'amount_laundry_partner', 'fagni_revenue_ht', 'margin_net'
         ])
         if partner:
             _send_notif_pressing(order)

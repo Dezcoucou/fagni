@@ -29,3 +29,31 @@ def haversine_distance_km(origin_lat, origin_lng, dest_lat, dest_lng):
     km = R * c
 
     return Decimal(str(km)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def osrm_distance_km(origin_lat, origin_lng, dest_lat, dest_lng):
+    """
+    Distance routiere reelle via OSRM public.
+    Fallback sur Haversine si OSRM indisponible.
+    Retourne Decimal en km.
+    """
+    import urllib.request
+    import json
+    from decimal import Decimal, ROUND_HALF_UP
+
+    try:
+        url = (
+            f"http://router.project-osrm.org/route/v1/driving/"
+            f"{origin_lng},{origin_lat};{dest_lng},{dest_lat}"
+            f"?overview=false"
+        )
+        with urllib.request.urlopen(url, timeout=3) as r:
+            data = json.loads(r.read())
+        if data.get("code") == "Ok":
+            meters = data["routes"][0]["legs"][0]["distance"]
+            km = meters / 1000
+            return Decimal(str(km)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    except Exception:
+        pass
+    # Fallback Haversine
+    return haversine_distance_km(origin_lat, origin_lng, dest_lat, dest_lng)

@@ -94,7 +94,7 @@ def api_login(request):
         return Response({'error': 'Numéro non reconnu'}, status=404)
     return Response({
         'access': _make_token(customer),
-        'customer': {'name': customer.name, 'phone': customer.phone},
+        'customer': {'id': customer.id, 'name': customer.name, 'phone': customer.phone},
     })
 
 
@@ -117,7 +117,7 @@ def api_register(request):
     if existing:
         return Response({
             'access': _make_token(existing),
-            'customer': {'name': existing.name, 'phone': existing.phone},
+            'customer': {'id': existing.id, 'name': existing.name, 'phone': existing.phone},
             'created': False
         })
 

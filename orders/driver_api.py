@@ -295,28 +295,41 @@ def driver_confirm_pickup(request, order_id):
             from django.utils import timezone
             from orders.models import DeliveryLeg, sync_order_status_from_legs
             pickup_leg = DeliveryLeg.objects.filter(
-                order=order,
-                leg_type='pickup',
-                driver=driver,
+                order=order, leg_type='pickup', driver=driver,
             ).first() or DeliveryLeg.objects.filter(
-                order=order,
-                leg_type='pickup',
+                order=order, leg_type='pickup',
             ).first()
-
             if pickup_leg:
                 now = timezone.now()
                 pickup_leg.driver = driver
                 pickup_leg.status = 'in_progress'
+                update_fields = ['driver', 'status']
                 if hasattr(pickup_leg, 'started_at'):
                     pickup_leg.started_at = now
-                    pickup_leg.save(update_fields=['driver', 'status', 'started_at'])
-                else:
-                    pickup_leg.save(update_fields=['driver', 'status'])
+                    update_fields.append('started_at')
 
+                # POP (Proof of Pickup) - GPS + signature optionnels (MVP)
+                pop_lat = request.data.get('lat')
+                pop_lng = request.data.get('lng')
+                pop_signature = request.data.get('signature')
+                try:
+                    if pop_lat not in [None, '']:
+                        pickup_leg.picked_up_lat = float(pop_lat)
+                        update_fields.append('picked_up_lat')
+                    if pop_lng not in [None, '']:
+                        pickup_leg.picked_up_lng = float(pop_lng)
+                        update_fields.append('picked_up_lng')
+                except (TypeError, ValueError):
+                    pass
+                if pop_signature:
+                    pickup_leg.pickup_signature = pop_signature
+                    pickup_leg.pickup_signed_at = now
+                    update_fields += ['pickup_signature', 'pickup_signed_at']
+
+                pickup_leg.save(update_fields=update_fields)
                 # Horodatage collecte client
                 Order.objects.filter(pk=order.pk).update(pickup_time=now)
-
-            sync_order_status_from_legs(order, save=True)
+                sync_order_status_from_legs(order, save=True)
         except Exception:
             pass
 
@@ -384,19 +397,24 @@ def driver_delivery_proof(request, order_id):
 
         now = timezone.now()
 
-        try:
-            import cloudinary.uploader as cu
-            result = cu.upload(photo_b64, folder='orders/delivery', public_id=f'delivery_{order.id}_{int(now.timestamp())}')
-            photo_url = result.get('secure_url', '')
-            OrderEvidencePhoto.objects.create(
-                order=order, leg=leg,
-                actor_type='driver', actor_id=driver.id,
-                kind='delivery_to_client',
-                image=photo_url,
-                caption=f'Remis a : {client_name}',
-            )
-        except Exception:
-            pass
+        if photo_b64:
+            try:
+                from orders.photo_api import _safe_decode_image
+                from django.core.files.base import ContentFile
+                raw, ext = _safe_decode_image(photo_b64)
+                evidence = OrderEvidencePhoto(
+                    order=order, leg=leg,
+                    actor_type='driver', actor_id=driver.id,
+                    kind='delivery_to_client',
+                    caption=f'Remis a : {client_name}',
+                )
+                evidence.image.save(
+                    f'delivery_{order.id}_{int(now.timestamp())}.{ext}',
+                    ContentFile(raw),
+                    save=True,
+                )
+            except Exception:
+                pass
 
         leg.client_signature = client_name
         leg.client_signed_at = now
@@ -535,15 +553,19 @@ def api_driver_dropoff(request, order_id):
         # Photo dépôt pressing (obligatoire)
         if photo_b64:
             try:
-                import cloudinary.uploader as cu
-                result = cu.upload(photo_b64, folder='orders/dropoff', public_id=f'dropoff_{order.id}_{int(now.timestamp())}')
-                OrderEvidencePhoto.objects.create(
+                from orders.photo_api import _safe_decode_image
+                from django.core.files.base import ContentFile
+                raw, ext = _safe_decode_image(photo_b64)
+                evidence = OrderEvidencePhoto(
                     order=order,
-                    actor_type='driver',
-                    actor_id=driver.id,
+                    actor_type='driver', actor_id=driver.id,
                     kind='dropoff_to_laundry',
-                    image=result.get('secure_url', ''),
                     caption=f'Depose par {driver.name}',
+                )
+                evidence.image.save(
+                    f'dropoff_{order.id}_{int(now.timestamp())}.{ext}',
+                    ContentFile(raw),
+                    save=True,
                 )
             except Exception:
                 pass

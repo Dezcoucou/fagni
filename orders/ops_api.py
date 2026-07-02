@@ -1,3 +1,5 @@
+import random
+import string
 
 def _send_notif_ops(order, title="FAGNI OPS", body=None):
     try:

@@ -1257,7 +1257,6 @@ def _get_authenticated_identity(request):
     return None, None
 
 
-@api_view(['GET'])
 def generer_code():
     """Générer un code parrainage unique."""
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))

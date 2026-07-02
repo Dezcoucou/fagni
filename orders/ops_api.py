@@ -1266,7 +1266,7 @@ def generer_code():
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def api_creer_parrainage(request):
+def api_creer_parrainage_v2secure(request):
     """POST /api/parrainage/creer/ — créer un lien de parrainage"""
     from orders.models import Parrainage
 

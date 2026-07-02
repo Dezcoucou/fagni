@@ -15,7 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 #  CONFIG DE BASE
 # ========================
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-change-me")
-DEBUG = (os.getenv("DEBUG", "1").strip() in ("1","true","True","yes","on"))  # 1=dev, 0=prod
+DEBUG = False
 
 CLIENT_SESSION_KEY = "fagni_client_phone"
 
@@ -23,13 +23,10 @@ ADMINS = [("Admin", "admin@example.com")]
 # --- Hosts autorisés ---
 # DEV par défaut, mais en prod Render on pilote via ALLOWED_HOSTS="a.com,b.onrender.com"
 ALLOWED_HOSTS = [
-    "127.0.0.1",
-    "localhost",
-    "0.0.0.0",
-    "fagni-api.onrender.com",
-    "web-production-f88c.up.railway.app",
-    "*.railway.app",
-    "*.onrender.com",
+    'dezcoucou80.pythonanywhere.com',
+    '127.0.0.1',
+    'localhost',
+    '0.0.0.0',
 ]
 # Ajouter hosts depuis variable d'environnement
 _env_hosts = (os.getenv("ALLOWED_HOSTS", "") or "").strip()
@@ -280,11 +277,11 @@ if DEBUG:
 #  SÉCURITÉ HTTPS
 # ========================
 # HSTS seulement si DEBUG = False
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 
 # Redirection HTTPS pilotée par variable d'env
-SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', '0') == '1'
+SECURE_SSL_REDIRECT = True
 
 # ========================
 #  FAGNI – LOGISTIQUE / LIVREURS
@@ -523,13 +520,10 @@ REST_FRAMEWORK = {
 }
 
 CORS_ALLOWED_ORIGINS = [
-    "http://127.0.0.1:5173",
-    "http://localhost:5173",
-    "http://localhost:3000",
     "https://fagni-client.vercel.app",
+    "https://fagni-driver.vercel.app",
     "https://fagni-partner.vercel.app",
     "https://fagni-ops.vercel.app",
-    "https://fagni-driver.vercel.app",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -543,3 +537,5 @@ cloudinary.config(
     api_secret = os.getenv('CLOUDINARY_API_SECRET', ''),
     secure     = True
 )
+
+SECURE_HSTS_SECONDS = 31536000

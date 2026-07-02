@@ -3697,6 +3697,8 @@ class OrderEvidencePhoto(models.Model):
         ("dropoff_to_laundry", "Dépôt chez blanchisseur"),
         ("return_from_laundry", "Retour depuis blanchisseur"),
         ("delivery_to_client", "Livraison au client"),
+        ("partner_before", "Avant traitement (pressing)"),
+        ("partner_after", "Après traitement (pressing)"),
         ("issue", "Litige / anomalie"),
     ]
 

@@ -1695,6 +1695,31 @@ def ops_order_detail(request, order_id):
                 'created_at': p.created_at.strftime('%d/%m %H:%M'),
             })
 
+        # Legs (GPS, signature, statuts collecte/livraison)
+        from orders.models import DeliveryLeg
+        legs_data = {}
+        for leg in DeliveryLeg.objects.filter(order=o):
+            legs_data[leg.leg_type] = {
+                'status': leg.status,
+                'driver': leg.driver.name if leg.driver else None,
+                'picked_up_lat': getattr(leg, 'picked_up_lat', None),
+                'picked_up_lng': getattr(leg, 'picked_up_lng', None),
+                'pickup_signature': bool(getattr(leg, 'pickup_signature', None)),
+                'pickup_signed_at': leg.pickup_signed_at.strftime('%d/%m %H:%M') if getattr(leg, 'pickup_signed_at', None) else None,
+                'delivered_lat': getattr(leg, 'delivered_lat', None),
+                'delivered_lng': getattr(leg, 'delivered_lng', None),
+                'client_signature': getattr(leg, 'client_signature', None),
+                'client_signed_at': leg.client_signed_at.strftime('%d/%m %H:%M') if getattr(leg, 'client_signed_at', None) else None,
+            }
+
+        # Fallback : photos historiques stockees uniquement en tag texte (avant migration)
+        notes_photos = []
+        for line in (o.notes or '').split('\n'):
+            if line.startswith('PHOTO_'):
+                parts = line.split(':', 1)
+                if len(parts) == 2:
+                    notes_photos.append({'type': parts[0].replace('PHOTO_', '').lower(), 'url': parts[1].strip()})
+
         # Timeline
         def fmt(dt): return dt.strftime('%d/%m %H:%M') if dt else None
 
@@ -1738,6 +1763,8 @@ def ops_order_detail(request, order_id):
                 'livraison': fmt(o.delivered_time),
             },
             'photos': photos,
+            'legs': legs_data,
+            'notes_photos_fallback': notes_photos,
             'notes': o.notes or '',
         })
     except Order.DoesNotExist:

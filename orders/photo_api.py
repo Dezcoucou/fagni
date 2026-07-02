@@ -23,6 +23,73 @@ def _get_partner(request):
     return LaundryPartner.objects.get(id=payload['pid'])
 
 
+MAX_PHOTO_BYTES = 8 * 1024 * 1024  # 8 Mo max avant décodage
+MAX_PHOTO_DIMENSION = 4000  # pixels, largeur ou hauteur max
+
+
+def _safe_decode_image(photo_data):
+    """
+    Decode et valide une image envoyee en base64 (avec ou sans prefixe data:).
+    Re-encode l'image via Pillow pour neutraliser tout payload cache
+    (metadonnees, contenu non-image deguise, exploits de parsing).
+    Retourne (raw_bytes, extension) ou leve ValueError si invalide.
+    """
+    import base64
+    from io import BytesIO
+    from PIL import Image
+
+    if isinstance(photo_data, str) and photo_data.startswith("data:"):
+        try:
+            header, encoded = photo_data.split(",", 1)
+        except ValueError:
+            raise ValueError("Format data URI invalide")
+    else:
+        encoded = str(photo_data)
+
+    # Limite de taille sur la chaine base64 avant tout decodage (evite DoS mémoire)
+    if len(encoded) > MAX_PHOTO_BYTES * 2:
+        raise ValueError("Photo trop volumineuse")
+
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+    except Exception:
+        raise ValueError("Contenu base64 invalide")
+
+    if len(raw) > MAX_PHOTO_BYTES:
+        raise ValueError("Photo trop volumineuse")
+
+    if len(raw) == 0:
+        raise ValueError("Photo vide")
+
+    # Verification stricte : Pillow doit reconnaitre un vrai fichier image
+    try:
+        img = Image.open(BytesIO(raw))
+        img.verify()
+        # verify() invalide l'objet, il faut le rouvrir pour l'utiliser
+        img = Image.open(BytesIO(raw))
+        img.load()
+    except Exception:
+        raise ValueError("Le fichier fourni n'est pas une image valide")
+
+    if img.width > MAX_PHOTO_DIMENSION or img.height > MAX_PHOTO_DIMENSION:
+        raise ValueError("Dimensions de l'image trop grandes")
+
+    # Re-encodage complet : neutralise EXIF, metadonnees, et tout octet
+    # cache apres les donnees d'image (technique de polyglotte de fichier)
+    if img.mode in ("RGBA", "LA", "P"):
+        img = img.convert("RGBA")
+        ext = "png"
+        out = BytesIO()
+        img.save(out, format="PNG", optimize=True)
+    else:
+        img = img.convert("RGB")
+        ext = "jpg"
+        out = BytesIO()
+        img.save(out, format="JPEG", quality=85, optimize=True)
+
+    return out.getvalue(), ext
+
+
 def _upload_to_cloudinary(data_uri, folder, public_id):
     return cloudinary.uploader.upload(
         data_uri,
@@ -50,23 +117,38 @@ def driver_upload_photo(request, order_id):
         if not photo_data:
             return Response({'error': 'Photo manquante'}, status=400)
 
-        public_id = f"order_{order_id}_{photo_type}_driver{driver.id}"
-        # Stockage local (Cloudinary non configuré en pilote)
-        import os, base64, uuid
-        from django.core.files.base import ContentFile
-        from django.core.files.storage import default_storage
-        if isinstance(photo_data, str) and photo_data.startswith("data:"):
-            header, encoded = photo_data.split(",", 1)
-            ext = "png" if "png" in header else "webp" if "webp" in header else "jpg"
-            raw = base64.b64decode(encoded)
-        else:
-            ext = "jpg"
-            raw = base64.b64decode(str(photo_data))
-        filename = f"orders/evidence/order_{order_id}_{photo_type}_driver{driver.id}_{uuid.uuid4().hex[:8]}.{ext}"
+            public_id = f"order_{order_id}_{photo_type}_driver{driver.id}"
+
+            # Stockage local (Cloudinary non configure en pilote)
+            import os, uuid
+            from django.core.files.base import ContentFile
+            from django.core.files.storage import default_storage
+
+            try:
+                raw, ext = _safe_decode_image(photo_data)
+            except ValueError as ve:
+                return Response({'error': 'photo_invalide', 'details': str(ve)}, status=400)
+
+            filename = f"orders/evidence/order_{order_id}_{photo_type}_driver{driver.id}_{uuid.uuid4().hex[:8]}.{ext}"
         saved_path = default_storage.save(filename, ContentFile(raw))
         url = default_storage.url(saved_path)
 
-        # Stocker l'URL dans les notes
+        # Enregistrement dans OrderEvidencePhoto (source unifiee pour OPS)
+        try:
+            from orders.models import OrderEvidencePhoto
+            KIND_MAP_DRIVER = {'pickup': 'pickup_items', 'delivery': 'delivery_to_client'}
+            kind = KIND_MAP_DRIVER.get(photo_type, 'pickup_items')
+            evidence = OrderEvidencePhoto(
+                order=order,
+                actor_type='driver', actor_id=driver.id,
+                kind=kind,
+            )
+            from django.core.files.base import ContentFile as _CF
+            evidence.image.save(filename.split('/')[-1], _CF(raw), save=True)
+        except Exception:
+            pass
+
+        # Stocker l'URL dans les notes (compatibilite ascendante)
         notes = order.notes or ''
         tag = f'PHOTO_{photo_type.upper()}:{url}'
         if tag not in notes:
@@ -127,26 +209,34 @@ def partner_upload_photo(request, order_id):
                 'file_keys': list(request.FILES.keys()),
             }, status=400)
 
-        # MVP terrain : stockage local si Cloudinary n'est pas configuré
-        import os, base64, uuid
-        from django.core.files.base import ContentFile
-        from django.core.files.storage import default_storage
+            # MVP terrain : stockage local si Cloudinary n'est pas configure
+            import os, uuid
+            from django.core.files.base import ContentFile
+            from django.core.files.storage import default_storage
 
-        if isinstance(photo_data, str) and photo_data.startswith("data:"):
-            header, encoded = photo_data.split(",", 1)
-            ext = "jpg"
-            if "png" in header:
-                ext = "png"
-            elif "webp" in header:
-                ext = "webp"
-            raw = base64.b64decode(encoded)
-        else:
-            ext = "jpg"
-            raw = base64.b64decode(str(photo_data))
+            try:
+                raw, ext = _safe_decode_image(photo_data)
+            except ValueError as ve:
+                return Response({'error': 'photo_invalide', 'details': str(ve)}, status=400)
 
-        filename = f"orders/evidence/order_{order_id}_{photo_type}_partner{partner.id}_{uuid.uuid4().hex[:8]}.{ext}"
+            filename = f"orders/evidence/order_{order_id}_{photo_type}_partner{partner.id}_{uuid.uuid4().hex[:8]}.{ext}"
         saved_path = default_storage.save(filename, ContentFile(raw))
         url = default_storage.url(saved_path)
+
+        # Enregistrement dans OrderEvidencePhoto (source unifiee pour OPS)
+        try:
+            from orders.models import OrderEvidencePhoto
+            KIND_MAP_PARTNER = {'before': 'partner_before', 'after': 'partner_after'}
+            kind = KIND_MAP_PARTNER.get(photo_type, 'partner_before')
+            evidence = OrderEvidencePhoto(
+                order=order,
+                actor_type='laundry', actor_id=partner.id,
+                kind=kind,
+            )
+            from django.core.files.base import ContentFile as _CF
+            evidence.image.save(filename.split('/')[-1], _CF(raw), save=True)
+        except Exception:
+            pass
 
         notes = order.notes or ''
         tag = f'PHOTO_{photo_type.upper()}:{url}'

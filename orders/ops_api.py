@@ -1236,8 +1236,28 @@ def api_score_livreur(request, driver_id):
     })
 
 
-@api_view(['GET'])
 
+def _get_authenticated_identity(request):
+    """Decode le JWT et retourne (type, id) de l'utilisateur authentifie, ou (None, None)."""
+    import jwt
+    from django.conf import settings
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return None, None
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+    except Exception:
+        return None, None
+    if 'cid' in payload:
+        return 'client', payload['cid']
+    if 'did' in payload:
+        return 'livreur', payload['did']
+    if 'pid' in payload:
+        return 'pressing', payload['pid']
+    return None, None
+
+
+@api_view(['GET'])
 def generer_code():
     """Générer un code parrainage unique."""
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
@@ -1255,6 +1275,10 @@ def api_creer_parrainage(request):
 
     if not all([parrain_type, parrain_id, parrain_nom]):
         return Response({'error': 'Données manquantes'}, status=400)
+
+        auth_type, auth_id = _get_authenticated_identity(request)
+        if auth_type is None or auth_type != parrain_type or str(auth_id) != str(parrain_id):
+            return Response({'error': 'Non autorise'}, status=401)
 
     # Vérifier si un parrainage existe déjà pour ce parrain
     existing = Parrainage.objects.filter(
@@ -1313,6 +1337,9 @@ def api_creer_parrainage(request):
 @permission_classes([AllowAny])
 def api_stats_parrainage(request, parrain_type, parrain_id):
     """GET /api/parrainage/stats/<type>/<id>/ — stats parrainage"""
+    auth_type, auth_id = _get_authenticated_identity(request)
+    if auth_type is None or auth_type != parrain_type or str(auth_id) != str(parrain_id):
+        return Response({'error': 'Non autorise'}, status=401)
     from orders.models import Parrainage
 
     parrainages = Parrainage.objects.filter(
@@ -1379,6 +1406,10 @@ def api_valider_code_parrainage(request):
 
     if p.statut != 'invite':
         return Response({'error': 'Code déjà utilisé'}, status=400)
+
+        auth_type, auth_id = _get_authenticated_identity(request)
+        if auth_type is None or auth_type != p.filleul_type or str(auth_id) != str(filleul_id):
+            return Response({'error': 'Non autorise'}, status=401)
 
     p.filleul_nom   = filleul_nom
     p.filleul_phone = filleul_phone

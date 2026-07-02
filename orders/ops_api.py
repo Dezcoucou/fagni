@@ -1338,7 +1338,9 @@ def api_creer_parrainage(request):
 @permission_classes([AllowAny])
 def api_stats_parrainage(request, parrain_type, parrain_id):
     """GET /api/parrainage/stats/<type>/<id>/ — stats parrainage"""
+    print('MARKER_AUTH_CHECK_V3_RUNNING')
     auth_type, auth_id = _get_authenticated_identity(request)
+    print(f'MARKER_AUTH_RESULT: auth_type={auth_type} auth_id={auth_id} parrain_type={parrain_type} parrain_id={parrain_id}')
     if auth_type is None or auth_type != parrain_type or str(auth_id) != str(parrain_id):
         return Response({'error': 'Non autorise'}, status=401)
     from orders.models import Parrainage

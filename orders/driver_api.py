@@ -835,6 +835,23 @@ def save_fcm_token(request):
         user_id = request.data.get('user_id')
         if not token:
             return Response({'error': 'token requis'}, status=400)
+
+        # Verifier que l'utilisateur authentifie correspond au user_id/user_type fournis
+        auth_token = request.headers.get('Authorization', '').replace('Bearer ', '')
+        try:
+            payload = jwt.decode(auth_token, settings.SECRET_KEY, algorithms=['HS256'])
+        except Exception:
+            return Response({'error': 'Non autorise'}, status=401)
+        auth_id = None
+        auth_type = None
+        if 'cid' in payload:
+            auth_type, auth_id = 'client', payload['cid']
+        elif 'did' in payload:
+            auth_type, auth_id = 'driver', payload['did']
+        elif 'pid' in payload:
+            auth_type, auth_id = 'partner', payload['pid']
+        if auth_type is None or auth_type != user_type or str(auth_id) != str(user_id):
+            return Response({'error': 'Non autorise'}, status=401)
         from orders.models import FCMToken
 
         # Un même appareil/token ne doit pas être attaché à plusieurs profils.

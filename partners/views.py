@@ -6,6 +6,7 @@ from .models import LaundryPartner
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def partner_list(request):
     """Liste des partenaires avec leur score — pour OPS dashboard."""
     partners = LaundryPartner.objects.filter(is_active=True).values(
@@ -18,6 +19,7 @@ def partner_list(request):
 
 
 @api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
 def update_score(request, pk):
     """Met à jour les sous-scores et recalcule le Partner Score."""
     try:
@@ -28,7 +30,10 @@ def update_score(request, pk):
     fields = ["score_delai", "score_litiges", "score_dispo", "score_refus"]
     for field in fields:
         if field in request.data:
-            val = int(request.data[field])
+            try:
+                val = int(request.data[field])
+            except (TypeError, ValueError):
+                return Response({"error": f"Valeur invalide pour {field}"}, status=400)
             setattr(partner, field, val)
 
     partner.recalculate_score()

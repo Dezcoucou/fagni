@@ -6,7 +6,7 @@ from orders.config_api import api_config
 from orders.client_api import api_chatbot, api_login, api_home, api_orders, api_order_detail, api_pricing_bags, api_create_order, api_articles, api_wallet, api_parrainage, api_rate_order, api_register, api_report_litige, api_pricing_detail, api_order_tracking, api_cancel_order
 from django.contrib import admin
 from django.urls import path, include
-from fagni.views import home, landing_riviera3
+from fagni.views import home, landing_riviera3, api_health
 from django.views.generic import RedirectView
 from django.contrib.staticfiles.storage import staticfiles_storage
 
@@ -25,6 +25,7 @@ urlpatterns = [
     path("api/client/wallet/",             api_wallet,       name="api-client-wallet"),
     path("api/client/parrainage/",         api_parrainage,   name="api-client-parrainage"),
     path("api/config/", api_config, name="api-config"),
+    path("api/health/", api_health, name="api-health"),
     path("api/fcm/token/", save_fcm_token, name="save-fcm-token"),
     path("api/client/orders/<int:order_id>/rate/",   api_rate_order,    name="api-client-rate"),
     path("api/client/orders/<int:order_id>/litige/",    api_report_litige,    name="api-client-litige"),

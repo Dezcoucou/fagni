@@ -160,7 +160,8 @@ def sync_delivery_legs_for_order(order):
                         leg.driver_amount = Decimal("0")
                         leg.fagni_margin = Decimal("0")
                     except Exception:
-                        pass
+                        import logging
+                        logging.getLogger("fagni.models.payout").exception("Echec silencieux: neutralisation montants jambe annulee (doublon 2) | order_id=%s", getattr(self, "id", None) if hasattr(self, "id") else getattr(self, "pk", None))
                     leg.save(update_fields=["status", "client_fee_share", "driver_amount", "fagni_margin"])
 
     # CANCEL legs legacy/protégés (autres types)
@@ -182,7 +183,8 @@ def sync_delivery_legs_for_order(order):
                         leg.driver_amount = Decimal("0")
                         leg.fagni_margin = Decimal("0")
                     except Exception:
-                        pass
+                        import logging
+                        logging.getLogger("fagni.models.payout").exception("Echec silencieux: neutralisation montants jambe annulee (doublon 1) | order_id=%s", getattr(self, "id", None) if hasattr(self, "id") else getattr(self, "pk", None))
                     leg.save(update_fields=["status", "client_fee_share", "driver_amount", "fagni_margin"])
 
     # RÈGLE (STRICTE) :
@@ -3224,7 +3226,8 @@ class Order(models.Model):
                 try:
                     sync_delivery_legs_for_order(self)
                 except Exception:
-                    pass
+                    import logging
+                    logging.getLogger("fagni.models.payout").exception("Echec silencieux: sync_delivery_legs_for_order (avant payouts) | order_id=%s", getattr(self, "id", None) if hasattr(self, "id") else getattr(self, "pk", None))
 
                 # 2) payout pour tous les legs déjà done (idempotent)
                 done_legs = (
@@ -3237,10 +3240,12 @@ class Order(models.Model):
                     try:
                         trigger_driver_payout_for_leg(leg)
                     except Exception:
-                        pass
+                        import logging
+                        logging.getLogger("fagni.models.payout").exception("Echec silencieux: trigger_driver_payout_for_leg (boucle done_legs) | order_id=%s", getattr(self, "id", None) if hasattr(self, "id") else getattr(self, "pk", None))
 
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.models.payout").exception("Echec silencieux: bloc payout complet (sync legs + payouts) - capture globale | order_id=%s", getattr(self, "id", None) if hasattr(self, "id") else getattr(self, "pk", None))
 
         # 2) Paiement livreur (DÉSACTIVÉ : payout driver géré par legs)
         # payout driver géré par legs (orders.service_layer.payouts.trigger_driver_payout_for_leg)
@@ -3513,14 +3518,16 @@ class DeliveryLeg(models.Model):
             try:
                 self.driver_amount = tx.amount
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.models.payout").exception("Echec silencieux: driver_amount = tx.amount (source de verite paiement) | order_id=%s", getattr(self, "id", None) if hasattr(self, "id") else getattr(self, "pk", None))
 
             # figer les autres montants sur la DB (ne plus bouger après paiement)
             if old:
                 try:
                     self.client_fee_share = old.get("client_fee_share")
                 except Exception:
-                    pass
+                    import logging
+                    logging.getLogger("fagni.models.payout").exception("Echec silencieux: gel montants apres paiement (client_fee_share) | order_id=%s", getattr(self, "id", None) if hasattr(self, "id") else getattr(self, "pk", None))
                 try:
                     self.fagni_margin = old.get("fagni_margin")
                 except Exception:
@@ -3577,7 +3584,8 @@ class DeliveryLeg(models.Model):
                 from orders.service_layer.payouts import trigger_driver_payout_for_leg
                 trigger_driver_payout_for_leg(self)
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.models.payout").exception("Echec silencieux: trigger_driver_payout_for_leg (transition vers done) | order_id=%s", getattr(self, "id", None) if hasattr(self, "id") else getattr(self, "pk", None))
 
 
 # =====================

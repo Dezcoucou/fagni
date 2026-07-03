@@ -300,7 +300,8 @@ def _get_order_upsell_total(order) -> Decimal:
         if upsell:
             return upsell.total
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=302")
     return Decimal("0.00")
 
 
@@ -1044,7 +1045,8 @@ def client_order_evidence_upload(request, order_id: int):
                 try:
                     setattr(obj, "file", f)
                 except Exception:
-                    pass
+                    import logging
+                    logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=1046")
 
             obj.save()
             created += 1
@@ -1534,7 +1536,8 @@ def ops_dashboard(request):
             try:
                 o.compute_totals(save=False)
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=1536")
 
             # Auto-heal legs (évite commandes "cassées" sans legs)
             try:
@@ -1542,7 +1545,8 @@ def ops_dashboard(request):
                     from orders.models import sync_delivery_legs_for_order
                     sync_delivery_legs_for_order(o)
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=1544")
 
     _refresh_amounts(pending_page_obj)
     _refresh_amounts(progress_page_obj)
@@ -2069,7 +2073,8 @@ def ops_planning(request):
         try:
             o.compute_totals(save=False)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=2071")
 
         info = _next_action(o)
         if not info:
@@ -2256,7 +2261,8 @@ def ops_update_step(request, order_id, action):
         if not DeliveryLeg.objects.filter(order=order).exclude(status="canceled").exists():
             sync_delivery_legs_for_order(order)
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=2258")
 
     # ------------------------------------------------------------
     # 4) ✅ VALIDER L'ÉTAPE
@@ -2487,7 +2493,8 @@ def order_mark_paid(request, order_id):
             if total_ctx > 0:
                 total_ttc = total_ctx
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=2489")
 
         already_paid = Decimal(str(getattr(order, "amount_paid", 0) or 0))
         remaining = total_ttc - already_paid
@@ -2532,7 +2539,8 @@ def order_mark_paid(request, order_id):
             order.payment_reference = ref
         order.save(update_fields=["payment_method", "payment_reference", "updated_at"])
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=2534")
 
     # 🔒 Stop si la commande n'est pas devenue "paid" ou "partial" après sync
     if getattr(order, "payment_status", "unpaid") not in ("paid", "partial"):
@@ -2553,13 +2561,15 @@ def order_mark_paid(request, order_id):
             order.fne_status = "pending"
             order.save(update_fields=["fne_status", "updated_at"])
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=2555")
 
     # ✅ Refresh order (assure état paiement à jour avant distribution/payout)
     try:
         order.refresh_from_db()
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=2561")
 
     # ✅ Ne distribuer / payer le livreur QUE si la commande est soldée
     if getattr(order, "payment_status", None) != "paid":
@@ -3090,7 +3100,8 @@ def _order_effective_total(order):
                 p = _safe_dec(getattr(it, "unit_price", 0))
                 items_sum += q * p
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=3092")
 
     service_fee = _safe_dec(getattr(order, "service_fee", None))
     delivery_fee = _safe_dec(getattr(order, "delivery_fee", None))
@@ -3225,7 +3236,8 @@ def _order_driver_income(order, delivery_fee=None):
             if total_legs > 0:
                 return total_legs
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=3227")
 
     # 4) Gestion livraison
     if delivery_fee is None:
@@ -4135,7 +4147,8 @@ def _find_slot(slot_value):
             h2, m2 = right.split(":")
             return time(int(h1), int(m1)), time(int(h2), int(m2))
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=4137")
 
     return None, None
 
@@ -4600,13 +4613,15 @@ def create(request):
         from orders.models import sync_delivery_legs_for_order
         sync_delivery_legs_for_order(order)
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=4602")
 
     try:
         from orders.service_layer.legs import normalize_order_legs
         normalize_order_legs(order, save=True)
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=4608")
 
     # 3.c) Bootstrap statut global commande
     # Si la commande a déjà une assignation partenaire/logistique,
@@ -4621,7 +4636,8 @@ def create(request):
             try:
                 _ensure_pickup_mission_for_order(order)
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=4623")
 
             # 🔥 RESYNC FINAL (clé du bug)
             try:
@@ -4636,9 +4652,11 @@ def create(request):
                         driver_id=order.delivery_partner_id
                     )
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=4638")
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=4640")
 
     # 9) Lignes de commande (PRIX VERROUILLÉS CÔTÉ SERVEUR)
     service_ids = request.POST.getlist("service_id[]")
@@ -4743,7 +4761,8 @@ def create(request):
         if not DeliveryLeg.objects.filter(order=order).exclude(status="canceled").exists():
             sync_delivery_legs_for_order(order)
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=4745")
 
     return redirect("orders:detail", order_id=order.id)
 
@@ -5446,12 +5465,14 @@ def client_new_order(request):
             try:
                 order.update_financials(save=True)
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=5448")
 
             try:
                 _ensure_pickup_mission_for_order(order)
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=5453")
 
 
             upsell, _ = OrderUpsell.objects.get_or_create(order=order)
@@ -5657,7 +5678,8 @@ def client_order_payment_ui_json(request, order_id):
         try:
             del request.session[f"wave_declared_{order.id}"]
         except KeyError:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=5659")
         wave_declared = False
 
 
@@ -5911,7 +5933,8 @@ def client_order_detail(request, order_id: int):
             live_tracking_title = "Commande terminée"
             live_tracking_text = "Ta commande a été finalisée."
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=5913")
 
     partner_tracking = {
         "pickup": {
@@ -6003,7 +6026,8 @@ def client_order_detail(request, order_id: int):
     try:
         ctx.update(build_order_display_context(order, customer, amounts, paid))
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6005")
 
     resp = render(request, "orders/client_order_detail.html", ctx)
     resp["Cache-Control"] = "no-store"
@@ -6166,12 +6190,14 @@ def client_order_pay_simulate(request, order_id: int):
     try:
         order.refresh_from_db()
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6168")
 
     try:
         order.refresh_from_db()
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6173")
 
     snap = build_order_canonical_snapshot(order)
     finance_summary = build_order_finance_summary(order)
@@ -6271,7 +6297,8 @@ def client_order_pay_cash(request, order_id: int):
             amount_raw = payload.get("amount", amount_raw)
             note = (payload.get("note", note) or "").strip()
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6273")
 
     add_amount = _parse_money_amount(str(amount_raw))
     if add_amount <= DECIMAL_ZERO:
@@ -6290,7 +6317,8 @@ def client_order_pay_cash(request, order_id: int):
     try:
         order.refresh_from_db()
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6292")
 
         # LOT 22C — MLM uniquement si la commande vient juste de devenir payée
         try:
@@ -6298,12 +6326,14 @@ def client_order_pay_cash(request, order_id: int):
                 generate_mlm_commissions_for_order(order)
             apply_fagni_monetization(order)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6300")
 
     try:
         order.refresh_from_db()
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6305")
 
     snap = build_order_canonical_snapshot(order)
     finance_summary = build_order_finance_summary(order)
@@ -6469,7 +6499,8 @@ def apply_order_payment(order, add_amount, *, channel="manual", reference="", no
             generate_mlm_commissions_for_order(order)
         apply_fagni_monetization(order)
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6471")
 
     try:
         finance_summary = build_order_finance_summary(order)
@@ -6942,7 +6973,8 @@ def admin_confirm_declared_payment(request, order_id: int):
         try:
             order.refresh_from_db()
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6944")
 
     if hasattr(order, "payment_verification_status"):
         if getattr(order, "payment_verification_status", "") != "verified":
@@ -6972,7 +7004,8 @@ def admin_confirm_declared_payment(request, order_id: int):
                 order.payment_verified_by = request.user
                 update_fields.append("payment_verified_by")
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6974")
 
     try:
         if update_fields:
@@ -7038,7 +7071,8 @@ def admin_reject_declared_payment(request, order_id: int):
                 order.payment_rejected_by = request.user
                 update_fields.append("payment_rejected_by")
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=7040")
 
     if hasattr(order, "payment_rejection_reason") and reason:
         order.payment_rejection_reason = reason
@@ -7116,7 +7150,8 @@ def client_order_item_new(request, order_id):
                 try:
                     order.update_financials(save=True)
                 except Exception:
-                    pass
+                    import logging
+                    logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=7118")
 
                 
         upsell_data = request.session.get("upsell_data", {})
@@ -7136,7 +7171,8 @@ def client_order_item_new(request, order_id):
                 order.total_client_ttc = (base_total + upsell_total).quantize(Decimal("0.01"))
                 order.save(update_fields=["total_client_ttc"])
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=7138")
 
             request.session.pop("upsell_data", None)
 
@@ -7209,7 +7245,8 @@ def client_order_item_edit(request, order_id, item_id):
                 try:
                     order.update_financials(save=True)
                 except Exception:
-                    pass
+                    import logging
+                    logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=7211")
 
                 return redirect("orders:client_order_detail", order_id=order.id)
 
@@ -7247,7 +7284,8 @@ def client_order_item_delete(request, order_id, item_id):
         try:
             order.update_financials(save=True)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=7249")
         return redirect("orders:client_order_detail", order_id=order.id)
 
     return render(request, "orders/client_order_item_form.html", {
@@ -7348,7 +7386,8 @@ def _get_vat_rate_percent(cfg) -> Decimal:
             try:
                 return Decimal(str(v))
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=7350")
     return Decimal("18")
 
 
@@ -7464,7 +7503,8 @@ def order_invoice_pdf(request, order_id):
     try:
         order.update_financials(save=True)
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=7466")
 
     # 🔒 NE PAS écraser items (déjà filtré + photos)
     # items = _build_client_display_items(order)
@@ -7733,13 +7773,15 @@ def update(request, order_id):
             try:
                 order.laundry_partner_id = int(laundry_id)
             except (TypeError, ValueError):
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=7735")
 
         if delivery_id:
             try:
                 order.delivery_partner_id = int(delivery_id)
             except (TypeError, ValueError):
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=7741")
 
         # notes / instructions
         notes_raw = request.POST.get("order_notes", None)
@@ -8549,7 +8591,8 @@ def ensure_default_driver_legs(order, driver):
     try:
         normalize_order_legs(order, driver=driver)
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=8551")
 
     # 🔒 Garde-fou : si commande assignée, on ne gère que le driver assigné
     assigned = getattr(order, "delivery_partner", None)
@@ -8565,7 +8608,8 @@ def ensure_default_driver_legs(order, driver):
             from orders.models import sync_delivery_legs_for_order
             sync_delivery_legs_for_order(order)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=8567")
         qs = DeliveryLeg.objects.filter(order=order, driver=driver).exclude(status="canceled").order_by("id")
 
     # Helper arrondi FCFA
@@ -8642,7 +8686,8 @@ def ensure_default_driver_legs(order, driver):
                 fagni_margin=margin_share_2,
             )
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=8644")
 
     # Re-load + ajuste return selon wash_complete_time (sans toucher done/canceled)
     qs = DeliveryLeg.objects.filter(order=order, driver=driver).exclude(status="canceled").order_by("id")
@@ -8656,7 +8701,8 @@ def ensure_default_driver_legs(order, driver):
             pass
         qs = DeliveryLeg.objects.filter(order=order, driver=driver).exclude(status="canceled").order_by("id")
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=8658")
 
     return qs
 
@@ -8740,7 +8786,8 @@ def driver_order_detail(request, order_id):
         try:
             normalize_order_legs(order, driver=driver)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=8742")
 
         # ==========================================
         # DRIVER_LEG_POST_JSON_V1 (AJAX actions)
@@ -9211,7 +9258,8 @@ def driver_app_data(request):
             if _net is None or _net < 0:
                 income_by_order_id[_oid] = Decimal("0")
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=9213")
 
     def _safe_float(x):
         try:
@@ -9305,7 +9353,8 @@ def driver_app_data(request):
                 if getattr(leg, "canceled_at", None):
                     continue
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=9307")
             total += _leg_driver_potential(leg)
         return total
 
@@ -10779,7 +10828,8 @@ def driver_missions_history(request):
         try:
             dt = make_aware(dt)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=10781")
         qs = qs.filter(created_at__gte=dt)
 
     if d_to:
@@ -10788,7 +10838,8 @@ def driver_missions_history(request):
         try:
             dt = make_aware(dt)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=10790")
         qs = qs.filter(created_at__lte=dt)
 
     # Recherche DB (réduit la charge)
@@ -10869,7 +10920,8 @@ def driver_missions_history(request):
             try:
                 total_km += Decimal(str(getattr(l, "distance_km", 0) or 0))
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=10871")
 
         items.append({
             "order": o,
@@ -11185,7 +11237,8 @@ def ensure_delivery_legs_for_order(order):
         if not DeliveryLeg.objects.filter(order=order).exclude(status="canceled").exists():
             sync_delivery_legs_for_order(order)
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=11187")
 
     if (not has_items) or total_client_dec <= 0:
         return existing_legs
@@ -11274,7 +11327,8 @@ def ensure_delivery_legs_for_order(order):
         from orders.models import sync_delivery_legs_for_order
         sync_delivery_legs_for_order(order)
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=11276")
 
     return (
         DeliveryLeg.objects
@@ -11307,7 +11361,8 @@ def update_leg_status(leg, action, user=None):
                 leg.driver = assigned
                 leg.save(update_fields=["driver"])
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=11309")
 
     action = (action or "").lower().strip()
 
@@ -11354,13 +11409,15 @@ def update_leg_status(leg, action, user=None):
             if action == "cancel" and return_started:
                 return False, "Annulation pickup impossible : le retour a déjà démarré."
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=11356")
 
     # 🔒 Normalisation anti-doublons avant transition
     try:
         normalize_order_legs(getattr(leg, "order", None), driver=getattr(leg, "driver", None))
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=11362")
 
     if action == "accept":
 
@@ -11376,7 +11433,8 @@ def update_leg_status(leg, action, user=None):
                     order.delivery_partner = driver
                     order.save(update_fields=["delivery_partner"])
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=11378")
 
             # 2) Aligner driver sur pickup+return
             try:
@@ -11389,7 +11447,8 @@ def update_leg_status(leg, action, user=None):
                         leg_type__in=["pickup", "return"],
                     ).update(driver_id=driver_id)
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=11391")
 
             # 3) Réactiver return canceled non payé
             try:
@@ -11509,7 +11568,8 @@ def update_leg_status(leg, action, user=None):
                 leg.driver_amount = Decimal("0")
                 leg.fagni_margin = Decimal("0")
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=11511")
     else:
         return False, "Action inconnue"
 
@@ -11540,7 +11600,8 @@ def update_leg_status(leg, action, user=None):
         try:
             leg.save()
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=11542")
 
 
     # ✅ Auto-sync après transition
@@ -11557,13 +11618,15 @@ def update_leg_status(leg, action, user=None):
                     order.save(update_fields=["wash_complete_time"])
 
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=11559")
 
     # 🔒 Normalisation après transition (ex: cancel d'un leg ancien)
     try:
         normalize_order_legs(getattr(leg, "order", None), driver=getattr(leg, "driver", None))
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=11565")
 
     return True, f"Statut mis à jour : {old_status} → {leg.status}"
 
@@ -11679,7 +11742,8 @@ def driver_leg_action(request, leg_id, action):
                             from django.http import JsonResponse
                             return JsonResponse({"ok": False, "redirect_url": full_url, "message": "Preuve photo requise avant de terminer."}, status=409)
                         except Exception:
-                            pass
+                            import logging
+                            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=11681")
 
                     full_url = f"{url}?leg_id={leg.id}&back={back}"
                     if request.headers.get("x-requested-with") == "XMLHttpRequest":
@@ -11687,7 +11751,8 @@ def driver_leg_action(request, leg_id, action):
                             from django.http import JsonResponse
                             return JsonResponse({"ok": False, "redirect_url": full_url, "message": "Preuve photo requise avant de terminer."}, status=409)
                         except Exception:
-                            pass
+                            import logging
+                            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=11689")
                     return redirect(full_url)
             except Exception:
                 # permissif si modèle/migration pas dispo (évite de casser)
@@ -11746,7 +11811,8 @@ def driver_order_live_status(request, order_id):
         try:
             v = timezone.localtime(v)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=11748")
         return v.strftime("%d/%m/%Y %H:%M")
 
     # ---------------------------------------
@@ -11849,7 +11915,8 @@ def driver_order_live_status(request, order_id):
                 if driver_income_progress_pct > 100:
                     driver_income_progress_pct = 100
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=11851")
 
     payload = {
         "ok": True,
@@ -12839,7 +12906,8 @@ def laundry_weighing(request, order_id):
                     try:
                         order.save()
                     except Exception:
-                        pass
+                        import logging
+                        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=12841")
 
         if action == "start":
             # Passe en "en cours" (sans casser si status n'existe pas)
@@ -12851,7 +12919,8 @@ def laundry_weighing(request, order_id):
                     try:
                         order.save()
                     except Exception:
-                        pass
+                        import logging
+                        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=12853")
 
         return redirect("orders:laundry_weighing", order_id=order.id) + f"?laundry_id={laundry.id}"
 
@@ -12892,7 +12961,8 @@ def laundry_weighing_confirm(request, order_id):
             try:
                 order.save()
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=12894")
 
     # ✅ Dès que c'est prêt, on crée/active la mission RETOUR
     try:
@@ -13155,7 +13225,8 @@ def client_new_order_step3(request, order_id: int):
                     try:
                         order.save(update_fields=["bag_size", "updated_at"])
                     except Exception:
-                        pass
+                        import logging
+                        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13157")
 
                 return redirect("orders:client_new_order_step4", order_id=order.id)
 
@@ -13201,7 +13272,8 @@ def client_new_order_step3(request, order_id: int):
                         order.save(update_fields=["service_type"])
                         current_service_type = selected_service_type
                     except Exception:
-                        pass
+                        import logging
+                        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13203")
 
                 for svc in services:
                     raw = (request.POST.get(f"qty_{svc.id}") or "").strip()
@@ -13244,7 +13316,8 @@ def client_new_order_step3(request, order_id: int):
                         try:
                             it.photos.all().delete()
                         except Exception:
-                            pass
+                            import logging
+                            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13246")
                         for photo_file in photo_files:
                             if not photo_file:
                                 continue
@@ -13258,7 +13331,8 @@ def client_new_order_step3(request, order_id: int):
                     try:
                         order.update_financials(save=True)
                     except Exception:
-                        pass
+                        import logging
+                        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13260")
 
                 action = (request.POST.get("action") or "").strip()
                 if action == "add_more":
@@ -13376,7 +13450,8 @@ def client_new_order_step4(request, order_id: int):
             from django.contrib import messages
             messages.error(request, "Ajoute au moins un article avant de confirmer la commande.")
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13378")
         return redirect("orders:client_new_order_step3", order_id=order.id)
 
     if is_bag_mode and bag_size not in ("small", "medium", "large"):
@@ -13384,7 +13459,8 @@ def client_new_order_step4(request, order_id: int):
             from django.contrib import messages
             messages.error(request, "Choisis une taille de sac avant de confirmer la commande.")
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13386")
         return redirect("orders:client_new_order_step3", order_id=order.id)
 
     if request.method == "POST":
@@ -13394,7 +13470,8 @@ def client_new_order_step4(request, order_id: int):
                 from django.contrib import messages
                 messages.error(request, "Merci d'accepter les Conditions Générales d'Utilisation FAGNI avant de confirmer la commande.")
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13396")
             return redirect("orders:client_new_order_step4", order_id=order.id)
 
         if not bool(request.session.get(f"client_cgu_accepted_{order.id}", False)):
@@ -13409,7 +13486,8 @@ def client_new_order_step4(request, order_id: int):
                     source="client_new_order_step4",
                 )
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13411")
         request.session[f"client_cgu_accepted_{order.id}"] = True
 
         if not is_bag_mode:
@@ -13459,7 +13537,8 @@ def client_new_order_step4(request, order_id: int):
                     from django.contrib import messages
                     messages.error(request, "Montant prestations = 0. Vérifie les quantités et prix de tes articles avant de confirmer.")
                 except Exception:
-                    pass
+                    import logging
+                    logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13461")
                 return redirect('orders:client_new_order_step3', order_id=order.id)
 
         from orders.models import DeliveryLeg
@@ -13473,17 +13552,20 @@ def client_new_order_step4(request, order_id: int):
         try:
             order.save()
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13475")
 
         try:
             order.update_financials(save=True)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13480")
 
         try:
             ensure_order_geocoded(order, save=True)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13485")
 
         try:
             from orders.assignment import pick_best_laundry
@@ -13495,7 +13577,8 @@ def client_new_order_step4(request, order_id: int):
             try:
                 order.laundry_partner = laundry
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13497")
 
         try:
             from orders.assignment import pick_best_driver
@@ -13507,7 +13590,8 @@ def client_new_order_step4(request, order_id: int):
             try:
                 order.delivery_partner = driver
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13509")
 
         try:
             update_fields = []
@@ -13523,19 +13607,22 @@ def client_new_order_step4(request, order_id: int):
             try:
                 order.save()
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13525")
 
         try:
             from orders.models import sync_delivery_legs_for_order
             sync_delivery_legs_for_order(order)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13531")
 
         try:
             from orders.service_layer.legs import normalize_order_legs
             normalize_order_legs(order, save=True)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13537")
 
         try:
             has_laundry = bool(getattr(order, "laundry_partner_id", None))
@@ -13556,9 +13643,11 @@ def client_new_order_step4(request, order_id: int):
                             driver_id=order.delivery_partner_id
                         )
                 except Exception:
-                    pass
+                    import logging
+                    logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13558")
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13560")
 
         try:
             amounts_after = _client_order_amounts(order)
@@ -13597,7 +13686,8 @@ def client_new_order_step4(request, order_id: int):
             try:
                 order.refresh_from_db()
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13599")
 
             try:
                 if update_fields:
@@ -13802,7 +13892,8 @@ def laundry_order_detail(request, order_id):
                         driver__isnull=True,
                     ).update(driver=order.delivery_partner)
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13804")
 
             # 🔒 Ne jamais réactiver un return déjà payé (payout existe)
             qs_reactivate = DeliveryLeg.objects.filter(
@@ -13864,7 +13955,8 @@ def laundry_order_detail(request, order_id):
                     set_status("in_progress")
                     order.save(update_fields=["status"])
                 except Exception:
-                    pass
+                    import logging
+                    logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13866")
 
         # 2) READY : une seule fois (piloté par wash_complete_time)
         elif action == "ready":
@@ -13890,7 +13982,8 @@ def laundry_order_detail(request, order_id):
                             partner_name=getattr(laundry, "name", ""),
                         )
                     except Exception:
-                        pass
+                        import logging
+                        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13892")
 
                     # ✅ Dès que c'est "Prêt", on crée/active la mission RETOUR
                     DeliveryLeg.objects.get_or_create(
@@ -13911,7 +14004,8 @@ def laundry_order_detail(request, order_id):
                                 driver__isnull=True,
                             ).update(driver=order.delivery_partner)
                     except Exception:
-                        pass
+                        import logging
+                        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13913")
 
                     # 🔒 Réactiver uniquement les returns annulés NON payés
                     qs_reactivate = DeliveryLeg.objects.filter(
@@ -13959,13 +14053,15 @@ def laundry_order_detail(request, order_id):
                         order.status = "done"
                         order.save()
                     except Exception:
-                        pass
+                        import logging
+                        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13961")
 
         # Recharge l'objet après action POST pour éviter tout affichage stale
         try:
             order.refresh_from_db()
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13967")
 
         return redirect(f"{request.path}?laundry_id={laundry.id}")
 

@@ -75,7 +75,8 @@ def _get_item_total(item) -> Decimal:
         try:
             return _to_decimal(item.total)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.utils.pricing").exception("Exception silencieuse (auto-log) - fichier=orders/utils/pricing.py ligne=77")
 
     unit = getattr(item, "unit_price", None) or 0
     qty = getattr(item, "quantity", None) or 0

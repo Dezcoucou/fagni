@@ -302,7 +302,8 @@ def is_in_delivery_zone(lat, lng, address=""):
             lat = float(lat); lng = float(lng)
             return 5.310 <= lat <= 5.410 and -3.985 <= lng <= -3.920
         except:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.client_api").exception("Exception silencieuse (auto-log) - fichier=orders/client_api.py ligne=304")
     return False
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -489,7 +490,8 @@ def api_create_order(request):
                 profitability_label=order_data['profitability_label'],
             )
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.client_api").exception("Exception silencieuse (auto-log) - fichier=orders/client_api.py ligne=491")
 
         # Notification WhatsApp OPS
         try:
@@ -501,7 +503,8 @@ def api_create_order(request):
             order.notes = (order.notes or '') + f'\nWA_OPS:{wa_url}'
             order.save(update_fields=['notes'])
         except:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.client_api").exception("Exception silencieuse (auto-log) - fichier=orders/client_api.py ligne=503")
 
         # Notification push OPS
         try:

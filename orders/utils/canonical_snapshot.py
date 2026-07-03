@@ -25,19 +25,22 @@ def _build_display_address(order) -> str:
     try:
         candidates.append(getattr(order, "pickup_address", None))
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.utils.canonical_snapshot").exception("Exception silencieuse (auto-log) - fichier=orders/utils/canonical_snapshot.py ligne=27")
 
     try:
         candidates.append(getattr(order, "delivery_address", None))
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.utils.canonical_snapshot").exception("Exception silencieuse (auto-log) - fichier=orders/utils/canonical_snapshot.py ligne=32")
 
     try:
         customer = getattr(order, "customer", None)
         if customer:
             candidates.append(getattr(customer, "address", None))
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.utils.canonical_snapshot").exception("Exception silencieuse (auto-log) - fichier=orders/utils/canonical_snapshot.py ligne=39")
 
     for raw in candidates:
         try:

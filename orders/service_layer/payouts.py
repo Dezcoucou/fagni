@@ -33,7 +33,8 @@ def trigger_driver_payout_for_leg(leg):
             _dbg("SKIP: leg status=canceled")
             return None
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.service_layer.payouts").exception("Exception silencieuse (auto-log) - fichier=orders/service_layer/payouts.py ligne=35")
 
     # 🧱 Guard rail: jambe annulée => jamais payer
     # (utile si quelqu’un repasse status=done par erreur)
@@ -73,7 +74,8 @@ def trigger_driver_payout_for_leg(leg):
         try:
             order.refresh_from_db(fields=["payment_status", "delivery_partner_id"])
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.service_layer.payouts").exception("Exception silencieuse (auto-log) - fichier=orders/service_layer/payouts.py ligne=75")
 
     if getattr(order, "payment_status", None) != "paid":
         _dbg("SKIP: order not paid", "order.payment_status=", getattr(order, "payment_status", None))
@@ -99,7 +101,8 @@ def trigger_driver_payout_for_leg(leg):
                 if done_count == 1:
                     amount = fallback
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.service_layer.payouts").exception("Exception silencieuse (auto-log) - fichier=orders/service_layer/payouts.py ligne=101")
 
         if amount <= 0:
             _dbg("SKIP: amount <= 0")

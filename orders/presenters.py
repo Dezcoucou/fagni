@@ -19,7 +19,8 @@ def _safe_items_count(order: Any) -> int:
         if hasattr(order, "items"):
             return int(order.items.count())
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.presenters").exception("Exception silencieuse (auto-log) - fichier=orders/presenters.py ligne=21")
     return 0
 
 

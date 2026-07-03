@@ -353,7 +353,8 @@ def ops_assign_partner(request, order_id):
                             {"type": "price_confirmed", "order_id": str(order.id), "total": str(total)}
                         )
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.ops_api").exception("Exception silencieuse (auto-log) - fichier=orders/ops_api.py ligne=355")
             # Notification OPS supprimée ici : OPS vient déjà de faire l’action.
             try:
                 from orders.models import log_event

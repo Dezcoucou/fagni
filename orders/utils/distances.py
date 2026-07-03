@@ -54,6 +54,7 @@ def osrm_distance_km(origin_lat, origin_lng, dest_lat, dest_lng):
             km = meters / 1000
             return Decimal(str(km)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.utils.distances").exception("Exception silencieuse (auto-log) - fichier=orders/utils/distances.py ligne=56")
     # Fallback Haversine
     return haversine_distance_km(origin_lat, origin_lng, dest_lat, dest_lng)

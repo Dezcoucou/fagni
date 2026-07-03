@@ -209,7 +209,11 @@ class Wallet(models.Model):
             except ValidationError:
                 raise
             except Exception:
-                pass
+                import logging
+                logging.getLogger("wallet_security").exception(
+                    "WALLET_GUARD_ERROR - controle anti-fraude en echec, sauvegarde bloquee par securite | wallet_id=%s", self.pk
+                )
+                raise
 
         super().save(*args, **kwargs)
 

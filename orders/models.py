@@ -247,7 +247,8 @@ def sync_delivery_legs_for_order(order):
                             cur = desired_status
                             status_changed = True
                     except Exception:
-                        pass
+                        import logging
+                        logging.getLogger("fagni.models.legs").exception("Echec silencieux: reactivation soft leg annule (pending/assigned) | pk=%s", getattr(leg, "pk", None) if "leg" in dir() else None)
 
             # 2) Sync métier autorisé : seulement pending/assigned (jamais done)
             else:
@@ -3545,14 +3546,16 @@ class DeliveryLeg(models.Model):
             if (not has_payout) and self.driver_id is None and (self.status or "").lower() in ("assigned", "in_progress", "done"):
                 self.status = "pending"
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.models.legs").exception("Echec silencieux: Guard sans driver - blocage assigned/in_progress/done | pk=%s", getattr(self, "pk", None) if "self" in dir() else None)
 
         # 🔒 Freeze: canceled ne peut pas être réouvert
         try:
             if old_status == "canceled" and self.status != "canceled":
                 self.status = "canceled"
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.models.legs").exception("Echec silencieux: Freeze canceled ne peut pas etre reouvert | pk=%s", getattr(self, "pk", None) if "self" in dir() else None)
 
         # ✅ canceled => neutraliser montants + garantir persistance même avec update_fields=["status"]
         try:

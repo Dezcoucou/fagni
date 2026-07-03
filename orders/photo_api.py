@@ -117,19 +117,19 @@ def driver_upload_photo(request, order_id):
         if not photo_data:
             return Response({'error': 'Photo manquante'}, status=400)
 
-            public_id = f"order_{order_id}_{photo_type}_driver{driver.id}"
+        public_id = f"order_{order_id}_{photo_type}_driver{driver.id}"
 
-            # Stockage local (Cloudinary non configure en pilote)
-            import os, uuid
-            from django.core.files.base import ContentFile
-            from django.core.files.storage import default_storage
+        # Stockage local (Cloudinary non configure en pilote)
+        import os, uuid
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import default_storage
 
-            try:
-                raw, ext = _safe_decode_image(photo_data)
-            except ValueError as ve:
-                return Response({'error': 'photo_invalide', 'details': str(ve)}, status=400)
+        try:
+            raw, ext = _safe_decode_image(photo_data)
+        except ValueError as ve:
+            return Response({'error': 'photo_invalide', 'details': str(ve)}, status=400)
 
-            filename = f"orders/evidence/order_{order_id}_{photo_type}_driver{driver.id}_{uuid.uuid4().hex[:8]}.{ext}"
+        filename = f"orders/evidence/order_{order_id}_{photo_type}_driver{driver.id}_{uuid.uuid4().hex[:8]}.{ext}"
         saved_path = default_storage.save(filename, ContentFile(raw))
         url = default_storage.url(saved_path)
 
@@ -163,7 +163,7 @@ def driver_upload_photo(request, order_id):
         import logging
         logger = logging.getLogger(__name__)
         logger.exception("partner_upload_photo failed order_id=%s", order_id)
-        import traceback; return Response({'error': 'upload_photo_failed', 'details': str(e), 'tb': traceback.format_exc()}, status=400)
+        return Response({'error': 'upload_photo_failed', 'details': str(e)}, status=400)
 
 
 @api_view(['POST'])
@@ -212,17 +212,17 @@ def partner_upload_photo(request, order_id):
                 'file_keys': list(request.FILES.keys()),
             }, status=400)
 
-            # MVP terrain : stockage local si Cloudinary n'est pas configure
-            import os, uuid
-            from django.core.files.base import ContentFile
-            from django.core.files.storage import default_storage
+        # MVP terrain : stockage local si Cloudinary n'est pas configure
+        import os, uuid
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import default_storage
 
-            try:
-                raw, ext = _safe_decode_image(photo_data)
-            except ValueError as ve:
-                return Response({'error': 'photo_invalide', 'details': str(ve)}, status=400)
+        try:
+            raw, ext = _safe_decode_image(photo_data)
+        except ValueError as ve:
+            return Response({'error': 'photo_invalide', 'details': str(ve)}, status=400)
 
-            filename = f"orders/evidence/order_{order_id}_{photo_type}_partner{partner.id}_{uuid.uuid4().hex[:8]}.{ext}"
+        filename = f"orders/evidence/order_{order_id}_{photo_type}_partner{partner.id}_{uuid.uuid4().hex[:8]}.{ext}"
         saved_path = default_storage.save(filename, ContentFile(raw))
         url = default_storage.url(saved_path)
 

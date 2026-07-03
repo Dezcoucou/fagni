@@ -148,7 +148,7 @@ TEMPLATES = [
 DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
 
 if DATABASE_URL:
-    # Render / Prod (PostgreSQL)
+    # PythonAnywhere / Prod (MySQL)
     DATABASES = {
         "default": dj_database_url.parse(
             DATABASE_URL,
@@ -156,6 +156,10 @@ if DATABASE_URL:
             ssl_require=(os.getenv("DB_SSL_REQUIRE", "1") == "1"),
         )
     }
+
+    # Active MySQL Strict Mode (empeche les troncatures/valeurs invalides silencieuses)
+    DATABASES["default"].setdefault("OPTIONS", {})
+    DATABASES["default"]["OPTIONS"]["init_command"] = "SET sql_mode='STRICT_TRANS_TABLES'"
 else:
     # Local (SQLite)
     DATABASES = {

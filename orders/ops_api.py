@@ -325,7 +325,8 @@ def ops_assign_partner(request, order_id):
                     order.fagni_revenue_ht = pricing['fagni_revenue_ht']
                     order.margin_net = pricing['total_fagni']
                 except Exception:
-                    pass
+                    import logging
+                    logging.getLogger("fagni.ops_api").exception("Echec silencieux: recalcul pricing apres changement partenaire/distance | order_id=%s", getattr(order, "id", None))
 
         order.save(update_fields=[
             'laundry_partner_id', 'delivery_fee',
@@ -365,7 +366,8 @@ def ops_assign_partner(request, order_id):
                     partner_name=partner.name,
                 )
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.ops_api").exception("Echec silencieux: partner.assigned (log_event) | order_id=%s", getattr(order, "id", None))
         return Response({'success': True, 'partner': partner.name if partner else None})
     except Exception as e:
         return Response({'error': str(e)}, status=400)
@@ -637,7 +639,8 @@ def ops_assign_driver(request, order_id):
                 driver_type=driver_type,
             )
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.ops_api").exception("Echec silencieux: driver.assigned (log_event) | order_id=%s", getattr(order, "id", None))
 
         # FGP — DESACTIVE PILOTE (activation apres 5 pressings + 200 commandes)
         # FGP — Cotisation Fonds Garantie Partenaire (version legere) — DESACTIVE
@@ -707,7 +710,8 @@ def ops_mark_paid(request, order_id):
             log_event("payment.paid", order=order, actor_type="ops",
                 actor_id=None, channel=channel, reference=reference)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.ops_api").exception("Echec silencieux: payment.paid (log_event) | order_id=%s", getattr(order, "id", None))
 
         return Response({
             'success': True,
@@ -1867,7 +1871,8 @@ def ops_assign_return_driver(request, order_id):
                     driver_name=driver.name,
                 )
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.ops_api").exception("Echec silencieux: return.assigned (log_event) | order_id=%s", getattr(order, "id", None))
 
         return Response({"success": True, "message": f"Livreur retour {driver.name} assigne"})
     except Exception as e:

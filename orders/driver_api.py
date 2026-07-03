@@ -331,7 +331,8 @@ def driver_confirm_pickup(request, order_id):
                 Order.objects.filter(pk=order.pk).update(pickup_time=now)
                 sync_order_status_from_legs(order, save=True)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.driver_api").exception("Echec silencieux: pickup_leg save + Order.pickup_time + sync_order_status_from_legs | order_id=%s", getattr(order, "id", None))
 
         # Event logging LOT1
         try:
@@ -342,7 +343,8 @@ def driver_confirm_pickup(request, order_id):
                 articles_count=articles_count,
             )
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.driver_api").exception("Echec silencieux: pickup.done (log_event) | order_id=%s", getattr(order, "id", None))
 
         # Payout différé : aucun crédit wallet à la collecte.
         # Crédit déclenché uniquement après order.done + payment_status=paid.
@@ -414,7 +416,8 @@ def driver_delivery_proof(request, order_id):
                     save=True,
                 )
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.driver_api").exception("Echec silencieux: delivery_to_client evidence.image.save | order_id=%s", getattr(order, "id", None))
 
         leg.client_signature = client_name
         leg.client_signed_at = now
@@ -496,7 +499,8 @@ def driver_confirm_delivery(request, order_id):
                 driver_name=driver.name,
             )
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.driver_api").exception("Echec silencieux: delivery.done (log_event) | order_id=%s", getattr(order, "id", None))
 
         # Payout différé : aucun crédit wallet direct ici.
         # Crédit déclenché uniquement après order.done + payment_status=paid.
@@ -568,7 +572,8 @@ def api_driver_dropoff(request, order_id):
                     save=True,
                 )
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.driver_api").exception("Echec silencieux: dropoff_to_laundry evidence.image.save | order_id=%s", getattr(order, "id", None))
 
         # Marquer leg pickup done
         pickup_leg = DeliveryLeg.objects.filter(

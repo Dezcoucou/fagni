@@ -163,7 +163,7 @@ def driver_upload_photo(request, order_id):
         import logging
         logger = logging.getLogger(__name__)
         logger.exception("partner_upload_photo failed order_id=%s", order_id)
-        return Response({'error': 'upload_photo_failed', 'details': str(e)}, status=400)
+        import traceback; return Response({'error': 'upload_photo_failed', 'details': str(e), 'tb': traceback.format_exc()}, status=400)
 
 
 @api_view(['POST'])

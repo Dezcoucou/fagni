@@ -8733,7 +8733,8 @@ def driver_order_detail(request, order_id):
                 from orders.models import sync_delivery_legs_for_order
                 sync_delivery_legs_for_order(order)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.views.legs").exception("Echec silencieux: resync legs pendant course en cours | order_id=%s", getattr(order, "id", None) if "order" in dir() else None)
 
         # 🔒 Normalisation légère (anti-doublons / return pending si wash pas prêt)
         try:
@@ -11419,7 +11420,8 @@ def update_leg_status(leg, action, user=None):
                                 status="canceled"
                             ).update(status="pending")
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.views.legs").exception("Echec silencieux: reactivation leg return si non paye | order_id=%s", getattr(order, "id", None) if "order" in dir() else None)
 
         # ✅ Déjà accepté
         elif leg.status == "assigned":

@@ -113,19 +113,24 @@ def trigger_driver_payout_for_leg(leg):
 
     wallet = get_or_create_wallet_for_delivery_partner(driver)
 
-    # 🔐 Anti-doublon dur (par jambe) — on retourne la tx si elle existe déjà
-    existing = WalletTransaction.objects.filter(
-        wallet=wallet,
-        order=order,
-        type="payout",
-        direction="in",
-        leg=leg,
-    ).order_by("-id").first()
-    if existing:
-        _dbg("EXISTS: tx_id=", existing.id, "leg_id=", getattr(leg, "id", None))
-        return existing
-
+    # Anti-doublon dur (par jambe) - verrou DB pour serialiser les appels concurrents
+    from orders.models import DeliveryLeg
+    
     with transaction.atomic():
+        # Verrouille la ligne du leg pour la duree de la transaction (bloque les appels concurrents)
+        DeliveryLeg.objects.select_for_update().filter(pk=leg.pk).first()
+    
+        existing = WalletTransaction.objects.filter(
+            wallet=wallet,
+            order=order,
+            type="payout",
+            direction="in",
+            leg=leg,
+        ).order_by("-id").first()
+        if existing:
+            _dbg("EXISTS: tx_id=", existing.id, "leg_id=", getattr(leg, "id", None))
+            return existing
+    
         tx = credit_wallet(
             wallet,
             amount,

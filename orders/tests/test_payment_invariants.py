@@ -26,7 +26,8 @@ class PaymentInvariantTests(TestCase):
         try:
             o.update_financials(save=True)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.tests.orders.tests.test_payment_invariants").exception("Exception silencieuse (auto-log) - fichier=orders/tests/test_payment_invariants.py ligne=28")
 
         expected_total = build_order_finance_summary(o)["total_client_ttc"]
 
@@ -71,7 +72,8 @@ class PaymentInvariantTests(TestCase):
         try:
             o.update_financials(save=True)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.tests.orders.tests.test_payment_invariants").exception("Exception silencieuse (auto-log) - fichier=orders/tests/test_payment_invariants.py ligne=73")
 
         expected_total = build_order_finance_summary(o)["total_client_ttc"]
 
@@ -93,7 +95,8 @@ class PaymentInvariantTests(TestCase):
         try:
             o.update_financials(save=True)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.tests.orders.tests.test_payment_invariants").exception("Exception silencieuse (auto-log) - fichier=orders/tests/test_payment_invariants.py ligne=95")
 
         expected_total = build_order_finance_summary(o)["total_client_ttc"]
         self.assertEqual(expected_total, Decimal("0"))

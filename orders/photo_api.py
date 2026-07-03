@@ -162,7 +162,7 @@ def driver_upload_photo(request, order_id):
     except Exception as e:
         import logging
         logger = logging.getLogger(__name__)
-        logger.exception("partner_upload_photo failed order_id=%s", order_id)
+        logger.exception("driver_upload_photo failed order_id=%s", order_id)
         return Response({'error': 'upload_photo_failed', 'details': str(e)}, status=400)
 
 
@@ -285,5 +285,5 @@ def order_photos(request, order_id):
     except Exception as e:
         import logging
         logger = logging.getLogger(__name__)
-        logger.exception("partner_upload_photo failed order_id=%s", order_id)
+        logger.exception("order_photos failed order_id=%s", order_id)
         return Response({'error': 'upload_photo_failed', 'details': str(e)}, status=400)

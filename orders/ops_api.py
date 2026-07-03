@@ -531,6 +531,48 @@ def ops_update_status(request, order_id):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+def ops_update_litige_status(request, order_id):
+    """POST /api/ops/orders/<id>/litige-status/ — {status, resolution_note}"""
+    try:
+        _check_ops(request)
+    except:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    from orders.models import Order
+    ALLOWED_LITIGE = ['ouvert', 'en_enquete', 'en_attente_client', 'en_attente_partner', 'resolu', 'refuse', 'rembourse']
+    try:
+        order = Order.objects.get(id=order_id)
+        new_status = request.data.get('status', '')
+        resolution_note = request.data.get('resolution_note', '')
+        if new_status not in ALLOWED_LITIGE:
+            return Response({'error': 'Statut litige invalide'}, status=400)
+
+        notes = order.notes or ''
+        lines_notes = notes.split('\n')
+        new_lines = []
+        found = False
+        for line in lines_notes:
+            if line.startswith('LITIGE:'):
+                found = True
+                parts = line.replace('LITIGE:', '').split('|')
+                litige_type = parts[0] if len(parts) > 0 else ''
+                litige_desc = parts[1] if len(parts) > 1 else ''
+                new_lines.append(f'LITIGE:{litige_type}|{litige_desc}|{new_status}|{resolution_note}')
+            else:
+                new_lines.append(line)
+        if not found:
+            return Response({'error': 'Aucun litige trouve sur cette commande'}, status=400)
+
+        order.notes = '\n'.join(new_lines)
+        order.save(update_fields=['notes', 'updated_at'])
+
+        return Response({'success': True, 'status': new_status})
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
 def ops_assign_driver(request, order_id):
     """POST /api/ops/orders/<id>/assign-driver/ — {driver_id}"""
     try:

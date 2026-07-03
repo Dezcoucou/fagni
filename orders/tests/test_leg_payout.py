@@ -191,7 +191,8 @@ class DeliveryLegPayoutTests(TestCase):
             from orders.models import sync_delivery_legs_for_order as _sync  # type: ignore
             sync_fn = _sync
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.tests.orders.tests.test_leg_payout").exception("Exception silencieuse (auto-log) - fichier=orders/tests/test_leg_payout.py ligne=193")
 
         if sync_fn is None:
             try:
@@ -199,7 +200,8 @@ class DeliveryLegPayoutTests(TestCase):
                 from orders.service_layer.sync import sync_delivery_legs_for_order as _sync  # type: ignore
                 sync_fn = _sync
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.tests.orders.tests.test_leg_payout").exception("Exception silencieuse (auto-log) - fichier=orders/tests/test_leg_payout.py ligne=201")
 
         if sync_fn is None:
             self.skipTest("sync_delivery_legs_for_order() introuvable : test resync ignoré.")

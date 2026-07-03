@@ -32,7 +32,8 @@ class PresenterAndClientFinanceTests(TestCase):
         try:
             self.order_bag.update_financials(save=True)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.tests.orders.tests.test_presenters_and_client_finance").exception("Exception silencieuse (auto-log) - fichier=orders/tests/test_presenters_and_client_finance.py ligne=34")
 
         self.client_http.cookies["client_phone"] = self.customer.phone
 

@@ -152,6 +152,7 @@ def ops_dashboard(request):
             'cost_driver_pickup':  o.cost_driver_pickup or 0,
             'cost_driver_delivery': o.cost_driver_delivery or 0,
             'cost_pressing':       o.cost_pressing or 0,
+            'notes': o.notes or '',
         })
 
     # Stats globales

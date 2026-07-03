@@ -140,12 +140,18 @@ def driver_wallet_dashboard(request):
             messages.error(request, "Le montant demandé dépasse ton solde disponible.")
             return redirect(f"{reverse('wallets:driver_wallet_dashboard')}?driver_id={driver.id}")
 
-        WithdrawalRequest.objects.create(
+        wr = WithdrawalRequest.objects.create(
             wallet=wallet,
             requested_by=request.user if request.user.is_authenticated else None,
             amount=amount,
             status="pending",
         )
+        # Notifier Amadou (OPS) via push FCM
+        try:
+            from fagni.notifications import notif_ops_retrait
+            notif_ops_retrait(wr.get_beneficiary_display(), amount, wallet.id)
+        except Exception as e:
+            print(f"[RETRAIT] Erreur notif FCM: {e}")
 
         messages.success(
             request,
@@ -266,12 +272,18 @@ def laundry_wallet_dashboard(request):
             messages.error(request, "Le montant demandé dépasse ton solde disponible.")
             return redirect(f"{reverse('wallets:laundry_wallet_dashboard')}?laundry_id={laundry.id}")
 
-        WithdrawalRequest.objects.create(
+        wr = WithdrawalRequest.objects.create(
             wallet=wallet,
             requested_by=request.user if request.user.is_authenticated else None,
             amount=amount,
             status="pending",
         )
+        # Notifier Amadou (OPS) via push FCM
+        try:
+            from fagni.notifications import notif_ops_retrait
+            notif_ops_retrait(wr.get_beneficiary_display(), amount, wallet.id)
+        except Exception as e:
+            print(f"[RETRAIT PRESSING] Erreur notif FCM: {e}")
 
         messages.success(request, "Ta demande de retrait a été enregistrée. Elle sera traitée par l'équipe FAGNI.")
         return redirect(f"{reverse('wallets:laundry_wallet_dashboard')}?laundry_id={laundry.id}")

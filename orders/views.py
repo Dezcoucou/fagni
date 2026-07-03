@@ -130,7 +130,8 @@ def apply_fagni_monetization(order):
                 description=f"Cashback FAGNI commande {order.code}"
             )
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.views.wallet").exception("Echec silencieux: credit_wallet cashback commande | order_id=%s", getattr(order, "id", None) if "order" in dir() else None)
 
     # ---- REFERRAL ----
     try:
@@ -150,7 +151,8 @@ def apply_fagni_monetization(order):
                 description="Bonus bienvenue FAGNI"
             )
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.views.wallet").exception("Echec silencieux: credit_wallet bonus bienvenue | order_id=%s", getattr(order, "id", None) if "order" in dir() else None)
 
 
 
@@ -13586,7 +13588,8 @@ def client_new_order_step4(request, order_id: int):
                     note="Auto paiement wallet",
                 )
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.views.wallet").exception("Echec silencieux: paiement auto wallet (wallet_auto) | order_id=%s", getattr(order, "id", None) if "order" in dir() else None)
 
             update_fields = []
             try:

@@ -8,7 +8,8 @@ def _field(model, name, label):
     try:
         model._meta.get_field(name).verbose_name = label
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.labels_fr").exception("Exception silencieuse (auto-log) - fichier=orders/labels_fr.py ligne=10")
 
 try:
     from .models import Order, OrderItem, ServiceCategory

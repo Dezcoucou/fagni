@@ -320,7 +320,8 @@ def driver_confirm_pickup(request, order_id):
                         pickup_leg.picked_up_lng = float(pop_lng)
                         update_fields.append('picked_up_lng')
                 except (TypeError, ValueError):
-                    pass
+                    import logging
+                    logging.getLogger("fagni.orders.driver_api").exception("Exception silencieuse (auto-log) - fichier=orders/driver_api.py ligne=322")
                 if pop_signature:
                     pickup_leg.pickup_signature = pop_signature
                     pickup_leg.pickup_signed_at = now
@@ -431,7 +432,8 @@ def driver_delivery_proof(request, order_id):
             if lng not in [None, '']:
                 leg.delivered_lng = float(lng)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.driver_api").exception("Exception silencieuse (auto-log) - fichier=orders/driver_api.py ligne=433")
 
         update_fields = ['client_signature', 'client_signed_at', 'driver', 'status']
         if hasattr(leg, 'finished_at'): update_fields.append('finished_at')

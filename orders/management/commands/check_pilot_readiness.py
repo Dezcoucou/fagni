@@ -88,7 +88,8 @@ class Command(BaseCommand):
                     if amt is not None:
                         return self._dec(amt)
                 except Exception:
-                    pass
+                    import logging
+                    logging.getLogger("fagni.orders.management.commands.check_pilot_readiness").exception("Exception silencieuse (auto-log) - fichier=orders/management/commands/check_pilot_readiness.py ligne=90")
 
             # Fallback: order fields (if exist)
             return self._dec(self._get_attr_first(order, ["amount_paid", "paid_amount", "total_paid"], default=0))

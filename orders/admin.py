@@ -755,7 +755,8 @@ class OrderAdmin(UnfoldModelAdmin):
                 try:
                     order.update_financials(save=False)
                 except Exception:
-                    pass
+                    import logging
+                    logging.getLogger("fagni.orders.admin").exception("Exception silencieuse (auto-log) - fichier=orders/admin.py ligne=757")
 
                 paid_at = timezone.now()
 
@@ -815,7 +816,8 @@ class OrderAdmin(UnfoldModelAdmin):
                         order.update_financials(save=False)
                         changed_fields.append("invoice_number")
                     except Exception:
-                        pass
+                        import logging
+                        logging.getLogger("fagni.orders.admin").exception("Exception silencieuse (auto-log) - fichier=orders/admin.py ligne=817")
 
                 if changed_fields:
                     order.save(update_fields=list(set(changed_fields)))
@@ -1452,7 +1454,8 @@ try:
                     has_payment_review = True
                     break
                 except Exception:
-                    pass
+                    import logging
+                    logging.getLogger("fagni.orders.admin").exception("Exception silencieuse (auto-log) - fichier=orders/admin.py ligne=1454")
 
         if not has_payment_review:
             fieldsets = list(fieldsets)

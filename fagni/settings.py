@@ -45,7 +45,8 @@ try:
     if _host and _host not in ALLOWED_HOSTS and ALLOWED_HOSTS != ["*"]:
         ALLOWED_HOSTS.append(_host)
 except Exception:
-    pass
+    import logging
+    logging.getLogger("fagni.fagni.settings").exception("Exception silencieuse (auto-log) - fichier=fagni/settings.py ligne=47")
 
 # Override via env (Render/Prod)
 _env_hosts = (os.getenv("ALLOWED_HOSTS", "") or "").strip()
@@ -392,7 +393,8 @@ try:
                 "django.template.loaders.app_directories.Loader",
             ]
 except Exception:
-    pass
+    import logging
+    logging.getLogger("fagni.fagni.settings").exception("Exception silencieuse (auto-log) - fichier=fagni/settings.py ligne=394")
 
 
 # ========================
@@ -512,7 +514,8 @@ try:
         "propagate": False,
     })
 except Exception:
-    pass
+    import logging
+    logging.getLogger("fagni.fagni.settings").exception("Exception silencieuse (auto-log) - fichier=fagni/settings.py ligne=514")
 
 # ── API CLIENT FAGNI ─────────────────────────────────────
 REST_FRAMEWORK = {

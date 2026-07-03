@@ -164,7 +164,8 @@ def partner_update_status(request, order_id):
             if t:
                 notif_client_pret(t.token, order.code or str(order.id))
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.partner_api").exception("Exception silencieuse (auto-log) - fichier=orders/partner_api.py ligne=166")
     return Response({'success': True, 'status': new_status, 'code': order.code})
 
 

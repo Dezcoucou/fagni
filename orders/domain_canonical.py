@@ -68,12 +68,14 @@ def infer_service_type_from_order_item(item) -> str:
                 chunks.append(str(getattr(category, "name", "") or ""))
                 chunks.append(str(getattr(category, "label", "") or ""))
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.domain_canonical").exception("Exception silencieuse (auto-log) - fichier=orders/domain_canonical.py ligne=70")
 
     try:
         chunks.append(str(getattr(item, "designation", "") or ""))
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.domain_canonical").exception("Exception silencieuse (auto-log) - fichier=orders/domain_canonical.py ligne=75")
 
     text = " ".join(chunks).strip().lower()
 

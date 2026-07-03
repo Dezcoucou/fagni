@@ -71,20 +71,23 @@ def _schedule_sync_order_status(order_id: int) -> None:
                 from .views import normalize_order_legs
                 normalize_order_legs(order)
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.signals").exception("Exception silencieuse (auto-log) - fichier=orders/signals.py ligne=73")
 
             # ✅ IMPORTANT: appliquer les règles métier legs (idempotent)
             # (ex: return reste pending tant que pickup n'est pas done)
             try:
                 sync_delivery_legs_for_order(order)
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.signals").exception("Exception silencieuse (auto-log) - fichier=orders/signals.py ligne=80")
 
             # ✅ Recalcul du statut Order depuis les legs
             try:
                 sync_order_status_from_legs(order, save=True)
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.signals").exception("Exception silencieuse (auto-log) - fichier=orders/signals.py ligne=86")
 
         finally:
             pending.discard(order_id)
@@ -97,7 +100,8 @@ def _schedule_sync_order_status(order_id: int) -> None:
             _run()
             return
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.signals").exception("Exception silencieuse (auto-log) - fichier=orders/signals.py ligne=99")
 
     transaction.on_commit(_run)
 
@@ -157,7 +161,8 @@ def _schedule_payouts_for_paid_order(order_id: int) -> None:
             _run()
             return
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.signals").exception("Exception silencieuse (auto-log) - fichier=orders/signals.py ligne=159")
 
     transaction.on_commit(_run)
 
@@ -218,7 +223,8 @@ def deliveryleg_post_save_sync_order_status(sender, instance: DeliveryLeg, creat
                     from orders.service_layer.payouts import trigger_driver_payout_for_leg
                     trigger_driver_payout_for_leg(instance)
                 except Exception:
-                    pass
+                    import logging
+                    logging.getLogger("fagni.orders.signals").exception("Exception silencieuse (auto-log) - fichier=orders/signals.py ligne=220")
 
             # payout après commit si on est en atomic
             try:
@@ -231,7 +237,8 @@ def deliveryleg_post_save_sync_order_status(sender, instance: DeliveryLeg, creat
                 # fallback : tente direct
                 _payout()
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.signals").exception("Exception silencieuse (auto-log) - fichier=orders/signals.py ligne=233")
 
     # 2) ✅ Sync legs + statut commande depuis les legs (après commit)
     if order_id:
@@ -271,9 +278,11 @@ def order_post_save_trigger_payouts_when_paid(sender, instance: Order, created=F
                     channel=getattr(instance, 'payment_declared_channel', '') or 'wave',
                 )
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.signals").exception("Exception silencieuse (auto-log) - fichier=orders/signals.py ligne=273")
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.signals").exception("Exception silencieuse (auto-log) - fichier=orders/signals.py ligne=275")
 
 
 # ── Notification WhatsApp partenaire (wa.me) ──────────────────
@@ -319,4 +328,5 @@ def notify_partner_on_assignment(sender, instance, created, **kwargs):
                     notes=notes + f'\nWA_PARTNER:{wa_link}'
                 )
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.signals").exception("Exception silencieuse (auto-log) - fichier=orders/signals.py ligne=321")

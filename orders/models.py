@@ -317,7 +317,8 @@ def sync_delivery_legs_for_order(order):
         from orders.models import sync_order_status_from_legs
         sync_order_status_from_legs(order, save=True)
     except Exception:
-        pass
+        import logging
+        logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=319")
 
     keepers = {existing_by_type.get("pickup"), existing_by_type.get("return")}
     keepers = {k for k in keepers if k is not None}
@@ -340,7 +341,8 @@ def sync_delivery_legs_for_order(order):
             if upsell:
                 return upsell.total
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=342")
         return Decimal("0.00")
 
 
@@ -512,7 +514,8 @@ class Subscription(models.Model):
             if getattr(self, "total_client_ttc", 0) and getattr(self, "payment_status", "") in ("declared", "paid"):
                 score += 1
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=514")
 
         return score
 
@@ -1564,7 +1567,8 @@ class Order(models.Model):
             from .services import recompute_order_distance_from_legs
             recompute_order_distance_from_legs(self, save=False)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=1566")
 
         data = compute_order_financials(self)
 
@@ -1598,7 +1602,8 @@ class Order(models.Model):
                 self.delivery_fee = Decimal(str(getattr(self, 'amount_driver_partner', 0) or 0)) + Decimal(str(getattr(self, 'logistic_margin', 0) or 0))
                 self.driver_logistic_cost = Decimal(str(getattr(self, 'amount_driver_partner', 0) or 0))
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=1600")
         else:
             self.delivery_fee = data.get('delivery_fee_client', Decimal('0'))
 
@@ -1674,7 +1679,8 @@ class Order(models.Model):
             try:
                 sync_delivery_legs_for_order(self)
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=1676")
 
         return data
 
@@ -1711,7 +1717,8 @@ class Order(models.Model):
         try:
             self.update_financials(save=False)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=1713")
 
         total_ttc = Decimal(str(getattr(self, "total_client_ttc", 0) or 0))
 
@@ -1723,7 +1730,8 @@ class Order(models.Model):
                 if save:
                     self.save(update_fields=["amount_paid", "payment_status"])
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=1725")
             return self
 
         # 1) Montant payé
@@ -1744,7 +1752,8 @@ class Order(models.Model):
             if getattr(self, "payment_date", None) is None:
                 self.payment_date = paid_at
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=1746")
 
         # 3) Audit : add_payment si possible (FCFA entier)
         pay_amount = amt
@@ -1793,13 +1802,15 @@ class Order(models.Model):
                 if getattr(self, "invoice_status", None) in (None, "", "draft", "issued"):
                     self.invoice_status = "paid"
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=1795")
 
             try:
                 # update_financials gère invoice_number + fne_status, + sync legs (si save=True)
                 self.update_financials(save=False)
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=1801")
 
         if save:
             try:
@@ -1822,13 +1833,15 @@ class Order(models.Model):
                 else:
                     self.save()
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=1824")
 
             # Sync legs après save si ton moteur en dépend (sécurisé)
             try:
                 sync_delivery_legs_for_order(self)
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=1830")
 
         return self
 
@@ -1959,7 +1972,8 @@ class Order(models.Model):
         try:
             self.refresh_from_db(fields=["total_client_ttc", "payment_status", "amount_paid"])
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=1961")
 
         total_ttc = Decimal(str(getattr(self, "total_client_ttc", 0) or 0))
         if total_ttc <= 0:
@@ -2372,7 +2386,8 @@ class Order(models.Model):
                 margin_total = Decimal(str(self.logistic_margin or 0))
                 delivery_fee = Decimal(str(self.delivery_fee or 0))
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=2374")
 
         # 3) Verrouillage payout par jambe
         locked_driver_amount = {}
@@ -2477,13 +2492,15 @@ class Order(models.Model):
             try:
                 self.delivery_fee = Decimal(str(delivery_fee or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=2479")
 
             # mirror legacy
             try:
                 self.driver_logistic_cost = Decimal(str(self.amount_driver_partner or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=2485")
 
             self.distance_km = total_dist or None
             self.save(update_fields=["amount_driver_partner", "logistic_margin", "delivery_fee", "driver_logistic_cost", "distance_km"])
@@ -2736,7 +2753,8 @@ class Order(models.Model):
                 try:
                     print(f"[MLM] Order {self.id} failed: {e}")
                 except Exception:
-                    pass
+                    import logging
+                    logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=2738")
 
         # 2) Payout legs DONE (idempotent)  ✅ TOUJOURS exécuter même si wallets_distributed=True
         from orders.service_layer.payouts import trigger_driver_payout_for_leg
@@ -2897,13 +2915,15 @@ class Order(models.Model):
             if hasattr(self, "pickup_address"):
                 self.pickup_address = clean_address_or_empty(getattr(self, "pickup_address", None))
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=2899")
 
         try:
             if hasattr(self, "delivery_address"):
                 self.delivery_address = clean_address_or_empty(getattr(self, "delivery_address", None))
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=2905")
 
 
         # ============================================================
@@ -2970,7 +2990,8 @@ class Order(models.Model):
             except ValidationError:
                 raise
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=2972")
 
             # ============================================================
             # 🔒 GARDE-FOU (AVANT ÉCRITURE) — Interdire paid -> non-paid si tx wallet
@@ -3003,7 +3024,8 @@ class Order(models.Model):
             if not (total_existing > 0 and not has_items):
                 self.update_financials(save=False)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=3005")
 
         # ============================================================
         # 🔒 VERROUS PAIEMENT (AVANT ÉCRITURE)
@@ -3020,7 +3042,8 @@ class Order(models.Model):
                 try:
                     total_ttc = Decimal(str(getattr(old, "total_client_ttc", 0) or 0))
                 except Exception:
-                    pass
+                    import logging
+                    logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=3022")
             amt = Decimal(str(getattr(self, "amount_paid", 0) or 0))
 
             # borne basse
@@ -3096,7 +3119,8 @@ class Order(models.Model):
                                 uf.add(f)
                         kwargs["update_fields"] = list(uf)
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=3098")
 
             # ✅ Jambe annulée => neutraliser montants (source-of-truth DB)
             # Peu importe d'où vient l'annulation (views, admin, scripts, normalizers)
@@ -3110,7 +3134,8 @@ class Order(models.Model):
                     if hasattr(self, "fagni_margin"):
                         self.fagni_margin = Decimal("0")
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=3112")
 
             super().save(*args, **kwargs)
         except IntegrityError as e:
@@ -3136,7 +3161,8 @@ class Order(models.Model):
         try:
             self.update_financials(save=False)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=3138")
 
         try:
             Payment = apps.get_model("orders", "Payment")
@@ -3207,7 +3233,8 @@ class Order(models.Model):
                     Order.objects.filter(pk=self.pk).update(**updates)
 
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=3209")
 
         # ============================================================
         # ✅ AUTO-REPAIR: si la commande devient PAID via RESYNC Payment
@@ -3532,7 +3559,8 @@ class DeliveryLeg(models.Model):
                 try:
                     self.fagni_margin = old.get("fagni_margin")
                 except Exception:
-                    pass
+                    import logging
+                    logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=3534")
 
             # forcer update_fields à inclure les champs verrouillés
             uf = kwargs.get("update_fields", None)
@@ -3571,7 +3599,8 @@ class DeliveryLeg(models.Model):
                     uf.update({"status", "client_fee_share", "driver_amount", "fagni_margin"})
                     kwargs["update_fields"] = list(uf)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=3573")
 
         # timestamps
         if self.status == "in_progress" and not self.started_at:

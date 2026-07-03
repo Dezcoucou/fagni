@@ -111,7 +111,8 @@ def ensure_order_geocoded(order, save: bool = True) -> bool:
                 partner.longitude = coords[1]
                 partner.save(update_fields=["latitude", "longitude"])
             except Exception:
-                pass
+                import logging
+                logging.getLogger("fagni.orders.utils.geocoding").exception("Exception silencieuse (auto-log) - fichier=orders/utils/geocoding.py ligne=113")
 
     if changed and save:
         try:

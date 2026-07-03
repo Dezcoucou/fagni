@@ -66,7 +66,8 @@ def auto_assign_delivery(order) -> Optional[DeliveryPartner]:
                 driver__isnull=True,
             ).update(driver=dp)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.orders.utils.assign").exception("Exception silencieuse (auto-log) - fichier=orders/utils/assign.py ligne=68")
 
         return dp
 

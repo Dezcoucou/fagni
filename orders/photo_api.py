@@ -146,7 +146,10 @@ def driver_upload_photo(request, order_id):
             from django.core.files.base import ContentFile as _CF
             evidence.image.save(filename.split('/')[-1], _CF(raw), save=True)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.photo_api").exception(
+                "Echec creation OrderEvidencePhoto (driver) order_id=%s kind=%s", order_id, kind
+            )
 
         # Stocker l'URL dans les notes (compatibilite ascendante)
         notes = order.notes or ''
@@ -236,7 +239,10 @@ def partner_upload_photo(request, order_id):
             from django.core.files.base import ContentFile as _CF
             evidence.image.save(filename.split('/')[-1], _CF(raw), save=True)
         except Exception:
-            pass
+            import logging
+            logging.getLogger("fagni.photo_api").exception(
+                "Echec creation OrderEvidencePhoto (partner) order_id=%s kind=%s", order_id, kind
+            )
 
         notes = order.notes or ''
         tag = f'PHOTO_{photo_type.upper()}:{url}'

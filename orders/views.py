@@ -3129,14 +3129,24 @@ def _dec_or_zero(val):
 def _compute_order_pricing(order):
     """
     Bridge legacy -> pricing engine canonique.
+    CORRECTIF 6 juillet 2026 : compute_order_pricing(order) etait appele avec l'objet
+    commande entier au lieu d'un nombre d'articles (TypeError systematique), provoquant
+    un 500 sur la page de paiement client /pay/wave/. Lecture directe des montants deja
+    verrouilles sur la commande (ADR-001) au lieu d'un recalcul via un moteur incompatible.
     """
-    result = compute_order_pricing(order)
+    total_locked = _safe_dec(getattr(order, "total_client_ttc", 0))
+    service_fee = _safe_dec(getattr(order, "service_fee", 0))
+    delivery_fee = _safe_dec(getattr(order, "delivery_fee", 0))
+    amount_driver = _safe_dec(getattr(order, "amount_driver_partner", 0))
+    amount_laundry = _safe_dec(getattr(order, "amount_laundry_partner", 0))
+    fagni_revenue = _safe_dec(getattr(order, "fagni_revenue_ht", 0))
+    prestation_total = total_locked - delivery_fee - service_fee
 
     child_referral_discount = get_child_referral_discount_amount(order)
     try:
-        total_client_adjusted = Decimal(str(result.total_client_ttc or 0)) - Decimal(str(child_referral_discount or 0))
+        total_client_adjusted = Decimal(str(total_locked or 0)) - Decimal(str(child_referral_discount or 0))
     except Exception:
-        total_client_adjusted = Decimal(str(result.total_client_ttc or 0))
+        total_client_adjusted = Decimal(str(total_locked or 0))
 
     if total_client_adjusted < 0:
         total_client_adjusted = Decimal("0")
@@ -3144,19 +3154,19 @@ def _compute_order_pricing(order):
     total_client_adjusted = total_client_adjusted.quantize(Decimal("1"))
 
     return {
-        "items_total": result.prestation_total,
-        "service_fee": result.service_fee_ht,
-        "delivery_fee": result.delivery_fee_client,
+        "items_total": prestation_total,
+        "service_fee": service_fee,
+        "delivery_fee": delivery_fee,
         "total_client": total_client_adjusted,
         "total_client_ttc": total_client_adjusted,
         "child_referral_discount": child_referral_discount,
-        "driver_income": result.amount_driver,
-        "vat_fagni": result.vat_fagni,
-        "express_extra_fee": result.express_extra_fee_client,
-        "fagni_revenue_ht": result.fagni_revenue_ht,
-        "fagni_revenue_ttc": result.fagni_revenue_ht + result.vat_fagni,
-        "laundry_amount": result.amount_laundry,
-        "logistic_margin": result.margin_delivery,
+        "driver_income": amount_driver,
+        "vat_fagni": Decimal("0"),
+        "express_extra_fee": Decimal("0"),
+        "fagni_revenue_ht": fagni_revenue,
+        "fagni_revenue_ttc": fagni_revenue,
+        "laundry_amount": amount_laundry,
+        "logistic_margin": Decimal("0"),
     }
 
 def _guess_delivery_fee(order, total_client=None, items_total=None, service_fee=None):

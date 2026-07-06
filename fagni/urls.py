@@ -1,6 +1,6 @@
 from orders.partner_api import partner_order_detail, partner_refuse_order, partner_login, partner_orders, partner_update_status
 from orders.ops_api import ops_suggest_pressing, ops_suggest_driver, ops_assign_return_driver, api_wallet_solde, api_partner_penalty, api_partner_bonus, api_partner_score_history, api_wallet_retrait, api_ops_paiements, api_ops_enregistrer_paiement, api_ops_revenus, api_ops_rapport_hebdo, api_ops_activite_jour, api_ops_wallets, api_score_pressing, api_score_livreur, api_creer_parrainage_v2secure, api_stats_parrainage, api_valider_code_parrainage, ops_login, ops_dashboard, ops_assign_partner, ops_update_status, ops_update_litige_status, ops_assign_driver, ops_mark_paid, ops_add_partner, ops_add_driver, ops_list_partners
-from orders.driver_api import save_fcm_token, api_driver_dropoff, driver_login, driver_missions, driver_confirm_pickup, driver_confirm_delivery, driver_delivery_proof, driver_wallet, driver_toggle_status, driver_pending_mission, driver_copilote, api_driver_profil_update, driver_update_location
+from orders.driver_api import save_fcm_token, api_driver_dropoff, driver_login, driver_missions, driver_confirm_pickup, driver_delivery_proof, driver_wallet, driver_toggle_status, driver_pending_mission, driver_copilote, api_driver_profil_update, driver_update_location
 from orders.photo_api import driver_upload_photo, partner_upload_photo, order_photos
 from orders.config_api import api_config
 from orders.client_api import api_chatbot, api_login, api_home, api_orders, api_order_detail, api_pricing_bags, api_create_order, api_articles, api_wallet, api_parrainage, api_rate_order, api_register, api_report_litige, api_pricing_detail, api_order_tracking, api_cancel_order
@@ -69,7 +69,6 @@ urlpatterns = [
     path("api/driver/missions/",                       driver_missions,         name="api-driver-missions"),
     path("api/driver/orders/<int:order_id>/dropoff/", api_driver_dropoff, name="driver-dropoff"),
     path("api/driver/orders/<int:order_id>/pickup/",   driver_confirm_pickup,   name="api-driver-pickup"),
-    path("api/driver/orders/<int:order_id>/delivery/", driver_confirm_delivery, name="api-driver-delivery"),
     path("api/driver/orders/<int:order_id>/delivery-proof/", driver_delivery_proof, name="api-driver-delivery-proof"),
     path("api/driver/orders/<int:order_id>/photo/",    driver_upload_photo,    name="api-driver-photo"),
     path("api/driver/wallet/",                         driver_wallet,           name="api-driver-wallet"),

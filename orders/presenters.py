@@ -57,26 +57,44 @@ def build_order_display_summary(order: Any) -> Dict[str, Any]:
 
 
 def build_order_finance_summary(order: Any) -> Dict[str, Any]:
-    result = compute_order_pricing(order)
+    # CORRECTIF 6 juillet 2026 : l'ancien code appelait compute_order_pricing(order)
+    # avec l'objet commande entier (au lieu d'un nombre d'articles), provoquant un
+    # TypeError systematique, puis accedait a des attributs (result.xxx) sur un
+    # dictionnaire qui ne les contient pas. Consequence : la page de paiement
+    # /orders/client/orders/{id}/pay/wave/ plantait en 500 pour tout client.
+    #
+    # Correctif : lire directement les montants deja verrouilles sur la commande
+    # (ADR-001, Immutable Pricing) plutot que de recalculer via le moteur de pricing.
+    total = _to_decimal(getattr(order, "total_client_ttc", 0))
+    paid = _to_decimal(getattr(order, "amount_paid", 0))
+    remaining = total - paid
+    if remaining < DECIMAL_ZERO:
+        remaining = DECIMAL_ZERO
+
+    service_fee = _to_decimal(getattr(order, "service_fee", 0))
+    delivery_fee = _to_decimal(getattr(order, "delivery_fee", 0))
+    amount_laundry = _to_decimal(getattr(order, "amount_laundry_partner", 0))
+    amount_driver = _to_decimal(getattr(order, "amount_driver_partner", 0))
+    fagni_revenue = _to_decimal(getattr(order, "fagni_revenue_ht", 0))
 
     return {
-        "prestation_total": _to_decimal(result.prestation_total),
-        "delivery_fee_client": _to_decimal(result.delivery_fee_client),
-        "delivery_cost_driver": _to_decimal(result.delivery_cost_driver),
-        "service_fee_ht": _to_decimal(result.service_fee_ht),
-        "vat_fagni": _to_decimal(result.vat_fagni),
-        "service_fee_client_ttc": _to_decimal(result.service_fee_client_ttc),
-        "express_surcharge": _to_decimal(result.express_surcharge),
-        "express_for_client": _to_decimal(result.express_for_client),
-        "express_extra_fee_client": _to_decimal(result.express_extra_fee_client),
-        "commission_laundry_ht": _to_decimal(result.commission_laundry_ht),
-        "commission_delivery_ht": _to_decimal(result.commission_delivery_ht),
-        "amount_laundry": _to_decimal(result.amount_laundry),
-        "amount_driver": _to_decimal(result.amount_driver),
-        "margin_delivery": _to_decimal(result.margin_delivery),
-        "fagni_revenue_ht": _to_decimal(result.fagni_revenue_ht),
-        "upsell_total": _to_decimal(result.upsell_total),
-        "total_client_ttc": _to_decimal(result.total_client_ttc),
-        "amount_paid": _to_decimal(result.amount_paid),
-        "amount_remaining": _to_decimal(result.amount_remaining),
+        "prestation_total": total - delivery_fee - service_fee,
+        "delivery_fee_client": delivery_fee,
+        "delivery_cost_driver": amount_driver,
+        "service_fee_ht": service_fee,
+        "vat_fagni": DECIMAL_ZERO,
+        "service_fee_client_ttc": service_fee,
+        "express_surcharge": DECIMAL_ZERO,
+        "express_for_client": DECIMAL_ZERO,
+        "express_extra_fee_client": DECIMAL_ZERO,
+        "commission_laundry_ht": DECIMAL_ZERO,
+        "commission_delivery_ht": DECIMAL_ZERO,
+        "amount_laundry": amount_laundry,
+        "amount_driver": amount_driver,
+        "margin_delivery": DECIMAL_ZERO,
+        "fagni_revenue_ht": fagni_revenue,
+        "upsell_total": DECIMAL_ZERO,
+        "total_client_ttc": total,
+        "amount_paid": paid,
+        "amount_remaining": remaining,
     }

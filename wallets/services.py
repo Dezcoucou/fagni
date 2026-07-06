@@ -170,24 +170,25 @@ def credit_wallet(
         if existing:
             return existing
 
-    # ✅ maintenant seulement on crédite réellement
-    wallet.balance = (wallet.balance + amount).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
-    wallet.save(update_fields=["balance", "updated_at"])
-
-
-    tx = WalletTransaction.create_tx(
-        wallet=wallet,
-        order=order,
-        leg=leg,
-        type=tx_type,
-        direction="in",
-        amount=amount,
-        description=description or "",
-        idempotency_key=idempotency_key,
-        allow_orphan=False,
-    )
+    # ✅ Solde + transaction dans un seul bloc atomique : si la creation de la
+    # transaction echoue, la modification du solde est annulee (rollback), evitant
+    # un solde fantome sans transaction correspondante (incident du 5 juillet 2026).
+    with transaction.atomic():
+        wallet.balance = (wallet.balance + amount).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        wallet.save(update_fields=["balance", "updated_at"])
+        tx = WalletTransaction.create_tx(
+            wallet=wallet,
+            order=order,
+            leg=leg,
+            type=tx_type,
+            direction="in",
+            amount=amount,
+            description=description or "",
+            idempotency_key=idempotency_key,
+            allow_orphan=False,
+        )
     return tx
 
 
@@ -233,7 +234,7 @@ def debit_wallet(
     # ✅ Idempotence métier sur une commande
     # Seulement si aucune clé explicite n'est fournie.
     # Si idempotency_key existe, elle devient la source d'idempotence.
-    if order is not None and not idempotency_key:
+    if order is not None:
         qs = WalletTransaction.objects.filter(
             wallet=wallet,
             order=order,
@@ -249,22 +250,28 @@ def debit_wallet(
         if existing:
             return existing
 
-    wallet.balance = (wallet.balance - amount).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
-    wallet.save(update_fields=["balance", "updated_at"])
-
-    tx = WalletTransaction.create_tx(
-        wallet=wallet,
-        order=order,
-        leg=leg,
-        type=tx_type,
-        direction="out",
-        amount=amount,
-        description=description or "",
-        idempotency_key=idempotency_key,
-        allow_orphan=False,
-    )
+    # ✅ Garde-fou de solvabilite : un debit ne doit jamais rendre le solde negatif
+    if (wallet.balance - amount) < 0:
+        raise ValueError("debit_wallet refuse : solde insuffisant pour ce debit")
+    
+    # ✅ Solde + transaction dans un seul bloc atomique (meme principe que credit_wallet
+    # ci-dessus, incident du 5 juillet 2026).
+    with transaction.atomic():
+        wallet.balance = (wallet.balance - amount).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        wallet.save(update_fields=["balance", "updated_at"])
+        tx = WalletTransaction.create_tx(
+            wallet=wallet,
+            order=order,
+            leg=leg,
+            type=tx_type,
+            direction="out",
+            amount=amount,
+            description=description or "",
+            idempotency_key=idempotency_key,
+            allow_orphan=False,
+        )
     return tx
 
 

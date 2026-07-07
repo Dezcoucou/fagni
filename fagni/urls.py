@@ -36,6 +36,7 @@ urlpatterns = [
     path("api/partner/orders/<int:order_id>/", partner_order_detail),
     path("api/partner/orders/",             partner_orders,        name="api-partner-orders"),
     path("api/partner/orders/<int:order_id>/status/", partner_update_status, name="api-partner-status"),
+    path("api/partner/orders/<int:order_id>/refuse/", partner_refuse_order, name="api-partner-refuse"),
     path("api/ops/login/",                        ops_login,          name="api-ops-login"),
     path("api/wallet/solde/", api_wallet_solde, name="wallet-solde"),
     path("api/wallet/retrait/", api_wallet_retrait, name="wallet-retrait"),

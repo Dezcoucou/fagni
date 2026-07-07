@@ -173,16 +173,3 @@ def notif_ops_retrait(beneficiaire, amount, wallet_id):
         {"type": "withdrawal", "wallet_id": str(wallet_id)},
     )
 
-
-def notif_ops_retrait(beneficiaire, amount, wallet_id):
-    """Notifie l'équipe OPS (push FCM) d'une nouvelle demande de retrait."""
-    from orders.models import FCMToken
-    tokens = list(
-        FCMToken.objects.filter(user_type='ops').values_list('token', flat=True)
-    )
-    return send_push_multi(
-        tokens,
-        "Nouvelle demande de retrait",
-        f"{beneficiaire} - {int(amount):,} FCFA".replace(",", " "),
-        {"type": "withdrawal", "wallet_id": str(wallet_id)},
-    )

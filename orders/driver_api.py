@@ -247,15 +247,56 @@ def driver_confirm_pickup(request, order_id):
         articles_count = request.data.get('articles_count', 0)
         try: articles_count = int(articles_count)
         except: articles_count = 0
-        # Controle divergence articles
+        # Controle divergence articles - ADR-023 (evolution metier, 7 juillet 2026)
+        # ADR-001 (prix verrouille) reste intact : total_client_ttc n'est jamais modifie.
+        # Les ecarts sont geres par ajustement explicite et tracable, jamais par reecriture silencieuse.
         expected = sum(it.quantity for it in order.items.all()) or int(order.articles_count or 0)
         count_diff = articles_count - expected
-        if expected > 0 and abs(count_diff) > 0:
-            alert_msg = f'⚠️ ECART ARTICLES #{order.code}: attendu {expected}, collecté {articles_count} (diff: {count_diff:+d})'
-            order.notes = (order.notes or '') + f'\n{alert_msg}'
-            order.save(update_fields=['notes','updated_at'])
-            if count_diff > 0:
-                return Response({'error': 'ecart_articles', 'message': f'Tu as compté {articles_count} articles mais la commande en prévoit {expected}. Contacte OPS.', 'expected': expected, 'actual': articles_count}, status=400)
+
+        if expected > 0 and count_diff != 0:
+            from orders.config_models import GlobalPricingSettings
+            from decimal import Decimal
+            prix_article = Decimal(str(GlobalPricingSettings.get_solo().prix_article_fcfa or 500))
+            adjustment_note = ''
+
+            if count_diff < 0:
+                montant_credit = abs(count_diff) * prix_article
+                try:
+                    from wallets.services import get_or_create_wallet_for_customer, credit_wallet
+                    wallet = get_or_create_wallet_for_customer(order.customer)
+                    credit_wallet(
+                        wallet, montant_credit,
+                        description=f"Ajustement après collecte — {abs(count_diff)} article(s) manquant(s) sur commande {order.code}",
+                        order=order, tx_type='collection_adjustment',
+                        idempotency_key=f"collection_adjustment_{order.id}",
+                    )
+                    adjustment_note = f"AJUSTEMENT:deficit|{expected}|{articles_count}|{montant_credit}|credit_wallet"
+                except Exception:
+                    import logging
+                    logging.getLogger("fagni.driver_api").exception(
+                        "Echec credit wallet ajustement collecte order_id=%s", order.id
+                    )
+                    adjustment_note = f"AJUSTEMENT:deficit|{expected}|{articles_count}|{montant_credit}|ECHEC_CREDIT"
+            else:
+                montant_complement = count_diff * prix_article
+                adjustment_note = f"AJUSTEMENT:exces|{expected}|{articles_count}|{montant_complement}|complement_requis"
+
+            order.notes = (order.notes or '') + f'\n{adjustment_note}'
+            order.save(update_fields=['notes', 'updated_at'])
+
+            try:
+                from orders.models import log_event
+                log_event(
+                    "ORDER_RECALCULATED_AFTER_COLLECTION", order=order,
+                    actor_type="driver", actor_id=driver.id,
+                    declared_quantity=expected, collected_quantity=articles_count,
+                    diff=count_diff,
+                )
+            except Exception:
+                import logging
+                logging.getLogger("fagni.driver_api").exception(
+                    "Echec log_event ORDER_RECALCULATED_AFTER_COLLECTION order_id=%s", order.id
+                )
         notes = request.data.get('notes', '')
 
         # Mettre à jour les notes avec le compte articles

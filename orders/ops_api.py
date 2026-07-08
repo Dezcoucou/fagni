@@ -799,8 +799,6 @@ def ops_add_driver(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
-@api_view(['GET'])
-@permission_classes([AllowAny])
 def api_ops_all_photos(request):
     """GET /api/ops/photos/ — vue globale de toutes les preuves photo (OrderEvidencePhoto), toutes commandes confondues.
     Filtrable par ?kind=pickup_items|delivery_to_client|partner_before|partner_after

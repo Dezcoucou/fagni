@@ -799,6 +799,57 @@ def ops_add_driver(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_ops_all_photos(request):
+    """GET /api/ops/photos/ — vue globale de toutes les preuves photo (OrderEvidencePhoto), toutes commandes confondues.
+    Filtrable par ?kind=pickup_items|delivery_to_client|partner_before|partner_after
+    Filtrable par ?order_id=<id>
+    """
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
+
+    from orders.models import OrderEvidencePhoto
+
+    qs = OrderEvidencePhoto.objects.select_related('order').order_by('-created_at')
+
+    kind = request.GET.get('kind')
+    if kind:
+        qs = qs.filter(kind=kind)
+
+    order_id = request.GET.get('order_id')
+    if order_id:
+        qs = qs.filter(order_id=order_id)
+
+    limit = int(request.GET.get('limit', 100))
+    qs = qs[:limit]
+
+    results = []
+    for photo in qs:
+        results.append({
+            'id': photo.id,
+            'order_id': photo.order_id,
+            'order_code': getattr(photo.order, 'code', ''),
+            'leg_id': photo.leg_id,
+            'actor_type': photo.actor_type,
+            'actor_id': photo.actor_id,
+            'kind': photo.kind,
+            'image_url': photo.image.url if photo.image else None,
+            'caption': photo.caption or '',
+            'created_at': photo.created_at.isoformat() if photo.created_at else None,
+        })
+
+    total_count = OrderEvidencePhoto.objects.count()
+
+    return Response({
+        'photos': results,
+        'total_count': total_count,
+        'returned_count': len(results),
+    })
+
+
 def ops_list_partners(request):
     """GET /api/ops/partners/ — liste blanchisseries + livreurs"""
     try:

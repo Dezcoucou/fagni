@@ -862,7 +862,7 @@ def ops_list_partners(request):
         'score_delai','score_litiges','score_dispo','score_refus'
     ))
     drivers = list(DeliveryPartner.objects.filter(is_active=True).values(
-        'id','name','phone','city','vehicle_type','is_online'
+        'id','name','phone','city','vehicle_type','is_online','wave_number'
     ))
     return Response({'partners': partners, 'drivers': drivers})
 

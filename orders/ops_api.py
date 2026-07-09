@@ -943,6 +943,8 @@ def api_ops_credit_client_wallet(request):
         return Response({'error': str(e)}, status=400)
 
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def ops_list_partners(request):
     """GET /api/ops/partners/ — liste blanchisseries + livreurs"""
     try:

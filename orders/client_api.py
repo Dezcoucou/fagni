@@ -455,6 +455,22 @@ def api_create_order(request):
         )
 
         order = Order.objects.create(**order_data)
+
+        # Application du coupon (ADR-025, Pilot Growth Plan, 9 juillet 2026)
+        coupon_code_input = (request.data.get('coupon_code') or '').strip()
+        if coupon_code_input:
+            try:
+                from orders.views import validate_and_get_coupon_discount
+                from orders.models import CouponUsage
+                discount, error, coupon = validate_and_get_coupon_discount(order, coupon_code_input)
+                if coupon and not error and discount > 0:
+                    order.coupon_code = coupon.code
+                    order.coupon_discount_applied = discount
+                    order.save(update_fields=['coupon_code', 'coupon_discount_applied'])
+                    CouponUsage.objects.create(coupon=coupon, customer=customer, order=order, discount_amount=discount)
+            except Exception:
+                import logging
+                logging.getLogger("fagni.client_api").exception("Echec application coupon order_id=%s", order.id)
         try:
             from orders.models import OrderItem
             if articles:

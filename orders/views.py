@@ -14676,7 +14676,7 @@ def handle_referral_reward(order):
         if not first_paid_order or getattr(first_paid_order, "id", None) != getattr(order, "id", None):
             return
 
-        reward_amount = 500  # FCFA
+        reward_amount = 1000  # FCFA (Pilot Growth Plan, 9 juillet 2026)
 
         # idempotence réelle : si déjà une tx MLM liée à cette commande -> stop
         already_rewarded = WalletTransaction.objects.filter(

@@ -78,6 +78,28 @@ def ops_login(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+def _parse_adjustment_note(notes):
+    """Parse la derniere ligne AJUSTEMENT: dans les notes d'une commande (ADR-023).
+    Format : AJUSTEMENT:type|declare|collecte|montant|resultat
+    """
+    if not notes or 'AJUSTEMENT:' not in notes:
+        return None
+    lines = [l for l in notes.split('\n') if l.startswith('AJUSTEMENT:')]
+    if not lines:
+        return None
+    try:
+        parts = lines[-1].replace('AJUSTEMENT:', '').split('|')
+        return {
+            'type': parts[0],
+            'declared_quantity': int(parts[1]),
+            'collected_quantity': int(parts[2]),
+            'amount': float(parts[3]),
+            'result': parts[4] if len(parts) > 4 else '',
+        }
+    except Exception:
+        return None
+
+
 def ops_dashboard(request):
     """GET /api/ops/dashboard/ — vue globale toutes commandes"""
     try:
@@ -92,12 +114,15 @@ def ops_dashboard(request):
     # Filtres
     status = request.GET.get('status', '')
     partner_id = request.GET.get('partner', '')
+    adjusted = request.GET.get('adjusted', '')
 
     qs = Order.objects.select_related('customer', 'laundry_partner').order_by('-created_at')
     if status:
         qs = qs.filter(status=status)
     if partner_id:
         qs = qs.filter(laundry_partner_id=partner_id)
+    if adjusted == 'true':
+        qs = qs.filter(notes__contains='AJUSTEMENT:')
 
     orders = []
     for o in qs[:100]:
@@ -153,6 +178,8 @@ def ops_dashboard(request):
             'cost_driver_delivery': o.cost_driver_delivery or 0,
             'cost_pressing':       o.cost_pressing or 0,
             'notes': o.notes or '',
+            'has_adjustment': 'AJUSTEMENT:' in (o.notes or ''),
+            'adjustment_info': _parse_adjustment_note(o.notes),
         })
 
     # Stats globales

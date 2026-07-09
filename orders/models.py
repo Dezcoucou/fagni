@@ -690,6 +690,17 @@ class Customer(models.Model):
         phone = (self.phone or "").strip()
         return f"{name} ({phone})" if phone else name
 
+    def is_founding_client_eligible(self):
+        """True si ce client fait partie des 100 premiers inscrits (Pilot Growth Plan, 9 juillet 2026)."""
+        return Customer.objects.filter(id__lte=self.id).count() <= 100
+
+    def founding_badge_unlocked(self):
+        """True si le badge Client Fondateur est debloque : eligible ET 3 commandes terminees."""
+        if not self.is_founding_client_eligible():
+            return False
+        completed = self.order_set.filter(status="done").count()
+        return completed >= 3
+
 
 class LogisticsConfig(models.Model):
     """

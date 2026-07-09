@@ -698,7 +698,7 @@ class Customer(models.Model):
         """True si le badge Client Fondateur est debloque : eligible ET 3 commandes terminees."""
         if not self.is_founding_client_eligible():
             return False
-        completed = self.order_set.filter(status="done").count()
+        completed = self.orders.filter(status="done").count()
         return completed >= 3
 
 

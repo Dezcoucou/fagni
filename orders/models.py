@@ -1851,6 +1851,16 @@ class Order(models.Model):
                 import logging
                 logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=1830")
 
+
+        # Recompense parrainage (Pilot Growth Plan, 9 juillet 2026) - uniquement au moment ou la commande devient payee
+        if just_became_paid:
+            try:
+                from orders.views import handle_referral_reward
+                handle_referral_reward(self)
+            except Exception:
+                import logging
+                logging.getLogger("fagni.orders.models").exception("Echec handle_referral_reward order_id=%s", self.id)
+
         return self
 
 

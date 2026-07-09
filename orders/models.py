@@ -1145,6 +1145,14 @@ class Order(models.Model):
         null=True,
         help_text="Code parrain saisi lors de la création de la commande."
     )
+    coupon_code = models.CharField(
+        "Code coupon saisi", max_length=30, blank=True, null=True,
+        help_text="Code coupon saisi lors de la creation de la commande (ADR-025).",
+    )
+    coupon_discount_applied = models.DecimalField(
+        "Reduction coupon appliquee (FCFA)", max_digits=10, decimal_places=2,
+        default=0,
+    )
 
     # --------- Paiement client ---------
     payment_status = models.CharField(
@@ -3833,6 +3841,74 @@ class OrderRating(models.Model):
 # =====================
 #  Catalogue de services
 # =====================
+class Coupon(models.Model):
+    """
+    Coupon de reduction FAGNI (ADR-025, Pilot Growth Plan, 9 juillet 2026).
+    La reduction est toujours absorbee par la marge FAGNI - jamais par
+    les commissions du partenaire ou du livreur, deja verrouillees a la
+    creation de la commande (ADR-001).
+    """
+    DISCOUNT_TYPE_CHOICES = [
+        ("percent", "Pourcentage"),
+        ("fixed", "Montant fixe (FCFA)"),
+    ]
+
+    code = models.CharField("Code", max_length=30, unique=True, db_index=True)
+    description = models.CharField("Description interne", max_length=200, blank=True)
+    discount_type = models.CharField("Type de reduction", max_length=10, choices=DISCOUNT_TYPE_CHOICES, default="percent")
+    discount_value = models.DecimalField("Valeur de la reduction", max_digits=10, decimal_places=2)
+    max_discount_amount = models.DecimalField(
+        "Plafond de reduction (FCFA)", max_digits=10, decimal_places=2,
+        null=True, blank=True,
+        help_text="Optionnel - plafonne la reduction pour un coupon en pourcentage.",
+    )
+    first_order_only = models.BooleanField("Premiere commande uniquement", default=True)
+    max_uses_per_customer = models.PositiveIntegerField("Utilisations max par client", default=1)
+    max_total_uses = models.PositiveIntegerField(
+        "Utilisations max au total", null=True, blank=True,
+        help_text="Optionnel - laisser vide pour illimite.",
+    )
+    valid_from = models.DateTimeField("Valide a partir de")
+    valid_until = models.DateTimeField("Valide jusqu'au")
+    is_active = models.BooleanField("Actif", default=True)
+    created_at = models.DateTimeField("Cree le", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Coupon de reduction"
+        verbose_name_plural = "Coupons de reduction"
+
+    def __str__(self):
+        return self.code
+
+    def is_currently_valid(self):
+        from django.utils import timezone
+        now = timezone.now()
+        if not self.is_active:
+            return False
+        if now < self.valid_from or now > self.valid_until:
+            return False
+        if self.max_total_uses is not None:
+            if self.usages.count() >= self.max_total_uses:
+                return False
+        return True
+
+
+class CouponUsage(models.Model):
+    """Trace chaque utilisation reelle d'un coupon, pour l'audit et la limite par client."""
+    coupon = models.ForeignKey(Coupon, on_delete=models.CASCADE, related_name="usages")
+    customer = models.ForeignKey("orders.Customer", on_delete=models.CASCADE, related_name="coupon_usages")
+    order = models.ForeignKey("orders.Order", on_delete=models.CASCADE, related_name="coupon_usages")
+    discount_amount = models.DecimalField("Montant reduit (FCFA)", max_digits=10, decimal_places=2)
+    used_at = models.DateTimeField("Utilise le", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Utilisation de coupon"
+        verbose_name_plural = "Utilisations de coupons"
+
+    def __str__(self):
+        return f"{self.coupon.code} - {self.customer_id} - commande {self.order_id}"
+
+
 class ServiceCategory(models.Model):
     """
     Exemples : Blanchisserie, Cordonnerie, Retouche, Repassage, etc.

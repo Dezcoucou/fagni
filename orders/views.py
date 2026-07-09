@@ -3143,8 +3143,9 @@ def _compute_order_pricing(order):
     prestation_total = total_locked - delivery_fee - service_fee
 
     child_referral_discount = get_child_referral_discount_amount(order)
+    coupon_discount = _safe_dec(getattr(order, "coupon_discount_applied", 0))
     try:
-        total_client_adjusted = Decimal(str(total_locked or 0)) - Decimal(str(child_referral_discount or 0))
+        total_client_adjusted = Decimal(str(total_locked or 0)) - Decimal(str(child_referral_discount or 0)) - Decimal(str(coupon_discount or 0))
     except Exception:
         total_client_adjusted = Decimal(str(total_locked or 0))
 
@@ -3160,6 +3161,7 @@ def _compute_order_pricing(order):
         "total_client": total_client_adjusted,
         "total_client_ttc": total_client_adjusted,
         "child_referral_discount": child_referral_discount,
+        "coupon_discount": coupon_discount,
         "driver_income": amount_driver,
         "vat_fagni": Decimal("0"),
         "express_extra_fee": Decimal("0"),
@@ -14730,6 +14732,60 @@ def get_child_referral_discount(customer, order=None):
         return 500
     except Exception:
         return 0
+
+
+def validate_and_get_coupon_discount(order, coupon_code):
+    """
+    Valide un coupon et calcule la reduction (ADR-025, Pilot Growth Plan, 9 juillet 2026).
+    La reduction est toujours calculee sur le montant HORS livraison (prestation seule),
+    et absorbee entierement par la marge FAGNI - jamais par les commissions
+    partenaire/livreur, deja verrouillees a la creation de la commande (ADR-001).
+
+    Retourne (discount_amount: Decimal, error: str|None, coupon: Coupon|None)
+    """
+    from orders.models import Coupon, CouponUsage
+
+    if not coupon_code:
+        return Decimal("0"), None, None
+
+    coupon_code = coupon_code.strip().upper()
+
+    try:
+        coupon = Coupon.objects.get(code=coupon_code)
+    except Coupon.DoesNotExist:
+        return Decimal("0"), "coupon_introuvable", None
+
+    if not coupon.is_currently_valid():
+        return Decimal("0"), "coupon_invalide_ou_expire", coupon
+
+    customer = getattr(order, "customer", None)
+    if not customer:
+        return Decimal("0"), "client_introuvable", coupon
+
+    if coupon.first_order_only:
+        first_order = Order.objects.filter(customer=customer).order_by("created_at", "id").first()
+        if not first_order or getattr(first_order, "id", None) != getattr(order, "id", None):
+            return Decimal("0"), "reserve_premiere_commande", coupon
+
+    already_used = CouponUsage.objects.filter(coupon=coupon, customer=customer).count()
+    if already_used >= coupon.max_uses_per_customer:
+        return Decimal("0"), "deja_utilise", coupon
+
+    prestation_total = _safe_dec(getattr(order, "total_client_ttc", 0)) - _safe_dec(getattr(order, "delivery_fee", 0)) - _safe_dec(getattr(order, "service_fee", 0))
+
+    if coupon.discount_type == "percent":
+        discount = (prestation_total * coupon.discount_value / Decimal("100")).quantize(Decimal("1"))
+        if coupon.max_discount_amount is not None and discount > coupon.max_discount_amount:
+            discount = coupon.max_discount_amount
+    else:
+        discount = coupon.discount_value
+
+    if discount > prestation_total:
+        discount = prestation_total
+    if discount < 0:
+        discount = Decimal("0")
+
+    return discount, None, coupon
 
 
 def get_child_referral_discount_amount(order):

@@ -646,37 +646,6 @@ def api_parrainage(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def api_rate_order(request, order_id):
-    """POST /api/client/orders/<id>/rate/ — {score, comment}"""
-    token = request.headers.get('Authorization', '').replace('Bearer ', '')
-    try:
-        import jwt
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-        from orders.models import Customer
-        customer = Customer.objects.get(id=payload['cid'])
-    except Exception:
-        return Response({'error': 'Non autorisé'}, status=401)
-
-    try:
-        from orders.models import Order, OrderRating
-        order = Order.objects.get(id=order_id, customer=customer)
-        score = int(request.data.get('score', 0))
-        comment = request.data.get('comment', '').strip()
-
-        if not 1 <= score <= 5:
-            return Response({'error': 'Score entre 1 et 5'}, status=400)
-
-        rating, created = OrderRating.objects.update_or_create(
-            order=order,
-            defaults={'score': score, 'comment': comment}
-        )
-        return Response({'success': True, 'score': score, 'created': created})
-    except Exception as e:
-        return Response({'error': str(e)}, status=400)
-
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
 def api_report_litige(request, order_id):
     """POST /api/client/orders/<id>/litige/ — {type, description}"""
     token = request.headers.get('Authorization', '').replace('Bearer ', '')
@@ -1250,8 +1219,11 @@ def api_rate_order(request, order_id):
         if order.status != 'done':
             return Response({'error': 'Commande non livrée'}, status=400)
 
-        score   = int(request.data.get('score', 5))
-        comment = request.data.get('comment', '')
+        score   = int(request.data.get('score', 0))
+        comment = request.data.get('comment', '').strip()
+
+        if not 1 <= score <= 5:
+            return Response({'error': 'Score entre 1 et 5'}, status=400)
 
         rating, created = OrderRating.objects.update_or_create(
             order=order,

@@ -76,8 +76,6 @@ def ops_login(request):
     return Response({'access': token})
 
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
 def _parse_adjustment_note(notes):
     """Parse la derniere ligne AJUSTEMENT: dans les notes d'une commande (ADR-023).
     Format : AJUSTEMENT:type|declare|collecte|montant|resultat

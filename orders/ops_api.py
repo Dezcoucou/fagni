@@ -899,6 +899,7 @@ def api_ops_credit_client_wallet(request):
             description=description,
             tx_type='manual_recharge',
             idempotency_key=idempotency_key,
+            allow_orphan=True,
         )
 
         wallet.refresh_from_db()

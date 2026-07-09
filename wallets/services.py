@@ -203,6 +203,7 @@ def debit_wallet(
     leg=None,
     idempotency_key: Optional[str] = None,
     tx_type: str = "debit",
+    allow_orphan: bool = False,
 ) -> Optional[WalletTransaction]:
     """
     Débite un wallet (sortie d'argent).
@@ -271,7 +272,7 @@ def debit_wallet(
             amount=amount,
             description=description or "",
             idempotency_key=idempotency_key,
-            allow_orphan=False,
+            allow_orphan=allow_orphan,
         )
     return tx
 

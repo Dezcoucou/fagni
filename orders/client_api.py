@@ -976,7 +976,6 @@ def api_order_tracking(request, order_id):
         pressing_info = None
         if order.laundry_partner:
             pressing_info = {
-                'name':     order.laundry_partner.name,
                 'initials': order.laundry_partner.name[0].upper() if order.laundry_partner.name else 'P',
             }
 

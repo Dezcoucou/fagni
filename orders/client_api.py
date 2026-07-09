@@ -166,6 +166,8 @@ def api_home(request):
             'name':    customer.name,
             'phone':   customer.phone,
             'initial': (customer.name or 'F')[0].upper(),
+            'is_founding_client_eligible': customer.is_founding_client_eligible(),
+            'founding_badge_unlocked': customer.founding_badge_unlocked(),
         },
         'wallet_balance':      _wallet_balance(customer),
         'orders_count_all':    qs.count(),

@@ -65,7 +65,11 @@ def build_order_finance_summary(order: Any) -> Dict[str, Any]:
     #
     # Correctif : lire directement les montants deja verrouilles sur la commande
     # (ADR-001, Immutable Pricing) plutot que de recalculer via le moteur de pricing.
-    total = _to_decimal(getattr(order, "total_client_ttc", 0))
+    total_locked = _to_decimal(getattr(order, "total_client_ttc", 0))
+    coupon_discount = _to_decimal(getattr(order, "coupon_discount_applied", 0))
+    total = total_locked - coupon_discount
+    if total < DECIMAL_ZERO:
+        total = DECIMAL_ZERO
     paid = _to_decimal(getattr(order, "amount_paid", 0))
     remaining = total - paid
     if remaining < DECIMAL_ZERO:
@@ -95,6 +99,9 @@ def build_order_finance_summary(order: Any) -> Dict[str, Any]:
         "fagni_revenue_ht": fagni_revenue,
         "upsell_total": DECIMAL_ZERO,
         "total_client_ttc": total,
+        "total_before_discount": total_locked,
+        "coupon_discount": coupon_discount,
+        "coupon_code": getattr(order, "coupon_code", None),
         "amount_paid": paid,
         "amount_remaining": remaining,
     }

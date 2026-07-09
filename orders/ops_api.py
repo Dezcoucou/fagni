@@ -848,6 +848,73 @@ def api_ops_all_photos(request):
     })
 
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_ops_credit_client_wallet(request):
+    """POST /api/ops/wallet/credit-client/ — crediter manuellement le wallet d'un client
+    (recharge demandee par WhatsApp/Wave, traitee par OPS).
+    Params: phone, amount, reference (optionnel), note (optionnel)
+    """
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
+
+    from orders.models import Customer
+    from wallets.services import get_or_create_wallet_for_customer, credit_wallet
+    from decimal import Decimal, InvalidOperation
+    from django.utils import timezone
+
+    phone = (request.data.get('phone') or '').strip()
+    reference = (request.data.get('reference') or '').strip()
+    note = (request.data.get('note') or '').strip()
+
+    try:
+        amount = Decimal(str(request.data.get('amount', 0)))
+    except (InvalidOperation, TypeError):
+        amount = Decimal('0')
+
+    if not phone:
+        return Response({'error': 'Numero de telephone requis'}, status=400)
+    if amount <= 0:
+        return Response({'error': 'Montant invalide'}, status=400)
+
+    try:
+        customer = Customer.objects.filter(phone=phone).first()
+        if not customer:
+            return Response({'error': 'Client introuvable pour ce numero'}, status=404)
+
+        wallet = get_or_create_wallet_for_customer(customer)
+
+        idempotency_key = f"manual_recharge_{customer.id}_{reference}" if reference else f"manual_recharge_{customer.id}_{int(timezone.now().timestamp())}"
+
+        description = f"Recharge manuelle OPS"
+        if reference:
+            description += f" — reference {reference}"
+        if note:
+            description += f" — {note}"
+
+        tx = credit_wallet(
+            wallet, amount,
+            description=description,
+            tx_type='manual_recharge',
+            idempotency_key=idempotency_key,
+        )
+
+        wallet.refresh_from_db()
+
+        return Response({
+            'success': True,
+            'customer_name': customer.name,
+            'new_balance': float(wallet.balance),
+            'transaction_id': tx.id if tx else None,
+        })
+    except Exception as e:
+        import logging
+        logging.getLogger("fagni.ops_api").exception("Echec credit client wallet")
+        return Response({'error': str(e)}, status=400)
+
+
 def ops_list_partners(request):
     """GET /api/ops/partners/ — liste blanchisseries + livreurs"""
     try:

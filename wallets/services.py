@@ -113,6 +113,7 @@ def credit_wallet(
     leg=None,
     idempotency_key: Optional[str] = None,
     tx_type: str = "credit",
+    allow_orphan: bool = False,
 ) -> Optional[WalletTransaction]:
     """
     Crédite un wallet (entrée d'argent).
@@ -187,7 +188,7 @@ def credit_wallet(
             amount=amount,
             description=description or "",
             idempotency_key=idempotency_key,
-            allow_orphan=False,
+            allow_orphan=allow_orphan,
         )
     return tx
 

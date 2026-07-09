@@ -98,6 +98,8 @@ def _parse_adjustment_note(notes):
         return None
 
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def ops_dashboard(request):
     """GET /api/ops/dashboard/ — vue globale toutes commandes"""
     try:

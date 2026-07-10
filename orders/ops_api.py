@@ -180,6 +180,7 @@ def ops_dashboard(request):
             'notes': o.notes or '',
             'has_adjustment': 'AJUSTEMENT:' in (o.notes or ''),
             'adjustment_info': _parse_adjustment_note(o.notes),
+            'items': [{'designation': it.designation, 'quantity': it.quantity, 'unit_price': float(it.unit_price or 0), 'total': float(it.total or 0)} for it in o.items.all()],
         })
 
     # Stats globales

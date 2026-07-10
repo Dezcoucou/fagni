@@ -4981,7 +4981,7 @@ def detail(request, order_id):
     payments = Payment.objects.filter(order=order).order_by("-id")
 
     try:
-        total = decimal.Decimal(str(getattr(order, "total_client_ttc", 0) or 0))
+        total = decimal.Decimal(str(getattr(order, "total_client_ttc", 0) or 0)) - decimal.Decimal(str(getattr(order, "coupon_discount_applied", 0) or 0))
         paid = decimal.Decimal(str(getattr(order, "amount_paid", 0) or 0))
     except Exception:
         total, paid = decimal.Decimal("0"), decimal.Decimal("0")

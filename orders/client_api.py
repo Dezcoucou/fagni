@@ -974,7 +974,7 @@ def api_order_tracking(request, order_id):
             'status':          status,
             'payment_status':  payment,
             'bag_size':        order.bag_size or '',
-            'total':           float(order.total_client_ttc or order.total or 0),
+        'total': float(max(0, (order.total_client_ttc or order.total or 0) - (order.coupon_discount_applied or 0))),
             'steps':           steps,
             'pickup_driver':   pickup_driver,
             'delivery_driver': delivery_driver,

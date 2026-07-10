@@ -1272,7 +1272,29 @@ class InvoiceSettingsAdmin(UnfoldModelAdmin):
 
 # === Enregistrement catalogue pressing (catégories + articles) ===
 from django.contrib import admin
-from .models import ServiceCategory, ServiceItem
+from .models import ServiceCategory, ServiceItem, Coupon, CouponUsage
+
+@admin.register(Coupon)
+class CouponAdmin(UnfoldModelAdmin):
+    list_display = ("code", "discount_type", "discount_value", "is_active", "usage_count", "max_total_uses", "valid_from", "valid_until")
+    list_filter = ("is_active", "discount_type", "first_order_only")
+    search_fields = ("code", "description")
+    ordering = ("-created_at",)
+    readonly_fields = ("created_at",)
+
+    def usage_count(self, obj):
+        return obj.usages.count()
+    usage_count.short_description = "Utilisations"
+
+
+@admin.register(CouponUsage)
+class CouponUsageAdmin(UnfoldModelAdmin):
+    list_display = ("coupon", "customer", "order", "discount_amount", "used_at")
+    list_filter = ("coupon",)
+    search_fields = ("coupon__code", "customer__phone", "customer__name", "order__code")
+    ordering = ("-used_at",)
+    readonly_fields = ("coupon", "customer", "order", "discount_amount", "used_at")
+
 
 @admin.register(ServiceCategory)
 class ServiceCategoryAdmin(UnfoldModelAdmin):

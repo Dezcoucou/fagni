@@ -1125,21 +1125,25 @@ def api_ops_revenus(request):
     debut_mois = today.replace(day=1)
 
     def stats(qs):
+        total_client = int(qs.aggregate(s=Sum('total_client_ttc'))['s'] or 0)
+        paye_pressing = int(qs.aggregate(s=Sum('amount_laundry_partner'))['s'] or 0)
+        paye_livreur = int(qs.aggregate(s=Sum('amount_driver_partner'))['s'] or 0)
         return {
             'nb': qs.count(),
-            'total_client': int(qs.aggregate(s=Sum('total_client_ttc'))['s'] or 0),
-            'revenus_fagni': int((qs.aggregate(e=Sum('total_client_ttc'))['e'] or 0) - (qs.aggregate(p=Sum('amount_laundry_partner'))['p'] or 0)),
-            'paye_pressing': int(qs.aggregate(s=Sum('amount_laundry_partner'))['s'] or 0),
+            'total_client': total_client,
+            'revenus_fagni': total_client - paye_pressing - paye_livreur,
+            'paye_pressing': paye_pressing,
+            'paye_livreur': paye_livreur,
         }
 
     done = Order.objects.filter(status='done')
 
     return Response({
-        'total':        stats(done),
-        'semaine':      stats(done.filter(created_at__date__gte=debut_semaine)),
-        'mois':         stats(done.filter(created_at__date__gte=debut_mois)),
-        'en_attente':   Order.objects.filter(status='pending').count(),
-        'en_cours':     Order.objects.filter(status='in_progress').count(),
+        'total': stats(done),
+        'semaine': stats(done.filter(updated_at__date__gte=debut_semaine)),
+        'mois': stats(done.filter(updated_at__date__gte=debut_mois)),
+        'en_attente': Order.objects.filter(status='pending').count(),
+        'en_cours': Order.objects.filter(status='in_progress').count(),
     })
 
 

@@ -162,7 +162,23 @@ def api_home(request):
         .annotate(items_total=_items_sum_annotation())
         .filter(Q(total_client_ttc__gt=0) | Q(items_total__gt=0))
     )
+    # Annonce active (Pilot Growth Plan, 10 juillet 2026)
+    announcement_data = None
+    try:
+        from orders.models import Announcement
+        ann = Announcement.objects.filter(is_active=True).order_by('-created_at').first()
+        if ann and ann.is_currently_valid():
+            announcement_data = {
+                'title': ann.title,
+                'message': ann.message,
+                'emoji': ann.emoji,
+                'image': ann.image.url if ann.image else None,
+            }
+    except Exception:
+        pass
+
     return Response({
+        'announcement': announcement_data,
         'customer': {
             'name':    customer.name,
             'phone':   customer.phone,

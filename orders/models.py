@@ -3862,6 +3862,43 @@ class OrderRating(models.Model):
 # =====================
 #  Catalogue de services
 # =====================
+class Announcement(models.Model):
+    """
+    Annonce affichee en banniere sur l'accueil client (Pilot Growth Plan, 10 juillet 2026).
+    Gerable depuis Django Admin - remplace la banniere codee en dur dans Home.jsx.
+    """
+    title = models.CharField("Titre", max_length=150)
+    message = models.CharField("Message", max_length=300)
+    image = models.ImageField("Image (optionnel)", upload_to="announcements/", null=True, blank=True)
+    emoji = models.CharField("Emoji", max_length=10, default="📣", blank=True)
+    is_active = models.BooleanField("Active", default=True)
+    valid_from = models.DateTimeField("Valide a partir de")
+    valid_until = models.DateTimeField("Valide jusqu'au")
+    send_push_notification = models.BooleanField(
+        "Envoyer aussi en notification push", default=False,
+        help_text="Coche pour notifier tous les clients au moment de l'activation (envoi unique).",
+    )
+    push_sent_at = models.DateTimeField("Notification envoyee le", null=True, blank=True)
+    created_at = models.DateTimeField("Creee le", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Annonce"
+        verbose_name_plural = "Annonces"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.title
+
+    def is_currently_valid(self):
+        from django.utils import timezone
+        now = timezone.now()
+        if not self.is_active:
+            return False
+        if now < self.valid_from or now > self.valid_until:
+            return False
+        return True
+
+
 class Coupon(models.Model):
     """
     Coupon de reduction FAGNI (ADR-025, Pilot Growth Plan, 9 juillet 2026).

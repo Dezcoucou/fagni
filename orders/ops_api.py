@@ -156,7 +156,7 @@ def ops_dashboard(request):
             'payment_status': o.payment_status,
             'lavage_termine': o.wash_complete_time.isoformat() if o.wash_complete_time else None,
             'service_type':   o.service_type or 'pressing',
-            'total':          float(o.total_client_ttc or o.total or 0),
+            'total': float(max(0, (o.total_client_ttc or o.total or 0) - (o.coupon_discount_applied or 0))),
             'bag_size':       o.bag_size or '',
             'customer_name':  o.customer.name if o.customer else '—',
             'customer_phone': o.customer.phone if o.customer else '—',

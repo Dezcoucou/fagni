@@ -373,7 +373,7 @@ def ops_assign_partner(request, order_id):
                 if customer:
                     t = FCMToken.objects.filter(user_type='client', user_id=customer.id).first()
                     if t:
-                        total = int(getattr(order, 'total_client_ttc', 0) or 0)
+                        total = int(max(0, (getattr(order, 'total_client_ttc', 0) or 0) - (getattr(order, 'coupon_discount_applied', 0) or 0)))
                         send_push(
                             t.token,
                             "Prix confirmé ✅",

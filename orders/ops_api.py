@@ -134,10 +134,20 @@ def ops_dashboard(request):
         if client_phone and not client_phone.startswith('+'):
             client_phone = '225' + client_phone if client_phone.startswith('0') else '225' + client_phone.lstrip('+')
 
-        wa_client = ''
-        if client_phone:
-            msg = f"Bonjour ! Votre commande FAGNI {o.code} est prête. Le livreur arrive bientôt."
-            wa_client = f"https://wa.me/{client_phone}?text={msg.replace(' ','%20')}"
+            wa_client = ''
+            if client_phone:
+                # Message dynamique selon le vrai statut (9 juillet 2026, Pilot Growth Plan)
+                _wa_status_messages = {
+                    'pending': f"Bonjour ! Nous avons bien reçu votre commande FAGNI {o.code}. Elle est en cours de traitement, nous vous tiendrons informé(e).",
+                    'assigned': f"Bonjour ! Votre commande FAGNI {o.code} a été assignée à un livreur, il arrive bientôt pour la collecte.",
+                    'in_progress': f"Bonjour ! Votre commande FAGNI {o.code} est en cours de collecte.",
+                    'at_pressing': f"Bonjour ! Votre commande FAGNI {o.code} est chez notre partenaire pressing.",
+                    'ready': f"Bonjour ! Votre commande FAGNI {o.code} est prête. Le livreur arrive bientôt pour la livraison.",
+                    'delivering': f"Bonjour ! Votre commande FAGNI {o.code} est en cours de livraison.",
+                    'done': f"Bonjour ! Votre commande FAGNI {o.code} a été livrée. Merci de votre confiance !",
+                }
+                msg = _wa_status_messages.get(o.status, f"Bonjour ! Votre commande FAGNI {o.code} est en cours de traitement.")
+                wa_client = f"https://wa.me/{client_phone}?text={msg.replace(' ','%20')}"
 
         # Générer lien WhatsApp partenaire
         wa_partner = ''

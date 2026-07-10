@@ -115,6 +115,9 @@ def apply_fagni_monetization(order):
 
     try:
         total = Decimal(str(getattr(order, "total_client_ttc", 0) or 0))
+        total = total - Decimal(str(getattr(order, "coupon_discount_applied", 0) or 0))
+        if total < 0:
+            total = Decimal("0")
     except Exception:
         total = Decimal("0")
 

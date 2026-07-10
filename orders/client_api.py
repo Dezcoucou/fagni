@@ -61,6 +61,7 @@ def _items_sum_annotation():
 
 def _order_to_dict(o):
     total = float(o.total_client_ttc or 0) or float(getattr(o, 'total', 0) or 0) or float(getattr(o, 'items_total', 0) or 0)
+    total = max(0, total - float(getattr(o, 'coupon_discount_applied', 0) or 0))
     return {
         'id':             o.id,
         'code':           o.code or str(o.id),
@@ -216,7 +217,8 @@ def api_order_detail(request, order_id):
 
     # Calculer le vrai total depuis pricing engine si total_client_ttc manque
     _total_raw = float(order.total_client_ttc or 0) or float(getattr(order,'total',0) or 0)
-    total = _total_raw
+    _coupon_discount = float(getattr(order, 'coupon_discount_applied', 0) or 0)
+    total = max(0, _total_raw - _coupon_discount)
     amount_paid = float(getattr(order, 'amount_paid', 0) or 0)
 
     items = []

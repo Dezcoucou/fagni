@@ -181,8 +181,11 @@ def ops_dashboard(request):
             'pickup_driver_name':   o.pickup_driver.name if o.pickup_driver else None,
             'pickup_driver_id':     o.pickup_driver.id if o.pickup_driver else None,
             'created_at':        o.created_at.isoformat() if o.created_at else None,
-            'margin_net':        o.margin_net or 0,
-            'profitability_score': float(o.profitability_score or 0),
+            'margin_net': float((o.margin_net or 0) - (o.coupon_discount_applied or 0)),
+            'profitability_score': (
+                round((float((o.margin_net or 0) - (o.coupon_discount_applied or 0)) / float(max(1, (o.total_client_ttc or 0) - (o.coupon_discount_applied or 0)))) * 100, 1)
+                if o.coupon_discount_applied else float(o.profitability_score or 0)
+            ),
             'profitability_label': o.profitability_label or '',
             'cost_driver_pickup':  o.cost_driver_pickup or 0,
             'cost_driver_delivery': o.cost_driver_delivery or 0,

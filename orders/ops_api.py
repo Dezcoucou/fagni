@@ -959,6 +959,107 @@ def api_ops_credit_client_wallet(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def api_ops_prospects(request):
+    """
+    GET  /api/ops/prospects/ — liste tous les prospects
+    POST /api/ops/prospects/ — cree un nouveau prospect
+    (Pilot Growth Plan, 10 juillet 2026)
+    """
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
+
+    from orders.models import Prospect
+
+    if request.method == 'GET':
+        prospects = Prospect.objects.all()
+        return Response({
+            'prospects': [
+                {
+                    'id': p.id,
+                    'nom': p.nom,
+                    'telephone': p.telephone,
+                    'canal': p.canal,
+                    'canal_label': p.get_canal_display(),
+                    'statut': p.statut,
+                    'statut_label': p.get_statut_display(),
+                    'notes': p.notes,
+                    'created_at': p.created_at.isoformat() if p.created_at else None,
+                }
+                for p in prospects
+            ]
+        })
+
+    # POST - creation
+    nom = (request.data.get('nom') or '').strip()
+    telephone = (request.data.get('telephone') or '').strip()
+    canal = (request.data.get('canal') or 'whatsapp').strip()
+    notes = (request.data.get('notes') or '').strip()
+
+    if not nom or not telephone:
+        return Response({'error': 'Nom et telephone requis'}, status=400)
+
+    valid_canaux = [c[0] for c in Prospect.CANAL_CHOICES]
+    if canal not in valid_canaux:
+        canal = 'autre'
+
+    prospect = Prospect.objects.create(nom=nom, telephone=telephone, canal=canal, notes=notes)
+
+    return Response({
+        'success': True,
+        'prospect': {
+            'id': prospect.id,
+            'nom': prospect.nom,
+            'telephone': prospect.telephone,
+            'canal': prospect.canal,
+            'canal_label': prospect.get_canal_display(),
+            'statut': prospect.statut,
+            'statut_label': prospect.get_statut_display(),
+            'notes': prospect.notes,
+            'created_at': prospect.created_at.isoformat(),
+        }
+    })
+
+
+@api_view(['PATCH', 'DELETE'])
+@permission_classes([AllowAny])
+def api_ops_prospect_detail(request, prospect_id):
+    """
+    PATCH  /api/ops/prospects/<id>/ — modifie le statut d'un prospect
+    DELETE /api/ops/prospects/<id>/ — supprime un prospect
+    (Pilot Growth Plan, 10 juillet 2026)
+    """
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
+
+    from orders.models import Prospect
+
+    try:
+        prospect = Prospect.objects.get(id=prospect_id)
+    except Prospect.DoesNotExist:
+        return Response({'error': 'Prospect introuvable'}, status=404)
+
+    if request.method == 'DELETE':
+        prospect.delete()
+        return Response({'success': True})
+
+    # PATCH - modification du statut
+    statut = (request.data.get('statut') or '').strip()
+    valid_statuts = [s[0] for s in Prospect.STATUT_CHOICES]
+    if statut not in valid_statuts:
+        return Response({'error': 'Statut invalide'}, status=400)
+
+    prospect.statut = statut
+    prospect.save(update_fields=['statut', 'updated_at'])
+
+    return Response({'success': True, 'statut': prospect.statut, 'statut_label': prospect.get_statut_display()})
+
+
 def ops_list_partners(request):
     """GET /api/ops/partners/ — liste blanchisseries + livreurs"""
     try:

@@ -3862,6 +3862,43 @@ class OrderRating(models.Model):
 # =====================
 #  Catalogue de services
 # =====================
+class Prospect(models.Model):
+    """
+    Suivi des prospects pour le recrutement des premiers clients (Pilot Growth Plan, 10 juillet 2026).
+    """
+    CANAL_CHOICES = [
+        ("whatsapp", "WhatsApp direct"),
+        ("voisinage", "Voisinage"),
+        ("residence", "Résidence"),
+        ("groupe_whatsapp", "Groupe WhatsApp"),
+        ("bouche_a_oreille", "Bouche-à-oreille"),
+        ("autre", "Autre"),
+    ]
+    STATUT_CHOICES = [
+        ("contacte", "Contacté"),
+        ("interesse", "Intéressé"),
+        ("commande", "1ère commande passée"),
+        ("fondateur", "Client Fondateur actif"),
+        ("perdu", "Pas intéressé"),
+    ]
+
+    nom = models.CharField("Nom", max_length=150)
+    telephone = models.CharField("Téléphone", max_length=20)
+    canal = models.CharField("Canal", max_length=30, choices=CANAL_CHOICES, default="whatsapp")
+    statut = models.CharField("Statut", max_length=20, choices=STATUT_CHOICES, default="contacte")
+    notes = models.TextField("Notes", blank=True, default="")
+    created_at = models.DateTimeField("Contacté le", auto_now_add=True)
+    updated_at = models.DateTimeField("Mis à jour le", auto_now=True)
+
+    class Meta:
+        verbose_name = "Prospect"
+        verbose_name_plural = "Prospects"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.nom} ({self.telephone}) - {self.get_statut_display()}"
+
+
 class Announcement(models.Model):
     """
     Annonce affichee en banniere sur l'accueil client (Pilot Growth Plan, 10 juillet 2026).

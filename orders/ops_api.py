@@ -957,8 +957,6 @@ def api_ops_credit_client_wallet(request):
         return Response({'error': str(e)}, status=400)
 
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def api_ops_prospects(request):
@@ -1060,6 +1058,8 @@ def api_ops_prospect_detail(request, prospect_id):
     return Response({'success': True, 'statut': prospect.statut, 'statut_label': prospect.get_statut_display()})
 
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def ops_list_partners(request):
     """GET /api/ops/partners/ — liste blanchisseries + livreurs"""
     try:

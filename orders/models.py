@@ -3862,6 +3862,38 @@ class OrderRating(models.Model):
 # =====================
 #  Catalogue de services
 # =====================
+class PilotBookEntry(models.Model):
+    """
+    Journal officiel du pilote FAGNI - FAGNI Pilot Book (14 juillet 2026).
+    Consigne les apprentissages reels, commande par commande, pour nourrir
+    les futures evolutions du BOS FAGNI 2035 (chapitre 13 - systeme d'apprentissage).
+    """
+    order = models.ForeignKey(
+        "Order", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="pilot_book_entries",
+        help_text="Commande liee, si applicable",
+    )
+    order_code_libre = models.CharField(
+        "Code commande (si non liee)", max_length=30, blank=True, default="",
+    )
+    ce_qui_a_bien_fonctionne = models.TextField("Ce qui s'est bien passe", blank=True, default="")
+    ce_qui_a_echoue = models.TextField("Ce qui a echoue", blank=True, default="")
+    cause_reelle = models.TextField("Cause reelle", blank=True, default="")
+    decision_prise = models.TextField("Decision prise", blank=True, default="")
+    modification_apportee = models.TextField("Modification apportee", blank=True, default="")
+    impact_mesure = models.TextField("Impact mesure", blank=True, default="")
+    created_at = models.DateTimeField("Consigne le", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Entree Pilot Book"
+        verbose_name_plural = "Pilot Book - Journal du pilote"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        ref = self.order.code if self.order else (self.order_code_libre or "sans commande")
+        return f"Pilot Book - {ref} - {self.created_at}"
+
+
 class Prospect(models.Model):
     """
     Suivi des prospects pour le recrutement des premiers clients (Pilot Growth Plan, 10 juillet 2026).

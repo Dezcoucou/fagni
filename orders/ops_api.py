@@ -959,6 +959,93 @@ def api_ops_credit_client_wallet(request):
 
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
+def api_ops_pilotbook(request):
+    """
+    GET  /api/ops/pilotbook/ - liste toutes les entrees du Pilot Book
+    POST /api/ops/pilotbook/ - cree une nouvelle entree
+    (FAGNI Pilot Book, 14 juillet 2026)
+    """
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
+
+    from orders.models import PilotBookEntry, Order
+
+    if request.method == 'GET':
+        entries = PilotBookEntry.objects.select_related('order').all()
+        return Response({
+            'entries': [
+                {
+                    'id': e.id,
+                    'order_id': e.order_id,
+                    'order_code': e.order.code if e.order else (e.order_code_libre or None),
+                    'ce_qui_a_bien_fonctionne': e.ce_qui_a_bien_fonctionne,
+                    'ce_qui_a_echoue': e.ce_qui_a_echoue,
+                    'cause_reelle': e.cause_reelle,
+                    'decision_prise': e.decision_prise,
+                    'modification_apportee': e.modification_apportee,
+                    'impact_mesure': e.impact_mesure,
+                    'created_at': e.created_at.isoformat() if e.created_at else None,
+                }
+                for e in entries
+            ]
+        })
+
+    order_code_input = (request.data.get('order_code') or '').strip()
+    order_obj = None
+    order_code_libre = ''
+    if order_code_input:
+        order_obj = Order.objects.filter(code=order_code_input).first()
+        if not order_obj:
+            order_code_libre = order_code_input
+
+    entry = PilotBookEntry.objects.create(
+        order=order_obj,
+        order_code_libre=order_code_libre,
+        ce_qui_a_bien_fonctionne=(request.data.get('ce_qui_a_bien_fonctionne') or '').strip(),
+        ce_qui_a_echoue=(request.data.get('ce_qui_a_echoue') or '').strip(),
+        cause_reelle=(request.data.get('cause_reelle') or '').strip(),
+        decision_prise=(request.data.get('decision_prise') or '').strip(),
+        modification_apportee=(request.data.get('modification_apportee') or '').strip(),
+        impact_mesure=(request.data.get('impact_mesure') or '').strip(),
+    )
+
+    return Response({
+        'success': True,
+        'entry': {
+            'id': entry.id,
+            'order_code': entry.order.code if entry.order else (entry.order_code_libre or None),
+            'created_at': entry.created_at.isoformat(),
+        }
+    })
+
+
+@api_view(['DELETE'])
+@permission_classes([AllowAny])
+def api_ops_pilotbook_detail(request, entry_id):
+    """
+    DELETE /api/ops/pilotbook/<id>/ - supprime une entree
+    (FAGNI Pilot Book, 14 juillet 2026)
+    """
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
+
+    from orders.models import PilotBookEntry
+
+    try:
+        entry = PilotBookEntry.objects.get(id=entry_id)
+    except PilotBookEntry.DoesNotExist:
+        return Response({'error': 'Entree introuvable'}, status=404)
+
+    entry.delete()
+    return Response({'success': True})
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
 def api_ops_prospects(request):
     """
     GET  /api/ops/prospects/ — liste tous les prospects

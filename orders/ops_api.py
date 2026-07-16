@@ -1854,11 +1854,7 @@ def notify_client_whatsapp(order, message):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_wallet_solde(request):
-    try:
-        _check_ops(request)
-    except Exception:
-        return Response({'error': 'Non autorise'}, status=401)
-    """POST /api/wallet/solde/ — solde wallet partenaire ou livreur"""
+    """POST /api/wallet/solde/ - solde wallet partenaire/livreur, consultation directe sans jeton OPS."""
     from wallets.models import Wallet, WalletTransaction
 
     partner_type = request.data.get('partner_type')

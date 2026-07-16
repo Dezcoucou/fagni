@@ -74,6 +74,14 @@ def _safe_decode_image(photo_data):
     if img.width > MAX_PHOTO_DIMENSION or img.height > MAX_PHOTO_DIMENSION:
         raise ValueError("Dimensions de l'image trop grandes")
 
+    # Redimensionnement reel avant stockage : une preuve photo n'a jamais
+    # besoin de plus de 1600px sur son plus grand cote pour rester lisible.
+    # Corrige le bug reel ou des photos de smartphone (3000-4000px, 3-4 Mo)
+    # passaient intactes et peinaient a charger sur mobile.
+    MAX_STOCKAGE_DIMENSION = 1600
+    if img.width > MAX_STOCKAGE_DIMENSION or img.height > MAX_STOCKAGE_DIMENSION:
+        img.thumbnail((MAX_STOCKAGE_DIMENSION, MAX_STOCKAGE_DIMENSION), Image.LANCZOS)
+
     # Re-encodage complet : neutralise EXIF, metadonnees, et tout octet
     # cache apres les donnees d'image (technique de polyglotte de fichier)
     if img.mode in ("RGBA", "LA", "P"):

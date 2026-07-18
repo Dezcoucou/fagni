@@ -182,3 +182,4 @@ fagni_data_export.json
 ANTHROPIC_API_KEY
 firebase_credentials.json
 *.backup_*
+secrets/

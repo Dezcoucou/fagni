@@ -12,7 +12,7 @@ class LaundryPartnerAdmin(admin.ModelAdmin):
     readonly_fields = ['partner_score', 'level', 'score_updated_at']
     fieldsets = [
         ('Identité', {'fields': [
-            'name', 'partner_type', 'phone', 'wave_number',
+            'name', 'partner_type', 'phone', 'email', 'wave_number',
             'address', 'city', 'latitude', 'longitude', 'is_active'
         ]}),
         ('Partner Score', {'fields': [

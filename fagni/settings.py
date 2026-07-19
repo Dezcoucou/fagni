@@ -148,20 +148,23 @@ TEMPLATES = [
 DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
 
 if DATABASE_URL:
-    # PythonAnywhere / Prod (MySQL)
+    # PythonAnywhere / Prod (MySQL) ou override local via DATABASE_URL
+    is_sqlite_url = DATABASE_URL.startswith("sqlite:")
     DATABASES = {
         "default": dj_database_url.parse(
             DATABASE_URL,
             conn_max_age=0,
-            ssl_require=(os.getenv("DB_SSL_REQUIRE", "1") == "1"),
+            ssl_require=(not is_sqlite_url and os.getenv("DB_SSL_REQUIRE", "1") == "1"),
         )
     }
 
     # Active MySQL Strict Mode (empeche les troncatures/valeurs invalides silencieuses)
     # + force utf8mb4 (emojis, caracteres 4 octets) suite a la migration du 6 juillet 2026
-    DATABASES["default"].setdefault("OPTIONS", {})
-    DATABASES["default"]["OPTIONS"]["init_command"] = "SET sql_mode='STRICT_TRANS_TABLES', NAMES 'utf8mb4'"
-    DATABASES["default"]["OPTIONS"]["charset"] = "utf8mb4"
+    # Ignore si override local SQLite (pas de sql_mode MySQL applicable).
+    if not is_sqlite_url:
+        DATABASES["default"].setdefault("OPTIONS", {})
+        DATABASES["default"]["OPTIONS"]["init_command"] = "SET sql_mode='STRICT_TRANS_TABLES', NAMES 'utf8mb4'"
+        DATABASES["default"]["OPTIONS"]["charset"] = "utf8mb4"
 else:
     # Local (SQLite)
     DATABASES = {

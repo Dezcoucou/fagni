@@ -130,32 +130,24 @@ def apply_fagni_monetization(order):
             credit_wallet(
                 wallet=wallet,
                 amount=cashback,
-                description=f"Cashback FAGNI commande {order.code}"
+                description=f"Cashback FAGNI commande {order.code}",
+                order=order,
             )
     except Exception:
         import logging
         logging.getLogger("fagni.views.wallet").exception("Echec silencieux: credit_wallet cashback commande | order_id=%s", getattr(order, "id", None) if "order" in dir() else None)
 
     # ---- REFERRAL ----
-    try:
-        ref = ReferralLink.objects.filter(referred_customer=customer).first()
-        if ref and ref.referrer:
-            referrer_wallet = get_or_create_wallet_for_customer(ref.referrer)
-
-            credit_wallet(
-                wallet=referrer_wallet,
-                amount=Decimal("500"),
-                description=f"Parrainage FAGNI {customer.name}"
-            )
-
-            credit_wallet(
-                wallet=wallet,
-                amount=Decimal("300"),
-                description="Bonus bienvenue FAGNI"
-            )
-    except Exception:
-        import logging
-        logging.getLogger("fagni.views.wallet").exception("Echec silencieux: credit_wallet bonus bienvenue | order_id=%s", getattr(order, "id", None) if "order" in dir() else None)
+    # Supprime le 19 juillet 2026 : bloc mort depuis toujours (ReferralLink
+    # n'a jamais eu de champs 'referred_customer'/'referrer' - vrais noms
+    # 'customer'/'sponsor' - chaque appel levait FieldError, capturee
+    # silencieusement, donc ni le credit parrain (500) ni le bonus
+    # bienvenue (300) n'ont jamais ete verses via ce chemin. Le vrai
+    # systeme actif est handle_referral_reward() (orders/models.py, sur
+    # transition payment_status vers 'paid'), avec le bon montant
+    # (1000 FCFA, Pilot Growth Plan du 9 juillet 2026). Le bonus
+    # bienvenue (300 FCFA) n'a pas d'equivalent actif - a recreer
+    # separement si ce comportement est encore voulu.
 
 
 

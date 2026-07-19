@@ -284,16 +284,6 @@ if DEBUG:
     })
 
 # ========================
-#  SÉCURITÉ HTTPS
-# ========================
-# HSTS seulement si DEBUG = False
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
-
-# Redirection HTTPS pilotée par variable d'env
-SECURE_SSL_REDIRECT = True
-
-# ========================
 #  FAGNI – LOGISTIQUE / LIVREURS
 # ========================
 FAGNI_LOGISTICS = {
@@ -379,7 +369,7 @@ WAVE_MERCHANT_LINK_BASE = "https://pay.wave.com/m/M_ci_8SO-R9nJg71k/c/ci/"
 # ========================
 #  SECURITY (PROD)
 # ========================
-if not DEBUG:
+if not DEBUG and not TESTING:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_SSL_REDIRECT = True
 

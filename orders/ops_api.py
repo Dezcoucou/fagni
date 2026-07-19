@@ -1913,11 +1913,12 @@ def api_wallet_solde(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_wallet_retrait(request):
-    try:
-        _check_ops(request)
-    except Exception:
-        return Response({'error': 'Non autorise'}, status=401)
-    """POST /api/wallet/retrait/ — demande de retrait partenaire"""
+    """
+    POST /api/wallet/retrait/ — demande de retrait partenaire.
+    Pas de _check_ops : l'app partenaire (pressing, livreur) n'a jamais
+    de jeton OPS, la fonction s'identifie deja via partner_id/partner_type
+    dans le payload - meme correction que api_wallet_solde (commit adec79a).
+    """
     from wallets.models import Wallet
     from orders.models import Paiement
 

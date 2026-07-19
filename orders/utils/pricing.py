@@ -118,7 +118,11 @@ def compute_order_amounts(order) -> Dict[str, Any]:
         subtotal = _to_decimal(bag_cfg.get("price", 0))
     else:
         items_manager = getattr(order, "items", None)
-        if items_manager is None:
+        if items_manager is None or order.pk is None:
+            # order.pk is None : instance pas encore inseree en base (ex:
+            # appelee depuis Order.save() avant l'INSERT initial, meme
+            # cause que recompute_order_distance_from_legs) - la relation
+            # items n'est pas encore interrogeable, evite le ValueError.
             subtotal = Decimal("0")
         else:
             items = list(items_manager.all())

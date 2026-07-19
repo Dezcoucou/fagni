@@ -1505,11 +1505,21 @@ def api_ops_activite_jour(request):
 def api_score_pressing(request, partner_id):
     """
     GET /api/ops/score/pressing/<id>/ — score pressing.
-    Pas de _check_ops : appele aussi par l'app partenaire (fagni-partner,
-    Score.jsx) avec partner_token (payload {pid, name}, jamais {ops}) -
-    echouait systematiquement. S'identifie deja via partner_id dans
-    l'URL, meme correction que api_wallet_solde/api_wallet_retrait.
+    Accessible a OPS (_check_ops) OU au partenaire proprietaire du score
+    (partner_token avec pid == partner_id demande) - durci le 19 juillet
+    2026, remplace l'ouverture totale (AllowAny sans verification) mise
+    en place lors du fix initial du 19 juillet.
     """
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        _check_ops(request)
+    except Exception:
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+            if payload.get('pid') != partner_id:
+                return Response({'error': 'Non autorise'}, status=401)
+        except Exception:
+            return Response({'error': 'Non autorise'}, status=401)
     from partners.models import LaundryPartner
     from orders.models import Order
     from django.db.models import Avg, Count
@@ -1575,11 +1585,21 @@ def api_score_pressing(request, partner_id):
 def api_score_livreur(request, driver_id):
     """
     GET /api/ops/score/livreur/<id>/ — score livreur.
-    Pas de _check_ops : appele aussi par l'app driver (fagni-driver,
-    Score.jsx) avec driver_token (payload sans champ ops) - echouait
-    systematiquement. S'identifie deja via driver_id dans l'URL, meme
-    correction que api_wallet_solde/api_wallet_retrait.
+    Accessible a OPS (_check_ops) OU au livreur proprietaire du score
+    (driver_token avec did == driver_id demande) - durci le 19 juillet
+    2026, remplace l'ouverture totale (AllowAny sans verification) mise
+    en place lors du fix initial du 19 juillet.
     """
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        _check_ops(request)
+    except Exception:
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+            if payload.get('did') != driver_id:
+                return Response({'error': 'Non autorise'}, status=401)
+        except Exception:
+            return Response({'error': 'Non autorise'}, status=401)
     from partners.models import DeliveryPartner
     from orders.models import Order
     from django.db.models import Sum

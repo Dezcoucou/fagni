@@ -21,7 +21,10 @@ def recompute_order_distance_from_legs(order, save: bool = True) -> Decimal:
         ➜ et si save=True : on met distance_km = None (anti-phantom)
     - Si save=True et qu'on a une somme, on met à jour distance_km_total ET distance_km.
     """
-    if not hasattr(order, "legs"):
+    if not hasattr(order, "legs") or order.pk is None:
+        # order.pk is None : instance pas encore inseree en base (ex: appelee
+        # depuis Order.save() avant l'INSERT initial) - aucune relation legs
+        # n'est encore interrogeable, evite le ValueError Django sinon leve.
         return order.distance_km_total or order.distance_km or Decimal("0.00")
 
     agg = order.legs.filter(distance_km__isnull=False).aggregate(s=Sum("distance_km"))

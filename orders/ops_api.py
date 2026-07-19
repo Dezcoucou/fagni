@@ -1918,15 +1918,20 @@ def api_wallet_retrait(request):
     Pas de _check_ops : l'app partenaire (pressing, livreur) n'a jamais
     de jeton OPS, la fonction s'identifie deja via partner_id/partner_type
     dans le payload - meme correction que api_wallet_solde (commit adec79a).
+
+    Cree un wallets.WithdrawalRequest - source de verite UNIQUE pour les
+    retraits (coherent avec laundry_wallet_dashboard/driver_wallet_dashboard
+    et l'ecran OPS Centre de retraits, qui lisaient deja WithdrawalRequest
+    sans jamais voir les demandes crees ici via Paiement - deux systemes
+    parallelles jamais synchronises, corrige le 19 juillet).
     """
-    from wallets.models import Wallet
-    from orders.models import Paiement
+    from wallets.models import Wallet, WithdrawalRequest
+    from fagni.notifications import notif_ops_retrait
 
     partner_type = request.data.get('partner_type')
     partner_id   = request.data.get('partner_id')
     partner_nom  = request.data.get('partner_nom', '')
     montant      = int(request.data.get('montant', 0))
-    wave_number  = request.data.get('wave_number', '')
 
     if montant < 500:
         return Response({'error': 'Montant minimum 500 FCFA'}, status=400)
@@ -1941,33 +1946,25 @@ def api_wallet_retrait(request):
             d = DeliveryPartner.objects.get(id=partner_id)
             wallet = Wallet.objects.get(delivery_partner=d)
 
-        frais = 100 if montant < 3000 else 0
-        montant_net = montant - frais
         if float(wallet.balance) < montant:
             return Response({'error': 'Solde insuffisant'}, status=400)
 
-        # Créer demande de retrait dans Paiement (en attente OPS)
-        paiement = Paiement.objects.create(
-            partenaire_type=partner_type,
-            partenaire_id=partner_id,
-            partenaire_nom=partner_nom,
-            montant=montant,
-            wave_number=wave_number or '',
-            note='DEMANDE_RETRAIT — En attente validation OPS',
+        wr = WithdrawalRequest.objects.create(
+            wallet=wallet,
+            amount=montant,
+            status='pending',
         )
 
-        # Lien WhatsApp OPS pour notifier
-        import urllib.parse
-        msg = f"Demande retrait FAGNI\n{partner_nom}\nMontant : {montant:,} FCFA\nWave : {wave_number}\nA valider sur fagni-ops.vercel.app"
-        wa_link = f"https://wa.me/2250142299949?text={urllib.parse.quote(msg)}"
+        try:
+            notif_ops_retrait(wr.get_beneficiary_display(), montant, wallet.id)
+        except Exception as e:
+            print(f"[RETRAIT] Erreur notif FCM: {e}")
 
         return Response({
             'success': True,
-            'paiement_id': paiement.id,
+            'withdrawal_request_id': wr.id,
             'montant': montant,
-            'frais': frais, 'montant_net': montant_net,
             'solde_actuel': float(wallet.balance),
-            'wa_link': wa_link,
             'message': f'Demande de {montant:,} FCFA enregistree. OPS vous paiera sous 24-48h.'
         })
     except Exception as e:

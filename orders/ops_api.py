@@ -1503,11 +1503,13 @@ def api_ops_activite_jour(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def api_score_pressing(request, partner_id):
-    try:
-        _check_ops(request)
-    except Exception:
-        return Response({'error': 'Non autorise'}, status=401)
-    """GET /api/ops/score/pressing/<id>/ — score pressing"""
+    """
+    GET /api/ops/score/pressing/<id>/ — score pressing.
+    Pas de _check_ops : appele aussi par l'app partenaire (fagni-partner,
+    Score.jsx) avec partner_token (payload {pid, name}, jamais {ops}) -
+    echouait systematiquement. S'identifie deja via partner_id dans
+    l'URL, meme correction que api_wallet_solde/api_wallet_retrait.
+    """
     from partners.models import LaundryPartner
     from orders.models import Order
     from django.db.models import Avg, Count
@@ -1571,11 +1573,13 @@ def api_score_pressing(request, partner_id):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def api_score_livreur(request, driver_id):
-    try:
-        _check_ops(request)
-    except Exception:
-        return Response({'error': 'Non autorise'}, status=401)
-    """GET /api/ops/score/livreur/<id>/ — score livreur"""
+    """
+    GET /api/ops/score/livreur/<id>/ — score livreur.
+    Pas de _check_ops : appele aussi par l'app driver (fagni-driver,
+    Score.jsx) avec driver_token (payload sans champ ops) - echouait
+    systematiquement. S'identifie deja via driver_id dans l'URL, meme
+    correction que api_wallet_solde/api_wallet_retrait.
+    """
     from partners.models import DeliveryPartner
     from orders.models import Order
     from django.db.models import Sum

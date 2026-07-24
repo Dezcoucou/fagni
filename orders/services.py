@@ -106,3 +106,89 @@ def completer_parrainage_client_si_applicable(order):
             )
         except Customer.DoesNotExist:
             pass
+
+
+def _incrementer_parrainage_acteur(parrain_type, acteur_id, wallet_getter, order):
+    """
+    Fonction commune livreur/pressing (24 juillet 2026, suite) - meme
+    logique que le type client (incrementer nb_actions, activer au
+    seuil) mais declenchee sur un acteur d'execution (DeliveryPartner ou
+    LaundryPartner), pas un Customer. Le seuil pour ces deux types est
+    de 10 actions (contre 1 pour client), defini a la creation du
+    Parrainage (REMUNERATIONS dans api_creer_parrainage_v2secure).
+    """
+    from orders.models import Parrainage
+
+    parrainage = Parrainage.objects.filter(
+        filleul_type=parrain_type,
+        filleul_id=acteur_id,
+        statut="inscrit",
+    ).first()
+
+    if not parrainage:
+        return
+
+    parrainage.nb_actions += 1
+    if parrainage.nb_actions < parrainage.actions_requises:
+        parrainage.save(update_fields=["nb_actions", "updated_at"])
+        return
+
+    parrainage.statut = "actif"
+    parrainage.cash_active = True
+    parrainage.save(update_fields=["nb_actions", "statut", "cash_active", "updated_at"])
+
+    if parrainage.remuneration_parrain > 0:
+        try:
+            from wallets.services import credit_wallet
+            wallet = wallet_getter(parrainage.parrain_id)
+            if wallet is not None:
+                credit_wallet(
+                    wallet, parrainage.remuneration_parrain,
+                    description=f"Recompense parrainage - filleul {parrainage.filleul_nom}",
+                    order=order,
+                    tx_type="parrainage",
+                )
+        except Exception:
+            import logging
+            logging.getLogger("fagni.orders.services").exception(
+                "Echec silencieux credit parrainage %s | parrain_id=%s", parrain_type, parrainage.parrain_id
+            )
+
+
+def completer_parrainage_livreur_si_applicable(order):
+    """
+    Compte une action pour chaque livreur ayant reellement participe a
+    cette commande (collecte et/ou livraison peuvent etre deux livreurs
+    distincts - chacun compte separement s'il a son propre parrainage
+    'inscrit' en attente).
+    """
+    from wallets.services import get_or_create_wallet_for_delivery_partner
+    from partners.models import DeliveryPartner
+
+    def _wallet_livreur(driver_id):
+        try:
+            driver = DeliveryPartner.objects.get(id=driver_id)
+        except DeliveryPartner.DoesNotExist:
+            return None
+        return get_or_create_wallet_for_delivery_partner(driver)
+
+    for driver_id in {getattr(order, "pickup_driver_id", None), getattr(order, "delivery_partner_id", None)}:
+        if driver_id:
+            _incrementer_parrainage_acteur("livreur", driver_id, _wallet_livreur, order)
+
+
+def completer_parrainage_pressing_si_applicable(order):
+    """Compte une action pour le pressing (LaundryPartner) ayant traite cette commande."""
+    from wallets.services import get_or_create_wallet_for_laundry_partner
+    from partners.models import LaundryPartner
+
+    def _wallet_pressing(partner_id):
+        try:
+            partner = LaundryPartner.objects.get(id=partner_id)
+        except LaundryPartner.DoesNotExist:
+            return None
+        return get_or_create_wallet_for_laundry_partner(partner)
+
+    partner_id = getattr(order, "laundry_partner_id", None)
+    if partner_id:
+        _incrementer_parrainage_acteur("pressing", partner_id, _wallet_pressing, order)

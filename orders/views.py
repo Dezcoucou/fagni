@@ -6504,8 +6504,14 @@ def apply_order_payment(order, add_amount, *, channel="manual", reference="", no
     try:
         if became_paid:
             generate_mlm_commissions_for_order(order)
-            from orders.services import completer_parrainage_client_si_applicable
+            from orders.services import (
+                completer_parrainage_client_si_applicable,
+                completer_parrainage_livreur_si_applicable,
+                completer_parrainage_pressing_si_applicable,
+            )
             completer_parrainage_client_si_applicable(order)
+            completer_parrainage_livreur_si_applicable(order)
+            completer_parrainage_pressing_si_applicable(order)
         apply_fagni_monetization(order)
     except Exception:
         import logging

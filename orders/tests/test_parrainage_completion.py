@@ -83,3 +83,129 @@ class CompletionParrainageClientTests(TestCase):
 
         wallet_parrain.refresh_from_db()
         self.assertEqual(wallet_parrain.balance, solde_avant)
+
+
+class CompletionParrainageLivreurPressingTests(TestCase):
+    def setUp(self):
+        from partners.models import DeliveryPartner, LaundryPartner
+
+        self.parrain_livreur = DeliveryPartner.objects.create(name="Parrain Livreur", phone="0700000093", vehicle_type="moto")
+        self.filleul_livreur = DeliveryPartner.objects.create(name="Filleul Livreur", phone="0700000094", vehicle_type="moto")
+
+        self.parrain_pressing = LaundryPartner.objects.create(name="Parrain Pressing", phone="0700000095", partner_type="standard")
+        self.filleul_pressing = LaundryPartner.objects.create(name="Filleul Pressing", phone="0700000096", partner_type="standard")
+
+        self.parrainage_livreur = Parrainage.objects.create(
+            parrain_type="livreur", parrain_id=self.parrain_livreur.id, parrain_nom=self.parrain_livreur.name,
+            filleul_type="livreur", filleul_id=self.filleul_livreur.id, filleul_nom=self.filleul_livreur.name,
+            code_parrainage="LIVCODE01",
+            statut="inscrit", actions_requises=10, nb_actions=0,
+            remuneration_parrain=2000, remuneration_filleul=0,
+        )
+
+        self.parrainage_pressing = Parrainage.objects.create(
+            parrain_type="pressing", parrain_id=self.parrain_pressing.id, parrain_nom=self.parrain_pressing.name,
+            filleul_type="pressing", filleul_id=self.filleul_pressing.id, filleul_nom=self.filleul_pressing.name,
+            code_parrainage="PRECODE01",
+            statut="inscrit", actions_requises=10, nb_actions=0,
+            remuneration_parrain=5000, remuneration_filleul=0,
+        )
+
+        self.client_customer = Customer.objects.create(name="Client Test", phone="0700000097", address="Test")
+
+    def _payer_commande(self, order):
+        with patch("orders.models.Order.mark_as_paid_and_distribute", return_value=None):
+            from orders.presenters import build_order_finance_summary
+            total = Decimal(str(build_order_finance_summary(order)["total_client_ttc"]))
+            apply_order_payment(order, total, channel="manual")
+
+    def test_seuil_10_actions_requises_avant_completion(self):
+        wallet_parrain = get_or_create_wallet_for_delivery_partner_helper(self.parrain_livreur)
+        solde_avant = wallet_parrain.balance
+
+        for i in range(9):
+            order = Order.objects.create(
+                customer=self.client_customer, status="pending", payment_status="unpaid",
+                pricing_mode="bag", bag_size="medium", amount_paid=Decimal("0"),
+                pickup_driver=self.filleul_livreur,
+            )
+            order.update_financials(save=True)
+            self._payer_commande(order)
+
+        self.parrainage_livreur.refresh_from_db()
+        self.assertEqual(self.parrainage_livreur.nb_actions, 9)
+        self.assertEqual(self.parrainage_livreur.statut, "inscrit")
+
+        wallet_parrain.refresh_from_db()
+        self.assertEqual(wallet_parrain.balance, solde_avant)
+
+    def test_10eme_action_declenche_la_recompense_livreur(self):
+        for i in range(10):
+            order = Order.objects.create(
+                customer=self.client_customer, status="pending", payment_status="unpaid",
+                pricing_mode="bag", bag_size="medium", amount_paid=Decimal("0"),
+                pickup_driver=self.filleul_livreur,
+            )
+            order.update_financials(save=True)
+            self._payer_commande(order)
+
+        self.parrainage_livreur.refresh_from_db()
+        self.assertEqual(self.parrainage_livreur.statut, "actif")
+        self.assertTrue(self.parrainage_livreur.cash_active)
+
+        wallet_parrain = get_or_create_wallet_for_delivery_partner_helper(self.parrain_livreur)
+        self.assertEqual(wallet_parrain.balance, Decimal("2000"))
+
+    def test_10eme_action_declenche_la_recompense_pressing(self):
+        for i in range(10):
+            order = Order.objects.create(
+                customer=self.client_customer, status="pending", payment_status="unpaid",
+                pricing_mode="bag", bag_size="medium", amount_paid=Decimal("0"),
+                laundry_partner=self.filleul_pressing,
+            )
+            order.update_financials(save=True)
+            self._payer_commande(order)
+
+        self.parrainage_pressing.refresh_from_db()
+        self.assertEqual(self.parrainage_pressing.statut, "actif")
+
+        wallet_parrain = get_or_create_wallet_for_laundry_partner_helper(self.parrain_pressing)
+        self.assertEqual(wallet_parrain.balance, Decimal("5000"))
+
+    def test_deux_livreurs_distincts_comptent_separement(self):
+        """Collecte et livraison peuvent etre 2 livreurs differents - chacun compte independamment."""
+        parrain_livraison = None
+        from partners.models import DeliveryPartner
+        parrain_livraison_partner = DeliveryPartner.objects.create(name="Parrain Livraison", phone="0700000098", vehicle_type="moto")
+        filleul_livraison = DeliveryPartner.objects.create(name="Filleul Livraison", phone="0700000099", vehicle_type="moto")
+
+        parrainage_livraison = Parrainage.objects.create(
+            parrain_type="livreur", parrain_id=parrain_livraison_partner.id, parrain_nom=parrain_livraison_partner.name,
+            filleul_type="livreur", filleul_id=filleul_livraison.id, filleul_nom=filleul_livraison.name,
+            code_parrainage="LIVCODE02",
+            statut="inscrit", actions_requises=10, nb_actions=0,
+            remuneration_parrain=2000, remuneration_filleul=0,
+        )
+
+        order = Order.objects.create(
+            customer=self.client_customer, status="pending", payment_status="unpaid",
+            pricing_mode="bag", bag_size="medium", amount_paid=Decimal("0"),
+            pickup_driver=self.filleul_livreur, delivery_partner=filleul_livraison,
+        )
+        order.update_financials(save=True)
+        self._payer_commande(order)
+
+        self.parrainage_livreur.refresh_from_db()
+        parrainage_livraison.refresh_from_db()
+        self.assertEqual(self.parrainage_livreur.nb_actions, 1)
+        self.assertEqual(parrainage_livraison.nb_actions, 1)
+
+
+def get_or_create_wallet_for_delivery_partner_helper(partner):
+    from wallets.services import get_or_create_wallet_for_delivery_partner
+    return get_or_create_wallet_for_delivery_partner(partner)
+
+
+def get_or_create_wallet_for_laundry_partner_helper(partner):
+    from wallets.services import get_or_create_wallet_for_laundry_partner
+    return get_or_create_wallet_for_laundry_partner(partner)

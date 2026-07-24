@@ -1701,9 +1701,9 @@ def api_creer_parrainage_v2secure(request):
     if not all([parrain_type, parrain_id, parrain_nom]):
         return Response({'error': 'Données manquantes'}, status=400)
 
-        auth_type, auth_id = _get_authenticated_identity(request)
-        if auth_type is None or auth_type != parrain_type or str(auth_id) != str(parrain_id):
-            return Response({'error': 'Non autorise'}, status=401)
+    auth_type, auth_id = _get_authenticated_identity(request)
+    if auth_type is None or auth_type != parrain_type or str(auth_id) != str(parrain_id):
+        return Response({'error': 'Non autorise'}, status=401)
 
     # Vérifier si un parrainage existe déjà pour ce parrain
     existing = Parrainage.objects.filter(
@@ -1832,9 +1832,9 @@ def api_valider_code_parrainage(request):
     if p.statut != 'invite':
         return Response({'error': 'Code déjà utilisé'}, status=400)
 
-        auth_type, auth_id = _get_authenticated_identity(request)
-        if auth_type is None or auth_type != p.filleul_type or str(auth_id) != str(filleul_id):
-            return Response({'error': 'Non autorise'}, status=401)
+    auth_type, auth_id = _get_authenticated_identity(request)
+    if auth_type is None or auth_type != p.filleul_type or str(auth_id) != str(filleul_id):
+        return Response({'error': 'Non autorise'}, status=401)
 
     p.filleul_nom   = filleul_nom
     p.filleul_phone = filleul_phone

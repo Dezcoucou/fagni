@@ -850,6 +850,14 @@ def save_fcm_token(request):
             auth_type, auth_id = 'driver', payload['did']
         elif 'pid' in payload:
             auth_type, auth_id = 'partner', payload['pid']
+        elif payload.get('ops') is True:
+            # Token OPS ({'ops': True, 'name': ...}, ops_login) n'a pas
+            # d'id individuel comme les autres profils - un seul type
+            # 'ops' partage par toute l'equipe OPS (cf. user_id=1 fixe
+            # envoye par fagni-ops/Login.jsx). Jamais reconnu jusqu'ici,
+            # cause du 401 systematique sur /api/fcm/token/ pour OPS,
+            # decouvert le 19 juillet lors du debug notification simulateur.
+            auth_type, auth_id = 'ops', user_id
         if auth_type is None or auth_type != user_type or str(auth_id) != str(user_id):
             return Response({'error': 'Non autorise'}, status=401)
         from orders.models import FCMToken

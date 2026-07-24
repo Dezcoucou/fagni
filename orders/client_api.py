@@ -1289,3 +1289,120 @@ Des questions ? Écrivez-nous ici !
     _ops_num2 = "225" + _ops_raw2.lstrip("0") if not _ops_raw2.startswith("225") else _ops_raw2
     wa_link = f"https://wa.me/{_ops_num2}?text={urllib.parse.quote(msg)}"
     return Response({'success': True, 'wa_link': wa_link})
+
+
+# ═══════════════════════════════════════════════════════════
+# ABONNEMENT — estimation et reservation (24 juillet 2026)
+# Construit directement en V1, jamais un pont vers V2.
+# ═══════════════════════════════════════════════════════════
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_abonnement_estimer(request):
+    """
+    POST /api/abonnement/estimer/
+    Payload : {"pack": "confort", "taille_sac": "M"}
+    Anonyme par construction - avant creation de compte.
+    """
+    from orders.models import AbonnementPricingRule
+
+    pack = request.data.get('pack', '').strip()
+    taille_sac = request.data.get('taille_sac', '').strip()
+
+    if pack not in ('essentiel', 'confort') or taille_sac not in ('S', 'M'):
+        return Response({'error': 'pack et taille_sac requis et valides'}, status=400)
+
+    try:
+        regle = AbonnementPricingRule.objects.get(pack=pack, taille_sac=taille_sac)
+    except AbonnementPricingRule.DoesNotExist:
+        return Response({'error': "Cette offre n'est pas encore configuree."}, status=503)
+
+    if not regle.is_active:
+        return Response({'error': "Cette offre n'est pas actuellement proposee."}, status=422)
+
+    prix = regle.prix_hebdomadaire
+    return Response({
+        'disponible': True,
+        'pack': regle.get_pack_display(),
+        'taille_sac': regle.get_taille_sac_display(),
+        'prix': float(prix),
+        'prix_quotidien_equivalent': round(float(prix) / 7, 0),
+        'offre_lancement': True,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_abonnement_reserver(request):
+    """
+    POST /api/abonnement/reserver/
+    Payload : {"telephone": "...", "nom": "...", "pack": "...", "taille_sac": "...", "jour_collecte": 0, "jour_livraison": 3}
+    Cree (ou reutilise) le Customer, cree l'Abonnement avec le prix
+    verrouille au moment de la reservation (BOS 4.1).
+    """
+    from orders.models import Abonnement, AbonnementPricingRule
+
+    telephone = request.data.get('telephone', '').strip()
+    nom = request.data.get('nom', '').strip()
+    pack = request.data.get('pack', '').strip()
+    taille_sac = request.data.get('taille_sac', '').strip()
+    jour_collecte = request.data.get('jour_collecte')
+    jour_livraison = request.data.get('jour_livraison')
+
+    if not all([telephone, nom, pack, taille_sac]) or jour_collecte is None or jour_livraison is None:
+        return Response({'error': 'Tous les champs sont requis'}, status=400)
+
+    try:
+        regle = AbonnementPricingRule.objects.get(pack=pack, taille_sac=taille_sac, is_active=True)
+    except AbonnementPricingRule.DoesNotExist:
+        return Response({'error': "Cette offre n'est pas disponible."}, status=422)
+
+    customer, _ = Customer.objects.get_or_create(
+        phone=telephone,
+        defaults={'name': nom, 'address': ''},
+    )
+
+    abonnement, cree = Abonnement.objects.get_or_create(
+        customer=customer, statut='actif', pack=pack, taille_sac=taille_sac,
+        defaults={
+            'jour_collecte': jour_collecte,
+            'jour_livraison': jour_livraison,
+            'prix_verrouille': regle.prix_hebdomadaire,
+        },
+    )
+
+    return Response({
+        'already_reserved': not cree,
+        'abonnement_id': abonnement.id,
+        'statut': abonnement.get_statut_display(),
+    }, status=200)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_mon_abonnement_v1(request):
+    """GET /api/abonnement/mon-abonnement/?telephone=..."""
+    from orders.models import Abonnement
+
+    telephone = request.GET.get('telephone', '').strip()
+    if not telephone:
+        return Response({'error': 'telephone requis'}, status=400)
+
+    try:
+        customer = Customer.objects.get(phone=telephone)
+    except Customer.DoesNotExist:
+        return Response({'abonnement': None})
+
+    abonnement = Abonnement.objects.filter(customer=customer).order_by('-created_at').first()
+    if not abonnement:
+        return Response({'abonnement': None})
+
+    return Response({
+        'abonnement': {
+            'pack': abonnement.get_pack_display(),
+            'taille_sac': abonnement.get_taille_sac_display(),
+            'statut': abonnement.get_statut_display(),
+            'prix': float(abonnement.prix_verrouille),
+            'cree_le': abonnement.created_at.strftime('%d/%m/%Y'),
+        }
+    })

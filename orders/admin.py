@@ -1527,3 +1527,12 @@ class ArticleConfigAdmin(admin.ModelAdmin):
     list_filter   = ['category', 'is_active']
     search_fields = ['label', 'article_id']
     ordering      = ['category', 'sort_order']
+
+
+from orders.models import FCMToken
+
+@admin.register(FCMToken)
+class FCMTokenAdmin(admin.ModelAdmin):
+    list_display = ['user_type', 'user_id', 'created_at', 'updated_at']
+    list_filter = ['user_type']
+    readonly_fields = ['created_at', 'updated_at']

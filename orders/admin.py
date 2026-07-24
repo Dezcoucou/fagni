@@ -1536,3 +1536,20 @@ class FCMTokenAdmin(admin.ModelAdmin):
     list_display = ['user_type', 'user_id', 'created_at', 'updated_at']
     list_filter = ['user_type']
     readonly_fields = ['created_at', 'updated_at']
+
+
+from orders.models import Abonnement, AbonnementPricingRule
+
+@admin.register(AbonnementPricingRule)
+class AbonnementPricingRuleAdmin(admin.ModelAdmin):
+    list_display = ['pack', 'taille_sac', 'prix_hebdomadaire', 'is_active']
+    list_filter = ['pack', 'taille_sac', 'is_active']
+    list_editable = ['prix_hebdomadaire', 'is_active']
+
+
+@admin.register(Abonnement)
+class AbonnementAdmin(admin.ModelAdmin):
+    list_display = ['customer', 'pack', 'taille_sac', 'statut', 'prix_verrouille', 'created_at']
+    list_filter = ['statut', 'pack', 'taille_sac']
+    search_fields = ['customer__name', 'customer__phone']
+    readonly_fields = ['created_at', 'updated_at']

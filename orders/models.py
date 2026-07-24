@@ -4716,3 +4716,87 @@ class OrderPhoto(models.Model):
 
     def __str__(self):
         return f"Photo {self.photo_type} - commande {self.order_id}"
+
+
+# ═══════════════════════════════════════════════════════════
+# ABONNEMENT — service recurrent hebdomadaire (24 juillet 2026)
+# Construit directement en V1 (pas de pont V2) - reutilise Customer,
+# DeliveryPartner, LaundryPartner deja existants, coherent avec le
+# reste de l'execution operationnelle reelle du pilote.
+# ═══════════════════════════════════════════════════════════
+
+class AbonnementPricingRule(models.Model):
+    """
+    Tarification des abonnements - meme principe que BagPricingRule
+    (tout le pricing business parametrable via l'admin, jamais code en
+    dur). Un prix par combinaison pack x taille_sac.
+    """
+    PACK_CHOICES = [
+        ("essentiel", "Essentiel (lavage seul)"),
+        ("confort", "Confort (lavage + repassage)"),
+    ]
+    TAILLE_SAC_CHOICES = [
+        ("S", "Sac S"),
+        ("M", "Sac M"),
+    ]
+
+    pack = models.CharField("Pack", max_length=20, choices=PACK_CHOICES)
+    taille_sac = models.CharField("Taille sac", max_length=2, choices=TAILLE_SAC_CHOICES)
+    prix_hebdomadaire = models.DecimalField("Prix hebdomadaire (FCFA)", max_digits=10, decimal_places=2)
+    is_active = models.BooleanField("Actif commercialement", default=False)
+    notes = models.TextField("Notes internes", blank=True, default="")
+    created_at = models.DateTimeField("Cree le", auto_now_add=True)
+    updated_at = models.DateTimeField("Mis a jour le", auto_now=True)
+
+    class Meta:
+        verbose_name = "Regle pricing abonnement"
+        verbose_name_plural = "Regles pricing abonnement"
+        unique_together = [("pack", "taille_sac")]
+        ordering = ["pack", "taille_sac"]
+
+    def __str__(self):
+        return f"{self.get_pack_display()} - {self.get_taille_sac_display()} - {self.prix_hebdomadaire} XOF"
+
+
+class Abonnement(models.Model):
+    """
+    Engagement recurrent hebdomadaire d'un client - meme concept que le
+    module V2 construit ce matin, mais directement en V1 pour rester
+    coherent avec l'execution operationnelle reelle (24 juillet 2026,
+    decision explicite de ne pas dependre d'un pont V1/V2 pour ce
+    parcours).
+    """
+    STATUT_CHOICES = [
+        ("actif", "Actif"),
+        ("suspendu", "Suspendu"),
+        ("resilie", "Resilie"),
+    ]
+
+    customer = models.ForeignKey(
+        "orders.Customer", on_delete=models.PROTECT, related_name="abonnements",
+    )
+    pack = models.CharField("Pack", max_length=20, choices=AbonnementPricingRule.PACK_CHOICES)
+    taille_sac = models.CharField("Taille sac", max_length=2, choices=AbonnementPricingRule.TAILLE_SAC_CHOICES)
+    jour_collecte = models.PositiveSmallIntegerField(
+        "Jour collecte",
+        choices=[(0, "Lundi"), (1, "Mardi"), (2, "Mercredi"), (3, "Jeudi"), (4, "Vendredi"), (5, "Samedi"), (6, "Dimanche")],
+    )
+    jour_livraison = models.PositiveSmallIntegerField(
+        "Jour livraison",
+        choices=[(0, "Lundi"), (1, "Mardi"), (2, "Mercredi"), (3, "Jeudi"), (4, "Vendredi"), (5, "Samedi"), (6, "Dimanche")],
+    )
+    statut = models.CharField("Statut", max_length=20, choices=STATUT_CHOICES, default="actif")
+    prix_verrouille = models.DecimalField(
+        "Prix verrouille (FCFA)", max_digits=10, decimal_places=2,
+        help_text="Prix au moment de la souscription - jamais modifie retroactivement (BOS 4.1, meme regle que Order.total_client_ttc).",
+    )
+    created_at = models.DateTimeField("Cree le", auto_now_add=True)
+    updated_at = models.DateTimeField("Mis a jour le", auto_now=True)
+
+    class Meta:
+        verbose_name = "Abonnement"
+        verbose_name_plural = "Abonnements"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.customer.name} - {self.get_pack_display()} {self.get_taille_sac_display()} ({self.get_statut_display()})"

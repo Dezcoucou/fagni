@@ -530,6 +530,7 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 OPS_PASSWORD = os.getenv('OPS_PASSWORD', 'fagni2025')
+SIMULATEUR_NOTIFY_KEY = os.getenv('SIMULATEUR_NOTIFY_KEY', 'fagni_simulateur_notify_2026')
 
 # Cloudinary
 import cloudinary

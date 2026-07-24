@@ -2248,3 +2248,40 @@ def ops_assign_return_driver(request, order_id):
         return Response({"success": True, "message": f"Livreur retour {driver.name} assigne"})
     except Exception as e:
         return Response({"error": str(e)}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_simulateur_notify(request):
+    """
+    POST /api/simulateur/notify?key=<SIMULATEUR_NOTIFY_KEY>
+    Appele par le backend V2 (fagni-platform) apres une reservation via
+    /estimation - fire-and-forget, jamais bloquant pour la reservation
+    elle-meme si cet appel echoue. Exception consciente au principe
+    "pas de pont automatique V1/V2" (FOS-213 section 0) : justifiee ici
+    car non-critique (une simple alerte), contrairement a une dependance
+    de logique metier.
+    """
+    key = request.GET.get('key', '') or request.data.get('key', '')
+    expected = getattr(settings, 'SIMULATEUR_NOTIFY_KEY', 'fagni_simulateur_notify_2026')
+    if key != expected:
+        return Response({'error': 'Cle invalide'}, status=401)
+
+    from fagni.notifications import notif_ops_retrait
+
+    sim_id = request.data.get('sim_id', '')
+    nom = request.data.get('nom', '')
+    telephone = request.data.get('telephone', '')
+    prix = request.data.get('prix', 0)
+
+    try:
+        notif_ops_retrait(
+            f"Nouvelle reservation {nom} ({telephone})",
+            prix,
+            f"sim:{sim_id}",
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger("fagni.ops_api").exception("Echec notif simulateur | sim_id=%s | error=%s", sim_id, str(e))
+
+    return Response({'success': True})

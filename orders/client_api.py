@@ -1371,6 +1371,20 @@ def api_abonnement_reserver(request):
         },
     )
 
+    if cree:
+        try:
+            from fagni.notifications import notif_ops_retrait
+            notif_ops_retrait(
+                f"Nouvel abonnement {nom} ({telephone})",
+                float(regle.prix_hebdomadaire),
+                f"abonnement:{abonnement.id}",
+            )
+        except Exception:
+            import logging
+            logging.getLogger("fagni.orders.client_api").exception(
+                "Echec silencieux notif nouvel abonnement | abonnement_id=%s", abonnement.id
+            )
+
     return Response({
         'already_reserved': not cree,
         'abonnement_id': abonnement.id,

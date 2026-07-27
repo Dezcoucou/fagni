@@ -1420,3 +1420,171 @@ def api_mon_abonnement_v1(request):
             'cree_le': abonnement.created_at.strftime('%d/%m/%Y'),
         }
     })
+
+
+# ═══════════════════════════════════════════════════════════
+# ROUTINE — essai ponctuel (Lot 3, 27 juillet 2026)
+# N'utilise JAMAIS le moteur "Pricing v3.0" par article
+# (incompatible - voir spec section 0). Prix pose directement
+# depuis AbonnementPricingRule, comme pour un vrai abonnement.
+# ═══════════════════════════════════════════════════════════
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_routine_essai(request):
+    """
+    POST /api/routine/essai/
+    Payload : {telephone, nom, routine, pack, taille_sac, adresse, jour_collecte_souhaite}
+    Anonyme par construction. Cree une vraie Order (order_origin='routine_trial'),
+    jamais un abonnement, jamais via api_create_order.
+    """
+    from datetime import date, timedelta
+    from orders.models import AbonnementPricingRule
+
+    telephone = request.data.get('telephone', '').strip()
+    nom = request.data.get('nom', '').strip()
+    routine = request.data.get('routine', '').strip()
+    pack = request.data.get('pack', '').strip()
+    taille_sac = request.data.get('taille_sac', '').strip()
+    adresse = request.data.get('adresse', '').strip()
+    jour_collecte_souhaite = request.data.get('jour_collecte_souhaite')
+
+    if not all([telephone, nom, routine, pack, taille_sac]):
+        return Response({'error': 'Champs requis manquants'}, status=400)
+
+    if routine not in dict(Order.ROUTINE_CHOICES):
+        return Response({'error': 'Routine invalide'}, status=400)
+
+    try:
+        regle = AbonnementPricingRule.objects.get(pack=pack, taille_sac=taille_sac, is_active=True)
+    except AbonnementPricingRule.DoesNotExist:
+        return Response({'error': "Cette offre n'est pas disponible."}, status=422)
+
+    customer, _ = Customer.objects.get_or_create(
+        phone=telephone,
+        defaults={'name': nom, 'address': adresse},
+    )
+
+    # Idempotence : un essai routine_trial deja en cours (non termine) bloque un nouveau
+    essai_existant = Order.objects.filter(
+        customer=customer, order_origin='routine_trial',
+    ).exclude(status__in=['delivered', 'cancelled']).first()
+
+    if essai_existant:
+        return Response({
+            'already_exists': True,
+            'order_id': essai_existant.id,
+            'status': essai_existant.status,
+        }, status=200)
+
+    today = date.today()
+    pickup_date = today + timedelta(days=1)
+    delivery_date = pickup_date + timedelta(days=2)
+
+    order = Order.objects.create(
+        customer=customer,
+        pricing_mode='bag',  # jamais 'routine_essai' - audit confirme, evite de casser is_bag/is_item
+        bag_size=taille_sac,
+        pickup_address=adresse or getattr(customer, 'address', '') or '',
+        delivery_address=adresse or getattr(customer, 'address', '') or '',
+        pickup_scheduled_date=pickup_date,
+        delivery_scheduled_date=delivery_date,
+        status='pending',
+        order_origin='routine_trial',
+        routine_proposee=routine,
+        routine_choisie=routine,
+        total_client_ttc=regle.prix_hebdomadaire,
+        notes=f"Essai Routine - {dict(Order.ROUTINE_CHOICES).get(routine)}",
+    )
+
+    return Response({
+        'already_exists': False,
+        'order_id': order.id,
+        'routine': routine,
+        'prix': float(regle.prix_hebdomadaire),
+        'status': order.status,
+    }, status=201)
+
+
+# ═══════════════════════════════════════════════════════════
+# ROUTINE — essai ponctuel (Lot 3, 27 juillet 2026)
+# N'utilise JAMAIS le moteur "Pricing v3.0" par article
+# (incompatible - voir spec section 0). Prix pose directement
+# depuis AbonnementPricingRule, comme pour un vrai abonnement.
+# ═══════════════════════════════════════════════════════════
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_routine_essai(request):
+    """
+    POST /api/routine/essai/
+    Payload : {telephone, nom, routine, pack, taille_sac, adresse, jour_collecte_souhaite}
+    Anonyme par construction. Cree une vraie Order (order_origin='routine_trial'),
+    jamais un abonnement, jamais via api_create_order.
+    """
+    from datetime import date, timedelta
+    from orders.models import AbonnementPricingRule
+
+    telephone = request.data.get('telephone', '').strip()
+    nom = request.data.get('nom', '').strip()
+    routine = request.data.get('routine', '').strip()
+    pack = request.data.get('pack', '').strip()
+    taille_sac = request.data.get('taille_sac', '').strip()
+    adresse = request.data.get('adresse', '').strip()
+    jour_collecte_souhaite = request.data.get('jour_collecte_souhaite')
+
+    if not all([telephone, nom, routine, pack, taille_sac]):
+        return Response({'error': 'Champs requis manquants'}, status=400)
+
+    if routine not in dict(Order.ROUTINE_CHOICES):
+        return Response({'error': 'Routine invalide'}, status=400)
+
+    try:
+        regle = AbonnementPricingRule.objects.get(pack=pack, taille_sac=taille_sac, is_active=True)
+    except AbonnementPricingRule.DoesNotExist:
+        return Response({'error': "Cette offre n'est pas disponible."}, status=422)
+
+    customer, _ = Customer.objects.get_or_create(
+        phone=telephone,
+        defaults={'name': nom, 'address': adresse},
+    )
+
+    # Idempotence : un essai routine_trial deja en cours (non termine) bloque un nouveau
+    essai_existant = Order.objects.filter(
+        customer=customer, order_origin='routine_trial',
+    ).exclude(status__in=['delivered', 'cancelled']).first()
+
+    if essai_existant:
+        return Response({
+            'already_exists': True,
+            'order_id': essai_existant.id,
+            'status': essai_existant.status,
+        }, status=200)
+
+    today = date.today()
+    pickup_date = today + timedelta(days=1)
+    delivery_date = pickup_date + timedelta(days=2)
+
+    order = Order.objects.create(
+        customer=customer,
+        pricing_mode='bag',  # jamais 'routine_essai' - audit confirme, evite de casser is_bag/is_item
+        bag_size=taille_sac,
+        pickup_address=adresse or getattr(customer, 'address', '') or '',
+        delivery_address=adresse or getattr(customer, 'address', '') or '',
+        pickup_scheduled_date=pickup_date,
+        delivery_scheduled_date=delivery_date,
+        status='pending',
+        order_origin='routine_trial',
+        routine_proposee=routine,
+        routine_choisie=routine,
+        total_client_ttc=regle.prix_hebdomadaire,
+        notes=f"Essai Routine - {dict(Order.ROUTINE_CHOICES).get(routine)}",
+    )
+
+    return Response({
+        'already_exists': False,
+        'order_id': order.id,
+        'routine': routine,
+        'prix': float(regle.prix_hebdomadaire),
+        'status': order.status,
+    }, status=201)

@@ -1148,6 +1148,45 @@ class Order(models.Model):
         help_text="Notes internes sur la commande (consignes, contexte, etc.)",
     )
 
+    ORDER_ORIGIN_CHOICES = [
+        ("normal", "Normal"),
+        ("routine_trial", "Essai Routine"),
+        ("backoffice", "Cree par OPS"),
+        ("migration", "Migration/import"),
+    ]
+    order_origin = models.CharField(
+        "Origine de la commande", max_length=30, choices=ORDER_ORIGIN_CHOICES, default="normal",
+    )
+
+    ROUTINE_CHOICES = [
+        ("solo", "Solo"),
+        ("duo", "Duo"),
+        ("famille", "Famille"),
+        ("business", "Business"),
+    ]
+    routine_proposee = models.CharField(
+        "Routine proposee par le diagnostic", max_length=20, choices=ROUTINE_CHOICES, blank=True, default="",
+        help_text="Jamais modifiee apres creation - trace la recommandation initiale du moteur.",
+    )
+    routine_choisie = models.CharField(
+        "Routine finalement choisie par le client", max_length=20, choices=ROUTINE_CHOICES, blank=True, default="",
+        help_text="Peut differer de routine_proposee si le client corrige la recommandation.",
+    )
+
+    SATISFACTION_CHOICES = [
+        ("pending", "En attente"),
+        ("positive", "Positive"),
+        ("incident", "Incident signale"),
+        ("resolved", "Incident resolu"),
+        ("negative", "Negative"),
+    ]
+    satisfaction_contactee_le = models.DateTimeField(
+        "Client contacte le", null=True, blank=True,
+    )
+    satisfaction_reponse = models.CharField(
+        "Reponse satisfaction", max_length=20, choices=SATISFACTION_CHOICES, default="pending",
+    )
+
     # --------- Parrainage / MLM ---------
     referral_code = models.CharField(
         "Code parrain saisi",
@@ -4786,6 +4825,11 @@ class Abonnement(models.Model):
         choices=[(0, "Lundi"), (1, "Mardi"), (2, "Mercredi"), (3, "Jeudi"), (4, "Vendredi"), (5, "Samedi"), (6, "Dimanche")],
     )
     statut = models.CharField("Statut", max_length=20, choices=STATUT_CHOICES, default="actif")
+    essai_origine = models.ForeignKey(
+        "orders.Order", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="abonnements_convertis",
+        help_text="Commande d'essai a l'origine de cet abonnement, si applicable - jamais modifie retroactivement.",
+    )
     prix_verrouille = models.DecimalField(
         "Prix verrouille (FCFA)", max_digits=10, decimal_places=2,
         help_text="Prix au moment de la souscription - jamais modifie retroactivement (BOS 4.1, meme regle que Order.total_client_ttc).",
@@ -4800,3 +4844,39 @@ class Abonnement(models.Model):
 
     def __str__(self):
         return f"{self.customer.name} - {self.get_pack_display()} {self.get_taille_sac_display()} ({self.get_statut_display()})"
+
+
+class EvenementRoutine(models.Model):
+    """
+    Telemetrie du parcours Routine (Lot 3, 27 juillet 2026) - separee du
+    vocabulaire FagniEvent (qui documente le cycle de vie metier reel),
+    meme principe que EvenementSimulation cote V2 : instrumentation UX,
+    jamais un fait metier engageant.
+    """
+    customer = models.ForeignKey(
+        "orders.Customer", null=True, blank=True, on_delete=models.SET_NULL,
+    )
+    TYPE_EVENEMENT_CHOICES = [
+        ("diagnostic_commence", "Diagnostic commence"),
+        ("diagnostic_termine", "Diagnostic termine"),
+        ("routine_recommandee", "Routine recommandee"),
+        ("routine_changee", "Routine changee"),
+        ("essai_reserve", "Essai reserve"),
+        ("essai_paye", "Essai paye"),
+        ("essai_livre", "Essai livre"),
+        ("satisfaction_confirmee", "Satisfaction confirmee"),
+        ("abonnement_propose", "Abonnement propose"),
+        ("abonnement_accepte", "Abonnement accepte"),
+        ("abonnement_active", "Abonnement active"),
+    ]
+    type_evenement = models.CharField("Type", max_length=40, choices=TYPE_EVENEMENT_CHOICES)
+    donnees = models.JSONField("Donnees", default=dict, blank=True)
+    horodatage = models.DateTimeField("Horodate le", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Evenement Routine"
+        verbose_name_plural = "Evenements Routine"
+        ordering = ["-horodatage"]
+
+    def __str__(self):
+        return f"{self.get_type_evenement_display()} - {self.horodatage.strftime('%d/%m %H:%M')}"

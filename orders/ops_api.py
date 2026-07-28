@@ -2285,3 +2285,120 @@ def api_simulateur_notify(request):
         logging.getLogger("fagni.ops_api").exception("Echec notif simulateur | sim_id=%s | error=%s", sim_id, str(e))
 
     return Response({'success': True})
+
+
+# ═══════════════════════════════════════════════════════════
+# ROUTINE — traitement OPS (Lot 4, 28 juillet 2026)
+# Identification des essais, confirmation de satisfaction,
+# action "proposer l'abonnement". PAS la conversion elle-meme (Lot 5).
+# ═══════════════════════════════════════════════════════════
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_ops_routine_essais(request):
+    """
+    GET /api/ops/routine-essais/
+    Liste les commandes d'essai Routine, filtrable par statut de
+    satisfaction pour prioriser le suivi OPS.
+    """
+    from orders.models import Order
+
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    filtre_satisfaction = request.GET.get('satisfaction', '')
+
+    qs = Order.objects.filter(order_origin='routine_trial').select_related('customer').order_by('-created_at')
+    if filtre_satisfaction:
+        qs = qs.filter(satisfaction_reponse=filtre_satisfaction)
+
+    data = [{
+        'id': o.id,
+        'customer_name': o.customer.name if o.customer else '',
+        'customer_phone': o.customer.phone if o.customer else '',
+        'routine_proposee': o.routine_proposee,
+        'routine_choisie': o.routine_choisie,
+        'status': o.status,
+        'satisfaction_reponse': o.satisfaction_reponse,
+        'satisfaction_contactee_le': o.satisfaction_contactee_le.isoformat() if o.satisfaction_contactee_le else None,
+        'total_client_ttc': float(o.total_client_ttc) if o.total_client_ttc else None,
+        'created_at': o.created_at.isoformat(),
+    } for o in qs[:200]]
+
+    return Response({'essais': data})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_ops_routine_satisfaction(request, order_id):
+    """
+    POST /api/ops/routine-essais/<id>/satisfaction/
+    Payload : {"reponse": "positive"|"incident"|"resolved"|"negative"}
+    """
+    from orders.models import Order
+
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    reponse = request.data.get('reponse', '').strip()
+    if reponse not in dict(Order.SATISFACTION_CHOICES):
+        return Response({'error': 'Reponse invalide'}, status=400)
+
+    try:
+        order = Order.objects.get(id=order_id, order_origin='routine_trial')
+    except Order.DoesNotExist:
+        return Response({'error': 'Essai introuvable'}, status=404)
+
+    from django.utils import timezone
+    order.satisfaction_reponse = reponse
+    order.satisfaction_contactee_le = timezone.now()
+    order.save(update_fields=['satisfaction_reponse', 'satisfaction_contactee_le', 'updated_at'])
+
+    from orders.models import EvenementRoutine
+    EvenementRoutine.objects.create(
+        customer=order.customer, type_evenement='satisfaction_confirmee',
+        donnees={'order_id': order.id, 'reponse': reponse},
+    )
+
+    return Response({'success': True, 'satisfaction_reponse': order.satisfaction_reponse})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_ops_routine_proposer_abonnement(request, order_id):
+    """
+    POST /api/ops/routine-essais/<id>/proposer-abonnement/
+    Verifie l'eligibilite (satisfaction positive/resolved), enregistre
+    l'evenement, retourne le lien a partager au client. Ne cree PAS
+    l'abonnement lui-meme - Lot 5.
+    """
+    from orders.models import Order
+
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    try:
+        order = Order.objects.get(id=order_id, order_origin='routine_trial')
+    except Order.DoesNotExist:
+        return Response({'error': 'Essai introuvable'}, status=404)
+
+    if order.satisfaction_reponse not in ('positive', 'resolved'):
+        return Response({
+            'error': f"Proposition impossible - satisfaction actuelle : {order.get_satisfaction_reponse_display()}",
+        }, status=422)
+
+    from orders.models import EvenementRoutine
+    EvenementRoutine.objects.create(
+        customer=order.customer, type_evenement='abonnement_propose',
+        donnees={'order_id': order.id, 'routine': order.routine_choisie or order.routine_proposee},
+    )
+
+    lien = f"https://fagni-client.vercel.app/abonnement?depuis_essai={order.id}"
+
+    return Response({'success': True, 'lien_a_partager': lien})

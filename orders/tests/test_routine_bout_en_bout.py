@@ -85,7 +85,7 @@ class ParcoursRoutineBoutEnBoutTests(TestCase):
         self.assertEqual(r4.status_code, 200)
         detail = r4.json()
         self.assertEqual(detail["routine"], "duo")
-        self.assertEqual(detail["prix"], 14800.0)
+        self.assertEqual(detail["prix"], 59200.0)  # 14800 x 4 (facturation mensuelle)
         self.assertEqual(detail["telephone"], "0700000800")
 
         # ---------- ETAPE 6 : le client confirme la recurrence -
@@ -108,7 +108,7 @@ class ParcoursRoutineBoutEnBoutTests(TestCase):
         self.assertEqual(abonnement.statut, "actif")
         self.assertEqual(abonnement.pack, "confort")
         self.assertEqual(abonnement.taille_sac, "M")
-        self.assertEqual(abonnement.prix_verrouille, Decimal("14800.00"))
+        self.assertEqual(abonnement.prix_verrouille, Decimal("59200.00"))  # 14800 x 4 (facturation mensuelle)
         self.assertEqual(abonnement.essai_origine_id, order_id)
         self.assertEqual(abonnement.customer.phone, "0700000800")
 

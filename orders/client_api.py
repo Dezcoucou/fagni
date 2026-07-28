@@ -1309,7 +1309,7 @@ def api_abonnement_estimer(request):
     pack = request.data.get('pack', '').strip()
     taille_sac = request.data.get('taille_sac', '').strip()
 
-    if pack not in ('essentiel', 'confort') or taille_sac not in ('S', 'M'):
+    if pack not in ('essentiel', 'confort') or taille_sac not in ('S', 'M', 'XL'):
         return Response({'error': 'pack et taille_sac requis et valides'}, status=400)
 
     try:
@@ -1320,13 +1320,15 @@ def api_abonnement_estimer(request):
     if not regle.is_active:
         return Response({'error': "Cette offre n'est pas actuellement proposee."}, status=422)
 
-    prix = regle.prix_hebdomadaire
+    prix_hebdo = regle.prix_hebdomadaire
+    prix_mensuel = regle.prix_mensuel
     return Response({
         'disponible': True,
         'pack': regle.get_pack_display(),
         'taille_sac': regle.get_taille_sac_display(),
-        'prix': float(prix),
-        'prix_quotidien_equivalent': round(float(prix) / 7, 0),
+        'prix': float(prix_hebdo),
+        'prix_mensuel': float(prix_mensuel),
+        'prix_quotidien_equivalent': round(float(prix_mensuel) / 30, 0),
         'offre_lancement': True,
     })
 
@@ -1379,7 +1381,7 @@ def api_abonnement_reserver(request):
         defaults={
             'jour_collecte': jour_collecte,
             'jour_livraison': jour_livraison,
-            'prix_verrouille': regle.prix_hebdomadaire,
+            'prix_verrouille': regle.prix_mensuel,
             'essai_origine': essai_origine,
         },
     )
@@ -1389,7 +1391,7 @@ def api_abonnement_reserver(request):
             from fagni.notifications import notif_ops_retrait
             notif_ops_retrait(
                 f"Nouvel abonnement {nom} ({telephone})",
-                float(regle.prix_hebdomadaire),
+                float(regle.prix_mensuel),
                 f"abonnement:{abonnement.id}",
             )
         except Exception:
@@ -1643,7 +1645,7 @@ def api_routine_essai_detail(request, order_id):
         'routine': routine,
         'pack': pack,
         'taille_sac': taille_sac,
-        'prix': float(regle.prix_hebdomadaire),
+        'prix': float(regle.prix_mensuel),
         'telephone': order.customer.phone if order.customer else '',
         'nom': order.customer.name if order.customer else '',
     })

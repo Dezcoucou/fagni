@@ -456,6 +456,7 @@ class Subscription(models.Model):
     BAG_SIZE_CHOICES = [
         ("S", "Sac S"),
         ("M", "Sac M"),
+        ("XL", "Sac XL"),
     ]
 
     WEEKDAY_CHOICES = [
@@ -4777,11 +4778,20 @@ class AbonnementPricingRule(models.Model):
     TAILLE_SAC_CHOICES = [
         ("S", "Sac S"),
         ("M", "Sac M"),
+        ("XL", "Sac XL"),
     ]
 
     pack = models.CharField("Pack", max_length=20, choices=PACK_CHOICES)
     taille_sac = models.CharField("Taille sac", max_length=2, choices=TAILLE_SAC_CHOICES)
-    prix_hebdomadaire = models.DecimalField("Prix hebdomadaire (FCFA)", max_digits=10, decimal_places=2)
+    prix_hebdomadaire = models.DecimalField(
+        "Prix hebdomadaire (FCFA)", max_digits=10, decimal_places=2,
+        help_text="Prix indicatif par collecte - utilise pour l'essai ponctuel (une seule collecte, pas d'engagement).",
+    )
+    prix_mensuel = models.DecimalField(
+        "Prix mensuel (FCFA)", max_digits=10, decimal_places=2,
+        default=0,
+        help_text="Prix reellement facture pour l'abonnement (4 collectes hebdomadaires) - source de verite pour la facturation reelle. Distinct du prix hebdomadaire indicatif.",
+    )
     is_active = models.BooleanField("Actif commercialement", default=False)
     notes = models.TextField("Notes internes", blank=True, default="")
     created_at = models.DateTimeField("Cree le", auto_now_add=True)
@@ -4792,6 +4802,16 @@ class AbonnementPricingRule(models.Model):
         verbose_name_plural = "Regles pricing abonnement"
         unique_together = [("pack", "taille_sac")]
         ordering = ["pack", "taille_sac"]
+
+    def save(self, *args, **kwargs):
+        # Secours : si prix_mensuel n'a jamais ete configure explicitement
+        # (0 par defaut), le deriver du prix hebdomadaire (x4) - evite
+        # qu'une nouvelle regle oubliee en config casse la facturation
+        # reelle. Un prix_mensuel explicitement configure (non nul) n'est
+        # jamais ecrase.
+        if not self.prix_mensuel:
+            self.prix_mensuel = self.prix_hebdomadaire * 4
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.get_pack_display()} - {self.get_taille_sac_display()} - {self.prix_hebdomadaire} XOF"

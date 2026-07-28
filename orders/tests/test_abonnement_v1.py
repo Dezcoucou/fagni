@@ -1,6 +1,7 @@
 """
 Tests des endpoints Abonnement V1 - FAGNI (24 juillet 2026).
 """
+from decimal import Decimal
 from django.test import TestCase
 
 from orders.models import Customer, Abonnement, AbonnementPricingRule
@@ -71,7 +72,7 @@ class ApiAbonnementReserverTests(TestCase):
 
         self.assertTrue(Customer.objects.filter(phone="0700000100").exists())
         abonnement = Abonnement.objects.get(id=data["abonnement_id"])
-        self.assertEqual(abonnement.prix_verrouille, 14800)
+        self.assertEqual(abonnement.prix_verrouille, 59200)  # 14800 x 4 (facturation mensuelle)
 
     def test_reservation_rejouee_ne_cree_pas_de_doublon(self):
         self.client.post("/api/abonnement/reserver/", data=self._payload(), content_type="application/json")
@@ -90,7 +91,7 @@ class ApiAbonnementReserverTests(TestCase):
         regle.save()
 
         abonnement = Abonnement.objects.first()
-        self.assertEqual(abonnement.prix_verrouille, 14800)
+        self.assertEqual(abonnement.prix_verrouille, 59200)  # 14800 x 4 (facturation mensuelle)
 
 
 class ApiMonAbonnementV1Tests(TestCase):
@@ -110,3 +111,48 @@ class ApiMonAbonnementV1Tests(TestCase):
         data = response.json()["abonnement"]
         self.assertEqual(data["statut"], "Actif")
         self.assertEqual(data["prix"], 14800.0)
+
+
+class TailleXLEtFacturationMensuelleTests(TestCase):
+    def setUp(self):
+        AbonnementPricingRule.objects.create(
+            pack="confort", taille_sac="XL", prix_hebdomadaire=22000, is_active=True,
+        )
+
+    def test_prix_mensuel_calcule_automatiquement_si_non_configure(self):
+        """Secours : prix_mensuel derive de prix_hebdomadaire x4 si jamais configure explicitement."""
+        regle = AbonnementPricingRule.objects.get(pack="confort", taille_sac="XL")
+        self.assertEqual(regle.prix_mensuel, Decimal("88000.00"))
+
+    def test_prix_mensuel_explicite_jamais_ecrase(self):
+        regle = AbonnementPricingRule.objects.create(
+            pack="essentiel", taille_sac="S", prix_hebdomadaire=7400,
+            prix_mensuel=25000,  # remise commerciale explicite, pas juste x4 (29600)
+        )
+        self.assertEqual(regle.prix_mensuel, Decimal("25000.00"))
+
+    def test_estimation_taille_xl_reussie(self):
+        response = self.client.post(
+            "/api/abonnement/estimer/", data={"pack": "confort", "taille_sac": "XL"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["prix"], 22000.0)
+        self.assertEqual(data["prix_mensuel"], 88000.0)
+
+    def test_reservation_verrouille_le_prix_mensuel_pas_hebdomadaire(self):
+        response = self.client.post(
+            "/api/abonnement/reserver/",
+            data={
+                "telephone": "0700000900", "nom": "Test XL",
+                "pack": "confort", "taille_sac": "XL",
+                "jour_collecte": 0, "jour_livraison": 3,
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        abonnement = Abonnement.objects.get(customer__phone="0700000900")
+        self.assertEqual(abonnement.prix_verrouille, Decimal("88000.00"))
+        self.assertEqual(abonnement.taille_sac, "XL")

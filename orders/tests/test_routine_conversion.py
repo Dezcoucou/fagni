@@ -23,7 +23,7 @@ class ApiRoutineEssaiDetailTests(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["routine"], "duo")
-        self.assertEqual(data["prix"], 14800.0)
+        self.assertEqual(data["prix"], 59200.0)  # 14800 x 4 (facturation mensuelle)
         self.assertEqual(data["telephone"], "0700000700")
 
     def test_essai_satisfaction_pending_bloque(self):

@@ -1546,9 +1546,9 @@ from orders.models import Abonnement, AbonnementPricingRule
 
 @admin.register(AbonnementPricingRule)
 class AbonnementPricingRuleAdmin(admin.ModelAdmin):
-    list_display = ['pack', 'taille_sac', 'prix_hebdomadaire', 'is_active']
+    list_display = ['pack', 'taille_sac', 'prix_hebdomadaire', 'prix_mensuel', 'is_active']
     list_filter = ['pack', 'taille_sac', 'is_active']
-    list_editable = ['prix_hebdomadaire', 'is_active']
+    list_editable = ['prix_hebdomadaire', 'prix_mensuel', 'is_active']
 
 
 @admin.register(Abonnement)

@@ -1340,7 +1340,7 @@ def api_abonnement_reserver(request):
     Cree (ou reutilise) le Customer, cree l'Abonnement avec le prix
     verrouille au moment de la reservation (BOS 4.1).
     """
-    from orders.models import Abonnement, AbonnementPricingRule
+    from orders.models import Abonnement, AbonnementPricingRule, Order
 
     telephone = request.data.get('telephone', '').strip()
     nom = request.data.get('nom', '').strip()
@@ -1348,9 +1348,21 @@ def api_abonnement_reserver(request):
     taille_sac = request.data.get('taille_sac', '').strip()
     jour_collecte = request.data.get('jour_collecte')
     jour_livraison = request.data.get('jour_livraison')
+    essai_origine_id = request.data.get('essai_origine')  # optionnel (Lot 5) - conversion post-essai
 
     if not all([telephone, nom, pack, taille_sac]) or jour_collecte is None or jour_livraison is None:
         return Response({'error': 'Tous les champs sont requis'}, status=400)
+
+    essai_origine = None
+    if essai_origine_id:
+        try:
+            essai_origine = Order.objects.get(id=essai_origine_id, order_origin='routine_trial')
+        except Order.DoesNotExist:
+            return Response({'error': "Essai d'origine introuvable."}, status=404)
+
+        # Un essai ne peut produire qu'un seul abonnement actif (spec section 6)
+        if Abonnement.objects.filter(essai_origine=essai_origine, statut='actif').exists():
+            return Response({'error': 'Cet essai a deja ete converti en abonnement.'}, status=409)
 
     try:
         regle = AbonnementPricingRule.objects.get(pack=pack, taille_sac=taille_sac, is_active=True)
@@ -1368,6 +1380,7 @@ def api_abonnement_reserver(request):
             'jour_collecte': jour_collecte,
             'jour_livraison': jour_livraison,
             'prix_verrouille': regle.prix_hebdomadaire,
+            'essai_origine': essai_origine,
         },
     )
 
@@ -1383,6 +1396,13 @@ def api_abonnement_reserver(request):
             import logging
             logging.getLogger("fagni.orders.client_api").exception(
                 "Echec silencieux notif nouvel abonnement | abonnement_id=%s", abonnement.id
+            )
+
+        if essai_origine:
+            from orders.models import EvenementRoutine
+            EvenementRoutine.objects.create(
+                customer=customer, type_evenement='abonnement_active',
+                donnees={'abonnement_id': abonnement.id, 'essai_origine_id': essai_origine.id},
             )
 
     return Response({
@@ -1588,3 +1608,42 @@ def api_routine_essai(request):
         'prix': float(regle.prix_hebdomadaire),
         'status': order.status,
     }, status=201)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_routine_essai_detail(request, order_id):
+    """
+    GET /api/routine/essai/<id>/
+    Lecture publique des infos d'un essai, pour prerempllir l'ecran de
+    conversion post-essai (Lot 5) - jamais de donnee sensible au-dela
+    de ce que le client connait deja.
+    """
+    from orders.models import Order, AbonnementPricingRule
+
+    try:
+        order = Order.objects.get(id=order_id, order_origin='routine_trial')
+    except Order.DoesNotExist:
+        return Response({'error': 'Essai introuvable'}, status=404)
+
+    if order.satisfaction_reponse not in ('positive', 'resolved'):
+        return Response({'error': "Cette proposition n'est pas encore disponible."}, status=422)
+
+    routine = order.routine_choisie or order.routine_proposee
+    pack = 'confort'  # seul pack commercialise au lancement
+    taille_sac = order.bag_size
+
+    try:
+        regle = AbonnementPricingRule.objects.get(pack=pack, taille_sac=taille_sac, is_active=True)
+    except AbonnementPricingRule.DoesNotExist:
+        return Response({'error': "Cette offre n'est plus disponible."}, status=422)
+
+    return Response({
+        'order_id': order.id,
+        'routine': routine,
+        'pack': pack,
+        'taille_sac': taille_sac,
+        'prix': float(regle.prix_hebdomadaire),
+        'telephone': order.customer.phone if order.customer else '',
+        'nom': order.customer.name if order.customer else '',
+    })

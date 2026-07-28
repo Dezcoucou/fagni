@@ -296,7 +296,11 @@ class SubscriptionCycleInline(admin.TabularInline):
     created_at_display.short_description = "Créé le"
 
 
-@admin.register(Subscription)
+# Non enregistre dans l'admin (28 juillet 2026) - modele Subscription
+# jamais utilise en production (0 entree), remplace par Abonnement
+# (orders/models.py) construit le 24 juillet. Cause un doublon visuel
+# "Abonnements" x2 dans le menu admin. Classe et modele conserves
+# intacts, juste retires du menu.
 class SubscriptionAdmin(UnfoldModelAdmin):
     action_form = SubscriptionActionForm
 

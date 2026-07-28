@@ -103,17 +103,18 @@ class MlmFlowsTestCase(TestCase):
             )
 
         # ---------- Mouvement de wallet côté parrain ----------
-        self.tx = WalletTransaction.objects.create(
-            wallet=self.wallet_parrain,
-            type="mlm_commission",
-            amount=Decimal("50.00"),
+        # credit_wallet() est le seul point d'entree legitime depuis
+        # l'ajout du garde-fou anti-fraude sur Wallet.balance - cree la
+        # WalletTransaction ET met a jour le solde de facon coherente,
+        # remplace la manipulation directe balance + save() precedente.
+        from wallets.services import credit_wallet
+        self.tx = credit_wallet(
+            self.wallet_parrain,
+            Decimal("50.00"),
             description=f"Commission niveau 1 pour commande {self.order.id}",
             order=self.order,
+            tx_type="mlm_commission",
         )
-
-        # Mise à jour du solde courant du wallet
-        self.wallet_parrain.balance = Decimal("50.00")
-        self.wallet_parrain.save()
 
     # ---------------------------------------------------------
     #  TESTS MÉTIER
@@ -231,9 +232,15 @@ class ReferralFlowEngineTestCase(TestCase):
         return order
 
     def test_child_discount_is_applied_on_first_order(self):
+        """
+        Corrige : baseline doit etre l'Order lui-meme (total_client_ttc
+        avant remise, 13330 par _make_order), pas compute_order_pricing(order)
+        qui appelle en fait calculate_order(nb_articles) - un alias different,
+        jamais concu pour prendre un Order complet en argument (TypeError).
+        """
         order = self._make_order()
 
-        baseline = compute_order_pricing(order)
+        baseline = order
         pricing = _compute_order_pricing(order)
         client_amounts = _client_order_amounts(order)
 
@@ -277,7 +284,10 @@ class ReferralFlowEngineTestCase(TestCase):
         )
 
         self.assertEqual(txs.count(), 1)
-        self.assertEqual(txs.first().amount, Decimal("500.00"))
+        # Montant mis a jour a 1000 FCFA (Pilot Growth Plan, decision du
+        # 9 juillet 2026, orders/views.py handle_referral_reward) - le
+        # test attendait encore l'ancien montant de 500 FCFA.
+        self.assertEqual(txs.first().amount, Decimal("1000.00"))
 
     def test_sponsor_reward_is_idempotent(self):
         order = self._make_order(

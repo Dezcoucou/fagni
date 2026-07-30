@@ -1649,3 +1649,65 @@ def api_routine_essai_detail(request, order_id):
         'telephone': order.customer.phone if order.customer else '',
         'nom': order.customer.name if order.customer else '',
     })
+
+
+# ═══════════════════════════════════════════════════════════
+# ACCUEIL — endpoint reel (28 juillet 2026)
+# Premier ecran Accueil jamais construit en production - point
+# d'entree une fois le client authentifie (JWT 'cid').
+# ═══════════════════════════════════════════════════════════
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def api_client_accueil(request):
+    """
+    GET /api/client/accueil/
+    Auth requise (Bearer JWT client). Retourne le ViewModel exact
+    attendu par l'ecran Accueil - aucune donnee inventee cote
+    frontend, tout vient d'ici.
+    """
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        import jwt
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        customer = Customer.objects.get(id=payload['cid'])
+    except Exception:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    # Commande active = statut reellement non-terminal (STATUS_CHOICES
+    # reel de Order : pending, in_progress, done, canceled)
+    commande = Order.objects.filter(
+        customer=customer, status__in=['pending', 'in_progress'],
+    ).order_by('-created_at').first()
+
+    commande_active = None
+    if commande:
+        libelles = {'pending': 'En attente de prise en charge', 'in_progress': 'En cours de traitement'}
+        etapes = {'pending': 1, 'in_progress': 2}
+        routine_label = None
+        if commande.routine_choisie:
+            routine_label = commande.get_routine_choisie_display()
+        elif commande.routine_proposee:
+            routine_label = commande.get_routine_proposee_display()
+
+        commande_active = {
+            'id': commande.id,
+            'service': routine_label or 'Pressing',
+            'libelleStatut': libelles.get(commande.status, commande.status),
+            'etape': etapes.get(commande.status, 1),
+            'etapesTotal': 3,
+        }
+
+    # Un seul service reel aujourd'hui - pas d'invention d'autres
+    # services, juste la structure prete a en recevoir demain.
+    services = [
+        {'id': 'pressing', 'nom': 'Pressing', 'disponible': True},
+    ]
+
+    return Response({
+        'status': 'ready',
+        'utilisateur': {'prenom': (customer.name or '').split(' ')[0] or 'Client'},
+        'commandeActive': commande_active,
+        'services': services,
+        'fidelite': None,  # pas encore de systeme de points reel - jamais invente
+    })

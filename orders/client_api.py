@@ -1440,6 +1440,8 @@ def api_mon_abonnement_v1(request):
             'statut': abonnement.get_statut_display(),
             'prix': float(abonnement.prix_verrouille),
             'cree_le': abonnement.created_at.strftime('%d/%m/%Y'),
+            'jour_collecte': abonnement.get_jour_collecte_display(),
+            'jour_livraison': abonnement.get_jour_livraison_display(),
         }
     })
 

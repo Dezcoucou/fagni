@@ -14899,12 +14899,22 @@ def wave_webhook(request):
     if payment_status != "succeeded" or checkout_status != "complete":
         return JsonResponse({"ok": True, "ignored": True})
 
+    # Sprint P0, Wave 2 (BP1) — rattachement par le champ dédié en priorité ;
+    # repli rétrocompatible sur payment_declared_reference pour les sessions
+    # créées avant l'ajout de ce champ (client_order_pay_wave_page).
     order = (
         Order.objects
         .select_related("customer")
-        .filter(payment_declared_reference=checkout_id)
+        .filter(wave_checkout_id=checkout_id)
         .first()
     )
+    if not order:
+        order = (
+            Order.objects
+            .select_related("customer")
+            .filter(payment_declared_reference=checkout_id)
+            .first()
+        )
     if not order:
         return JsonResponse({"ok": False, "error": "order_not_found"}, status=404)
 

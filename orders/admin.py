@@ -20,6 +20,7 @@ from .models import (
     OrderItem,
     Payment,
     OrderItemPhoto,
+    PilotWhitelist,
     ServiceCategory,
     ServiceItem,
     Subscription,
@@ -251,6 +252,29 @@ class CustomerAdmin(UnfoldModelAdmin):
         agg = obj.orders.aggregate(total=Sum("total"))
         return f"{agg['total'] or 0:,.0f} FCFA"
     montant_total.short_description = "Montant total"
+
+
+@admin.register(PilotWhitelist)
+class PilotWhitelistAdmin(UnfoldModelAdmin):
+    """Sprint P0, Wave 1 (BP2). Revocation = decocher "Actif", jamais de suppression :
+    conserve la trace de qui a ete autorise pendant le pilote."""
+    list_display  = ("phone_normalized", "active", "note", "created_at", "updated_at")
+    list_filter   = ("active",)
+    search_fields = ("phone_normalized", "note")
+    list_editable = ("active",)
+    fields        = ("phone_normalized", "active", "note")
+    save_on_top   = True
+    actions       = ["revoquer", "reactiver"]
+
+    def revoquer(self, request, queryset):
+        updated = queryset.update(active=False)
+        self.message_user(request, f"{updated} numéro(s) révoqué(s).", messages.SUCCESS)
+    revoquer.short_description = "Révoquer (désactiver sans supprimer)"
+
+    def reactiver(self, request, queryset):
+        updated = queryset.update(active=True)
+        self.message_user(request, f"{updated} numéro(s) réactivé(s).", messages.SUCCESS)
+    reactiver.short_description = "Réactiver"
 
 
 # ============================================================

@@ -351,7 +351,9 @@ def _get_or_create_wave_checkout(order, amount_xof, request):
 def api_order_detail(request, order_id):
     """GET /api/client/orders/<id>/"""
     customer = request.user
-    order = Order.objects.filter(id=order_id, customer=customer).annotate(
+    order = Order.objects.filter(id=order_id, customer=customer).select_related(
+        'pickup_driver', 'laundry_partner'
+    ).annotate(
         items_total=_items_sum_annotation()
     ).first()
 
@@ -412,6 +414,27 @@ def api_order_detail(request, order_id):
     except:
         already_rated = False
 
+    def _initials(name):
+        parts = (name or '').split()
+        return ''.join(p[0].upper() for p in parts[:2]) or '?'
+
+    # Sprint P0, Wave "pilote propre" — l'app expose deja un bloc "Votre equipe
+    # FAGNI" (OrderTeamSection) qui degrade silencieusement si ces champs sont
+    # absents, mais l'endpoint ne les fournissait jamais : la section ne
+    # s'affichait donc pour aucune commande, meme apres affectation (manuelle
+    # ou BC1). Jamais de donnee inventee : null tant qu'aucun partenaire/
+    # livreur n'est reellement assigne.
+    pickup_driver_info = None
+    if getattr(order, 'pickup_driver_id', None):
+        pickup_driver_info = {
+            'initials': _initials(order.pickup_driver.name),
+            'vehicle':  order.pickup_driver.vehicle_type or None,
+        }
+
+    pressing_info = None
+    if getattr(order, 'laundry_partner_id', None):
+        pressing_info = {'initials': _initials(order.laundry_partner.name)}
+
     return Response({
         'id':             order.id,
         'code':           order.code or str(order.id),
@@ -429,6 +452,8 @@ def api_order_detail(request, order_id):
         'already_rated':  already_rated,
         'created_at':     order.created_at.isoformat() if order.created_at else None,
         'items':          items,
+        'pickup_driver':  pickup_driver_info,
+        'pressing_info':  pressing_info,
     })
 
 

@@ -7,7 +7,13 @@ from pathlib import Path
 from decimal import Decimal
 
 import sys
-TESTING = "test" in sys.argv
+# "test" in sys.argv detecte `manage.py test`, mais pas `pytest` (sys.argv
+# vaut alors ['pytest', ...] ou ['-q', ...] selon l'invocation) - la CI de ce
+# depot lance `pytest -q`, ce qui laissait TESTING=False et donc
+# SECURE_SSL_REDIRECT actif (voir plus bas), redirigeant en 301 chaque
+# requete du client de test Django et faisant echouer toute la suite sous
+# pytest independamment du contenu des tests eux-memes.
+TESTING = "test" in sys.argv or "pytest" in sys.modules
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 

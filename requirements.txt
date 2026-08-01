@@ -60,6 +60,7 @@ PyJWT==2.12.1
 PyMatting==1.1.15
 pyphen==0.17.2
 python-decouple==3.8
+python-dotenv==1.2.2
 pytokens==0.4.1
 qrcode==8.2
 referencing==0.37.0

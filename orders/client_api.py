@@ -462,6 +462,129 @@ def is_in_delivery_zone(lat, lng, address=""):
             import logging
             logging.getLogger("fagni.orders.client_api").exception("Exception silencieuse (auto-log) - fichier=orders/client_api.py ligne=304")
     return False
+
+
+def _bc1_auto_assign_pickup_and_laundry(order):
+    """
+    Sprint P0, Wave 3 (BC1) — auto-affectation additive a la creation d'une
+    commande fagni-client, derriere settings.AUTO_ASSIGN_ON_CLIENT_ORDER
+    (defaut False = jamais appelee).
+
+    Affecte uniquement :
+    - laundry_partner (pressing) ;
+    - pickup_driver (livreur de collecte).
+    Ne touche JAMAIS delivery_partner (livreur retour) : ce role reste
+    gere apres le statut pressing "pret" par le flux OPS existant
+    (ops_assign_return_driver) - regle metier confirmee par l'audit
+    prealable (Wave 3, section "Analyse des effets").
+
+    Reutilise integralement orders.assignment (pick_best_laundry/
+    pick_best_driver) et orders.services.recompute_order_pricing_for_laundry_partner
+    (meme fonction que ops_assign_partner) - aucun nouveau moteur, aucune
+    nouvelle formule. Reproduit aussi, a l'identique, les quelques lignes
+    deja utilisees par ops_assign_driver pour rendre la collecte visible/
+    payable au livreur (creation/mise a jour de la DeliveryLeg pickup +
+    driver_amount + order.cost_driver_pickup) : sans cela, l'affectation
+    ne serait pas exploitable par l'app livreur (driver_missions/
+    driver_pending_mission filtrent sur DeliveryLeg.driver, jamais sur
+    Order.pickup_driver_id directement).
+
+    Ne leve jamais d'exception : chaque etape (pressing, livreur) est
+    isolee dans son propre try/except, pour qu'un echec sur l'un ne
+    bloque jamais l'autre ni la creation de la commande.
+    """
+    from orders.assignment import pick_best_laundry, pick_best_driver
+    from orders.services import recompute_order_pricing_for_laundry_partner
+    from orders.models import DeliveryLeg
+    from orders.ops_api import _send_notif_pressing, _send_notif_mission
+
+    result = {"laundry_assigned": False, "driver_assigned": False, "pricing_recomputed": False}
+
+    # Garde-fou (defense en profondeur, meme si l'appel actuel est toujours
+    # synchrone juste apres la creation donc order.status vaut deja "pending") :
+    # une commande annulee ne doit jamais recevoir d'affectation.
+    if getattr(order, "status", None) == "canceled":
+        return result
+
+    try:
+        laundry, _reason = pick_best_laundry(order)
+        if laundry:
+            order.laundry_partner = laundry
+            update_fields = ["laundry_partner"]
+
+            recomputed = False
+            try:
+                recomputed = recompute_order_pricing_for_laundry_partner(order, laundry)
+            except Exception:
+                recomputed = False
+
+            if recomputed:
+                update_fields += [
+                    "delivery_fee", "distance_km_pickup", "distance_km_delivery",
+                    "distance_km_total", "distance_km",
+                    "total_client_ttc", "total", "service_fee",
+                    "amount_laundry_partner", "fagni_revenue_ht", "margin_net",
+                ]
+
+            order.save(update_fields=update_fields)
+            result["laundry_assigned"] = True
+            result["pricing_recomputed"] = recomputed
+    except Exception:
+        import logging
+        logging.getLogger("fagni.orders.client_api").exception(
+            "BC1 auto-affectation pressing en echec | order_id=%s", getattr(order, "id", None)
+        )
+
+    try:
+        driver, _reason = pick_best_driver(order)
+        if driver:
+            from orders.config_models import GlobalPricingSettings
+            from decimal import Decimal as _D
+
+            driver_amount = _D(str(GlobalPricingSettings.get_solo().driver_amount_per_leg))
+
+            order.pickup_driver = driver
+            order.cost_driver_pickup = int(driver_amount)
+            order.save(update_fields=["pickup_driver", "cost_driver_pickup"])
+
+            leg, created = DeliveryLeg.objects.get_or_create(
+                order=order,
+                leg_type="pickup",
+                defaults={"driver": driver, "status": "pending", "driver_amount": driver_amount},
+            )
+            if not created:
+                leg.driver = driver
+            if leg.status == "pending":
+                leg.status = "assigned"
+            leg.driver_amount = driver_amount
+            leg.save(update_fields=["driver", "status", "driver_amount"])
+
+            result["driver_assigned"] = True
+    except Exception:
+        import logging
+        logging.getLogger("fagni.orders.client_api").exception(
+            "BC1 auto-affectation livreur collecte en echec | order_id=%s", getattr(order, "id", None)
+        )
+
+    # Notifications : _send_notif_pressing/_send_notif_mission neutralisent
+    # deja leurs propres exceptions en interne (voir orders/ops_api.py), mais
+    # on garde un filet ici aussi - l'affectation ci-dessus est deja
+    # sauvegardee, une panne de notification ne doit jamais faire remonter
+    # d'exception hors de cette fonction.
+    try:
+        if result["laundry_assigned"]:
+            _send_notif_pressing(order)
+        if result["driver_assigned"]:
+            _send_notif_mission(order, order.pickup_driver)
+    except Exception:
+        import logging
+        logging.getLogger("fagni.orders.client_api").exception(
+            "BC1 notification en echec | order_id=%s", getattr(order, "id", None)
+        )
+
+    return result
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @authentication_classes([])
@@ -646,6 +769,35 @@ def api_create_order(request):
                 OrderItem.objects.create(order=order,designation='Articles pressing',quantity=nb_articles,unit_price=int(_pa),total=nb_articles*int(_pa))
         except Exception: pass
 
+        # Sprint P0, Wave 3 (BC1) — auto-affectation additive, desactivee par
+        # defaut. Placee ici (apres les OrderItem, pas juste apres le create())
+        # car le recalcul pricing partage avec ops_assign_partner a besoin des
+        # quantites d'articles deja en base. Si le pricing a ete recalcule,
+        # les variables locales total/service_fee/bag_price sont mises a jour
+        # AVANT la suite (event logging, notifications OPS, reponse) pour que
+        # tout ce qui suit reflete deja le prix reellement sauvegarde.
+        bc1_assignment = {"laundry_assigned": False, "driver_assigned": False, "pricing_recomputed": False}
+        if getattr(settings, "AUTO_ASSIGN_ON_CLIENT_ORDER", False):
+            try:
+                bc1_assignment = _bc1_auto_assign_pickup_and_laundry(order)
+            except Exception:
+                import logging
+                logging.getLogger("fagni.orders.client_api").exception(
+                    "BC1 auto-affectation en echec | order_id=%s", order.id
+                )
+
+            if bc1_assignment.get("pricing_recomputed"):
+                try:
+                    order.refresh_from_db()
+                    total = float(order.total_client_ttc or order.total or total)
+                    service_fee = float(order.service_fee or service_fee)
+                    bag_price = total
+                except Exception:
+                    import logging
+                    logging.getLogger("fagni.orders.client_api").exception(
+                        "BC1: lecture des valeurs sauvegardees en echec | order_id=%s", order.id
+                    )
+
         # Event logging LOT1
         try:
             from orders.models import log_event
@@ -672,6 +824,19 @@ def api_create_order(request):
             _ops_raw = (GlobalPricingSettings.get_solo().whatsapp_ops_number or "0142299949").lstrip("0")
             ops_num = "225" + _ops_raw if not _ops_raw.startswith("225") else _ops_raw
             msg = f"🆕 Nouvelle commande FAGNI\n\nCode : {order.code}\nClient : {customer.name}\nSac : {bag_size}\nTotal : {total:,} FCFA\nAdresse : {pickup_addr}\n\nConnecte-toi sur fagni-ops.vercel.app"
+
+            # Sprint P0, Wave 3 (BC1) — flag desactive : message strictement
+            # inchange. Flag active : etat anonymise ajoute au message OPS
+            # existant (aucun nouveau canal) uniquement si l'auto-affectation
+            # n'a pas pleinement reussi.
+            if getattr(settings, "AUTO_ASSIGN_ON_CLIENT_ORDER", False):
+                if not bc1_assignment.get("laundry_assigned"):
+                    msg += "\n\n⚠️ Pressing : non affecté"
+                elif not bc1_assignment.get("pricing_recomputed"):
+                    msg += "\n\n⚠️ Pressing : affecté, prix non recalculé (à vérifier)"
+                if not bc1_assignment.get("driver_assigned"):
+                    msg += "\n⚠️ Collecte : livreur non affecté"
+
             wa_url = f"https://wa.me/{ops_num}?text={urllib.parse.quote(msg)}"
             order.notes = (order.notes or '') + f'\nWA_OPS:{wa_url}'
             order.save(update_fields=['notes'])

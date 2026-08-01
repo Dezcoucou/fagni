@@ -385,7 +385,9 @@ def api_order_detail(request, order_id):
     # Sprint P0, Wave 2 (BP1) — si activé, remplace le lien marchand statique
     # par une vraie session Checkout Wave (rattachable par le webhook). Toute
     # indisponibilité (flag off, échec, timeout) laisse wave_link inchangé.
-    if remaining > 0:
+    # Jamais de session pour une commande annulée, même si elle n'a jamais
+    # été payée (remaining > 0) : rien à encaisser sur une commande annulée.
+    if remaining > 0 and order.status != "canceled":
         checkout_url, _checkout_id = _get_or_create_wave_checkout(order, int(remaining), request)
         if checkout_url:
             wave_link = checkout_url

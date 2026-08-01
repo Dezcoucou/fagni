@@ -184,6 +184,99 @@ class WaveCheckoutFlagEnabledTests(TestCase):
         order.refresh_from_db()
         self.assertEqual(order.wave_checkout_id, "cs_new")
 
+    def test_commande_annulee_jamais_de_session(self):
+        """
+        Validation CTO (finalisation Wave 2) : une commande annulee ne doit
+        jamais declencher de session Checkout, meme si elle n'a jamais ete
+        payee (remaining > 0 - rien a encaisser sur une commande annulee).
+        """
+        order = _make_order(total="5000", status="canceled")
+        fake = _fake_session_creation()
+
+        with patch("urllib.request.urlopen", side_effect=fake):
+            resp = self.client.get(
+                reverse("api-client-order-detail", args=[order.id]),
+                **_client_headers(order.customer),
+            )
+
+        self.assertEqual(resp.status_code, 200)
+        fake.calls  # noqa: B018 (acces explicite pour lisibilite)
+        self.assertEqual(fake.calls["n"], 0)
+        order.refresh_from_db()
+        self.assertEqual(order.wave_checkout_id, "")
+
+    def test_commande_deja_entierement_payee_jamais_de_session(self):
+        from orders.views import apply_order_payment
+
+        order = _make_order(total="5000")
+        apply_order_payment(order, Decimal("5000"), channel="manual")
+        order.refresh_from_db()
+        fake = _fake_session_creation()
+
+        with patch("urllib.request.urlopen", side_effect=fake):
+            resp = self.client.get(
+                reverse("api-client-order-detail", args=[order.id]),
+                **_client_headers(order.customer),
+            )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(fake.calls["n"], 0)
+        order.refresh_from_db()
+        self.assertEqual(order.wave_checkout_id, "")
+
+    def test_commande_dun_autre_client_introuvable_jamais_de_session(self):
+        order = _make_order(total="5000", phone="0700001112")
+        autre_client, _ = Customer.objects.get_or_create(
+            phone="0700001113", defaults={"name": "Autre Client", "address": "X"},
+        )
+        fake = _fake_session_creation()
+
+        with patch("urllib.request.urlopen", side_effect=fake):
+            resp = self.client.get(
+                reverse("api-client-order-detail", args=[order.id]),
+                **_client_headers(autre_client),
+            )
+
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(fake.calls["n"], 0)
+        order.refresh_from_db()
+        self.assertEqual(order.wave_checkout_id, "")
+
+    def test_montant_toujours_calcule_cote_backend_jamais_fourni_par_le_frontend(self):
+        """Le montant Wave vient de order.total_client_ttc/amount_paid en DB,
+        jamais d'un parametre de requete - aucune tentative du frontend de le
+        modifier ne doit avoir d'effet."""
+        order = _make_order(total="5000")
+        captured = {}
+
+        def fake(req, timeout=8):
+            body = json.loads(req.data.decode("utf-8"))
+            captured["amount"] = body["amount"]
+            return _FakeWaveResponse({"id": "cs_amt", "wave_launch_url": "https://checkout.wave.com/cs_amt"})
+
+        with patch("urllib.request.urlopen", side_effect=fake):
+            self.client.get(
+                reverse("api-client-order-detail", args=[order.id]) + "?amount=1",
+                **_client_headers(order.customer),
+            )
+
+        self.assertEqual(captured["amount"], "5000")
+
+    def test_url_wave_retournee_telle_quelle_jamais_reconstruite(self):
+        """L'URL renvoyee au client est exactement celle de la reponse Wave
+        (wave_launch_url), jamais reformatee/reconstruite localement."""
+        order = _make_order(total="5000")
+        odd_url = "https://checkout.wave.com/c/cos-xyz123?foo=bar&baz=qux"
+        fake = _fake_session_creation({"id": "cs_odd", "wave_launch_url": odd_url})
+
+        with patch("urllib.request.urlopen", side_effect=fake):
+            resp = self.client.get(
+                reverse("api-client-order-detail", args=[order.id]),
+                **_client_headers(order.customer),
+            )
+
+        self.assertEqual(resp.json()["wave_link"], odd_url)
+
     def test_reference_declaree_manuellement_jamais_ecrasee(self):
         """
         payment_declared_reference melange deja 3 usages (declaration client,

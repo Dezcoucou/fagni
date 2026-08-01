@@ -164,12 +164,15 @@ if DATABASE_URL:
         )
     }
 
-    # Active MySQL Strict Mode (empeche les troncatures/valeurs invalides silencieuses)
-    # + force utf8mb4 (emojis, caracteres 4 octets) suite a la migration du 6 juillet 2026
-    # Ignore si override local SQLite (pas de sql_mode MySQL applicable).
-    if not is_sqlite_url:
+    # Active MySQL Strict Mode uniquement pour MySQL.
+    # Ces options ne sont pas valides avec PostgreSQL/Psycopg.
+    engine = DATABASES["default"].get("ENGINE", "")
+
+    if engine.endswith("mysql"):
         DATABASES["default"].setdefault("OPTIONS", {})
-        DATABASES["default"]["OPTIONS"]["init_command"] = "SET sql_mode='STRICT_TRANS_TABLES', NAMES 'utf8mb4'"
+        DATABASES["default"]["OPTIONS"]["init_command"] = (
+            "SET sql_mode='STRICT_TRANS_TABLES', NAMES 'utf8mb4'"
+        )
         DATABASES["default"]["OPTIONS"]["charset"] = "utf8mb4"
 else:
     # Local (SQLite)

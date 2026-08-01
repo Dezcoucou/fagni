@@ -13,7 +13,14 @@ from rest_framework.response import Response
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 
-from .models import Order, Customer
+from .models import Order, Customer, PilotWhitelist
+
+# Sprint P0, Wave 1 (BP2). Message exact valide par le CTO - ne pas
+# reformuler, le frontend l'affiche tel quel (voir Login.jsx).
+PILOT_WHITELIST_MESSAGE = (
+    "Le pilote FAGNI est actuellement accessible uniquement sur invitation. "
+    "Contactez notre équipe si vous souhaitez participer."
+)
 
 
 # ── JWT CUSTOM CLIENT ─────────────────────────────────────
@@ -90,6 +97,8 @@ def api_login(request):
     phone = (request.data.get('phone') or '').strip()
     if not phone:
         return Response({'error': 'Numéro requis'}, status=400)
+    if settings.PILOT_WHITELIST_ENFORCED and not PilotWhitelist.is_authorized(phone):
+        return Response({'error': PILOT_WHITELIST_MESSAGE}, status=403)
     customer = Customer.objects.filter(phone=phone).first()
     if not customer:
         return Response({'error': 'Numéro non reconnu'}, status=404)
@@ -112,6 +121,8 @@ def api_register(request):
         return Response({'error': 'Numéro requis'}, status=400)
     if not name:
         return Response({'error': 'Nom requis'}, status=400)
+    if settings.PILOT_WHITELIST_ENFORCED and not PilotWhitelist.is_authorized(phone):
+        return Response({'error': PILOT_WHITELIST_MESSAGE}, status=403)
 
     # Vérifier si client existe déjà
     existing = Customer.objects.filter(phone=phone).first()

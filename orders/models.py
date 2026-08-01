@@ -16,6 +16,7 @@ from .domain_canonical import (
     map_order_status_to_canonical,
 )
 from orders.utils.address_rules import clean_address_or_empty
+from .phone_utils import normalize_phone
 
 from .services import recompute_order_distance_from_legs
 
@@ -701,6 +702,60 @@ class Customer(models.Model):
             return False
         completed = self.orders.filter(status="done").count()
         return completed >= 3
+
+
+class PilotWhitelist(models.Model):
+    """
+    Liste blanche des numeros autorises a s'inscrire/se connecter pendant
+    le pilote Riviera 3 (Sprint P0, Wave 1 - BP2). Remplace temporairement
+    la verification OTP - explicitement hors perimetre du pilote - par un
+    controle metier : seul un numero present ici, et actif, peut creer un
+    compte ou se connecter (voir api_login/api_register dans
+    client_api.py).
+
+    Le gate n'est effectif que si settings.PILOT_WHITELIST_ENFORCED vaut
+    True (voir fagni/settings.py). Ce flag reste a False tant que la liste
+    n'a pas ete verifiee et peuplee avec de vrais participants - voir les
+    management commands audit_pilot_whitelist_candidates (rapport en
+    lecture seule sur les Customer existants) et populate_pilot_whitelist
+    (peuplement explicite, jamais automatique).
+
+    Plan de sortie : quand un vrai OTP sera disponible, il suffit de
+    repasser PILOT_WHITELIST_ENFORCED a False - cette table peut rester en
+    base sans aucun effet, aucune migration de retrait necessaire.
+    """
+    # unique=True cree deja un index unique en base : cela couvre a la fois
+    # la contrainte d'unicite et l'index demandes, sans champ redondant.
+    phone_normalized = models.CharField(
+        max_length=20, unique=True, verbose_name="Numéro (normalisé)",
+    )
+    active = models.BooleanField(default=True, verbose_name="Actif")
+    note = models.CharField(max_length=255, blank=True, verbose_name="Note interne")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Créé le")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Modifié le")
+
+    class Meta:
+        verbose_name = "Numéro autorisé (pilote)"
+        verbose_name_plural = "Liste blanche du pilote"
+        ordering = ["-created_at"]
+
+    def save(self, *args, **kwargs):
+        # Normalisation centralisee : quelle que soit la forme saisie
+        # (admin, shell, management command), la valeur stockee est
+        # toujours le format canonique.
+        self.phone_normalized = normalize_phone(self.phone_normalized)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.phone_normalized}{'' if self.active else ' (révoqué)'}"
+
+    @classmethod
+    def is_authorized(cls, raw_phone):
+        """True si ce numero, sous n'importe quelle forme, est present et actif dans la liste blanche."""
+        normalized = normalize_phone(raw_phone)
+        if not normalized:
+            return False
+        return cls.objects.filter(phone_normalized=normalized, active=True).exists()
 
 
 class LogisticsConfig(models.Model):

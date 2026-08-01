@@ -7,7 +7,13 @@ from pathlib import Path
 from decimal import Decimal
 
 import sys
-TESTING = "test" in sys.argv
+# "test" in sys.argv detecte `manage.py test`, mais pas `pytest` (sys.argv
+# vaut alors ['pytest', ...] ou ['-q', ...] selon l'invocation) - la CI de ce
+# depot lance `pytest -q`, ce qui laissait TESTING=False et donc
+# SECURE_SSL_REDIRECT actif (voir plus bas), redirigeant en 301 chaque
+# requete du client de test Django et faisant echouer toute la suite sous
+# pytest independamment du contenu des tests eux-memes.
+TESTING = "test" in sys.argv or "pytest" in sys.modules
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -325,6 +331,13 @@ FAGNI_LOGISTICS = {
 # ========================
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 GOOGLE_DISTANCE_MATRIX_API_KEY = os.getenv("GOOGLE_DISTANCE_MATRIX_API_KEY", "")
+
+# Sprint P0, Wave 1 (BP2) : reserve l'inscription/connexion du pilote aux
+# numeros presents dans PilotWhitelist (orders/models.py). Reste a False
+# tant que la liste n'a pas ete verifiee et peuplee - voir les management
+# commands audit_pilot_whitelist_candidates et populate_pilot_whitelist.
+# Plan de sortie (OTP reel) : repasser a False, aucun autre changement requis.
+PILOT_WHITELIST_ENFORCED = (os.getenv("PILOT_WHITELIST_ENFORCED", "false") or "").strip().lower() in ("1", "true", "yes", "on")
 
 TWILIO_ACCOUNT_SID = (os.getenv("TWILIO_ACCOUNT_SID", "") or "").strip()
 TWILIO_AUTH_TOKEN = (os.getenv("TWILIO_AUTH_TOKEN", "") or "").strip()

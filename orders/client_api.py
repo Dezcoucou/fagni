@@ -4,6 +4,7 @@ from decimal import Decimal
 from datetime import datetime, timedelta
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Sum, F, Value, DecimalField, Q
 from django.db.models.functions import Coalesce, Cast
 
@@ -229,6 +230,121 @@ def api_orders(request):
     })
 
 
+# Sprint P0, Wave 2 (BP1) — fenêtre de réutilisation d'une session Checkout
+# Wave déjà créée pour une commande, avant d'en générer une nouvelle. L'API
+# de création de session Wave consommée ici ne renvoie pas de champ
+# d'expiration : cette fenêtre est une politique de renouvellement interne
+# volontairement courte, pas une garantie de validité côté Wave. Passé ce
+# délai, une nouvelle session est créée et remplace la précédente.
+WAVE_CHECKOUT_SESSION_TTL_SECONDS = 25 * 60
+
+
+def _get_or_create_wave_checkout(order, amount_xof, request):
+    """
+    Sprint P0, Wave 2 (BP1). Retourne (checkout_url, checkout_id) pour la
+    commande, ou (None, None) si WAVE_CHECKOUT_ENABLED est désactivé, si le
+    montant est nul, ou si l'appel à l'API Wave échoue/timeout — dans tous
+    ces cas l'appelant doit retomber sur le lien marchand statique existant,
+    jamais bloquer le client.
+
+    Ne réutilise/écrit jamais `payment_declared_reference` (déjà utilisé pour
+    3 usages distincts : référence tapée par le client, référence libre
+    saisie par OPS via ops_mark_paid, ancien id de session Checkout de
+    client_order_pay_wave_page) : l'id de session est stocké dans le champ
+    dédié `wave_checkout_id`/`wave_checkout_url` ajouté pour cette Wave.
+
+    Concurrence : la lecture + création est faite sous select_for_update sur
+    la commande, pour qu'un deuxième appel simultané (ou un deuxième GET
+    successif) voie la session fraîchement créée par le premier plutôt que
+    d'en créer une seconde.
+    """
+    api_enabled = bool(getattr(settings, "WAVE_CHECKOUT_ENABLED", False))
+    api_key = (getattr(settings, "WAVE_CHECKOUT_API_KEY", "") or "").strip()
+
+    if not api_enabled or not api_key or amount_xof <= 0:
+        return None, None
+
+    import json
+    import time
+    import hmac
+    import hashlib
+    import urllib.request
+    import urllib.error
+    from django.utils import timezone
+
+    # Toute la section ci-dessous (verrouillage, appel réseau Wave, écriture
+    # DB) est volontairement dans un seul try/except large : une panne à
+    # n'importe quelle étape (Wave indisponible, DB verrouillée sous forte
+    # concurrence, etc.) doit produire (None, None) et jamais remonter une
+    # exception jusqu'à api_order_detail - le client ne doit jamais recevoir
+    # une 500 à cause d'un problème de session Checkout.
+    try:
+        with transaction.atomic():
+            locked_order = Order.objects.select_for_update().get(pk=order.pk)
+
+            existing_id = (locked_order.wave_checkout_id or "").strip()
+            existing_url = (locked_order.wave_checkout_url or "").strip()
+            created_at = locked_order.wave_checkout_created_at
+
+            if existing_id and existing_url and created_at:
+                age_seconds = (timezone.now() - created_at).total_seconds()
+                if age_seconds < WAVE_CHECKOUT_SESSION_TTL_SECONDS:
+                    return existing_url, existing_id
+
+            base = (getattr(settings, "SITE_BASE_URL", "") or "").rstrip("/")
+            if not base:
+                base = request.build_absolute_uri("/").rstrip("/")
+
+            payload = {
+                "amount": str(int(amount_xof)),
+                "currency": "XOF",
+                "success_url": base + f"/api/client/orders/{order.id}/?wave=success",
+                "error_url": base + f"/api/client/orders/{order.id}/?wave=error",
+                "client_reference": f"order-{order.id}-{getattr(order, 'code', order.id)}",
+            }
+            body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+
+            signing_secret = (getattr(settings, "WAVE_CHECKOUT_SIGNING_SECRET", "") or "").strip()
+            if signing_secret:
+                timestamp = str(int(time.time()))
+                signature = hmac.new(
+                    signing_secret.encode("utf-8"),
+                    timestamp.encode("utf-8") + body,
+                    hashlib.sha256,
+                ).hexdigest()
+                headers["Wave-Signature"] = f"t={timestamp},v1={signature}"
+
+            req = urllib.request.Request(
+                "https://api.wave.com/v1/checkout/sessions",
+                data=body,
+                headers=headers,
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+
+            checkout_url = (data.get("wave_launch_url") or "").strip()
+            checkout_id = (data.get("id") or "").strip()
+
+            if not checkout_url or not checkout_id:
+                return None, None
+
+            locked_order.wave_checkout_id = checkout_id
+            locked_order.wave_checkout_url = checkout_url
+            locked_order.wave_checkout_created_at = timezone.now()
+            locked_order.save(update_fields=[
+                "wave_checkout_id", "wave_checkout_url", "wave_checkout_created_at",
+            ])
+
+            return checkout_url, checkout_id
+    except Exception:
+        return None, None
+
+
 @api_view(['GET'])
 @authentication_classes([ClientAuth])
 @permission_classes([])
@@ -265,6 +381,14 @@ def api_order_detail(request, order_id):
     # Lien Wave CI — format standard pour paiement marchand
     wave_number = "0748643892"
     wave_link = f"https://pay.wave.com/m/M_ci_8SO-R9nJg71k/c/ci/?amount={int(remaining)}" if remaining > 0 else None
+
+    # Sprint P0, Wave 2 (BP1) — si activé, remplace le lien marchand statique
+    # par une vraie session Checkout Wave (rattachable par le webhook). Toute
+    # indisponibilité (flag off, échec, timeout) laisse wave_link inchangé.
+    if remaining > 0:
+        checkout_url, _checkout_id = _get_or_create_wave_checkout(order, int(remaining), request)
+        if checkout_url:
+            wave_link = checkout_url
 
     # Statut livraison détaillé
     status_map = {

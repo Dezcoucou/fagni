@@ -1325,6 +1325,34 @@ class Order(models.Model):
         verbose_name="Référence déclarée"
     )
 
+    # Sprint P0, Wave 2 (BP1) — identifiant dédié de session Checkout Wave.
+    # `payment_declared_reference` mélange déjà 3 usages distincts (référence
+    # tapée par le client, référence libre saisie par OPS via ops_mark_paid,
+    # et l'ancien id de session Checkout de client_order_pay_wave_page) : on
+    # n'y ajoute pas un 4e usage pour ne jamais risquer d'écraser une
+    # déclaration client ou une référence OPS existante. wave_webhook lit ce
+    # champ en priorité, avec repli rétrocompatible sur l'ancien champ.
+    wave_checkout_id = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        db_index=True,
+        verbose_name="ID session Checkout Wave",
+    )
+
+    wave_checkout_url = models.URLField(
+        max_length=500,
+        blank=True,
+        default="",
+        verbose_name="URL session Checkout Wave",
+    )
+
+    wave_checkout_created_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Session Checkout Wave créée le",
+    )
+
     payment_proof = models.FileField(
         "Preuve de paiement",
         upload_to="payment_proofs/",

@@ -331,43 +331,12 @@ def ops_assign_partner(request, order_id):
         partner = LaundryPartner.objects.get(id=partner_id) if partner_id else None
         order.laundry_partner_id = partner.id if partner else None
 
-        # Recalcul delivery_fee au km réel après assignation pressing
-        if partner and getattr(partner, 'latitude', None) and getattr(partner, 'longitude', None):
-            from orders.utils.distances import osrm_distance_km
-            from orders.config_models import GlobalPricingSettings
-            from decimal import Decimal as _D
-            _cfg = GlobalPricingSettings.get_solo()
-            _price_km = _D(str(_cfg.delivery_price_per_km or 150))
-            _min_fee = _D(str(_cfg.delivery_min_fee or 2000))
-            client_lat = order.pickup_lat or order.delivery_lat
-            client_lng = order.pickup_lng or order.delivery_lng
-            dist = osrm_distance_km(
-                client_lat, client_lng,
-                float(partner.latitude), float(partner.longitude)
-            )
-            if dist is not None:
-                fee = max(_min_fee, dist * 2 * _price_km)
-                fee_int = int(fee.quantize(_D('1')))
-                order.delivery_fee = fee_int
-                order.distance_km_pickup = dist
-                order.distance_km_delivery = dist
-                order.distance_km_total = dist * 2
-                order.distance_km = dist * 2
-                # Recalcul total client avec nouveau delivery_fee
-                try:
-                    from orders.pricing_engine import calculate_order
-                    from django.db.models import Sum
-                    nb = order.items.aggregate(s=Sum('quantity'))['s'] or order.articles_count or 1
-                    pricing = calculate_order(nb, order.bag_size or 'small', delivery_fee=fee_int)
-                    order.total_client_ttc = pricing['total_client_ttc']
-                    order.total = pricing['total_client']
-                    order.service_fee = pricing['service_fee']
-                    order.amount_laundry_partner = pricing['amount_laundry_partner']
-                    order.fagni_revenue_ht = pricing['fagni_revenue_ht']
-                    order.margin_net = pricing['total_fagni']
-                except Exception:
-                    import logging
-                    logging.getLogger("fagni.ops_api").exception("Echec silencieux: recalcul pricing apres changement partenaire/distance | order_id=%s", getattr(order, "id", None))
+        # Recalcul delivery_fee au km réel après assignation pressing.
+        # Fonction partagée avec l'auto-affectation BC1 (client_api.py) -
+        # voir orders/services.py::recompute_order_pricing_for_laundry_partner,
+        # meme calcul, aucune formule dupliquee.
+        from orders.services import recompute_order_pricing_for_laundry_partner
+        recompute_order_pricing_for_laundry_partner(order, partner)
 
         order.save(update_fields=[
             'laundry_partner_id', 'delivery_fee',

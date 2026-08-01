@@ -342,6 +342,12 @@ GOOGLE_DISTANCE_MATRIX_API_KEY = os.getenv("GOOGLE_DISTANCE_MATRIX_API_KEY", "")
 # Plan de sortie (OTP reel) : repasser a False, aucun autre changement requis.
 PILOT_WHITELIST_ENFORCED = (os.getenv("PILOT_WHITELIST_ENFORCED", "false") or "").strip().lower() in ("1", "true", "yes", "on")
 
+# Sprint P0, Wave 3 (BC1) : quand actif, api_create_order tente une
+# auto-affectation (pressing + livreur de collecte uniquement, jamais le
+# livreur retour) juste apres la creation de la commande fagni-client.
+# Desactive par defaut : comportement strictement identique a avant BC1.
+AUTO_ASSIGN_ON_CLIENT_ORDER = (os.getenv("AUTO_ASSIGN_ON_CLIENT_ORDER", "false") or "").strip().lower() in ("1", "true", "yes", "on")
+
 TWILIO_ACCOUNT_SID = (os.getenv("TWILIO_ACCOUNT_SID", "") or "").strip()
 TWILIO_AUTH_TOKEN = (os.getenv("TWILIO_AUTH_TOKEN", "") or "").strip()
 TWILIO_VERIFY_SERVICE_SID = (os.getenv("TWILIO_VERIFY_SERVICE_SID", "") or "").strip()

@@ -3,6 +3,74 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.db.models import Sum
 
 
+def recompute_order_pricing_for_laundry_partner(order, partner) -> bool:
+    """
+    Sprint P0, Wave 3 (BC1). Extrait tel quel (aucune formule/pourcentage
+    modifié) le recalcul distance + pricing auparavant en ligne dans
+    orders/ops_api.py::ops_assign_partner, pour que ce recalcul soit
+    partagé à l'identique entre l'affectation manuelle OPS et
+    l'auto-affectation BC1 (orders/client_api.py::api_create_order) —
+    les deux doivent produire exactement le même prix final pour un même
+    partenaire/commande.
+
+    Ne sauvegarde jamais order.save() elle-même : mute les attributs en
+    mémoire (delivery_fee, distances, total_client_ttc/total/service_fee/
+    amount_laundry_partner/fagni_revenue_ht/margin_net) et laisse
+    l'appelant décider du update_fields et du moment de l'écriture —
+    exactement comme le faisait ops_assign_partner avant extraction.
+
+    Retourne True si le recalcul a été effectué (partenaire géolocalisé,
+    distance obtenue, moteur pricing exécuté sans erreur), False sinon —
+    dans ce cas l'appelant doit conserver le pricing existant de la
+    commande tel quel (jamais un prix incohérent/à moitié recalculé).
+    """
+    if not (partner and getattr(partner, 'latitude', None) and getattr(partner, 'longitude', None)):
+        return False
+
+    from orders.utils.distances import osrm_distance_km
+    from orders.config_models import GlobalPricingSettings
+    from decimal import Decimal as _D
+
+    _cfg = GlobalPricingSettings.get_solo()
+    _price_km = _D(str(_cfg.delivery_price_per_km or 150))
+    _min_fee = _D(str(_cfg.delivery_min_fee or 2000))
+    client_lat = order.pickup_lat or order.delivery_lat
+    client_lng = order.pickup_lng or order.delivery_lng
+    dist = osrm_distance_km(
+        client_lat, client_lng,
+        float(partner.latitude), float(partner.longitude)
+    )
+    if dist is None:
+        return False
+
+    fee = max(_min_fee, dist * 2 * _price_km)
+    fee_int = int(fee.quantize(_D('1')))
+    order.delivery_fee = fee_int
+    order.distance_km_pickup = dist
+    order.distance_km_delivery = dist
+    order.distance_km_total = dist * 2
+    order.distance_km = dist * 2
+
+    try:
+        from orders.pricing_engine import calculate_order
+        nb = order.items.aggregate(s=Sum('quantity'))['s'] or order.articles_count or 1
+        pricing = calculate_order(nb, order.bag_size or 'small', delivery_fee=fee_int)
+        order.total_client_ttc = pricing['total_client_ttc']
+        order.total = pricing['total_client']
+        order.service_fee = pricing['service_fee']
+        order.amount_laundry_partner = pricing['amount_laundry_partner']
+        order.fagni_revenue_ht = pricing['fagni_revenue_ht']
+        order.margin_net = pricing['total_fagni']
+        return True
+    except Exception:
+        import logging
+        logging.getLogger("fagni.orders.services").exception(
+            "Echec silencieux: recalcul pricing apres changement partenaire/distance | order_id=%s",
+            getattr(order, "id", None),
+        )
+        return False
+
+
 def recompute_order_distance_from_legs(order, save: bool = True) -> Decimal:
     """
     Recalcule la distance totale de mission pour une commande FAGNI

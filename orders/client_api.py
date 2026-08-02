@@ -518,10 +518,21 @@ def _bc1_auto_assign_pickup_and_laundry(order):
     isolee dans son propre try/except, pour qu'un echec sur l'un ne
     bloque jamais l'autre ni la creation de la commande.
     """
+    import logging
     from orders.assignment import pick_best_laundry, pick_best_driver
     from orders.services import recompute_order_pricing_for_laundry_partner
     from orders.models import DeliveryLeg
     from orders.ops_api import _send_notif_pressing, _send_notif_mission
+
+    # Journalisation diagnostic (mission "auto-affectation ne trouve/assigne
+    # aucun candidat en production") : pick_best_laundry/pick_best_driver
+    # calculent deja un `reason` lisible dans chaque branche "aucun candidat"
+    # (ex: "Aucune blanchisserie active.", "Coordonnees client indisponibles
+    # (lat/lng manquants).") - il etait jusqu'ici capture puis jete
+    # (`_reason`, jamais logue). Aucune donnee sensible : uniquement
+    # order_id + id/nom du partenaire ou livreur (entite metier, pas une
+    # donnee personnelle client) + le message de raison deja generique.
+    logger = logging.getLogger("fagni.bc1.assignment")
 
     result = {"laundry_assigned": False, "driver_assigned": False, "pricing_recomputed": False}
 
@@ -532,8 +543,12 @@ def _bc1_auto_assign_pickup_and_laundry(order):
         return result
 
     try:
-        laundry, _reason = pick_best_laundry(order)
+        laundry, reason = pick_best_laundry(order)
         if laundry:
+            logger.info(
+                "BC1 pressing: candidat trouve | order_id=%s | partner_id=%s | partner_name=%s",
+                order.id, laundry.id, laundry.name,
+            )
             order.laundry_partner = laundry
             update_fields = ["laundry_partner"]
 
@@ -554,15 +569,23 @@ def _bc1_auto_assign_pickup_and_laundry(order):
             order.save(update_fields=update_fields)
             result["laundry_assigned"] = True
             result["pricing_recomputed"] = recomputed
+        else:
+            logger.warning(
+                "BC1 pressing: aucun candidat | order_id=%s | raison=%s",
+                order.id, reason or "raison non renseignee par le moteur",
+            )
     except Exception:
-        import logging
-        logging.getLogger("fagni.orders.client_api").exception(
-            "BC1 auto-affectation pressing en echec | order_id=%s", getattr(order, "id", None)
+        logger.exception(
+            "BC1 pressing: EXCEPTION moteur d'affectation | order_id=%s", getattr(order, "id", None)
         )
 
     try:
-        driver, _reason = pick_best_driver(order)
+        driver, reason = pick_best_driver(order)
         if driver:
+            logger.info(
+                "BC1 livreur: candidat trouve | order_id=%s | driver_id=%s | driver_name=%s",
+                order.id, driver.id, driver.name,
+            )
             from orders.config_models import GlobalPricingSettings
             from decimal import Decimal as _D
 
@@ -585,10 +608,14 @@ def _bc1_auto_assign_pickup_and_laundry(order):
             leg.save(update_fields=["driver", "status", "driver_amount"])
 
             result["driver_assigned"] = True
+        else:
+            logger.warning(
+                "BC1 livreur: aucun candidat | order_id=%s | raison=%s",
+                order.id, reason or "raison non renseignee par le moteur",
+            )
     except Exception:
-        import logging
-        logging.getLogger("fagni.orders.client_api").exception(
-            "BC1 auto-affectation livreur collecte en echec | order_id=%s", getattr(order, "id", None)
+        logger.exception(
+            "BC1 livreur: EXCEPTION moteur d'affectation | order_id=%s", getattr(order, "id", None)
         )
 
     # Notifications : _send_notif_pressing/_send_notif_mission neutralisent
@@ -602,10 +629,7 @@ def _bc1_auto_assign_pickup_and_laundry(order):
         if result["driver_assigned"]:
             _send_notif_mission(order, order.pickup_driver)
     except Exception:
-        import logging
-        logging.getLogger("fagni.orders.client_api").exception(
-            "BC1 notification en echec | order_id=%s", getattr(order, "id", None)
-        )
+        logger.exception("BC1 notification en echec | order_id=%s", getattr(order, "id", None))
 
     return result
 

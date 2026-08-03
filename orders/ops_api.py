@@ -2184,16 +2184,14 @@ def ops_assign_return_driver(request, order_id):
         )
         assigned_now = False
         if leg.status not in ("assigned", "in_progress", "done"):
-            from orders.config_models import GlobalPricingSettings as _GPS2
-            _driver_amount_return = Decimal(str(_GPS2.get_solo().driver_amount_per_leg))
             leg.driver = driver
             leg.status = "assigned"
-            leg.driver_amount = _driver_amount_return
+            leg.driver_amount = _dap_ret
             leg.save(update_fields=["driver", "status", "driver_amount"])
             assigned_now = True
 
         order.delivery_partner = driver
-        order.cost_driver_delivery = int(_driver_amount_return)
+        order.cost_driver_delivery = int(_dap_ret)
         order.save(update_fields=["delivery_partner", "cost_driver_delivery", "updated_at"])
 
         # Notifications retour : une seule fois, uniquement lors de l'assignation effective.

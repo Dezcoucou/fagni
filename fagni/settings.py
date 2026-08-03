@@ -348,6 +348,13 @@ PILOT_WHITELIST_ENFORCED = (os.getenv("PILOT_WHITELIST_ENFORCED", "false") or ""
 # Desactive par defaut : comportement strictement identique a avant BC1.
 AUTO_ASSIGN_ON_CLIENT_ORDER = (os.getenv("AUTO_ASSIGN_ON_CLIENT_ORDER", "false") or "").strip().lower() in ("1", "true", "yes", "on")
 
+# BC3 : quand actif, partner_update_status tente une auto-affectation du
+# livreur retour au moment ou le pressing marque la commande PRET (meme
+# moteur pick_best_driver que BC1 collecte et que ops_assign_return_driver).
+# Desactive par defaut : comportement strictement identique a avant BC3
+# (mission retour creee mais jamais assignee automatiquement).
+AUTO_ASSIGN_RETURN_DRIVER = (os.getenv("AUTO_ASSIGN_RETURN_DRIVER", "false") or "").strip().lower() in ("1", "true", "yes", "on")
+
 TWILIO_ACCOUNT_SID = (os.getenv("TWILIO_ACCOUNT_SID", "") or "").strip()
 TWILIO_AUTH_TOKEN = (os.getenv("TWILIO_AUTH_TOKEN", "") or "").strip()
 TWILIO_VERIFY_SERVICE_SID = (os.getenv("TWILIO_VERIFY_SERVICE_SID", "") or "").strip()

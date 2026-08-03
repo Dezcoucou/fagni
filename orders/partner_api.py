@@ -13,6 +13,111 @@ def _get_partner(request):
     return LaundryPartner.objects.get(id=payload['pid'])
 
 
+def _bc3_auto_assign_return_driver(order):
+    """
+    BC3 — auto-affectation additive du livreur retour au moment ou le
+    pressing marque la commande PRET (wash_complete_time), derriere
+    settings.AUTO_ASSIGN_RETURN_DRIVER (defaut False = comportement
+    strictement identique a avant BC3 : la mission retour est creee mais
+    jamais assignee automatiquement).
+
+    Reutilise integralement orders.assignment.pick_best_driver (meme moteur
+    que BC1 collecte et que ops_assign_return_driver) - aucune nouvelle
+    regle, aucune nouvelle formule. Reproduit a l'identique les effets de
+    bord de ops_assign_return_driver (driver sur la DeliveryLeg return,
+    order.delivery_partner, order.cost_driver_delivery, notifications) pour
+    que la mission soit exploitable par l'app livreur et que la
+    reaffectation OPS reste possible ensuite.
+
+    Ne cree jamais de 2e jambe return (get_or_create sur (order,
+    leg_type='return'), deja verrouille par la contrainte DB
+    uniq_leg_per_order_type). Idempotent : si order.delivery_partner est
+    deja renseigne (affectation BC3 precedente ou reaffectation OPS), ne
+    refait rien et ne renvoie aucune notification en double.
+
+    Ne leve jamais d'exception : l'appelant doit pouvoir ignorer un echec
+    sans jamais bloquer la transition "Pret".
+    """
+    import logging
+    from decimal import Decimal
+    from orders.assignment import pick_best_driver
+    from orders.models import DeliveryLeg
+    from orders.config_models import GlobalPricingSettings
+    from orders.ops_api import _send_notif_mission, _send_notif_client_livraison
+
+    logger = logging.getLogger("fagni.bc3.assignment")
+
+    result = {"driver_assigned": False}
+
+    if getattr(order, "status", None) == "canceled":
+        return result
+
+    # Deja assigne (appel BC3 precedent sur repetition du statut PRET, ou
+    # reaffectation OPS entre-temps) : ne jamais re-choisir ni re-notifier.
+    if getattr(order, "delivery_partner_id", None):
+        return result
+
+    try:
+        driver, reason = pick_best_driver(order)
+        if not driver:
+            logger.warning(
+                "BC3 livreur retour: aucun candidat | order_id=%s | raison=%s",
+                order.id, reason or "raison non renseignee par le moteur",
+            )
+            return result
+
+        logger.info(
+            "BC3 livreur retour: candidat trouve | order_id=%s | driver_id=%s | driver_name=%s",
+            order.id, driver.id, driver.name,
+        )
+
+        driver_amount = Decimal(str(GlobalPricingSettings.get_solo().driver_amount_per_leg))
+
+        leg, _created = DeliveryLeg.objects.get_or_create(
+            order=order, leg_type="return",
+            defaults={"status": "pending", "driver_amount": driver_amount},
+        )
+
+        assigned_now = False
+        if leg.status not in ("assigned", "in_progress", "done"):
+            leg.driver = driver
+            leg.status = "assigned"
+            leg.driver_amount = driver_amount
+            leg.save(update_fields=["driver", "status", "driver_amount"])
+            assigned_now = True
+
+        order.delivery_partner = driver
+        order.cost_driver_delivery = int(driver_amount)
+        order.save(update_fields=["delivery_partner", "cost_driver_delivery"])
+
+        result["driver_assigned"] = True
+
+        if assigned_now:
+            try:
+                _send_notif_mission(order, driver)
+                _send_notif_client_livraison(order)
+            except Exception:
+                logger.exception("BC3 notification en echec | order_id=%s", order.id)
+
+            try:
+                from orders.models import log_event
+                log_event(
+                    "return.assigned", order=order,
+                    actor_type="system", actor_id=None,
+                    driver_id=driver.id, driver_name=driver.name,
+                )
+            except Exception:
+                logger.exception("BC3 log_event en echec | order_id=%s", order.id)
+
+    except Exception:
+        logger.exception(
+            "BC3 livreur retour: EXCEPTION moteur d'affectation | order_id=%s",
+            getattr(order, "id", None),
+        )
+
+    return result
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def partner_login(request):
@@ -154,6 +259,19 @@ def partner_update_status(request, order_id):
             order=order, leg_type='return',
             defaults={'status': 'pending', 'driver_amount': _driver_amount}
         )
+        # Sprint P0, BC3 — auto-affectation additive du livreur retour,
+        # desactivee par defaut (AUTO_ASSIGN_RETURN_DRIVER). Flag off :
+        # comportement strictement identique a avant (mission retour creee
+        # mais jamais assignee automatiquement).
+        if getattr(settings, "AUTO_ASSIGN_RETURN_DRIVER", False):
+            try:
+                order.refresh_from_db()
+                _bc3_auto_assign_return_driver(order)
+            except Exception:
+                import logging
+                logging.getLogger("fagni.orders.partner_api").exception(
+                    "BC3 auto-affectation retour en echec | order_id=%s", order.id
+                )
     # Notifier le client que son linge est prêt
     try:
         from fagni.notifications import notif_client_pret

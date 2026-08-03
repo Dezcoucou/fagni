@@ -2178,21 +2178,32 @@ def ops_assign_return_driver(request, order_id):
         driver = DeliveryPartner.objects.get(id=driver_id)
         from orders.config_models import GlobalPricingSettings as _GPS4
         _dap_ret = Decimal(str(_GPS4.get_solo().driver_amount_per_leg))
+
+        # order.delivery_partner DOIT etre sauvegarde AVANT toute sauvegarde
+        # de la DeliveryLeg return : le post_save de DeliveryLeg (voir
+        # orders/signals.py) declenche de facon synchrone
+        # sync_delivery_legs_for_order(order), qui relit order.delivery_partner_id
+        # en base pour re-appliquer le driver sur le leg. Si cette lecture
+        # arrive avant que l'ordre ci-dessous soit ecrit, elle retrouve
+        # l'ANCIEN driver et l'ecrase sur la jambe - c'est cette course qui
+        # faisait "echouer" la reaffectation (order.delivery_partner changeait,
+        # DeliveryLeg.driver non, exactement l'inverse de ce qui est lu par
+        # l'app livreur et les paiements).
+        order.delivery_partner = driver
+        order.cost_driver_delivery = int(_dap_ret)
+        order.save(update_fields=["delivery_partner", "cost_driver_delivery", "updated_at"])
+
         leg, created = DeliveryLeg.objects.get_or_create(
             order=order, leg_type="return",
             defaults={"status": "pending", "driver_amount": _dap_ret}
         )
         assigned_now = False
-        if leg.status not in ("assigned", "in_progress", "done"):
+        if leg.status not in ("in_progress", "done"):
             leg.driver = driver
             leg.status = "assigned"
             leg.driver_amount = _dap_ret
             leg.save(update_fields=["driver", "status", "driver_amount"])
             assigned_now = True
-
-        order.delivery_partner = driver
-        order.cost_driver_delivery = int(_dap_ret)
-        order.save(update_fields=["delivery_partner", "cost_driver_delivery", "updated_at"])
 
         # Notifications retour : une seule fois, uniquement lors de l'assignation effective.
         if assigned_now:

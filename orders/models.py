@@ -417,9 +417,13 @@ def sync_order_status_from_legs(order, save=False):
       - sinon => pending
     """
 
-    # Ne jamais toucher une commande annulée
-    if getattr(order, "status", None) == "canceled":
-        return getattr(order, "status", None) or "canceled"
+    # Ne jamais toucher une commande annulée, ni "ready" (étape pilotée
+    # explicitement par le pressing via partner_update_status, pas par les
+    # legs - cette fonction ne connaît que pending/in_progress/done et
+    # écraserait silencieusement "ready" au premier save() de DeliveryLeg
+    # qui suit, ex: création de la jambe return).
+    if getattr(order, "status", None) in ("canceled", "ready"):
+        return getattr(order, "status", None)
 
     legs_all = DeliveryLeg.objects.filter(order=order)
 

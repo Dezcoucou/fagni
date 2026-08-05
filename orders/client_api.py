@@ -1830,7 +1830,7 @@ def api_routine_essai(request):
     # Idempotence : un essai routine_trial deja en cours (non termine) bloque un nouveau
     essai_existant = Order.objects.filter(
         customer=customer, order_origin='routine_trial',
-    ).exclude(status__in=['delivered', 'cancelled']).first()
+    ).exclude(status__in=['done', 'canceled']).first()
 
     if essai_existant:
         return Response({
@@ -1914,7 +1914,7 @@ def api_routine_essai(request):
     # Idempotence : un essai routine_trial deja en cours (non termine) bloque un nouveau
     essai_existant = Order.objects.filter(
         customer=customer, order_origin='routine_trial',
-    ).exclude(status__in=['delivered', 'cancelled']).first()
+    ).exclude(status__in=['done', 'canceled']).first()
 
     if essai_existant:
         return Response({

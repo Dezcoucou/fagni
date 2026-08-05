@@ -1259,11 +1259,24 @@ def api_ops_enregistrer_paiement(request):
         # Si c'est une validation de retrait, mettre à jour WithdrawalRequest
         if note == 'Retrait valide par OPS':
             from wallets.models import WithdrawalRequest
-            from django.utils import timezone
             WithdrawalRequest.objects.filter(
                 id=partenaire_id, status='pending'
             ).update(status='paid', processed_at=timezone.now())
             return Response({'success': True})
+
+        # Anti-double-paiement : un double clic OPS (aucun garde-fou cote
+        # frontend, aucune cle d'idempotence envoyee) recree le meme paiement
+        # a quelques secondes d'intervalle. On refuse un doublon exact recent
+        # plutot que de laisser enregistrer deux fois le meme reglement.
+        from datetime import timedelta
+        doublon_recent = Paiement.objects.filter(
+            partenaire_type=partenaire_type,
+            partenaire_id=partenaire_id,
+            montant=montant,
+            created_at__gte=timezone.now() - timedelta(seconds=60),
+        ).exists()
+        if doublon_recent:
+            return Response({'error': 'Paiement identique deja enregistre il y a moins d\'une minute (probable double clic)'}, status=409)
 
         paiement = Paiement.objects.create(
             partenaire_type=partenaire_type,

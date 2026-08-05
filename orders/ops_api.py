@@ -1847,11 +1847,26 @@ def notify_client_whatsapp(order, message):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_wallet_solde(request):
-    """POST /api/wallet/solde/ - solde wallet partenaire/livreur, consultation directe sans jeton OPS."""
+    """POST /api/wallet/solde/ - solde wallet partenaire/livreur, identite verifiee via le JWT partenaire/livreur (pas de jeton OPS requis)."""
     from wallets.models import Wallet, WalletTransaction
 
     partner_type = request.data.get('partner_type')
     partner_id   = request.data.get('partner_id')
+
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+    except Exception:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    if partner_type == 'pressing':
+        if str(payload.get('pid')) != str(partner_id):
+            return Response({'error': 'Non autorisé'}, status=403)
+    elif partner_type == 'livreur':
+        if str(payload.get('did')) != str(partner_id):
+            return Response({'error': 'Non autorisé'}, status=403)
+    else:
+        return Response({'error': 'Type invalide'}, status=400)
 
     try:
         if partner_type == 'pressing':
@@ -1861,15 +1876,13 @@ def api_wallet_solde(request):
                 laundry_partner=p,
                 defaults={'currency': 'XOF', 'balance': 0}
             )
-        elif partner_type == 'livreur':
+        else:
             from partners.models import DeliveryPartner
             d = DeliveryPartner.objects.get(id=partner_id)
             wallet, _ = Wallet.objects.get_or_create(
                 delivery_partner=d,
                 defaults={'currency': 'XOF', 'balance': 0}
             )
-        else:
-            return Response({'error': 'Type invalide'}, status=400)
 
         transactions = WalletTransaction.objects.filter(
             wallet=wallet
@@ -2377,6 +2390,6 @@ def api_ops_routine_proposer_abonnement(request, order_id):
         donnees={'order_id': order.id, 'routine': order.routine_choisie or order.routine_proposee},
     )
 
-    lien = f"https://fagni-client.vercel.app/abonnement?depuis_essai={order.id}"
+    lien = f"https://fagni-client.vercel.app/abonnement?depuis_essai={order.code}"
 
     return Response({'success': True, 'lien_a_partager': lien})

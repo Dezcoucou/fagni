@@ -74,14 +74,15 @@ class ParcoursRoutineBoutEnBoutTests(TestCase):
         )
         self.assertEqual(r3.status_code, 200)
         lien = r3.json()["lien_a_partager"]
-        self.assertIn(str(order_id), lien)
+        self.assertIn(order.code, lien)
+        self.assertNotIn(f"depuis_essai={order_id}", lien, "le lien partage ne doit jamais exposer l'id sequentiel")
         self.assertTrue(
             EvenementRoutine.objects.filter(type_evenement="abonnement_propose").exists()
         )
 
         # ---------- ETAPE 5 : le client consulte le detail de l'essai
-        # (ce que fait l'ecran client en arrivant sur le lien) ----------
-        r4 = self.client.get(f"/api/routine/essai/{order_id}/")
+        # (ce que fait l'ecran client en arrivant sur le lien, via order.code) ----------
+        r4 = self.client.get(f"/api/routine/essai/{order.code}/")
         self.assertEqual(r4.status_code, 200)
         detail = r4.json()
         self.assertEqual(detail["routine"], "duo")
@@ -96,7 +97,7 @@ class ParcoursRoutineBoutEnBoutTests(TestCase):
                 "telephone": detail["telephone"], "nom": "Client Bout En Bout",
                 "pack": detail["pack"], "taille_sac": detail["taille_sac"],
                 "jour_collecte": 0, "jour_livraison": 3,
-                "essai_origine": order_id,
+                "essai_origine": order.code,
             },
             content_type="application/json",
         )
@@ -149,7 +150,7 @@ class ParcoursRoutineBoutEnBoutTests(TestCase):
         self.assertEqual(r_propose.status_code, 422)
 
         # Le detail public doit rester inaccessible
-        r_detail = self.client.get(f"/api/routine/essai/{order_id}/")
+        r_detail = self.client.get(f"/api/routine/essai/{order.code}/")
         self.assertEqual(r_detail.status_code, 422)
 
         # Aucun abonnement ne doit jamais exister pour ce client

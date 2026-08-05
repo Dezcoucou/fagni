@@ -1257,12 +1257,16 @@ def api_ops_enregistrer_paiement(request):
 
     try:
         # Si c'est une validation de retrait, mettre à jour WithdrawalRequest
+        # ET débiter réellement le wallet — apply_payout() est atomique,
+        # verrouille le wallet et est idempotent (anti-double-débit via
+        # _tx_exists), donc sûr à appeler même en cas de rejeu de la requête.
         if note == 'Retrait valide par OPS':
             from wallets.models import WithdrawalRequest
-            from django.utils import timezone
-            WithdrawalRequest.objects.filter(
-                id=partenaire_id, status='pending'
-            ).update(status='paid', processed_at=timezone.now())
+            wr = WithdrawalRequest.objects.filter(id=partenaire_id, status='pending').first()
+            if wr:
+                wr.status = 'paid'
+                wr.save(update_fields=['status'])
+                wr.apply_payout()
             return Response({'success': True})
 
         paiement = Paiement.objects.create(

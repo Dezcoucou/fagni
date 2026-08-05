@@ -65,8 +65,12 @@ def _make_driver(name="Livreur Retour BC3", active=True):
 
 
 def _make_order(laundry, phone="0700004101"):
+    """BC3 se declenche quand le pressing marque la commande PRET, ce qui
+    (audit parcours logistique V1, item 2B) requiert desormais reellement
+    une DeliveryLeg pickup status=done - condition toujours vraie en
+    production a ce stade du parcours. On la pose donc ici par defaut."""
     customer = Customer.objects.create(name="Client BC3", phone=phone, address="Riviera 3")
-    return Order.objects.create(
+    order = Order.objects.create(
         customer=customer,
         laundry_partner=laundry,
         status="in_progress",
@@ -77,6 +81,9 @@ def _make_order(laundry, phone="0700004101"):
         delivery_lat=RIVIERA_LAT,
         delivery_lng=RIVIERA_LNG,
     )
+    pickup_leg = DeliveryLeg.objects.create(order=order, leg_type="pickup", status="pending")
+    DeliveryLeg.objects.filter(pk=pickup_leg.pk).update(status="done")
+    return order
 
 
 def _mark_ready(laundry, order):

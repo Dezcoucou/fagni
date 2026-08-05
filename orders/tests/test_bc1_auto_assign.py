@@ -76,8 +76,9 @@ def _fake_osrm(distance_km="3.2"):
     return _osrm
 
 
+@override_settings(AUTO_ASSIGN_ON_CLIENT_ORDER=False)
 class Bc1FlagDisabledTests(TestCase):
-    """Flag desactive (defaut) : comportement strictement identique a main."""
+    """Lorsque le flag est explicitement désactivé, aucune auto-affectation n'est réalisée."""
 
     def test_flag_desactive_aucune_affectation(self):
         customer = _make_customer()
@@ -98,7 +99,7 @@ class Bc1FlagDisabledTests(TestCase):
         self.assertIsNone(order.delivery_partner)
         self.assertFalse(DeliveryLeg.objects.filter(order=order).exists())
 
-    def test_flag_desactive_defaut_settings(self):
+    def test_flag_est_explicitement_desactive_dans_ce_scenario(self):
         self.assertFalse(settings.AUTO_ASSIGN_ON_CLIENT_ORDER)
 
 

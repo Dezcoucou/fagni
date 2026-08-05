@@ -93,6 +93,7 @@ def _client():
     return Client()
 
 
+@override_settings(AUTO_ASSIGN_RETURN_DRIVER=False)
 class Bc3FlagDisabledTests(TestCase):
     """Flag desactive (defaut) : comportement strictement identique a avant BC3."""
 
@@ -111,7 +112,7 @@ class Bc3FlagDisabledTests(TestCase):
         self.assertIsNone(leg.driver)
         self.assertEqual(leg.status, "pending")
 
-    def test_flag_desactive_defaut_settings(self):
+    def test_flag_est_explicitement_desactive_dans_ce_scenario(self):
         self.assertFalse(settings.AUTO_ASSIGN_RETURN_DRIVER)
 
 

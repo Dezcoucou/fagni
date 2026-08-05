@@ -522,11 +522,20 @@ def ops_update_status(request, order_id):
 
     from orders.models import Order
     ALLOWED = ['pending','in_progress','done','canceled','ready']
+    TERMINAL = ('done', 'canceled')
     try:
         order = Order.objects.get(id=order_id)
         new_status = request.data.get('status','')
         if new_status not in ALLOWED:
             return Response({'error': 'Statut invalide'}, status=400)
+        # Garde-fou : un statut terminal (done/canceled) ne doit jamais
+        # regresser vers un autre statut via cette route generique - des
+        # effets deja declenches (paiement, score partenaire) ne doivent
+        # pas etre remis en cause par une simple mise a jour de statut.
+        if order.status in TERMINAL and new_status != order.status:
+            return Response({
+                'error': f"Impossible de modifier une commande au statut terminal '{order.status}'",
+            }, status=409)
         order.status = new_status
         order.save(update_fields=['status','updated_at'])
         # Recalcul Partner Score si statut terminal

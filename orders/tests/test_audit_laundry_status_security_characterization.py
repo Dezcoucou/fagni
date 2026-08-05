@@ -123,6 +123,9 @@ class LaundryUpdateStatusSecurityCharacterizationTests(TestCase):
         owner = _make_laundry("0700010106", "own5@example.com")
         owner_user = _make_laundry_user(owner)
         order = _make_order("0700010005", laundry=owner, status="pending")
+        from orders.models import DeliveryLeg
+        pickup_leg = DeliveryLeg.objects.create(order=order, leg_type="pickup", status="pending")
+        DeliveryLeg.objects.filter(pk=pickup_leg.pk).update(status="done")
 
         self.client.force_login(owner_user)
         resp = _post_status(self.client, order, "start")

@@ -1871,7 +1871,7 @@ def ops_dashboard(request):
     return render(request, "orders/ops_dashboard.html", context)
 
 
-@login_required
+@staff_member_required
 def ops_weighing_resolve(request, order_id: int):
     from decimal import Decimal
     """
@@ -1888,11 +1888,11 @@ def ops_weighing_resolve(request, order_id: int):
 
     order = get_object_or_404(Order, pk=order_id)
 
-    
+
 
     ow, _ = OrderWeighing.objects.get_or_create(order=order)
-    # Garde-fou : page de résolution seulement pour les pesées "contestées"
-    if request.method != "POST" and ow.status != "disputed":
+    # Garde-fou : resolution seulement pour les pesees "contestees" (GET et POST)
+    if ow.status != "disputed":
         messages.info(request, "Aucun litige de pesée à trancher pour cette commande.")
         return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}&focus=order")
 
@@ -1920,18 +1920,6 @@ def ops_weighing_resolve(request, order_id: int):
             scale_url = ""
 
     if request.method == "POST":
-        address = (request.POST.get("address") or "").strip()
-
-        if not address:
-            error = "Veuillez indiquer votre adresse de collecte pour que le livreur puisse vous trouver."
-            return render(request, "orders/client_new_order.html", {
-                "error": error,
-                "address_init": request.POST.get("address", ""),
-                "name_init": request.POST.get("name", ""),
-                "phone_init": request.POST.get("phone", ""),
-                "email_init": request.POST.get("email", ""),
-            })
-
         w_raw = (request.POST.get("final_weight_kg") or "").strip().replace(",", ".")
         note = (request.POST.get("resolution_notes") or "").strip()
 
@@ -1962,7 +1950,6 @@ def ops_weighing_resolve(request, order_id: int):
         "scale_url": scale_url,
         "latest_issue": latest_issue,
         "latest_scale": latest_scale,
-        "snapshot": snapshot,
     }
     return render(request, "orders/ops_weighing_resolve.html", ctx)
 
@@ -12722,10 +12709,11 @@ def driver_weighing(request, order_id):
 
     back_url = (request.GET.get("back") or request.POST.get("back") or "").strip()
 
-    # Si déjà confirmé, on bloque l'édition côté livreur
-    is_locked = (ow.status == "confirmed")
+    # Seule une pesée "draft" est modifiable par le livreur.
+    # confirmed/disputed/resolved sont en lecture seule.
+    is_locked = (ow.status != "draft")
     if is_locked:
-        messages.info(request, "Pesée déjà confirmée par la blanchisserie (lecture seule).")
+        messages.info(request, "Pesée déjà traitée (lecture seule).")
 
     if request.method == "POST":
         if is_locked:
@@ -12753,8 +12741,11 @@ def driver_weighing(request, order_id):
             except Exception:
                 weight = None
 
+        if weight is not None and weight <= 0:
+            weight = None
+
         if weight is None:
-            messages.warning(request, "Poids invalide. Exemple attendu : 3.50")
+            messages.warning(request, "Poids invalide. Exemple attendu : 3.50 (strictement superieur a 0)")
             if back_url and url_has_allowed_host_and_scheme(back_url, allowed_hosts={request.get_host()}):
                 return redirect(back_url)
             url = reverse("orders:driver_weighing", kwargs={"order_id": order.id})
@@ -13037,15 +13028,8 @@ def laundry_weighing(request, order_id):
     
     # Sécurité: la commande doit appartenir à cette blanchisserie
     if getattr(order, "laundry_partner_id", None) != laundry.id:
-        return render(request, "orders/laundry_weighing.html", {
-            "laundry": laundry,
-            "order": None,
-            "items": [],
-            "totals": {"total_fcfa": 0},
-            "error": "Accès refusé : cette commande n'est pas attribuée à ta blanchisserie.",
-            "laundry_id": str(laundry.id),
-            "evidence": [],
-        })
+        messages.warning(request, "Accès refusé : cette commande n'est pas attribuée à ta blanchisserie.")
+        return redirect(f"{reverse('orders:laundry_app')}?laundry_id={laundry.id}")
 
     # Résumé bag/item
     items = []
@@ -13097,20 +13081,16 @@ def laundry_weighing(request, order_id):
                         import logging
                         logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=12841")
 
-        if action == "start":
-            # Passe en "en cours" (sans casser si status n'existe pas)
-            if hasattr(order, "status"):
-                try:
-                    order.status = "laundry_in_progress"
-                    order.save(update_fields=["status"])
-                except Exception:
-                    try:
-                        order.save()
-                    except Exception:
-                        import logging
-                        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=12853")
+        if action == "start" and order.status != "canceled":
+            pickup_done = DeliveryLeg.objects.filter(
+                order=order, leg_type="pickup", status="done",
+            ).exists()
+            if pickup_done:
+                order.status = "in_progress"
+                order.save(update_fields=["status"])
 
-        return redirect("orders:laundry_weighing", order_id=order.id) + f"?laundry_id={laundry.id}"
+        redirect_url = reverse("orders:laundry_weighing", kwargs={"order_id": order.id})
+        return redirect(f"{redirect_url}?laundry_id={laundry.id}")
 
     return render(request, "orders/laundry_weighing.html", {
         "laundry": laundry,
@@ -13137,20 +13117,29 @@ def laundry_weighing_confirm(request, order_id):
 
     order = get_object_or_404(Order, id=order_id)
 
+    # --- Validations (aucune écriture avant ce point) ---
     if getattr(order, "laundry_partner_id", None) != laundry.id:
-        return HttpResponseRedirect(f"{reverse('orders:laundry_app')}?laundry_id={laundry.id}")
+        return redirect(f"{reverse('orders:laundry_app')}?laundry_id={laundry.id}")
 
-    # Déjà prêt ? => idempotent
-    if hasattr(order, "wash_complete_time") and not getattr(order, "wash_complete_time", None):
+    if order.status == "canceled":
+        messages.warning(request, "Une commande annulée ne peut plus être marquée prête.")
+        return redirect(f"{reverse('orders:laundry_weighing', kwargs={'order_id': order.id})}?laundry_id={laundry.id}")
+
+    pickup_done = DeliveryLeg.objects.filter(
+        order=order, leg_type="pickup", status="done",
+    ).exists()
+    if not pickup_done:
+        messages.warning(request, "La collecte n'est pas encore terminée : impossible de marquer la commande prête.")
+        return redirect(f"{reverse('orders:laundry_weighing', kwargs={'order_id': order.id})}?laundry_id={laundry.id}")
+
+    # --- Écritures (idempotentes) ---
+    if not getattr(order, "wash_complete_time", None):
         order.wash_complete_time = timezone.now()
-        try:
-            order.save(update_fields=["wash_complete_time"])
-        except Exception:
-            try:
-                order.save()
-            except Exception:
-                import logging
-                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=12894")
+        order.status = "ready"
+        order.save(update_fields=["wash_complete_time", "status", "updated_at"])
+    elif order.status != "ready":
+        order.status = "ready"
+        order.save(update_fields=["status", "updated_at"])
 
     # ✅ Dès que c'est prêt, on crée/active la mission RETOUR
     try:
@@ -13197,7 +13186,7 @@ def laundry_weighing_confirm(request, order_id):
 
     # redirect propre
     url = reverse("orders:laundry_weighing", kwargs={"order_id": order.id})
-    return HttpResponseRedirect(f"{url}?laundry_id={laundry.id}")
+    return redirect(f"{url}?laundry_id={laundry.id}")
 
 
 @login_required
@@ -13213,33 +13202,38 @@ def laundry_weighing_dispute(request, order_id):
     order = get_object_or_404(Order, id=order_id)
 
     if getattr(order, "laundry_partner_id", None) != laundry.id:
-        return HttpResponseRedirect(f"{reverse('orders:laundry_app')}?laundry_id={laundry.id}")
+        return redirect(f"{reverse('orders:laundry_app')}?laundry_id={laundry.id}")
 
     reason = (request.POST.get("reason") or "").strip()[:250]
     image = request.FILES.get("image")
 
-    # ✅ On standardise sur OrderEvidencePhoto
-    try:
-        from .models import OrderEvidencePhoto
-        if reason or image:
-            # kind: on met "issue" si dispo, sinon "laundry"
+    if reason or image:
+        try:
+            from .models import OrderEvidencePhoto, OrderWeighing
+
             allowed = {k for (k, _lbl) in getattr(OrderEvidencePhoto, "KIND_CHOICES", [])}
             kind = "issue" if "issue" in allowed else ("laundry" if "laundry" in allowed else "pickup_items")
 
             OrderEvidencePhoto.objects.create(
                 order=order,
-                leg=leg_obj,
+                leg=None,
                 actor_type="laundry",
                 actor_id=getattr(request.user, "id", None),
                 kind=kind,
                 image=image if image else None,
                 caption=reason or "Problème signalé par la blanchisserie",
             )
-    except Exception:
-        logger.exception("laundry_weighing_dispute: cannot create evidence for order=%s", getattr(order, "id", None))
+
+            ow, _created = OrderWeighing.objects.get_or_create(order=order)
+            # Une pesee resolue par OPS ne doit jamais repasser en dispute.
+            if ow.status != "resolved":
+                ow.status = "disputed"
+                ow.save(update_fields=["status", "updated_at"])
+        except Exception:
+            logger.exception("laundry_weighing_dispute: cannot create evidence for order=%s", getattr(order, "id", None))
 
     url = reverse("orders:laundry_weighing", kwargs={"order_id": order.id})
-    return HttpResponseRedirect(f"{url}?laundry_id={laundry.id}")
+    return redirect(f"{url}?laundry_id={laundry.id}")
 
 
 # ============================================================
@@ -14340,22 +14334,57 @@ def ops_order_confirm_wave_paid(request, order_id: int):
 # --- LOT_3_1_GUARD_DOUBLE_PAY_OK ---
 
 
+@login_required
 @require_POST
 def laundry_update_status(request, order_id):
     order = get_object_or_404(Order, id=order_id)
 
-    action = request.POST.get("action")
-    payment_reference = (request.POST.get("payment_reference") or "").strip()
+    laundry, _error = _resolve_laundry_for_user(request)
+    if not laundry:
+        return JsonResponse({
+            "error": "blanchisserie_introuvable",
+            "message": "Aucune blanchisserie liee a ce compte.",
+        }, status=403)
 
+    if getattr(order, "laundry_partner_id", None) != laundry.id:
+        return JsonResponse({
+            "error": "acces_refuse",
+            "message": "Cette commande n'est pas attribuee a ta blanchisserie.",
+        }, status=403)
 
-    if action == "accept":
-        order.status = "accepted"
-    elif action == "start":
-        order.status = "in_progress"
-    elif action == "done":
-        order.status = "done"
+    if getattr(order, "status", None) == "canceled":
+        return JsonResponse({
+            "error": "commande_annulee",
+            "message": "Une commande annulee ne peut plus etre modifiee.",
+        }, status=400)
 
-    order.save()
+    action = (request.POST.get("action") or "").strip()
+
+    # Le pressing ne doit jamais pouvoir finaliser directement la commande :
+    # Order.status ne passe a "done" que via sync_order_status_from_legs.
+    if action == "done":
+        return JsonResponse({
+            "error": "statut_interdit",
+            "message": "Le pressing ne peut pas terminer directement la commande.",
+        }, status=400)
+
+    if action != "start":
+        return JsonResponse({
+            "error": "action_invalide",
+            "message": f"Action inconnue : {action!r}",
+        }, status=400)
+
+    pickup_done = DeliveryLeg.objects.filter(
+        order=order, leg_type="pickup", status="done",
+    ).exists()
+    if not pickup_done:
+        return JsonResponse({
+            "error": "pickup_non_termine",
+            "message": "La collecte (DeliveryLeg pickup) n'est pas encore terminee.",
+        }, status=409)
+
+    order.status = "in_progress"
+    order.save(update_fields=["status", "updated_at"])
 
     return JsonResponse({
         "success": True,

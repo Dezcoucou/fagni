@@ -51,6 +51,16 @@ def _make_laundry_user(laundry):
     return User.objects.create_user(username=f"laundry_{laundry.id}", email=laundry.email, password="x")
 
 
+def _make_done_pickup_leg(order):
+    """DeliveryLeg.save() force silencieusement une jambe sans driver a
+    rester 'pending' si on tente assigned/in_progress/done (garde-fou
+    existant, correct). On cree donc 'pending' puis on force 'done' via un
+    update() bas niveau qui ne declenche pas ce garde-fou."""
+    leg = DeliveryLeg.objects.create(order=order, leg_type="pickup", status="pending")
+    DeliveryLeg.objects.filter(pk=leg.pk).update(status="done")
+    return leg
+
+
 def _make_order(phone, laundry, status="in_progress"):
     return Order.objects.create(
         customer=_make_customer(phone),
@@ -142,7 +152,7 @@ class LaundryWeighingConfirmCharacterizationTests(TestCase):
         laundry = _make_laundry("0700020202", "own5@example.com")
         owner_user = _make_laundry_user(laundry)
         order = _make_order("0700020005", laundry, status="in_progress")
-        DeliveryLeg.objects.create(order=order, leg_type="pickup", status="done")
+        _make_done_pickup_leg(order)
 
         self.client.force_login(owner_user)
         resp = self.client.post(reverse("orders:laundry_weighing_confirm", args=[order.id]))
@@ -155,7 +165,7 @@ class LaundryWeighingConfirmCharacterizationTests(TestCase):
         laundry = _make_laundry("0700020203", "own6@example.com")
         owner_user = _make_laundry_user(laundry)
         order = _make_order("0700020006", laundry, status="in_progress")
-        DeliveryLeg.objects.create(order=order, leg_type="pickup", status="done")
+        _make_done_pickup_leg(order)
 
         self.client.force_login(owner_user)
         self.client.post(reverse("orders:laundry_weighing_confirm", args=[order.id]))
@@ -170,7 +180,7 @@ class LaundryWeighingConfirmCharacterizationTests(TestCase):
         laundry = _make_laundry("0700020204", "own7@example.com")
         owner_user = _make_laundry_user(laundry)
         order = _make_order("0700020007", laundry, status="in_progress")
-        DeliveryLeg.objects.create(order=order, leg_type="pickup", status="done")
+        _make_done_pickup_leg(order)
 
         self.client.force_login(owner_user)
         self.client.post(reverse("orders:laundry_weighing_confirm", args=[order.id]))
@@ -182,7 +192,7 @@ class LaundryWeighingConfirmCharacterizationTests(TestCase):
         laundry = _make_laundry("0700020205", "own8@example.com")
         owner_user = _make_laundry_user(laundry)
         order = _make_order("0700020008", laundry, status="in_progress")
-        DeliveryLeg.objects.create(order=order, leg_type="pickup", status="done")
+        _make_done_pickup_leg(order)
 
         self.client.force_login(owner_user)
         self.client.post(reverse("orders:laundry_weighing_confirm", args=[order.id]))
@@ -214,7 +224,7 @@ class LaundryWeighingConfirmCharacterizationTests(TestCase):
         foreign = _make_laundry("0700020208", "foreign10@example.com")
         foreign_user = _make_laundry_user(foreign)
         order = _make_order("0700020010", owner, status="in_progress")
-        DeliveryLeg.objects.create(order=order, leg_type="pickup", status="done")
+        _make_done_pickup_leg(order)
 
         self.client.force_login(foreign_user)
         resp = self.client.post(reverse("orders:laundry_weighing_confirm", args=[order.id]))

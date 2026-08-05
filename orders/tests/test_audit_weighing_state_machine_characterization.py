@@ -53,23 +53,25 @@ class DriverWeighingStateMachineCharacterizationTests(TestCase):
         driver = _make_driver("0700030101", "d1@example.com")
         user = _make_driver_user(driver)
         order = _make_order_with_assigned_pickup("0700030001", driver)
+        OrderWeighing.objects.create(order=order, status="draft", weight_kg=Decimal("5.0"))
 
         self.client.force_login(user)
         _post_weight(self.client, order, "0")
 
         ow = OrderWeighing.objects.get(order=order)
-        self.assertNotEqual(ow.weight_kg, Decimal("0"), "un poids nul doit etre refuse")
+        self.assertEqual(ow.weight_kg, Decimal("5.0"), "un poids nul doit etre refuse (poids existant conserve)")
 
     def test_refuses_negative_weight(self):
         driver = _make_driver("0700030102", "d2@example.com")
         user = _make_driver_user(driver)
         order = _make_order_with_assigned_pickup("0700030002", driver)
+        OrderWeighing.objects.create(order=order, status="draft", weight_kg=Decimal("5.0"))
 
         self.client.force_login(user)
         _post_weight(self.client, order, "-3.5")
 
         ow = OrderWeighing.objects.get(order=order)
-        self.assertGreater(ow.weight_kg, Decimal("0"), "un poids negatif doit etre refuse")
+        self.assertEqual(ow.weight_kg, Decimal("5.0"), "un poids negatif doit etre refuse (poids existant conserve)")
 
     def test_allows_positive_weight_on_draft(self):
         driver = _make_driver("0700030103", "d3@example.com")

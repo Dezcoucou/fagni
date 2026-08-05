@@ -10,3 +10,11 @@ services:
         value: fagni.settings
       - key: PYTHON_VERSION
         value: 3.11
+      - key: SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: OPS_PASSWORD
+        sync: false
+      - key: ALLOWED_HOSTS
+        sync: false

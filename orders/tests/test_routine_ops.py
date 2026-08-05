@@ -125,7 +125,7 @@ class ApiOpsRoutineProposerAbonnementTests(TestCase):
             content_type="application/json", **_headers_ops(),
         )
         self.assertEqual(response.status_code, 200)
-        self.assertIn(str(order.id), response.json()["lien_a_partager"])
+        self.assertIn(order.code, response.json()["lien_a_partager"])
 
         self.assertTrue(EvenementRoutine.objects.filter(type_evenement="abonnement_propose").exists())
 

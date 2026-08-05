@@ -89,6 +89,7 @@ urlpatterns = [
     path("api/driver/orders/<int:order_id>/delivery-proof/", driver_delivery_proof, name="api-driver-delivery-proof"),
     path("api/driver/orders/<int:order_id>/photo/",    driver_upload_photo,    name="api-driver-photo"),
     path("api/driver/wallet/",                         driver_wallet,           name="api-driver-wallet"),
+    path("api/driver/profil/update/", api_driver_profil_update, name="api-driver-profil-update"),
     path("api/driver/status/", driver_toggle_status, name="api-driver-status"),
     path("api/driver/pending/", driver_pending_mission, name="api-driver-pending"),
     path("api/driver/copilote/", driver_copilote, name="api-driver-copilote"),

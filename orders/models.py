@@ -1074,6 +1074,7 @@ class Order(models.Model):
     STATUS_CHOICES = [
         ("pending", "En attente"),
         ("in_progress", "En cours"),
+        ("ready", "Prêt"),
         ("done", "Terminée"),
         ("canceled", "Annulée"),
     ]
@@ -4827,7 +4828,8 @@ class FagniEvent(models.Model):
         ("payment.paid",        "Paiement reçu"),
         ("pickup.assigned",     "Livreur collecte assigné"),
         ("pickup.started",      "Collecte démarrée"),
-        ("pickup.done",         "Collecte confirmée"),
+        ("pickup.done",         "Collecte confirmée (legacy, conserve pour historique)"),
+        ("pickup.collected",    "Collecte confirmée"),
         ("pressing.received",   "Pressing reçu"),
         ("pressing.done",       "Pressing terminé"),
         ("delivery.assigned",   "Livreur livraison assigné"),

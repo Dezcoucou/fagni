@@ -233,7 +233,16 @@ def partner_update_status(request, order_id):
     }
     new_status = STATUS_MAP.get(raw_status, raw_status)
 
-    ALLOWED = ['in_progress', 'done', 'pending', 'ready']
+    # Le pressing ne doit jamais pouvoir finaliser directement la commande :
+    # Order.status ne passe a "done" que via sync_order_status_from_legs,
+    # quand les DeliveryLeg pickup ET return sont toutes deux "done".
+    if new_status == 'done':
+        return Response({
+            'error': 'statut_interdit',
+            'message': 'Le pressing ne peut pas terminer directement la commande.',
+        }, status=400)
+
+    ALLOWED = ['in_progress', 'pending', 'ready']
     if new_status not in ALLOWED:
         return Response({
             'error': 'statut_invalide',
@@ -242,16 +251,27 @@ def partner_update_status(request, order_id):
             'choices': ALLOWED,
         }, status=400)
 
+    from orders.models import DeliveryLeg
+
+    if new_status == 'ready':
+        pickup_done = DeliveryLeg.objects.filter(
+            order=order, leg_type='pickup', status='done',
+        ).exists()
+        if not pickup_done:
+            return Response({
+                'error': 'pickup_non_termine',
+                'message': "La collecte (DeliveryLeg pickup) n'est pas encore terminee.",
+            }, status=409)
+
     # Mode terrain MVP : la blanchisserie peut confirmer la réception du sac.
     # On ne bloque pas ici sur paiement ou note DEPOSE_PRESSING, car ces contrôles
     # peuvent empêcher le test opérationnel alors que le sac est physiquement reçu.
 
     order.status = new_status
     order.save(update_fields=['status', 'updated_at'])
-    if raw_status in ('ready', 'done') or new_status == 'done':
+    if new_status == 'ready':
         from django.utils import timezone
         from decimal import Decimal
-        from orders.models import DeliveryLeg
         from orders.config_models import GlobalPricingSettings
         _driver_amount = Decimal(str(GlobalPricingSettings.get_solo().driver_amount_per_leg))
         Order.objects.filter(pk=order.pk).update(wash_complete_time=timezone.now())

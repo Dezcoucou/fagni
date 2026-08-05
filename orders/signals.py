@@ -67,6 +67,18 @@ def _schedule_sync_order_status(order_id: int) -> None:
                 return
 
             # ✅ Auto-heal SOFT (idempotent) : pas de delete/recreate
+            #
+            # NOTE (audit parcours logistique V1) : ceci importe
+            # views.normalize_order_legs, qui n'est PAS la meme fonction que
+            # service_layer.legs.normalize_order_legs. views.py fait de la
+            # deduplication/anti-conflit multi-driver (verrouille 1 seul
+            # driver actif = order.delivery_partner, annule les legs des
+            # "autres" drivers) ; service_layer/legs.py fait de la
+            # canonicalisation de statut par jambe (pending->assigned,
+            # gating return/pickup). Les deux sont volontairement appelees
+            # separement ici tant que la fusion (prevue dans un lot
+            # technique separe, apres analyse complete des appelants et de
+            # la contrainte DB uniq_leg_per_order_type) n'a pas eu lieu.
             try:
                 from .views import normalize_order_legs
                 normalize_order_legs(order)

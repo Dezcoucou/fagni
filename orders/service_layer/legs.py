@@ -60,12 +60,11 @@ def normalize_order_legs(order, save: bool = True) -> dict:
             if pickup_leg is not None:
                 pickup_status = (getattr(pickup_leg, "status", None) or "").strip().lower()
                 if pickup_status not in ("done",):
-                    # return ne doit pas avancer trop tôt
+                    # return ne doit pas avancer avant que pickup soit done,
+                    # meme si un driver est deja affecte en base : seul le
+                    # statut reste pending (le driver n'est pas retire).
                     if new in ("assigned", "in_progress"):
-                        if getattr(leg, "driver_id", None):
-                            new = "assigned"
-                        else:
-                            new = "pending"
+                        new = "pending"
 
         if old != new:
             leg.status = new

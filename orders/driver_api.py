@@ -392,13 +392,13 @@ def driver_confirm_pickup(request, order_id):
         try:
             from orders.models import log_event
             log_event(
-                "pickup.done", order=order,
+                "pickup.collected", order=order,
                 actor_type="driver", actor_id=driver.id,
                 articles_count=articles_count,
             )
         except Exception:
             import logging
-            logging.getLogger("fagni.driver_api").exception("Echec silencieux: pickup.done (log_event) | order_id=%s", getattr(order, "id", None))
+            logging.getLogger("fagni.driver_api").exception("Echec silencieux: pickup.collected (log_event) | order_id=%s", getattr(order, "id", None))
 
         # Payout différé : aucun crédit wallet à la collecte.
         # Crédit déclenché uniquement après order.done + payment_status=paid.
@@ -560,16 +560,23 @@ def api_driver_dropoff(request, order_id):
                 import logging
                 logging.getLogger("fagni.driver_api").exception("Echec silencieux: dropoff_to_laundry evidence.image.save | order_id=%s", getattr(order, "id", None))
 
-        # Marquer leg pickup done
+        # 🔒 Garde-fou métier : seul le livreur reellement affecte a la
+        # jambe pickup peut la finaliser. On ne réaffecte jamais
+        # silencieusement pickup_leg.driver au livreur appelant.
         pickup_leg = DeliveryLeg.objects.filter(
             order=order, leg_type='pickup'
         ).first()
-        if pickup_leg and pickup_leg.status != 'done':
-            pickup_leg.driver = driver
+        if not pickup_leg or not pickup_leg.driver_id or pickup_leg.driver_id != driver.id:
+            return Response({
+                'error': 'mission_non_affectee',
+                'message': 'Cette mission de collecte n’est pas affectée à ce livreur.',
+            }, status=403)
+
+        if pickup_leg.status != 'done':
             pickup_leg.status = 'done'
             if hasattr(pickup_leg, 'finished_at'):
                 pickup_leg.finished_at = now
-            pickup_leg.save(update_fields=['driver', 'status'] + (['finished_at'] if hasattr(pickup_leg, 'finished_at') else []))
+            pickup_leg.save(update_fields=['status'] + (['finished_at'] if hasattr(pickup_leg, 'finished_at') else []))
 
         sync_order_status_from_legs(order, save=True)
 
@@ -584,9 +591,12 @@ def api_driver_dropoff(request, order_id):
             'message': 'Depot au pressing confirme',
             'dropoff_time': now.isoformat(),
         })
-    except Exception as e:
-        import traceback
-        return Response({'error': str(e), 'traceback': traceback.format_exc()}, status=400)
+    except Exception:
+        import logging
+        logging.getLogger("fagni.driver_api").exception(
+            "Echec api_driver_dropoff | order_id=%s", order_id,
+        )
+        return Response({'error': 'Erreur lors du depot au pressing'}, status=400)
 
 
 

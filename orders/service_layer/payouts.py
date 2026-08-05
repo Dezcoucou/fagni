@@ -52,10 +52,19 @@ def trigger_driver_payout_for_leg(leg):
     order = getattr(leg, "order", None)
     driver = getattr(leg, "driver", None)
 
-    # ✅ fallback: si jambe sans driver, prendre le livreur de la commande
+    # ✅ fallback: si jambe sans driver, prendre le livreur historique de la
+    # commande - UNIQUEMENT celui correspondant au type de la jambe. Une
+    # jambe pickup ne doit jamais etre payee via order.delivery_partner
+    # (livreur retour), et inversement.
     if order and not driver:
+        leg_type = (getattr(leg, "leg_type", "") or "").strip().lower()
         try:
-            driver = getattr(order, "delivery_partner", None)
+            if leg_type == "pickup":
+                driver = getattr(order, "pickup_driver", None)
+            elif leg_type == "return":
+                driver = getattr(order, "delivery_partner", None)
+            else:
+                driver = None
         except Exception:
             driver = None
 

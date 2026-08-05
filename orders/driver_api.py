@@ -244,6 +244,18 @@ def driver_confirm_pickup(request, order_id):
     from orders.models import Order, OrderEvidencePhoto
     try:
         order = Order.objects.get(id=order_id)
+
+        # Garde-fou : un livreur ne peut confirmer que la mission de
+        # collecte qui lui est reellement affectee. Sans cette verification,
+        # un livreur dont la mission a ete reaffectee (OPS ou BC3) pouvait,
+        # depuis un ecran reste ouvert, reprendre silencieusement la
+        # collecte a la place du livreur reellement affecte (audit de
+        # stabilite, lot 3).
+        from orders.models import DeliveryLeg as _DeliveryLegCheck
+        existing_pickup_leg = _DeliveryLegCheck.objects.filter(order=order, leg_type='pickup').first()
+        if existing_pickup_leg and existing_pickup_leg.driver_id and existing_pickup_leg.driver_id != driver.id:
+            return Response({'error': 'Mission de collecte affectee a un autre livreur'}, status=403)
+
         articles_count = request.data.get('articles_count', 0)
         try: articles_count = int(articles_count)
         except: articles_count = 0

@@ -1677,15 +1677,15 @@ def api_abonnement_reserver(request):
     taille_sac = request.data.get('taille_sac', '').strip()
     jour_collecte = request.data.get('jour_collecte')
     jour_livraison = request.data.get('jour_livraison')
-    essai_origine_id = request.data.get('essai_origine')  # optionnel (Lot 5) - conversion post-essai
+    essai_origine_code = request.data.get('essai_origine')  # optionnel (Lot 5) - conversion post-essai, order.code
 
     if not all([telephone, nom, pack, taille_sac]) or jour_collecte is None or jour_livraison is None:
         return Response({'error': 'Tous les champs sont requis'}, status=400)
 
     essai_origine = None
-    if essai_origine_id:
+    if essai_origine_code:
         try:
-            essai_origine = Order.objects.get(id=essai_origine_id, order_origin='routine_trial')
+            essai_origine = Order.objects.get(code=essai_origine_code, order_origin='routine_trial')
         except Order.DoesNotExist:
             return Response({'error': "Essai d'origine introuvable."}, status=404)
 
@@ -1744,12 +1744,23 @@ def api_abonnement_reserver(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def api_mon_abonnement_v1(request):
-    """GET /api/abonnement/mon-abonnement/?telephone=..."""
+    """GET /api/abonnement/mon-abonnement/?telephone=... - identite verifiee via le JWT client."""
     from orders.models import Abonnement
+
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        import jwt
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        auth_customer = Customer.objects.get(id=payload['cid'])
+    except Exception:
+        return Response({'error': 'Non autorisé'}, status=401)
 
     telephone = request.GET.get('telephone', '').strip()
     if not telephone:
         return Response({'error': 'telephone requis'}, status=400)
+
+    if auth_customer.phone != telephone:
+        return Response({'error': 'Non autorisé'}, status=403)
 
     try:
         customer = Customer.objects.get(phone=telephone)
@@ -1943,17 +1954,21 @@ def api_routine_essai(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
-def api_routine_essai_detail(request, order_id):
+def api_routine_essai_detail(request, order_code):
     """
-    GET /api/routine/essai/<id>/
+    GET /api/routine/essai/<code>/
     Lecture publique des infos d'un essai, pour prerempllir l'ecran de
     conversion post-essai (Lot 5) - jamais de donnee sensible au-dela
     de ce que le client connait deja.
+
+    Identifiee par order.code (aleatoire, non enumerable), jamais par
+    l'id sequentiel de la commande - l'id permettrait de deviner/parcourir
+    les essais d'autres clients et d'en recuperer nom + telephone.
     """
     from orders.models import Order, AbonnementPricingRule
 
     try:
-        order = Order.objects.get(id=order_id, order_origin='routine_trial')
+        order = Order.objects.get(code=order_code, order_origin='routine_trial')
     except Order.DoesNotExist:
         return Response({'error': 'Essai introuvable'}, status=404)
 

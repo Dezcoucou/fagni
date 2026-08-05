@@ -19,7 +19,7 @@ class ApiRoutineEssaiDetailTests(TestCase):
             customer=self.customer, order_origin="routine_trial", satisfaction_reponse="positive",
             routine_choisie="duo", pricing_mode="bag", bag_size="M",
         )
-        response = self.client.get(f"/api/routine/essai/{order.id}/")
+        response = self.client.get(f"/api/routine/essai/{order.code}/")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["routine"], "duo")
@@ -31,11 +31,20 @@ class ApiRoutineEssaiDetailTests(TestCase):
             customer=self.customer, order_origin="routine_trial", satisfaction_reponse="pending",
             pricing_mode="bag", bag_size="M",
         )
-        response = self.client.get(f"/api/routine/essai/{order.id}/")
+        response = self.client.get(f"/api/routine/essai/{order.code}/")
         self.assertEqual(response.status_code, 422)
 
     def test_essai_introuvable_404(self):
-        response = self.client.get("/api/routine/essai/99999/")
+        response = self.client.get("/api/routine/essai/ODRINTROUVABLE/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_essai_non_enumerable_par_id_sequentiel(self):
+        """Preuve du correctif : l'id sequentiel de la commande ne doit plus jamais donner acces a l'essai."""
+        order = Order.objects.create(
+            customer=self.customer, order_origin="routine_trial", satisfaction_reponse="positive",
+            routine_choisie="duo", pricing_mode="bag", bag_size="M",
+        )
+        response = self.client.get(f"/api/routine/essai/{order.id}/")
         self.assertEqual(response.status_code, 404)
 
 
@@ -54,7 +63,7 @@ class ApiAbonnementReserverAvecEssaiOrigineTests(TestCase):
         base = {
             "telephone": "0700000701", "nom": "Client Test",
             "pack": "confort", "taille_sac": "M", "jour_collecte": 0, "jour_livraison": 3,
-            "essai_origine": self.order.id,
+            "essai_origine": self.order.code,
         }
         base.update(overrides)
         return base
@@ -87,7 +96,7 @@ class ApiAbonnementReserverAvecEssaiOrigineTests(TestCase):
 
     def test_essai_origine_inexistant_404(self):
         response = self.client.post(
-            "/api/abonnement/reserver/", data=self._payload(essai_origine=99999),
+            "/api/abonnement/reserver/", data=self._payload(essai_origine="ODRINTROUVABLE"),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 404)

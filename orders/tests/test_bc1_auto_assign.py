@@ -417,3 +417,81 @@ class Bc1CanceledOrderTests(TestCase):
         self.assertFalse(result["driver_assigned"])
         self.assertIsNone(order.laundry_partner)
         self.assertIsNone(order.pickup_driver)
+
+
+@override_settings(AUTO_ASSIGN_ON_CLIENT_ORDER=True)
+class Bc1ProductionDiagnosticTests(TestCase):
+    """
+    Reproduit les deux causes racines identifiees pour "l'auto-affectation
+    ne trouve/n'assigne aucun candidat en production" et prouve que le
+    diagnostic (journal fagni.bc1.assignment) rend chaque cas identifiable
+    sans avoir a lire une trace technique.
+    """
+
+    def test_aucun_partenaire_actif_journalise_avec_la_raison_du_moteur(self):
+        """Cause A : aucun LaundryPartner/DeliveryPartner actif en base.
+        pick_best_laundry/pick_best_driver renvoient (None, raison) - avant
+        ce correctif, cette raison etait calculee puis jetee sans jamais
+        etre journalisee."""
+        customer = _make_customer()
+        # Aucun _make_laundry()/_make_driver() : base vide, exactement le cas
+        # ou personne n'a encore ete active en production.
+
+        with self.assertLogs("fagni.bc1.assignment", level="WARNING") as logs:
+            resp = self.client.post(
+                reverse('api-client-create-order'),
+                data=json.dumps(_order_payload()),
+                content_type='application/json',
+                **_client_headers(customer),
+            )
+
+        self.assertEqual(resp.status_code, 201)
+        order = Order.objects.get(id=resp.json()['order_id'])
+        self.assertIsNone(order.laundry_partner)
+        self.assertIsNone(order.pickup_driver)
+
+        joined = "\n".join(logs.output)
+        self.assertIn("BC1 pressing: aucun candidat", joined)
+        self.assertIn("Aucune blanchisserie active.", joined)
+        self.assertIn("BC1 livreur: aucun candidat", joined)
+        self.assertIn("Aucun livreur actif disponible.", joined)
+
+    def test_commande_sans_coordonnees_bloque_uniquement_le_livreur(self):
+        """
+        Cause B : le client n'a pas transmis pickup_lat/pickup_lng (GPS
+        refuse/indisponible cote telephone) - la commande est quand meme
+        creee car is_in_delivery_zone() accepte l'adresse "Riviera 3" par
+        mot-cle, sans jamais verifier les coordonnees dans ce cas.
+
+        Consequence exacte, verifiee ici : pick_best_laundry tolere les
+        coordonnees manquantes (fallback "1ere active"), mais
+        pick_best_driver refuse tout net et ne retourne JAMAIS aucun
+        livreur dans ce cas precis, meme si des livreurs actifs existent -
+        c'est une dissymetrie reelle entre les deux moteurs, pas une
+        question de donnees partenaires.
+        """
+        customer = _make_customer()
+        _make_laundry()
+        _make_driver()
+
+        payload = _order_payload()
+        del payload['pickup_lat']
+        del payload['pickup_lng']
+
+        with self.assertLogs("fagni.bc1.assignment", level="INFO") as logs:
+            resp = self.client.post(
+                reverse('api-client-create-order'),
+                data=json.dumps(payload),
+                content_type='application/json',
+                **_client_headers(customer),
+            )
+
+        self.assertEqual(resp.status_code, 201, "la commande doit se creer meme sans coordonnees (fallback adresse)")
+        order = Order.objects.get(id=resp.json()['order_id'])
+
+        self.assertIsNotNone(order.laundry_partner, "le pressing doit quand meme etre affecte (fallback tolerant)")
+        self.assertIsNone(order.pickup_driver, "le livreur ne doit jamais etre affecte sans coordonnees client")
+
+        joined = "\n".join(logs.output)
+        self.assertIn("BC1 livreur: aucun candidat", joined)
+        self.assertIn("Coordonnées client indisponibles", joined)

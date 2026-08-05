@@ -4,7 +4,12 @@ Tests des endpoints Abonnement V1 - FAGNI (24 juillet 2026).
 from decimal import Decimal
 from django.test import TestCase
 
+from orders.client_api import _make_token
 from orders.models import Customer, Abonnement, AbonnementPricingRule
+
+
+def _client_headers(customer):
+    return {'HTTP_AUTHORIZATION': f'Bearer {_make_token(customer)}'}
 
 
 class ApiAbonnementEstimerTests(TestCase):
@@ -96,7 +101,10 @@ class ApiAbonnementReserverTests(TestCase):
 
 class ApiMonAbonnementV1Tests(TestCase):
     def test_telephone_sans_abonnement_retourne_none(self):
-        response = self.client.get("/api/abonnement/mon-abonnement/?telephone=0700000101")
+        customer = Customer.objects.create(name="Sans Abo", phone="0700000101", address="")
+        response = self.client.get(
+            "/api/abonnement/mon-abonnement/?telephone=0700000101", **_client_headers(customer),
+        )
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.json()["abonnement"])
 
@@ -106,11 +114,32 @@ class ApiMonAbonnementV1Tests(TestCase):
             customer=customer, pack="confort", taille_sac="M",
             jour_collecte=0, jour_livraison=3, prix_verrouille=14800,
         )
-        response = self.client.get("/api/abonnement/mon-abonnement/?telephone=0700000102")
+        response = self.client.get(
+            "/api/abonnement/mon-abonnement/?telephone=0700000102", **_client_headers(customer),
+        )
         self.assertEqual(response.status_code, 200)
         data = response.json()["abonnement"]
         self.assertEqual(data["statut"], "Actif")
         self.assertEqual(data["prix"], 14800.0)
+
+    def test_sans_jeton_refuse(self):
+        """Preuve du correctif : avant, aucune authentification n'etait requise ici."""
+        Customer.objects.create(name="Test", phone="0700000103", address="")
+        response = self.client.get("/api/abonnement/mon-abonnement/?telephone=0700000103")
+        self.assertEqual(response.status_code, 401)
+
+    def test_jeton_dun_autre_client_refuse(self):
+        """Un client authentifie ne doit jamais pouvoir consulter l'abonnement d'un autre."""
+        victime = Customer.objects.create(name="Victime", phone="0700000104", address="")
+        Abonnement.objects.create(
+            customer=victime, pack="confort", taille_sac="M",
+            jour_collecte=0, jour_livraison=3, prix_verrouille=14800,
+        )
+        attaquant = Customer.objects.create(name="Attaquant", phone="0700000105", address="")
+        response = self.client.get(
+            "/api/abonnement/mon-abonnement/?telephone=0700000104", **_client_headers(attaquant),
+        )
+        self.assertEqual(response.status_code, 403)
 
 
 class TailleXLEtFacturationMensuelleTests(TestCase):

@@ -2100,91 +2100,169 @@ class Order(models.Model):
         return rem.quantize(Decimal("0.01"))
 
 
-    def add_payment(self, amount, channel="psp", reference="", source="driver", confirmed_by=None, save=True):
+    def add_payment(
+        self,
+        amount,
+        channel="psp",
+        reference="",
+        source="driver",
+        confirmed_by=None,
+        save=True,
+    ):
         """
-        Enregistre un paiement (partiel ou total) avec garde-fous:
-        - total_client_ttc == 0 => ValidationError
-        - commande déjà soldée => None (ne crée rien)
-        - surpaiement => cappé au reste dû
-        - idempotent si reference fournie (order+reference unique soft via get_or_create)
+        Enregistre un paiement dans Payment, source de vérité canonique.
+
+        Règles :
+        - refuse les commandes annulées ;
+        - refuse un total_client_ttc nul ;
+        - plafonne un nouveau paiement au reste dû ;
+        - une référence déjà utilisée avec le même montant est rejouable
+          sans créer ni modifier un second paiement ;
+        - une référence déjà utilisée avec un montant différent est refusée ;
+        - Payment.save() assure la synchronisation de amount_paid et
+          payment_status sur la commande.
         """
         from decimal import Decimal
+
         from django.core.exceptions import ValidationError
         from django.db.models import Sum
+
         from .models import Payment
 
-        # normalisation amount -> int FCFA
+        reference = (reference or "").strip()
+        channel = (channel or "psp")[:20]
+        source = (source or "system")[:20]
+
         try:
-            amt = int(Decimal(str(amount or 0)))
-        except Exception:
-            amt = 0
-        if amt <= 0:
+            requested_amount = Decimal(str(amount or 0))
+        except Exception as exc:
+            raise ValidationError(
+                "Paiement refusé : montant invalide."
+            ) from exc
+
+        if requested_amount <= 0:
             return None
 
-        channel = (channel or "psp")[:20]
-        reference = (reference or "").strip()
-
-        # refresh minimal (évite états stale)
         try:
-            self.refresh_from_db(fields=["total_client_ttc", "payment_status", "amount_paid"])
+            self.refresh_from_db(
+                fields=[
+                    "status",
+                    "total_client_ttc",
+                    "payment_status",
+                    "amount_paid",
+                ]
+            )
         except Exception:
-            import logging
-            logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=1961")
+            pass
 
-        total_ttc = Decimal(str(getattr(self, "total_client_ttc", 0) or 0))
+        if getattr(self, "status", None) == "canceled":
+            raise ValidationError(
+                "Impossible d'enregistrer un paiement sur une commande annulée."
+            )
+
+        total_ttc = Decimal(
+            str(getattr(self, "total_client_ttc", 0) or 0)
+        )
+
         if total_ttc <= 0:
-            raise ValidationError("Impossible d'enregistrer un paiement : total_client_ttc est à 0.")
+            raise ValidationError(
+                "Impossible d'enregistrer un paiement : "
+                "total_client_ttc est à 0."
+            )
 
-        # source de vérité: somme des paiements existants
-        paid_sum = Payment.objects.filter(order=self).aggregate(s=Sum("amount")).get("s") or 0
+        # L'idempotence doit être vérifiée AVANT le calcul du reste dû.
+        # Sinon le rejeu d'un paiement déjà appliqué serait interprété comme
+        # un nouveau paiement sur le solde restant.
+        if reference:
+            existing = (
+                Payment.objects
+                .filter(order=self, reference=reference)
+                .order_by("id")
+                .first()
+            )
+
+            if existing is not None:
+                existing_amount = Decimal(str(existing.amount or 0))
+
+                if existing_amount != requested_amount:
+                    raise ValidationError(
+                        "Cette référence de paiement existe déjà avec "
+                        "un montant différent."
+                    )
+
+                # Attribut non persisté, uniquement destiné à informer
+                # apply_order_payment() qu'aucune nouvelle écriture n'a eu lieu.
+                existing._fagni_created = False
+
+                if save:
+                    try:
+                        self.refresh_from_db(
+                            fields=[
+                                "amount_paid",
+                                "payment_status",
+                                "payment_date",
+                            ]
+                        )
+                    except Exception:
+                        pass
+
+                return existing
+
+        paid_sum = (
+            Payment.objects
+            .filter(order=self)
+            .aggregate(total=Sum("amount"))
+            .get("total")
+            or 0
+        )
         paid_sum = Decimal(str(paid_sum))
+
         if paid_sum < 0:
             paid_sum = Decimal("0")
 
         remaining = total_ttc - paid_sum
+
         if remaining <= 0:
-            # commande déjà soldée
             return None
 
-        # cap au reste dû
-        capped = Decimal(str(min(Decimal(str(amt)), remaining)))
-        amt = int(capped)
-        if amt <= 0:
+        amount_to_create = min(requested_amount, remaining)
+
+        # Les montants FAGNI sont enregistrés en FCFA entiers.
+        amount_to_create = Decimal(int(amount_to_create))
+
+        if amount_to_create <= 0:
             return None
 
-        # idempotence: si reference existe déjà, on retourne l'existant (sans créer un nouveau)
-        if reference:
-            p, created = Payment.objects.get_or_create(
-                order=self,
-                reference=reference,
-                defaults={"amount": amt, "channel": channel, "source": source, "confirmed_by": confirmed_by},
-            )
-            # si on vient de le créer mais qu'entre-temps remaining a changé, le Payment.save guard gérera.
-            # normaliser champs (soft)
-            upd = {}
-            if p.amount != amt:
-                upd["amount"] = amt
-            if p.channel != channel:
-                upd["channel"] = channel
-            if p.source != source:
-                upd["source"] = source
-            if confirmed_by and p.confirmed_by_id != getattr(confirmed_by, "id", None):
-                upd["confirmed_by"] = confirmed_by
-            if upd:
-                Payment.objects.filter(pk=p.pk).update(**upd)
-        else:
-            p = Payment.objects.create(
-                order=self,
-                amount=amt,
-                channel=channel,
-                reference="",
-                source=source,
-                confirmed_by=confirmed_by,
-            )
+        payment = Payment.objects.create(
+            order=self,
+            amount=amount_to_create,
+            channel=channel,
+            reference=reference,
+            source=source,
+            confirmed_by=confirmed_by,
+        )
+        payment._fagni_created = True
 
+        # Payment.save() a déjà synchronisé la commande par mise à jour DB.
+        # On recharge seulement l'instance courante : ne surtout pas rappeler
+        # self.save() ou sync_payment_status_from_payments(save=True), qui
+        # entreraient en conflit avec le garde-fou de Order.save().
         if save:
-            self.sync_payment_status_from_payments(save=True)
-        return p
+            try:
+                self.refresh_from_db(
+                    fields=[
+                        "amount_paid",
+                        "payment_status",
+                        "payment_date",
+                        "invoice_date",
+                        "invoice_status",
+                    ]
+                )
+            except Exception:
+                pass
+
+        return payment
+
 
     # ---------- Propriétés de calcul ----------
     @property

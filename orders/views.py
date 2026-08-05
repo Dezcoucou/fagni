@@ -6360,10 +6360,22 @@ def client_order_pay_cash(request, order_id: int):
     return resp
 
 
-def apply_order_payment(order, add_amount, *, channel="manual", reference="", note=""):
+def apply_order_payment(
+    order,
+    add_amount,
+    *,
+    channel="manual",
+    reference="",
+    note="",
+):
     """
-    Applique un paiement à une commande de façon centralisée et traçable.
-    Retourne un dict:
+    Orchestrateur canonique des paiements FAGNI.
+
+    Payment est la source de vérité comptable.
+    Order.amount_paid et Order.payment_status sont des projections
+    synchronisées à partir des Payment.
+
+    Retourne :
     {
         "applied": Decimal,
         "amount_paid": Decimal,
@@ -6371,26 +6383,42 @@ def apply_order_payment(order, add_amount, *, channel="manual", reference="", no
         "payment_status": str,
         "became_paid": bool,
         "already_settled": bool,
+        "already_applied": bool,
     }
     """
     from decimal import Decimal
+
+    from django.core.exceptions import ValidationError
     from django.db import transaction
-    from django.utils import timezone
-    from orders.models import OrderPaymentEvent
+    from django.db.models import Sum
+
+    from orders.models import OrderPaymentEvent, Payment
 
     try:
-        add_amount = Decimal(str(add_amount or 0))
-    except Exception:
-        add_amount = DECIMAL_ZERO
+        requested_amount = Decimal(str(add_amount or 0))
+    except Exception as exc:
+        raise ValidationError(
+            "Paiement refusé : montant invalide."
+        ) from exc
 
-    if add_amount <= DECIMAL_ZERO:
+    reference = (reference or "").strip()
+    channel = (channel or "manual").strip() or "manual"
+
+    if requested_amount <= DECIMAL_ZERO:
         return {
             "applied": DECIMAL_ZERO,
-            "amount_paid": DECIMAL_ZERO,
-            "remaining": DECIMAL_ZERO,
-            "payment_status": getattr(order, "payment_status", "") or "",
+            "amount_paid": Decimal(
+                str(getattr(order, "amount_paid", 0) or 0)
+            ),
+            "remaining": Decimal(
+                str(getattr(order, "amount_remaining", 0) or 0)
+            ),
+            "payment_status": (
+                getattr(order, "payment_status", "") or ""
+            ),
             "became_paid": False,
             "already_settled": False,
+            "already_applied": False,
         }
 
     with transaction.atomic():
@@ -6401,138 +6429,283 @@ def apply_order_payment(order, add_amount, *, channel="manual", reference="", no
             .get(pk=order.pk)
         )
 
+        if getattr(order, "status", None) == "canceled":
+            raise ValidationError(
+                "Impossible d'enregistrer un paiement sur une commande annulée."
+            )
+
         try:
             finance_summary = build_order_finance_summary(order)
         except Exception:
             finance_summary = {}
 
         try:
-            total = Decimal(str(finance_summary.get("total_client_ttc", 0) or 0))
+            total = Decimal(
+                str(
+                    finance_summary.get(
+                        "total_client_ttc",
+                        getattr(order, "total_client_ttc", 0),
+                    )
+                    or 0
+                )
+            )
         except Exception:
             total = DECIMAL_ZERO
 
-        try:
-            already_paid = Decimal(str(getattr(order, "amount_paid", 0) or 0))
-        except Exception:
-            already_paid = DECIMAL_ZERO
+        if total <= DECIMAL_ZERO:
+            raise ValidationError(
+                "Impossible d'enregistrer un paiement : "
+                "total_client_ttc est à 0."
+            )
 
-        if total < DECIMAL_ZERO:
-            total = DECIMAL_ZERO
+        # --------------------------------------------------------
+        # Idempotence stricte avant toute opération wallet ou DB
+        # --------------------------------------------------------
+        if reference:
+            existing_payment = (
+                Payment.objects
+                .filter(order=order, reference=reference)
+                .order_by("id")
+                .first()
+            )
+
+            if existing_payment is not None:
+                existing_amount = Decimal(
+                    str(existing_payment.amount or 0)
+                )
+
+                if existing_amount != requested_amount:
+                    raise ValidationError(
+                        "Cette référence de paiement existe déjà avec "
+                        "un montant différent."
+                    )
+
+                order.refresh_from_db(
+                    fields=[
+                        "amount_paid",
+                        "payment_status",
+                        "payment_date",
+                    ]
+                )
+
+                amount_paid = Decimal(
+                    str(getattr(order, "amount_paid", 0) or 0)
+                )
+                remaining = total - amount_paid
+
+                if remaining < DECIMAL_ZERO:
+                    remaining = DECIMAL_ZERO
+
+                return {
+                    "applied": DECIMAL_ZERO,
+                    "amount_paid": amount_paid,
+                    "remaining": remaining,
+                    "payment_status": (
+                        getattr(order, "payment_status", "") or ""
+                    ),
+                    "became_paid": False,
+                    "already_settled": remaining <= DECIMAL_ZERO,
+                    "already_applied": True,
+                }
+
+        paid_sum = (
+            Payment.objects
+            .filter(order=order)
+            .aggregate(total=Sum("amount"))
+            .get("total")
+            or 0
+        )
+        already_paid = Decimal(str(paid_sum))
+
         if already_paid < DECIMAL_ZERO:
             already_paid = DECIMAL_ZERO
 
         remaining = total - already_paid
+
         if remaining < DECIMAL_ZERO:
             remaining = DECIMAL_ZERO
 
         if remaining <= DECIMAL_ZERO:
+            order.refresh_from_db(
+                fields=["amount_paid", "payment_status", "payment_date"]
+            )
+
             return {
                 "applied": DECIMAL_ZERO,
-                "amount_paid": already_paid,
+                "amount_paid": Decimal(
+                    str(getattr(order, "amount_paid", 0) or 0)
+                ),
                 "remaining": DECIMAL_ZERO,
-                "payment_status": getattr(order, "payment_status", "") or "",
+                "payment_status": (
+                    getattr(order, "payment_status", "") or ""
+                ),
                 "became_paid": False,
                 "already_settled": True,
+                "already_applied": False,
             }
 
-        to_apply = add_amount if add_amount <= remaining else remaining
+        to_apply = min(requested_amount, remaining)
+        to_apply = Decimal(int(to_apply))
+
         if to_apply <= DECIMAL_ZERO:
             return {
                 "applied": DECIMAL_ZERO,
                 "amount_paid": already_paid,
                 "remaining": remaining,
-                "payment_status": getattr(order, "payment_status", "") or "",
+                "payment_status": (
+                    getattr(order, "payment_status", "") or ""
+                ),
                 "became_paid": False,
                 "already_settled": False,
+                "already_applied": False,
             }
 
-        previous_payment_status = getattr(order, "payment_status", None)
+        previous_payment_status = (
+            getattr(order, "payment_status", None) or "pending"
+        )
         previous_amount_paid = already_paid
 
-        # 🔒 Débit wallet centralisé pour wallet_auto
+        # wallet_auto est le seul canal pour lequel cette fonction effectue
+        # elle-même le débit. Le canal "wallet" est déjà débité explicitement
+        # par client_order_pay_wave_page avant cet appel.
         if channel == "wallet_auto":
-            from wallets.services import get_or_create_wallet_for_customer, debit_wallet
+            from wallets.services import (
+                debit_wallet,
+                get_or_create_wallet_for_customer,
+            )
 
             wallet = get_or_create_wallet_for_customer(order.customer)
-            debit_wallet(
+
+            wallet_tx = debit_wallet(
                 wallet,
                 to_apply,
                 description=f"Paiement commande {order.code}",
                 order=order,
-                idempotency_key=f"WALLET-AUTO-{order.id}-{reference or ''}",
+                idempotency_key=(
+                    reference
+                    or f"WALLET-AUTO-{order.id}"
+                ),
                 tx_type="debit",
             )
 
-        order.amount_paid = already_paid + to_apply
+            if wallet_tx is None:
+                raise ValidationError(
+                    "Le débit du wallet n'a pas pu être enregistré."
+                )
 
-        print("⚠️ WRITE PAYMENT:", order.id, order.amount_paid, getattr(order, "payment_status", None))
-
-        if hasattr(order, "payment_status"):
-            if order.amount_paid <= DECIMAL_ZERO:
-                order.payment_status = "unpaid"
-            elif order.amount_paid >= total:
-                order.payment_status = "paid"
-            else:
-                order.payment_status = "partial"
-
-        update_fields = ["amount_paid"]
-        if hasattr(order, "payment_status"):
-            update_fields.append("payment_status")
-        if hasattr(order, "payment_date") and getattr(order, "payment_status", None) == "paid" and not getattr(order, "payment_date", None):
-            order.payment_date = timezone.now()
-            update_fields.append("payment_date")
-        if channel == "wave_webhook" and hasattr(order, "payment_declared_channel") and getattr(order, "payment_declared_channel", "") != "wave":
-            order.payment_declared_channel = "wave"
-            update_fields.append("payment_declared_channel")
-
-        order.save(update_fields=update_fields)
-
-        OrderPaymentEvent.objects.create(
-            order=order,
-            channel=channel or "manual",
-            reference=reference or "",
+        payment = order.add_payment(
             amount=to_apply,
-            amount_paid_before=previous_amount_paid,
-            amount_paid_after=order.amount_paid,
-            status_before=previous_payment_status or "",
-            status_after=getattr(order, "payment_status", "") or "",
-            note=note or "",
+            channel=channel,
+            reference=reference,
+            source="system",
+            confirmed_by=None,
+            save=True,
         )
 
-    became_paid = previous_payment_status != "paid" and getattr(order, "payment_status", None) == "paid"
-
-    try:
-        if became_paid:
-            generate_mlm_commissions_for_order(order)
-            from orders.services import (
-                completer_parrainage_client_si_applicable,
-                completer_parrainage_livreur_si_applicable,
-                completer_parrainage_pressing_si_applicable,
+        if payment is None:
+            order.refresh_from_db(
+                fields=["amount_paid", "payment_status", "payment_date"]
             )
-            completer_parrainage_client_si_applicable(order)
-            completer_parrainage_livreur_si_applicable(order)
-            completer_parrainage_pressing_si_applicable(order)
-        apply_fagni_monetization(order)
-    except Exception:
-        import logging
-        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6471")
+
+            current_paid = Decimal(
+                str(getattr(order, "amount_paid", 0) or 0)
+            )
+            current_remaining = total - current_paid
+
+            if current_remaining < DECIMAL_ZERO:
+                current_remaining = DECIMAL_ZERO
+
+            return {
+                "applied": DECIMAL_ZERO,
+                "amount_paid": current_paid,
+                "remaining": current_remaining,
+                "payment_status": (
+                    getattr(order, "payment_status", "") or ""
+                ),
+                "became_paid": False,
+                "already_settled": current_remaining <= DECIMAL_ZERO,
+                "already_applied": False,
+            }
+
+        created = bool(getattr(payment, "_fagni_created", True))
+
+        order.refresh_from_db()
+
+        amount_paid_after = Decimal(
+            str(getattr(order, "amount_paid", 0) or 0)
+        )
+        payment_status_after = (
+            getattr(order, "payment_status", "") or ""
+        )
+
+        applied_amount = (
+            Decimal(str(payment.amount or 0))
+            if created
+            else DECIMAL_ZERO
+        )
+
+        if created:
+            OrderPaymentEvent.objects.create(
+                order=order,
+                channel=channel,
+                reference=reference,
+                amount=applied_amount,
+                amount_paid_before=previous_amount_paid,
+                amount_paid_after=amount_paid_after,
+                status_before=previous_payment_status,
+                status_after=payment_status_after,
+                note=note or "",
+            )
+
+    became_paid = (
+        previous_payment_status != "paid"
+        and payment_status_after == "paid"
+    )
+
+    # Les effets complémentaires restent hors du verrou principal.
+    # Les services appelés doivent conserver leur propre idempotence.
+    if created:
+        try:
+            if became_paid:
+                generate_mlm_commissions_for_order(order)
+
+                from orders.services import (
+                    completer_parrainage_client_si_applicable,
+                    completer_parrainage_livreur_si_applicable,
+                    completer_parrainage_pressing_si_applicable,
+                )
+
+                completer_parrainage_client_si_applicable(order)
+                completer_parrainage_livreur_si_applicable(order)
+                completer_parrainage_pressing_si_applicable(order)
+
+            apply_fagni_monetization(order)
+
+        except Exception:
+            logging.getLogger("fagni.orders.views").exception(
+                "Échec des effets post-paiement | order_id=%s",
+                getattr(order, "id", None),
+            )
 
     try:
         finance_summary = build_order_finance_summary(order)
-        new_remaining = Decimal(str(finance_summary.get("amount_remaining", 0) or 0))
+        new_remaining = Decimal(
+            str(finance_summary.get("amount_remaining", 0) or 0)
+        )
     except Exception:
-        new_remaining = DECIMAL_ZERO
+        new_remaining = total - amount_paid_after
 
     if new_remaining < DECIMAL_ZERO:
         new_remaining = DECIMAL_ZERO
 
     return {
-        "applied": to_apply,
-        "amount_paid": Decimal(str(getattr(order, "amount_paid", 0) or 0)),
+        "applied": applied_amount,
+        "amount_paid": amount_paid_after,
         "remaining": new_remaining,
-        "payment_status": getattr(order, "payment_status", "") or "",
+        "payment_status": payment_status_after,
         "became_paid": became_paid,
-        "already_settled": False,
+        "already_settled": new_remaining <= DECIMAL_ZERO,
+        "already_applied": not created,
     }
 
 

@@ -68,9 +68,29 @@ class ApiRoutineEssaiTests(TestCase):
         self.assertEqual(Order.objects.filter(order_origin="routine_trial").count(), 1)
 
     def test_nouvel_essai_possible_apres_livraison(self):
+        """
+        Le statut reel utilise par Order (voir Order.STATUS_CHOICES) est
+        'done', jamais 'delivered' - une faute de frappe dans le filtre
+        d'idempotence utilisait 'delivered'/'cancelled', ce qui bloquait
+        en permanence tout nouvel essai pour un client ayant deja eu un
+        essai termine (audit de stabilite, lot 2). Ce test utilise
+        volontairement le vrai statut pour ne plus jamais reproduire ce
+        piege.
+        """
         r1 = self.client.post("/api/routine/essai/", data=self._payload(), content_type="application/json")
         order1 = Order.objects.get(id=r1.json()["order_id"])
-        order1.status = "delivered"
+        order1.status = "done"
+        order1.save()
+
+        r2 = self.client.post("/api/routine/essai/", data=self._payload(), content_type="application/json")
+        self.assertFalse(r2.json()["already_exists"])
+        self.assertNotEqual(r1.json()["order_id"], r2.json()["order_id"])
+
+    def test_nouvel_essai_possible_apres_annulation(self):
+        """Meme correctif : un essai 'canceled' (jamais 'cancelled') ne doit plus bloquer un nouvel essai."""
+        r1 = self.client.post("/api/routine/essai/", data=self._payload(), content_type="application/json")
+        order1 = Order.objects.get(id=r1.json()["order_id"])
+        order1.status = "canceled"
         order1.save()
 
         r2 = self.client.post("/api/routine/essai/", data=self._payload(), content_type="application/json")

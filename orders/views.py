@@ -15049,8 +15049,23 @@ def validate_and_get_coupon_discount(order, coupon_code):
         return Decimal("0"), "client_introuvable", coupon
 
     if coupon.first_order_only:
-        first_order = Order.objects.filter(customer=customer).order_by("created_at", "id").first()
-        if not first_order or getattr(first_order, "id", None) != getattr(order, "id", None):
+        # Une commande technique, abandonnée, non payée ou annulée ne doit
+        # pas faire perdre au client son offre de première commande.
+        #
+        # La première commande commerciale correspond ici à la première
+        # commande réellement payée. L'usage du coupon reste également
+        # protégé plus bas par CouponUsage.
+        previous_paid_order_exists = (
+            Order.objects
+            .filter(
+                customer=customer,
+                payment_status="paid",
+            )
+            .exclude(pk=getattr(order, "pk", None))
+            .exists()
+        )
+
+        if previous_paid_order_exists:
             return Decimal("0"), "reserve_premiere_commande", coupon
 
     already_used = CouponUsage.objects.filter(coupon=coupon, customer=customer).count()

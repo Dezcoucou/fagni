@@ -7275,6 +7275,10 @@ def client_order_item_new(request, order_id):
     if not order:
         return redirect("orders:client_home")
 
+    locked_response = _client_order_locked_response(request, order)
+    if locked_response is not None:
+        return locked_response
+
     error = None
 
     if request.method == "POST":
@@ -7369,6 +7373,10 @@ def client_order_item_edit(request, order_id, item_id):
     if not order:
         return redirect("orders:client_home")
 
+    locked_response = _client_order_locked_response(request, order)
+    if locked_response is not None:
+        return locked_response
+
     item = (
         OrderItem.objects
         .filter(pk=item_id, order=order)
@@ -7441,6 +7449,10 @@ def client_order_item_delete(request, order_id, item_id):
     )
     if not order:
         return redirect("orders:client_home")
+
+    locked_response = _client_order_locked_response(request, order)
+    if locked_response is not None:
+        return locked_response
 
     item = OrderItem.objects.filter(pk=item_id, order=order).first()
     if not item:
@@ -13228,6 +13240,72 @@ def laundry_weighing_dispute(request, order_id):
     return redirect(f"{url}?laundry_id={laundry.id}")
 
 
+def _client_order_lock_reason(order) -> str:
+    """
+    Retourne la raison pour laquelle une commande client ne peut plus être
+    modifiée, ou une chaîne vide lorsqu'elle reste modifiable.
+
+    Une session Wave déjà créée gèle définitivement le montant présenté au
+    prestataire de paiement. Une modification nécessite alors une nouvelle
+    commande, et non la réécriture du prix de la commande existante.
+    """
+    if getattr(order, "status", None) == "canceled":
+        return "order_canceled"
+
+    if not bool(getattr(order, "is_draft", True)):
+        return "order_confirmed"
+
+    payment_status = (
+        getattr(order, "payment_status", "") or ""
+    ).strip().lower()
+
+    if payment_status in {"partial", "paid"}:
+        return "payment_started"
+
+    try:
+        amount_paid = Decimal(
+            str(getattr(order, "amount_paid", 0) or 0)
+        )
+    except Exception:
+        amount_paid = DECIMAL_ZERO
+
+    if amount_paid > DECIMAL_ZERO:
+        return "payment_started"
+
+    if (getattr(order, "wave_checkout_id", "") or "").strip():
+        return "wave_checkout_active"
+
+    return ""
+
+
+def _client_order_locked_response(request, order):
+    reason = _client_order_lock_reason(order)
+
+    if not reason:
+        return None
+
+    if request.method == "POST":
+        resp = JsonResponse(
+            {
+                "ok": False,
+                "error": "order_locked",
+                "reason": reason,
+                "message": (
+                    "Cette commande est verrouillée et ne peut plus être "
+                    "modifiée."
+                ),
+            },
+            status=409,
+        )
+        resp["Cache-Control"] = "no-store"
+        return resp
+
+    return redirect(
+        "orders:client_order_detail",
+        order_id=order.id,
+    )
+
+
 # ============================================================
 # Wizard Client V1 (Step2/3/4) — ajout safe (anti-crash URLs)
 # ============================================================
@@ -13255,6 +13333,10 @@ def client_new_order_step2(request, order_id: int):
     )
     if not order:
         return redirect("orders:client_new_order")
+
+    locked_response = _client_order_locked_response(request, order)
+    if locked_response is not None:
+        return locked_response
 
     display_summary = build_order_display_summary(order)
     finance_summary = build_order_finance_summary(order)
@@ -13336,6 +13418,10 @@ def client_new_order_step3(request, order_id: int):
     )
     if not order:
         return redirect("orders:client_new_order")
+
+    locked_response = _client_order_locked_response(request, order)
+    if locked_response is not None:
+        return locked_response
 
     display_summary = build_order_display_summary(order)
     finance_summary = build_order_finance_summary(order)

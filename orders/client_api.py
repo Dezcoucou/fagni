@@ -261,8 +261,30 @@ def _get_or_create_wave_checkout(order, amount_xof, request):
     api_enabled = bool(getattr(settings, "WAVE_CHECKOUT_ENABLED", False))
     api_key = (getattr(settings, "WAVE_CHECKOUT_API_KEY", "") or "").strip()
 
-    if not api_enabled or not api_key or amount_xof <= 0:
+    try:
+        normalized_amount_xof = int(amount_xof or 0)
+    except (TypeError, ValueError, ArithmeticError):
+        normalized_amount_xof = 0
+
+    order_status = (
+        getattr(order, "status", "") or ""
+    ).strip().lower()
+    payment_status = (
+        getattr(order, "payment_status", "") or ""
+    ).strip().lower()
+
+    # Une commande annulée, déjà soldée ou sans montant payable ne doit
+    # jamais provoquer la création d'une session Wave.
+    if (
+        not api_enabled
+        or not api_key
+        or normalized_amount_xof <= 0
+        or order_status == "canceled"
+        or payment_status == "paid"
+    ):
         return None, None
+
+    amount_xof = normalized_amount_xof
 
     import json
     import time

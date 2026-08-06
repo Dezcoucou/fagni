@@ -5493,7 +5493,7 @@ def client_new_order(request):
                 order.save()
 
             
-            request.session["upsell_data"] = {
+            request.session[f"upsell_data_{order.id}"] = {
                 "express_24h": bool(request.POST.get("express_24h")),
                 "premium_ironing": bool(request.POST.get("premium_ironing")),
                 "fragrance": bool(request.POST.get("fragrance")),
@@ -6127,10 +6127,22 @@ def client_order_detail_json(request, order_id: int):
 def client_order_pay_simulate(request, order_id: int):
 
     """
-    Paiement simulé (MVP) : marque la commande comme payée (amount_paid = total_ttc).
-    Sécurisé par phone cookie.
-    + Guard serveur: refuse si déjà payé.
+    Paiement simulé strictement réservé aux environnements de développement.
+
+    Cette route ne doit jamais pouvoir créer un paiement lorsque DEBUG=False.
     """
+    if not getattr(settings, "DEBUG", False):
+        resp = JsonResponse(
+            {
+                "ok": False,
+                "error": "simulate_disabled",
+                "message": "Le paiement simulé est désactivé sur cet environnement.",
+            },
+            status=403,
+        )
+        resp["Cache-Control"] = "no-store"
+        return resp
+
     phone = _client_phone(request)
     if not phone:
         resp = JsonResponse({"ok": False, "error": "not_authenticated"}, status=401)
@@ -6145,6 +6157,18 @@ def client_order_pay_simulate(request, order_id: int):
     )
     if not order:
         resp = JsonResponse({"ok": False, "error": "order_not_found"}, status=404)
+        resp["Cache-Control"] = "no-store"
+        return resp
+
+    if getattr(order, "status", None) == "canceled":
+        resp = JsonResponse(
+            {
+                "ok": False,
+                "error": "order_canceled",
+                "message": "Une commande annulée ne peut pas être payée.",
+            },
+            status=409,
+        )
         resp["Cache-Control"] = "no-store"
         return resp
 
@@ -6231,15 +6255,18 @@ def _parse_money_amount(raw: str) -> Decimal:
 @client_login_required
 def client_order_pay_cash(request, order_id: int):
     """
-    Déclaration CASH / acompte (V1) :
-    - POST form-data: amount, note (optionnel)
-    - met à jour amount_paid += amount
-    - calcule paid/partial/unpaid
-    + Guard serveur: refuse si déjà payé.
+    Ancien point d'entrée cash côté client.
+
+    Le client ne peut jamais comptabiliser lui-même un paiement cash.
+    La confirmation doit provenir d'un acteur habilité ou des opérations
+    FAGNI, via un parcours vérifié.
     """
     phone = _client_phone(request)
     if not phone:
-        resp = JsonResponse({"ok": False, "error": "not_authenticated"}, status=401)
+        resp = JsonResponse(
+            {"ok": False, "error": "not_authenticated"},
+            status=401,
+        )
         resp["Cache-Control"] = "no-store"
         return resp
 
@@ -6249,100 +6276,65 @@ def client_order_pay_cash(request, order_id: int):
         .filter(pk=order_id, customer__phone=phone)
         .first()
     )
+
     if not order:
-        resp = JsonResponse({"ok": False, "error": "order_not_found"}, status=404)
+        resp = JsonResponse(
+            {"ok": False, "error": "order_not_found"},
+            status=404,
+        )
         resp["Cache-Control"] = "no-store"
         return resp
 
-    finance_summary = build_order_finance_summary(order)
-    total = finance_summary.get("total_client_ttc") or DECIMAL_ZERO
+    if getattr(order, "status", None) == "canceled":
+        resp = JsonResponse(
+            {
+                "ok": False,
+                "error": "order_canceled",
+                "message": "Une commande annulée ne peut pas être payée.",
+            },
+            status=409,
+        )
+        resp["Cache-Control"] = "no-store"
+        return resp
+
     try:
-        total = Decimal(str(total))
+        total = Decimal(
+            str(getattr(order, "total_client_ttc", 0) or 0)
+        )
     except Exception:
         total = DECIMAL_ZERO
 
-    if total <= DECIMAL_ZERO:
-        resp = JsonResponse({"ok": False, "error": "no_total_amount"}, status=400)
-        resp["Cache-Control"] = "no-store"
-        return resp
-
-    # LOT_3_1_GUARD_DOUBLE_PAY_OK — already paid guard
     try:
-        paid_now = getattr(order, "amount_paid", None) or DECIMAL_ZERO
-        paid_now = Decimal(str(paid_now))
-        if paid_now < DECIMAL_ZERO:
-            paid_now = DECIMAL_ZERO
+        paid_now = Decimal(
+            str(getattr(order, "amount_paid", 0) or 0)
+        )
     except Exception:
         paid_now = DECIMAL_ZERO
 
-    if paid_now >= total:
-        resp = JsonResponse({"ok": False, "error": "already_paid"}, status=409)
+    if (
+        getattr(order, "payment_status", None) == "paid"
+        or (total > DECIMAL_ZERO and paid_now >= total)
+    ):
+        resp = JsonResponse(
+            {"ok": False, "error": "already_paid"},
+            status=409,
+        )
         resp["Cache-Control"] = "no-store"
         return resp
 
-    # read input (form ou json)
-    amount_raw = request.POST.get("amount", "")
-    note = (request.POST.get("note", "") or "").strip()
-
-    ct = (request.headers.get("content-type") or "").lower()
-    if "application/json" in ct:
-        try:
-            payload = json.loads((request.body or b"{}").decode("utf-8", errors="replace"))
-            amount_raw = payload.get("amount", amount_raw)
-            note = (payload.get("note", note) or "").strip()
-        except Exception:
-            import logging
-            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6273")
-
-    add_amount = _parse_money_amount(str(amount_raw))
-    if add_amount <= DECIMAL_ZERO:
-        resp = JsonResponse({"ok": False, "error": "invalid_amount"}, status=400)
-        resp["Cache-Control"] = "no-store"
-        return resp
-
-    payment_result = apply_order_payment(
-        order,
-        add_amount,
-        channel="api",
-        reference=f"API-{order.id}",
-        note=note or "Paiement API",
-    )
-
-    try:
-        order.refresh_from_db()
-    except Exception:
-        import logging
-        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6292")
-
-        # LOT 22C — MLM uniquement si la commande vient juste de devenir payée
-        try:
-            if previous_payment_status != "paid" and getattr(order, "payment_status", None) == "paid":
-                generate_mlm_commissions_for_order(order)
-            apply_fagni_monetization(order)
-        except Exception:
-            import logging
-            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6300")
-
-    try:
-        order.refresh_from_db()
-    except Exception:
-        import logging
-        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6305")
-
-    snap = build_order_canonical_snapshot(order)
-    finance_summary = build_order_finance_summary(order)
-
-    resp = JsonResponse({
-        "ok": True,
-        "payment_ui": "paid" if snap.get("payment_status_canonical") == "paid" else "partial",
-        "payment_status": snap.get("payment_status_canonical"),
-        "note": note,
-        "amounts": {
-            "total_ttc": float(Decimal(str(finance_summary.get("total_client_ttc", 0) or 0))),
-            "amount_paid": float(Decimal(str(finance_summary.get("amount_paid", 0) or 0))),
-            "amount_remaining": float(Decimal(str(finance_summary.get("amount_remaining", 0) or 0))),
+    # Sécurité P0 : une déclaration provenant uniquement du client
+    # ne doit jamais alimenter Payment, source de vérité comptable.
+    resp = JsonResponse(
+        {
+            "ok": False,
+            "error": "cash_requires_verification",
+            "message": (
+                "Le paiement cash doit être confirmé par un livreur "
+                "habilité ou par les opérations FAGNI."
+            ),
         },
-    })
+        status=403,
+    )
     resp["Cache-Control"] = "no-store"
     return resp
 
@@ -6911,92 +6903,48 @@ def client_order_pay_wave_page(request, order_id: int):
     # Numéro Wave: priorise settings.WAVE_RECEIVER_PHONE, sinon fallback sur phone client
     wave_phone = (getattr(settings, "WAVE_RECEIVER_PHONE", "") or "").strip() or phone
 
-    # ✅ V2: lien de paiement Wave (Checkout API) avec montant exact
+    # Session Wave Checkout canonique et partagée avec l'API client.
+    # Le helper central assure :
+    # - le verrouillage transactionnel ;
+    # - la réutilisation pendant le TTL ;
+    # - le stockage dans wave_checkout_id / wave_checkout_url ;
+    # - la préservation de payment_declared_reference.
     pay_link = ""
     checkout_id = ""
-    api_enabled = bool(getattr(settings, "WAVE_CHECKOUT_ENABLED", False))
-    api_key = (getattr(settings, "WAVE_CHECKOUT_API_KEY", "") or "").strip()
 
-    # Montant Wave en XOF (entier, pas de décimales)
     try:
-        amount_xof = str(int(wave_remaining))
-    except Exception:
-        amount_xof = "0"
+        amount_xof = int(wave_remaining)
+    except (TypeError, ValueError, ArithmeticError):
+        amount_xof = 0
 
-    if api_enabled and api_key and amount_xof != "0":
+    order_status = (
+        getattr(order, "status", "") or ""
+    ).strip().lower()
+    payment_status = (
+        getattr(order, "payment_status", "") or ""
+    ).strip().lower()
+
+    if (
+        order_status != "canceled"
+        and payment_status != "paid"
+        and amount_xof > 0
+    ):
         try:
-            import json
-            import urllib.request
-            import urllib.error
-            import hmac
-            import hashlib
-            import time
+            from orders.client_api import _get_or_create_wave_checkout
 
-            # Base URL publique (pour success/error)
-            base = (getattr(settings, "SITE_BASE_URL", "") or "").rstrip("/")
-            if not base:
-                # fallback: construit depuis la requête
-                base = request.build_absolute_uri("/").rstrip("/")
-
-            success_url = base + reverse("orders:client_order_detail", args=[order.id]) + "?wave=success"
-            error_url = base + reverse("orders:client_order_detail", args=[order.id]) + "?wave=error"
-
-            payload = {
-                "amount": amount_xof,
-                "currency": "XOF",
-                "success_url": success_url,
-                "error_url": error_url,
-                "client_reference": f"order-{order.id}-{getattr(order,'code',order.id)}",
-            }
-
-            body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            }
-
-            signing_secret = (getattr(settings, "WAVE_CHECKOUT_SIGNING_SECRET", "") or "").strip()
-            if signing_secret:
-                timestamp = str(int(time.time()))
-                signature_payload = timestamp.encode("utf-8") + body
-                signature = hmac.new(
-                    signing_secret.encode("utf-8"),
-                    signature_payload,
-                    hashlib.sha256,
-                ).hexdigest()
-                headers["Wave-Signature"] = f"t={timestamp},v1={signature}"
-
-            req = urllib.request.Request(
-                "https://api.wave.com/v1/checkout/sessions",
-                data=body,
-                headers=headers,
-                method="POST",
+            pay_link, checkout_id = _get_or_create_wave_checkout(
+                order,
+                amount_xof,
+                request,
             )
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-
-            pay_link = (data.get("wave_launch_url") or "").strip()
-            checkout_id = (data.get("id") or "").strip()
-
-            if checkout_id:
-                update_fields = []
-                if getattr(order, "payment_declared_reference", "") != checkout_id:
-                    order.payment_declared_reference = checkout_id
-                    update_fields.append("payment_declared_reference")
-                if getattr(order, "payment_declared_channel", "") != "wave":
-                    order.payment_declared_channel = "wave"
-                    update_fields.append("payment_declared_channel")
-                if update_fields:
-                    try:
-                        order.save(update_fields=update_fields)
-                    except Exception:
-                        order.save()
-
+            pay_link = (pay_link or "").strip()
+            checkout_id = (checkout_id or "").strip()
         except Exception:
-            # On ne casse pas la page: fallback ci-dessous
+            # Une indisponibilité Wave ne doit pas casser la page :
+            # le lien marchand statique reste disponible en repli.
             pay_link = ""
             checkout_id = ""
+
     # Fallback: lien marchand Wave (si pas de pay_link API)
     base_link = (getattr(settings, "WAVE_MERCHANT_LINK_BASE", "") or "").strip()
     if (not pay_link) and base_link:
@@ -7283,6 +7231,10 @@ def client_order_item_new(request, order_id):
     if not order:
         return redirect("orders:client_home")
 
+    locked_response = _client_order_locked_response(request, order)
+    if locked_response is not None:
+        return locked_response
+
     error = None
 
     if request.method == "POST":
@@ -7329,7 +7281,7 @@ def client_order_item_new(request, order_id):
                     logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=7118")
 
                 
-        upsell_data = request.session.get("upsell_data", {})
+        upsell_data = request.session.get(f"upsell_data_{order.id}", {})
 
         if upsell_data:
             upsell, _ = OrderUpsell.objects.get_or_create(order=order)
@@ -7349,7 +7301,7 @@ def client_order_item_new(request, order_id):
                 import logging
                 logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=7138")
 
-            request.session.pop("upsell_data", None)
+            request.session.pop(f"upsell_data_{order.id}", None)
 
         return redirect("orders:client_order_detail", order_id=order.id)
 
@@ -7376,6 +7328,10 @@ def client_order_item_edit(request, order_id, item_id):
     )
     if not order:
         return redirect("orders:client_home")
+
+    locked_response = _client_order_locked_response(request, order)
+    if locked_response is not None:
+        return locked_response
 
     item = (
         OrderItem.objects
@@ -7449,6 +7405,10 @@ def client_order_item_delete(request, order_id, item_id):
     )
     if not order:
         return redirect("orders:client_home")
+
+    locked_response = _client_order_locked_response(request, order)
+    if locked_response is not None:
+        return locked_response
 
     item = OrderItem.objects.filter(pk=item_id, order=order).first()
     if not item:
@@ -13236,6 +13196,72 @@ def laundry_weighing_dispute(request, order_id):
     return redirect(f"{url}?laundry_id={laundry.id}")
 
 
+def _client_order_lock_reason(order) -> str:
+    """
+    Retourne la raison pour laquelle une commande client ne peut plus être
+    modifiée, ou une chaîne vide lorsqu'elle reste modifiable.
+
+    Une session Wave déjà créée gèle définitivement le montant présenté au
+    prestataire de paiement. Une modification nécessite alors une nouvelle
+    commande, et non la réécriture du prix de la commande existante.
+    """
+    if getattr(order, "status", None) == "canceled":
+        return "order_canceled"
+
+    if not bool(getattr(order, "is_draft", True)):
+        return "order_confirmed"
+
+    payment_status = (
+        getattr(order, "payment_status", "") or ""
+    ).strip().lower()
+
+    if payment_status in {"partial", "paid"}:
+        return "payment_started"
+
+    try:
+        amount_paid = Decimal(
+            str(getattr(order, "amount_paid", 0) or 0)
+        )
+    except Exception:
+        amount_paid = DECIMAL_ZERO
+
+    if amount_paid > DECIMAL_ZERO:
+        return "payment_started"
+
+    if (getattr(order, "wave_checkout_id", "") or "").strip():
+        return "wave_checkout_active"
+
+    return ""
+
+
+def _client_order_locked_response(request, order):
+    reason = _client_order_lock_reason(order)
+
+    if not reason:
+        return None
+
+    if request.method == "POST":
+        resp = JsonResponse(
+            {
+                "ok": False,
+                "error": "order_locked",
+                "reason": reason,
+                "message": (
+                    "Cette commande est verrouillée et ne peut plus être "
+                    "modifiée."
+                ),
+            },
+            status=409,
+        )
+        resp["Cache-Control"] = "no-store"
+        return resp
+
+    return redirect(
+        "orders:client_order_detail",
+        order_id=order.id,
+    )
+
+
 # ============================================================
 # Wizard Client V1 (Step2/3/4) — ajout safe (anti-crash URLs)
 # ============================================================
@@ -13264,13 +13290,17 @@ def client_new_order_step2(request, order_id: int):
     if not order:
         return redirect("orders:client_new_order")
 
+    locked_response = _client_order_locked_response(request, order)
+    if locked_response is not None:
+        return locked_response
+
     display_summary = build_order_display_summary(order)
     finance_summary = build_order_finance_summary(order)
 
     categories = ServiceCategory.objects.all().order_by("name")
     error = None
 
-    selected_pricing_mode = getattr(order, "pricing_mode", None) or request.session.get("client_wizard_pricing_mode") or "bag"
+    selected_pricing_mode = getattr(order, "pricing_mode", None) or request.session.get(f"client_wizard_pricing_mode_{order.id}") or "bag"
 
     if request.method == "POST":
         # 1) mode de commande
@@ -13278,7 +13308,7 @@ def client_new_order_step2(request, order_id: int):
         if pricing_mode not in ("bag", "item"):
             pricing_mode = "bag"
 
-        request.session["client_wizard_pricing_mode"] = pricing_mode
+        request.session[f"client_wizard_pricing_mode_{order.id}"] = pricing_mode
         selected_pricing_mode = pricing_mode
         order.pricing_mode = pricing_mode
 
@@ -13288,9 +13318,9 @@ def client_new_order_step2(request, order_id: int):
             if not cat_id.isdigit():
                 error = "Merci de choisir une catégorie."
             else:
-                request.session["client_wizard_category_id"] = int(cat_id)
+                request.session[f"client_wizard_category_id_{order.id}"] = int(cat_id)
         else:
-            request.session.pop("client_wizard_category_id", None)
+            request.session.pop(f"client_wizard_category_id_{order.id}", None)
 
         # 3) mode livraison
         delivery_mode = (request.POST.get("delivery_mode") or "").strip() or "standard"
@@ -13323,7 +13353,7 @@ def client_new_order_step2(request, order_id: int):
     return render(request, "orders/client_new_order_step2.html", {
         "order": order,
         "categories": categories,
-        "selected_category_id": request.session.get("client_wizard_category_id"),
+        "selected_category_id": request.session.get(f"client_wizard_category_id_{order.id}"),
         "selected_pricing_mode": selected_pricing_mode,
         "error": error,
     })
@@ -13345,14 +13375,18 @@ def client_new_order_step3(request, order_id: int):
     if not order:
         return redirect("orders:client_new_order")
 
+    locked_response = _client_order_locked_response(request, order)
+    if locked_response is not None:
+        return locked_response
+
     display_summary = build_order_display_summary(order)
     finance_summary = build_order_finance_summary(order)
 
-    pricing_mode = getattr(order, "pricing_mode", None) or request.session.get("client_wizard_pricing_mode") or "bag"
+    pricing_mode = getattr(order, "pricing_mode", None) or request.session.get(f"client_wizard_pricing_mode_{order.id}") or "bag"
 
     # Catégorie choisie en step2 (stockée en session)
     categories = ServiceCategory.objects.order_by("name")
-    selected_id = request.session.get("client_wizard_category_id")
+    selected_id = request.session.get(f"client_wizard_category_id_{order.id}")
     category = None
     if selected_id:
         category = categories.filter(id=selected_id).first()
@@ -13553,6 +13587,26 @@ def client_new_order_step4(request, order_id: int):
     if not order:
         return redirect("orders:client_new_order")
 
+    if getattr(order, "status", None) == "canceled":
+        if request.method == "POST":
+            resp = JsonResponse(
+                {
+                    "ok": False,
+                    "error": "order_canceled",
+                    "message": (
+                        "Une commande annulée ne peut pas être confirmée."
+                    ),
+                },
+                status=409,
+            )
+            resp["Cache-Control"] = "no-store"
+            return resp
+
+        return redirect(
+            "orders:client_order_detail",
+            order_id=order.id,
+        )
+
     from decimal import Decimal
     from orders.models import OrderItem
 
@@ -13750,86 +13804,113 @@ def client_new_order_step4(request, order_id: int):
             logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13485")
 
         try:
-            from orders.assignment import pick_best_laundry
-            laundry, _laundry_reason = pick_best_laundry(order)
+            payment_total = Decimal(
+                str(getattr(order, "total_client_ttc", 0) or 0)
+            )
         except Exception:
-            laundry, _laundry_reason = None, None
+            payment_total = Decimal("0")
 
-        if laundry:
+        try:
+            payment_paid = Decimal(
+                str(getattr(order, "amount_paid", 0) or 0)
+            )
+        except Exception:
+            payment_paid = Decimal("0")
+
+        payment_status = (
+            getattr(order, "payment_status", "") or ""
+        ).strip().lower()
+
+        payment_confirmed = bool(
+            payment_total > Decimal("0")
+            and payment_paid >= payment_total
+            and payment_status == "paid"
+        )
+
+        # Aucun pressing, livreur ou statut opérationnel actif avant
+        # confirmation comptable du paiement.
+        if payment_confirmed:
             try:
-                order.laundry_partner = laundry
+                from orders.assignment import pick_best_laundry
+                laundry, _laundry_reason = pick_best_laundry(order)
             except Exception:
-                import logging
-                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13497")
+                laundry, _laundry_reason = None, None
 
-        try:
-            from orders.assignment import pick_best_driver
-            driver, _driver_reason = pick_best_driver(order)
-        except Exception:
-            driver, _driver_reason = None, None
-
-        if driver:
-            try:
-                order.delivery_partner = driver
-            except Exception:
-                import logging
-                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13509")
-
-        try:
-            update_fields = []
-            if hasattr(order, "laundry_partner_id"):
-                update_fields.append("laundry_partner")
-            if hasattr(order, "delivery_partner_id"):
-                update_fields.append("delivery_partner")
-            if update_fields:
-                order.save(update_fields=update_fields)
-            else:
-                order.save()
-        except Exception:
-            try:
-                order.save()
-            except Exception:
-                import logging
-                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13525")
-
-        try:
-            from orders.models import sync_delivery_legs_for_order
-            sync_delivery_legs_for_order(order)
-        except Exception:
-            import logging
-            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13531")
-
-        try:
-            from orders.service_layer.legs import normalize_order_legs
-            normalize_order_legs(order, save=True)
-        except Exception:
-            import logging
-            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13537")
-
-        try:
-            has_laundry = bool(getattr(order, "laundry_partner_id", None))
-            has_driver = bool(getattr(order, "delivery_partner_id", None))
-            if getattr(order, "status", None) == "pending" and (has_laundry or has_driver):
-                order.status = "in_progress"
-                order.save(update_fields=["status"])
-
+            if laundry:
                 try:
-                    from orders.models import sync_delivery_legs_for_order, DeliveryLeg
-                    from orders.service_layer.legs import normalize_order_legs
-
-                    sync_delivery_legs_for_order(order)
-                    normalize_order_legs(order, save=True)
-
-                    if getattr(order, "delivery_partner_id", None):
-                        DeliveryLeg.objects.filter(order=order).exclude(status="canceled").update(
-                            driver_id=order.delivery_partner_id
-                        )
+                    order.laundry_partner = laundry
                 except Exception:
                     import logging
-                    logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13558")
-        except Exception:
-            import logging
-            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13560")
+                    logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13497")
+
+            try:
+                from orders.assignment import pick_best_driver
+                driver, _driver_reason = pick_best_driver(order)
+            except Exception:
+                driver, _driver_reason = None, None
+
+            if driver:
+                try:
+                    order.delivery_partner = driver
+                except Exception:
+                    import logging
+                    logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13509")
+
+            try:
+                update_fields = []
+                if hasattr(order, "laundry_partner_id"):
+                    update_fields.append("laundry_partner")
+                if hasattr(order, "delivery_partner_id"):
+                    update_fields.append("delivery_partner")
+                if update_fields:
+                    order.save(update_fields=update_fields)
+                else:
+                    order.save()
+            except Exception:
+                try:
+                    order.save()
+                except Exception:
+                    import logging
+                    logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13525")
+
+            try:
+                from orders.models import sync_delivery_legs_for_order
+                sync_delivery_legs_for_order(order)
+            except Exception:
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13531")
+
+            try:
+                from orders.service_layer.legs import normalize_order_legs
+                normalize_order_legs(order, save=True)
+            except Exception:
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13537")
+
+            try:
+                has_laundry = bool(getattr(order, "laundry_partner_id", None))
+                has_driver = bool(getattr(order, "delivery_partner_id", None))
+                if getattr(order, "status", None) == "pending" and (has_laundry or has_driver):
+                    order.status = "in_progress"
+                    order.save(update_fields=["status"])
+
+                    try:
+                        from orders.models import sync_delivery_legs_for_order, DeliveryLeg
+                        from orders.service_layer.legs import normalize_order_legs
+
+                        sync_delivery_legs_for_order(order)
+                        normalize_order_legs(order, save=True)
+
+                        if getattr(order, "delivery_partner_id", None):
+                            DeliveryLeg.objects.filter(order=order).exclude(status="canceled").update(
+                                driver_id=order.delivery_partner_id
+                            )
+                    except Exception:
+                        import logging
+                        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13558")
+            except Exception:
+                import logging
+                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13560")
 
         try:
             amounts_after = _client_order_amounts(order)

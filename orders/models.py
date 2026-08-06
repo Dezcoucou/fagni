@@ -4421,6 +4421,27 @@ class Payment(models.Model):
             o2 = type(o).objects.get(pk=o.pk)
             o2.mark_as_paid_and_distribute()
 
+            # L'affectation opérationnelle ne doit démarrer qu'après validation
+            # définitive de la transaction contenant le Payment.
+            try:
+                from django.db import transaction
+                from orders.services import trigger_post_payment_auto_assignment
+
+                transaction.on_commit(
+                    lambda order_id=o.pk: trigger_post_payment_auto_assignment(
+                        order_id
+                    )
+                )
+            except Exception:
+                import logging
+                logging.getLogger(
+                    "fagni.post_payment_assignment"
+                ).exception(
+                    "Impossible de programmer l'affectation post-paiement | "
+                    "order_id=%s",
+                    getattr(o, "pk", None),
+                )
+
     class Meta:
         verbose_name = 'Paiement'
         verbose_name_plural = 'Paiements'

@@ -260,3 +260,136 @@ def completer_parrainage_pressing_si_applicable(order):
     partner_id = getattr(order, "laundry_partner_id", None)
     if partner_id:
         _incrementer_parrainage_acteur("pressing", partner_id, _wallet_pressing, order)
+
+
+def trigger_post_payment_auto_assignment(order_id):
+    """
+    Déclenche l'affectation automatique pressing + livreur collecte après
+    confirmation comptable définitive du paiement.
+
+    Garanties :
+    - respecte AUTO_ASSIGN_ON_CLIENT_ORDER ;
+    - refuse les commandes inexistantes, annulées ou non payées ;
+    - ne remplace jamais un pressing déjà affecté ;
+    - ne remplace jamais un livreur de collecte déjà affecté ;
+    - ne crée pas une deuxième DeliveryLeg pickup ;
+    - ne propage jamais une exception vers le flux de paiement.
+    """
+    import logging
+
+    from django.conf import settings
+
+    logger = logging.getLogger("fagni.post_payment_assignment")
+
+    result = {
+        "triggered": False,
+        "laundry_assigned": False,
+        "driver_assigned": False,
+        "reason": "",
+    }
+
+    if not getattr(settings, "AUTO_ASSIGN_ON_CLIENT_ORDER", False):
+        result["reason"] = "flag_disabled"
+        logger.info(
+            "Affectation post-paiement ignorée : flag désactivé | order_id=%s",
+            order_id,
+        )
+        return result
+
+    try:
+        from orders.models import DeliveryLeg, Order
+
+        order = (
+            Order.objects
+            .select_related("laundry_partner", "pickup_driver")
+            .filter(pk=order_id)
+            .first()
+        )
+
+        if not order:
+            result["reason"] = "order_not_found"
+            return result
+
+        if order.status == "canceled":
+            result["reason"] = "order_canceled"
+            return result
+
+        if order.payment_status != "paid":
+            result["reason"] = "payment_not_confirmed"
+            return result
+
+        existing_pickup_leg = (
+            DeliveryLeg.objects
+            .filter(order=order, leg_type="pickup")
+            .select_related("driver")
+            .first()
+        )
+
+        laundry_already_assigned = bool(order.laundry_partner_id)
+        driver_already_assigned = bool(
+            order.pickup_driver_id
+            or (
+                existing_pickup_leg
+                and existing_pickup_leg.driver_id
+            )
+        )
+
+        result["laundry_assigned"] = laundry_already_assigned
+        result["driver_assigned"] = driver_already_assigned
+
+        if laundry_already_assigned and driver_already_assigned:
+            result["triggered"] = True
+            result["reason"] = "already_fully_assigned"
+
+            logger.info(
+                "Affectation post-paiement déjà complète | "
+                "order_id=%s | laundry_id=%s | pickup_driver_id=%s",
+                order.id,
+                order.laundry_partner_id,
+                order.pickup_driver_id,
+            )
+            return result
+
+        from orders.client_api import _bc1_auto_assign_pickup_and_laundry
+
+        assignment = _bc1_auto_assign_pickup_and_laundry(
+            order,
+            assign_laundry=not laundry_already_assigned,
+            assign_driver=not driver_already_assigned,
+        )
+
+        order.refresh_from_db(
+            fields=[
+                "laundry_partner",
+                "pickup_driver",
+                "payment_status",
+                "status",
+            ]
+        )
+
+        result["triggered"] = True
+        result["laundry_assigned"] = bool(order.laundry_partner_id)
+        result["driver_assigned"] = bool(order.pickup_driver_id)
+        result["reason"] = "assignment_executed"
+
+        logger.info(
+            "Affectation post-paiement exécutée | "
+            "order_id=%s | helper_result=%s | "
+            "laundry_id=%s | pickup_driver_id=%s",
+            order.id,
+            assignment,
+            order.laundry_partner_id,
+            order.pickup_driver_id,
+        )
+
+        return result
+
+    except Exception:
+        result["reason"] = "unexpected_error"
+
+        logger.exception(
+            "Échec non bloquant de l'affectation post-paiement | order_id=%s",
+            order_id,
+        )
+
+        return result

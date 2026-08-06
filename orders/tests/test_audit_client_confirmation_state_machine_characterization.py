@@ -209,8 +209,12 @@ class WizardSessionIsolationTests(TestCase):
             "les upsells choisis pour la commande A ne doivent jamais s'appliquer a la commande B",
         )
         self.assertEqual(
-            order_b.total_client_ttc, Decimal("5000") + Decimal("5000"),
-            "total_client_ttc de B ne doit refleter que ses propres articles, pas les upsells de A",
+            order_b.total_client_ttc,
+            Decimal("5000"),
+            (
+                "le total verrouillé de B doit rester inchangé et ne doit "
+                "jamais intégrer les upsells appartenant à une autre commande"
+            ),
         )
 
 

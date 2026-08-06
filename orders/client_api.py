@@ -541,6 +541,7 @@ def _bc1_auto_assign_pickup_and_laundry(order):
     bloque jamais l'autre ni la creation de la commande.
     """
     import logging
+    from decimal import Decimal
     from orders.assignment import pick_best_laundry, pick_best_driver
     from orders.services import recompute_order_pricing_for_laundry_partner
     from orders.models import DeliveryLeg
@@ -558,10 +559,57 @@ def _bc1_auto_assign_pickup_and_laundry(order):
 
     result = {"laundry_assigned": False, "driver_assigned": False, "pricing_recomputed": False}
 
-    # Garde-fou (defense en profondeur, meme si l'appel actuel est toujours
-    # synchrone juste apres la creation donc order.status vaut deja "pending") :
-    # une commande annulee ne doit jamais recevoir d'affectation.
-    if getattr(order, "status", None) == "canceled":
+    # Garde-fou métier central :
+    # aucune ressource opérationnelle ne doit être mobilisée avant que le
+    # paiement soit réellement confirmé par la source de vérité comptable.
+    order_status = (
+        getattr(order, "status", "") or ""
+    ).strip().lower()
+    payment_status = (
+        getattr(order, "payment_status", "") or ""
+    ).strip().lower()
+
+    try:
+        total_client_ttc = Decimal(
+            str(getattr(order, "total_client_ttc", 0) or 0)
+        )
+    except Exception:
+        total_client_ttc = Decimal("0")
+
+    try:
+        amount_paid = Decimal(
+            str(getattr(order, "amount_paid", 0) or 0)
+        )
+    except Exception:
+        amount_paid = Decimal("0")
+
+    try:
+        payment_rows_total = order.total_paid_from_payments()
+    except Exception:
+        payment_rows_total = Decimal("0")
+
+    payment_confirmed = bool(
+        order_status != "canceled"
+        and total_client_ttc > Decimal("0")
+        and payment_status == "paid"
+        and amount_paid >= total_client_ttc
+        and payment_rows_total >= total_client_ttc
+    )
+
+    if not payment_confirmed:
+        logger.warning(
+            (
+                "BC1 affectation refusee avant paiement confirme | "
+                "order_id=%s | status=%s | payment_status=%s | "
+                "amount_paid=%s | total=%s | payments_total=%s"
+            ),
+            getattr(order, "id", None),
+            order_status,
+            payment_status,
+            amount_paid,
+            total_client_ttc,
+            payment_rows_total,
+        )
         return result
 
     try:
@@ -571,26 +619,14 @@ def _bc1_auto_assign_pickup_and_laundry(order):
                 "BC1 pressing: candidat trouve | order_id=%s | partner_id=%s | partner_name=%s",
                 order.id, laundry.id, laundry.name,
             )
+            # Le prix est définitivement verrouillé avant le paiement.
+            # L'affectation post-paiement ne doit modifier que le partenaire,
+            # jamais recalculer total_client_ttc ou les montants déjà payés.
             order.laundry_partner = laundry
-            update_fields = ["laundry_partner"]
+            order.save(update_fields=["laundry_partner"])
 
-            recomputed = False
-            try:
-                recomputed = recompute_order_pricing_for_laundry_partner(order, laundry)
-            except Exception:
-                recomputed = False
-
-            if recomputed:
-                update_fields += [
-                    "delivery_fee", "distance_km_pickup", "distance_km_delivery",
-                    "distance_km_total", "distance_km",
-                    "total_client_ttc", "total", "service_fee",
-                    "amount_laundry_partner", "fagni_revenue_ht", "margin_net",
-                ]
-
-            order.save(update_fields=update_fields)
             result["laundry_assigned"] = True
-            result["pricing_recomputed"] = recomputed
+            result["pricing_recomputed"] = False
         else:
             logger.warning(
                 "BC1 pressing: aucun candidat | order_id=%s | raison=%s",
@@ -847,17 +883,16 @@ def api_create_order(request):
         # les variables locales total/service_fee/bag_price sont mises a jour
         # AVANT la suite (event logging, notifications OPS, reponse) pour que
         # tout ce qui suit reflete deja le prix reellement sauvegarde.
-        bc1_assignment = {"laundry_assigned": False, "driver_assigned": False, "pricing_recomputed": False}
-        if getattr(settings, "AUTO_ASSIGN_ON_CLIENT_ORDER", False):
-            try:
-                bc1_assignment = _bc1_auto_assign_pickup_and_laundry(order)
-            except Exception:
-                import logging
-                logging.getLogger("fagni.orders.client_api").exception(
-                    "BC1 auto-affectation en echec | order_id=%s", order.id
-                )
+        # Une commande nouvellement créée n'est pas encore payée.
+        # L'affectation pressing/livreur doit être déclenchée uniquement après
+        # confirmation comptable du paiement, jamais depuis api_create_order.
+        bc1_assignment = {
+            "laundry_assigned": False,
+            "driver_assigned": False,
+            "pricing_recomputed": False,
+        }
 
-            if bc1_assignment.get("pricing_recomputed"):
+        if bc1_assignment.get("pricing_recomputed"):
                 try:
                     order.refresh_from_db()
                     total = float(order.total_client_ttc or order.total or total)

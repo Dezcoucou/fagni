@@ -212,120 +212,118 @@ class ClientCannotPayForeignOrderTests(TestCase):
         self.assertEqual(order.amount_paid, Decimal("0"))
 
 
-class CashReferenceCollisionTests(TestCase):
+class ClientCashDeclarationNeverCreatesPaymentTests(TestCase):
+    """
+    La route client cash est une route non vérifiée.
+
+    Tant qu'aucun modèle séparé de déclaration cash n'existe, elle ne doit
+    jamais créer une ligne Payment, car Payment est la source de vérité
+    comptable et synchronise immédiatement amount_paid/payment_status.
+    """
+
     @override_settings(DEBUG=True)
-    def test_two_legitimate_cash_installments_different_amounts_do_not_conflict(self):
-        """Deux acomptes cash legitimes et distincts (montants differents)
-        doivent tous les deux s'appliquer. Constat actuel : la reference
-        fixe API-{order.id} fait que le 2e acompte est traite comme une
-        relecture du 1er par apply_order_payment (montant different =>
-        ValidationError non rattrapee -> 500)."""
+    def test_first_client_cash_declaration_creates_no_payment(self):
         customer = _make_customer("0700070010")
         order = _make_order(customer, total=Decimal("20000"))
         client = _client_with_phone("0700070010")
 
-        resp1 = _pay_cash(client, order, "5000")
-        self.assertEqual(resp1.status_code, 200)
-
-        resp2 = _pay_cash(client, order, "7000")
+        resp = _pay_cash(client, order, "5000")
 
         order.refresh_from_db()
-        self.assertEqual(
-            resp2.status_code, 200,
-            "un 2e acompte cash legitime avec un montant different ne doit jamais planter (500)",
+
+        self.assertNotEqual(
+            resp.status_code,
+            200,
+            "une déclaration cash client non vérifiée ne doit pas être comptabilisée",
         )
         self.assertEqual(
-            order.amount_paid, Decimal("12000"),
-            "les deux acomptes cash distincts doivent s'additionner (5000 + 7000)",
+            Payment.objects.filter(order=order).count(),
+            0,
+            "la route client cash ne doit créer aucune ligne Payment",
         )
+        self.assertEqual(order.amount_paid, Decimal("0"))
+        self.assertNotEqual(order.payment_status, "paid")
 
     @override_settings(DEBUG=True)
-    def test_two_legitimate_cash_installments_same_amount_both_apply(self):
-        """Deux acomptes cash legitimes du MEME montant (coincidence
-        plausible) doivent aussi s'additionner tous les deux. Constat
-        actuel : le 2e est traite comme un replay idempotent du 1er
-        (meme reference + meme montant) et n'ajoute rien."""
+    def test_repeated_client_cash_declarations_create_no_payments(self):
         customer = _make_customer("0700070011")
         order = _make_order(customer, total=Decimal("20000"))
         client = _client_with_phone("0700070011")
 
-        _pay_cash(client, order, "5000")
-        _pay_cash(client, order, "5000")
+        resp1 = _pay_cash(client, order, "5000")
+        resp2 = _pay_cash(client, order, "7000")
 
         order.refresh_from_db()
-        self.assertEqual(
-            order.amount_paid, Decimal("10000"),
-            "deux acomptes cash distincts du meme montant doivent tous les deux etre comptabilises",
-        )
-        self.assertEqual(
-            Payment.objects.filter(order=order).count(), 2,
-            "chaque acompte cash legitime doit creer sa propre ligne Payment",
-        )
+
+        self.assertNotEqual(resp1.status_code, 200)
+        self.assertNotEqual(resp2.status_code, 200)
+        self.assertEqual(Payment.objects.filter(order=order).count(), 0)
+        self.assertEqual(order.amount_paid, Decimal("0"))
 
 
-class CashPaymentReferenceUniquenessAndIdempotencyTests(TestCase):
-    @override_settings(DEBUG=True)
-    def test_distinct_legitimate_installments_should_have_distinct_references(self):
-        """Deux acomptes cash legitimes et distincts doivent produire deux
-        lignes Payment avec des references DISTINCTES (tracables
-        separement). Constat actuel : reference=f"API-{order.id}" est fixe
-        par commande, jamais par transaction -> impossible de distinguer
-        deux acomptes distincts d'une simple relecture."""
-        customer = _make_customer("0700070013")
-        order = _make_order(customer, total=Decimal("20000"))
-        client = Client(raise_request_exception=False)
-        client.cookies[CLIENT_PHONE_COOKIE] = "0700070013"
-
-        _pay_cash(client, order, "5000")
-        _pay_cash(client, order, "7000")
-
-        payments = list(Payment.objects.filter(order=order).values_list("reference", flat=True))
-        self.assertEqual(
-            len(payments), 2,
-            "deux acomptes cash distincts et legitimes doivent produire deux lignes Payment",
-        )
-        self.assertEqual(
-            len(payments), len(set(payments)),
-            "chaque acompte cash distinct doit avoir sa propre reference, jamais une reference partagee",
-        )
-
+class PaymentOrchestratorIdempotencyTests(TestCase):
     @override_settings(DEBUG=True)
     def test_apply_order_payment_exact_repetition_is_idempotent(self):
-        """Propriete deja-correcte de l'orchestrateur apply_order_payment
-        lui-meme (independamment du bug de reference fixe de la vue) : un
-        rejeu EXACT (meme reference, meme montant - ex. double-clic ou
-        retry reseau) ne doit jamais dupliquer le paiement."""
+        """
+        Propriété correcte de l'orchestrateur : le rejeu exact d'une même
+        transaction confirmée ne doit jamais dupliquer le paiement.
+        """
         from orders.views import apply_order_payment
 
         customer = _make_customer("0700070014")
         order = _make_order(customer, total=Decimal("20000"))
 
-        apply_order_payment(order, Decimal("5000"), channel="api", reference="RETRY-TOKEN-1", note="")
-        apply_order_payment(order, Decimal("5000"), channel="api", reference="RETRY-TOKEN-1", note="")
+        apply_order_payment(
+            order,
+            Decimal("5000"),
+            channel="api",
+            reference="RETRY-TOKEN-1",
+            note="",
+        )
+        apply_order_payment(
+            order,
+            Decimal("5000"),
+            channel="api",
+            reference="RETRY-TOKEN-1",
+            note="",
+        )
 
         order.refresh_from_db()
+
         self.assertEqual(
-            Payment.objects.filter(order=order, reference="RETRY-TOKEN-1").count(), 1,
-            "un rejeu exact de la meme reference ne doit jamais creer un 2e Payment",
+            Payment.objects.filter(
+                order=order,
+                reference="RETRY-TOKEN-1",
+            ).count(),
+            1,
+            "un rejeu exact ne doit jamais créer un deuxième Payment",
         )
-        self.assertEqual(order.amount_paid, Decimal("5000"), "le rejeu exact ne doit pas doubler le montant applique")
+        self.assertEqual(order.amount_paid, Decimal("5000"))
 
 
 class NoUnverifiedRouteCreatesConfirmedPaymentTests(TestCase):
     @override_settings(DEBUG=True)
-    def test_cash_payment_is_marked_as_client_declared_not_third_party_confirmed(self):
-        """Aucune route client non verifiee ne doit creer directement un
-        Payment confirme par un tiers : un Payment issu de cette route doit
-        etre tracable comme 'declare par le client', pas 'confirme'."""
+    def test_client_cash_route_creates_no_accounting_payment(self):
+        """
+        Une déclaration provenant uniquement du client ne constitue pas une
+        preuve de paiement. Elle ne doit donc jamais alimenter Payment.
+        """
         customer = _make_customer("0700070012")
         order = _make_order(customer, total=Decimal("10000"))
         client = _client_with_phone("0700070012")
 
-        _pay_cash(client, order, "10000")
+        resp = _pay_cash(client, order, "10000")
 
-        payment = Payment.objects.filter(order=order).order_by("-id").first()
-        self.assertIsNotNone(payment)
-        self.assertIsNone(
-            payment.confirmed_by_id,
-            "un paiement declare par le client via une route non verifiee ne doit jamais porter confirmed_by",
+        order.refresh_from_db()
+
+        self.assertNotEqual(
+            resp.status_code,
+            200,
+            "la route client cash ne doit pas confirmer un paiement",
         )
+        self.assertFalse(
+            Payment.objects.filter(order=order).exists(),
+            "aucun Payment ne doit être créé sans vérification tierce",
+        )
+        self.assertEqual(order.amount_paid, Decimal("0"))
+        self.assertNotEqual(order.payment_status, "paid")

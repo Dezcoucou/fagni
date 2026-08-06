@@ -6127,10 +6127,22 @@ def client_order_detail_json(request, order_id: int):
 def client_order_pay_simulate(request, order_id: int):
 
     """
-    Paiement simulé (MVP) : marque la commande comme payée (amount_paid = total_ttc).
-    Sécurisé par phone cookie.
-    + Guard serveur: refuse si déjà payé.
+    Paiement simulé strictement réservé aux environnements de développement.
+
+    Cette route ne doit jamais pouvoir créer un paiement lorsque DEBUG=False.
     """
+    if not getattr(settings, "DEBUG", False):
+        resp = JsonResponse(
+            {
+                "ok": False,
+                "error": "simulate_disabled",
+                "message": "Le paiement simulé est désactivé sur cet environnement.",
+            },
+            status=403,
+        )
+        resp["Cache-Control"] = "no-store"
+        return resp
+
     phone = _client_phone(request)
     if not phone:
         resp = JsonResponse({"ok": False, "error": "not_authenticated"}, status=401)
@@ -6145,6 +6157,18 @@ def client_order_pay_simulate(request, order_id: int):
     )
     if not order:
         resp = JsonResponse({"ok": False, "error": "order_not_found"}, status=404)
+        resp["Cache-Control"] = "no-store"
+        return resp
+
+    if getattr(order, "status", None) == "canceled":
+        resp = JsonResponse(
+            {
+                "ok": False,
+                "error": "order_canceled",
+                "message": "Une commande annulée ne peut pas être payée.",
+            },
+            status=409,
+        )
         resp["Cache-Control"] = "no-store"
         return resp
 
@@ -6231,15 +6255,18 @@ def _parse_money_amount(raw: str) -> Decimal:
 @client_login_required
 def client_order_pay_cash(request, order_id: int):
     """
-    Déclaration CASH / acompte (V1) :
-    - POST form-data: amount, note (optionnel)
-    - met à jour amount_paid += amount
-    - calcule paid/partial/unpaid
-    + Guard serveur: refuse si déjà payé.
+    Ancien point d'entrée cash côté client.
+
+    Le client ne peut jamais comptabiliser lui-même un paiement cash.
+    La confirmation doit provenir d'un acteur habilité ou des opérations
+    FAGNI, via un parcours vérifié.
     """
     phone = _client_phone(request)
     if not phone:
-        resp = JsonResponse({"ok": False, "error": "not_authenticated"}, status=401)
+        resp = JsonResponse(
+            {"ok": False, "error": "not_authenticated"},
+            status=401,
+        )
         resp["Cache-Control"] = "no-store"
         return resp
 
@@ -6249,100 +6276,65 @@ def client_order_pay_cash(request, order_id: int):
         .filter(pk=order_id, customer__phone=phone)
         .first()
     )
+
     if not order:
-        resp = JsonResponse({"ok": False, "error": "order_not_found"}, status=404)
+        resp = JsonResponse(
+            {"ok": False, "error": "order_not_found"},
+            status=404,
+        )
         resp["Cache-Control"] = "no-store"
         return resp
 
-    finance_summary = build_order_finance_summary(order)
-    total = finance_summary.get("total_client_ttc") or DECIMAL_ZERO
+    if getattr(order, "status", None) == "canceled":
+        resp = JsonResponse(
+            {
+                "ok": False,
+                "error": "order_canceled",
+                "message": "Une commande annulée ne peut pas être payée.",
+            },
+            status=409,
+        )
+        resp["Cache-Control"] = "no-store"
+        return resp
+
     try:
-        total = Decimal(str(total))
+        total = Decimal(
+            str(getattr(order, "total_client_ttc", 0) or 0)
+        )
     except Exception:
         total = DECIMAL_ZERO
 
-    if total <= DECIMAL_ZERO:
-        resp = JsonResponse({"ok": False, "error": "no_total_amount"}, status=400)
-        resp["Cache-Control"] = "no-store"
-        return resp
-
-    # LOT_3_1_GUARD_DOUBLE_PAY_OK — already paid guard
     try:
-        paid_now = getattr(order, "amount_paid", None) or DECIMAL_ZERO
-        paid_now = Decimal(str(paid_now))
-        if paid_now < DECIMAL_ZERO:
-            paid_now = DECIMAL_ZERO
+        paid_now = Decimal(
+            str(getattr(order, "amount_paid", 0) or 0)
+        )
     except Exception:
         paid_now = DECIMAL_ZERO
 
-    if paid_now >= total:
-        resp = JsonResponse({"ok": False, "error": "already_paid"}, status=409)
+    if (
+        getattr(order, "payment_status", None) == "paid"
+        or (total > DECIMAL_ZERO and paid_now >= total)
+    ):
+        resp = JsonResponse(
+            {"ok": False, "error": "already_paid"},
+            status=409,
+        )
         resp["Cache-Control"] = "no-store"
         return resp
 
-    # read input (form ou json)
-    amount_raw = request.POST.get("amount", "")
-    note = (request.POST.get("note", "") or "").strip()
-
-    ct = (request.headers.get("content-type") or "").lower()
-    if "application/json" in ct:
-        try:
-            payload = json.loads((request.body or b"{}").decode("utf-8", errors="replace"))
-            amount_raw = payload.get("amount", amount_raw)
-            note = (payload.get("note", note) or "").strip()
-        except Exception:
-            import logging
-            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6273")
-
-    add_amount = _parse_money_amount(str(amount_raw))
-    if add_amount <= DECIMAL_ZERO:
-        resp = JsonResponse({"ok": False, "error": "invalid_amount"}, status=400)
-        resp["Cache-Control"] = "no-store"
-        return resp
-
-    payment_result = apply_order_payment(
-        order,
-        add_amount,
-        channel="api",
-        reference=f"API-{order.id}",
-        note=note or "Paiement API",
-    )
-
-    try:
-        order.refresh_from_db()
-    except Exception:
-        import logging
-        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6292")
-
-        # LOT 22C — MLM uniquement si la commande vient juste de devenir payée
-        try:
-            if previous_payment_status != "paid" and getattr(order, "payment_status", None) == "paid":
-                generate_mlm_commissions_for_order(order)
-            apply_fagni_monetization(order)
-        except Exception:
-            import logging
-            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6300")
-
-    try:
-        order.refresh_from_db()
-    except Exception:
-        import logging
-        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6305")
-
-    snap = build_order_canonical_snapshot(order)
-    finance_summary = build_order_finance_summary(order)
-
-    resp = JsonResponse({
-        "ok": True,
-        "payment_ui": "paid" if snap.get("payment_status_canonical") == "paid" else "partial",
-        "payment_status": snap.get("payment_status_canonical"),
-        "note": note,
-        "amounts": {
-            "total_ttc": float(Decimal(str(finance_summary.get("total_client_ttc", 0) or 0))),
-            "amount_paid": float(Decimal(str(finance_summary.get("amount_paid", 0) or 0))),
-            "amount_remaining": float(Decimal(str(finance_summary.get("amount_remaining", 0) or 0))),
+    # Sécurité P0 : une déclaration provenant uniquement du client
+    # ne doit jamais alimenter Payment, source de vérité comptable.
+    resp = JsonResponse(
+        {
+            "ok": False,
+            "error": "cash_requires_verification",
+            "message": (
+                "Le paiement cash doit être confirmé par un livreur "
+                "habilité ou par les opérations FAGNI."
+            ),
         },
-    })
+        status=403,
+    )
     resp["Cache-Control"] = "no-store"
     return resp
 

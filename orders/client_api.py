@@ -511,7 +511,12 @@ def is_in_delivery_zone(lat, lng, address=""):
     return False
 
 
-def _bc1_auto_assign_pickup_and_laundry(order):
+def _bc1_auto_assign_pickup_and_laundry(
+    order,
+    *,
+    assign_laundry=True,
+    assign_driver=True,
+):
     """
     Sprint P0, Wave 3 (BC1) — auto-affectation additive a la creation d'une
     commande fagni-client, derriere settings.AUTO_ASSIGN_ON_CLIENT_ORDER
@@ -612,82 +617,133 @@ def _bc1_auto_assign_pickup_and_laundry(order):
         )
         return result
 
-    try:
-        laundry, reason = pick_best_laundry(order)
-        if laundry:
-            logger.info(
-                "BC1 pressing: candidat trouve | order_id=%s | partner_id=%s | partner_name=%s",
-                order.id, laundry.id, laundry.name,
-            )
-            # Le prix est définitivement verrouillé avant le paiement.
-            # L'affectation post-paiement ne doit modifier que le partenaire,
-            # jamais recalculer total_client_ttc ou les montants déjà payés.
-            order.laundry_partner = laundry
-            order.save(update_fields=["laundry_partner"])
+    if assign_laundry:
+        try:
+            laundry, reason = pick_best_laundry(order)
+            if laundry:
+                logger.info(
+                    "BC1 pressing: candidat trouve | order_id=%s | partner_id=%s | partner_name=%s",
+                    order.id, laundry.id, laundry.name,
+                )
+                # Le prix est définitivement verrouillé avant le paiement.
+                # L'affectation post-paiement ne doit modifier que le partenaire,
+                # jamais recalculer total_client_ttc ou les montants déjà payés.
+                order.laundry_partner = laundry
+                order.save(update_fields=["laundry_partner"])
 
-            result["laundry_assigned"] = True
-            result["pricing_recomputed"] = False
-        else:
-            logger.warning(
-                "BC1 pressing: aucun candidat | order_id=%s | raison=%s",
-                order.id, reason or "raison non renseignee par le moteur",
+                result["laundry_assigned"] = True
+                result["pricing_recomputed"] = False
+            else:
+                logger.warning(
+                    "BC1 pressing: aucun candidat | order_id=%s | raison=%s",
+                    order.id, reason or "raison non renseignee par le moteur",
+                )
+        except Exception:
+            logger.exception(
+                "BC1 pressing: EXCEPTION moteur d'affectation | order_id=%s",
+                getattr(order, "id", None),
             )
-    except Exception:
-        logger.exception(
-            "BC1 pressing: EXCEPTION moteur d'affectation | order_id=%s", getattr(order, "id", None)
+    else:
+        result["laundry_assigned"] = bool(
+            getattr(order, "laundry_partner_id", None)
         )
 
-    try:
-        driver, reason = pick_best_driver(order)
-        if driver:
-            logger.info(
-                "BC1 livreur: candidat trouve | order_id=%s | driver_id=%s | driver_name=%s",
-                order.id, driver.id, driver.name,
+    if assign_driver:
+        try:
+            driver, reason = pick_best_driver(order)
+
+            if driver:
+                logger.info(
+                    "BC1 livreur: candidat trouve | "
+                    "order_id=%s | driver_id=%s | driver_name=%s",
+                    order.id,
+                    driver.id,
+                    driver.name,
+                )
+
+                from orders.config_models import GlobalPricingSettings
+                from decimal import Decimal as _D
+
+                driver_amount = _D(
+                    str(
+                        GlobalPricingSettings
+                        .get_solo()
+                        .driver_amount_per_leg
+                    )
+                )
+
+                order.pickup_driver = driver
+                order.cost_driver_pickup = int(driver_amount)
+                order.save(
+                    update_fields=[
+                        "pickup_driver",
+                        "cost_driver_pickup",
+                    ]
+                )
+
+                leg, created = DeliveryLeg.objects.get_or_create(
+                    order=order,
+                    leg_type="pickup",
+                    defaults={
+                        "driver": driver,
+                        "status": "pending",
+                        "driver_amount": driver_amount,
+                    },
+                )
+
+                if not created:
+                    leg.driver = driver
+
+                if leg.status == "pending":
+                    leg.status = "assigned"
+
+                leg.driver_amount = driver_amount
+                leg.save(
+                    update_fields=[
+                        "driver",
+                        "status",
+                        "driver_amount",
+                    ]
+                )
+
+                result["driver_assigned"] = True
+            else:
+                logger.warning(
+                    "BC1 livreur: aucun candidat | "
+                    "order_id=%s | raison=%s",
+                    order.id,
+                    reason or (
+                        "raison non renseignee par le moteur"
+                    ),
+                )
+        except Exception:
+            logger.exception(
+                "BC1 livreur: EXCEPTION moteur d'affectation | "
+                "order_id=%s",
+                getattr(order, "id", None),
             )
-            from orders.config_models import GlobalPricingSettings
-            from decimal import Decimal as _D
-
-            driver_amount = _D(str(GlobalPricingSettings.get_solo().driver_amount_per_leg))
-
-            order.pickup_driver = driver
-            order.cost_driver_pickup = int(driver_amount)
-            order.save(update_fields=["pickup_driver", "cost_driver_pickup"])
-
-            leg, created = DeliveryLeg.objects.get_or_create(
-                order=order,
-                leg_type="pickup",
-                defaults={"driver": driver, "status": "pending", "driver_amount": driver_amount},
-            )
-            if not created:
-                leg.driver = driver
-            if leg.status == "pending":
-                leg.status = "assigned"
-            leg.driver_amount = driver_amount
-            leg.save(update_fields=["driver", "status", "driver_amount"])
-
-            result["driver_assigned"] = True
-        else:
-            logger.warning(
-                "BC1 livreur: aucun candidat | order_id=%s | raison=%s",
-                order.id, reason or "raison non renseignee par le moteur",
-            )
-    except Exception:
-        logger.exception(
-            "BC1 livreur: EXCEPTION moteur d'affectation | order_id=%s", getattr(order, "id", None)
+    else:
+        result["driver_assigned"] = bool(
+            getattr(order, "pickup_driver_id", None)
         )
 
-    # Notifications : _send_notif_pressing/_send_notif_mission neutralisent
-    # deja leurs propres exceptions en interne (voir orders/ops_api.py), mais
-    # on garde un filet ici aussi - l'affectation ci-dessus est deja
-    # sauvegardee, une panne de notification ne doit jamais faire remonter
-    # d'exception hors de cette fonction.
+    # Les notifications ne sont envoyées que pour les ressources
+    # réellement affectées pendant cet appel. Une ressource déjà affectée
+    # ne doit pas recevoir une seconde notification.
     try:
-        if result["laundry_assigned"]:
+        if assign_laundry and result["laundry_assigned"]:
             _send_notif_pressing(order)
-        if result["driver_assigned"]:
-            _send_notif_mission(order, order.pickup_driver)
+
+        if assign_driver and result["driver_assigned"]:
+            _send_notif_mission(
+                order,
+                order.pickup_driver,
+            )
     except Exception:
-        logger.exception("BC1 notification en echec | order_id=%s", getattr(order, "id", None))
+        logger.exception(
+            "BC1 notification en echec | order_id=%s",
+            getattr(order, "id", None),
+        )
 
     return result
 

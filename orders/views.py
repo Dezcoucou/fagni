@@ -6903,92 +6903,48 @@ def client_order_pay_wave_page(request, order_id: int):
     # Numéro Wave: priorise settings.WAVE_RECEIVER_PHONE, sinon fallback sur phone client
     wave_phone = (getattr(settings, "WAVE_RECEIVER_PHONE", "") or "").strip() or phone
 
-    # ✅ V2: lien de paiement Wave (Checkout API) avec montant exact
+    # Session Wave Checkout canonique et partagée avec l'API client.
+    # Le helper central assure :
+    # - le verrouillage transactionnel ;
+    # - la réutilisation pendant le TTL ;
+    # - le stockage dans wave_checkout_id / wave_checkout_url ;
+    # - la préservation de payment_declared_reference.
     pay_link = ""
     checkout_id = ""
-    api_enabled = bool(getattr(settings, "WAVE_CHECKOUT_ENABLED", False))
-    api_key = (getattr(settings, "WAVE_CHECKOUT_API_KEY", "") or "").strip()
 
-    # Montant Wave en XOF (entier, pas de décimales)
     try:
-        amount_xof = str(int(wave_remaining))
-    except Exception:
-        amount_xof = "0"
+        amount_xof = int(wave_remaining)
+    except (TypeError, ValueError, ArithmeticError):
+        amount_xof = 0
 
-    if api_enabled and api_key and amount_xof != "0":
+    order_status = (
+        getattr(order, "status", "") or ""
+    ).strip().lower()
+    payment_status = (
+        getattr(order, "payment_status", "") or ""
+    ).strip().lower()
+
+    if (
+        order_status != "canceled"
+        and payment_status != "paid"
+        and amount_xof > 0
+    ):
         try:
-            import json
-            import urllib.request
-            import urllib.error
-            import hmac
-            import hashlib
-            import time
+            from orders.client_api import _get_or_create_wave_checkout
 
-            # Base URL publique (pour success/error)
-            base = (getattr(settings, "SITE_BASE_URL", "") or "").rstrip("/")
-            if not base:
-                # fallback: construit depuis la requête
-                base = request.build_absolute_uri("/").rstrip("/")
-
-            success_url = base + reverse("orders:client_order_detail", args=[order.id]) + "?wave=success"
-            error_url = base + reverse("orders:client_order_detail", args=[order.id]) + "?wave=error"
-
-            payload = {
-                "amount": amount_xof,
-                "currency": "XOF",
-                "success_url": success_url,
-                "error_url": error_url,
-                "client_reference": f"order-{order.id}-{getattr(order,'code',order.id)}",
-            }
-
-            body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            }
-
-            signing_secret = (getattr(settings, "WAVE_CHECKOUT_SIGNING_SECRET", "") or "").strip()
-            if signing_secret:
-                timestamp = str(int(time.time()))
-                signature_payload = timestamp.encode("utf-8") + body
-                signature = hmac.new(
-                    signing_secret.encode("utf-8"),
-                    signature_payload,
-                    hashlib.sha256,
-                ).hexdigest()
-                headers["Wave-Signature"] = f"t={timestamp},v1={signature}"
-
-            req = urllib.request.Request(
-                "https://api.wave.com/v1/checkout/sessions",
-                data=body,
-                headers=headers,
-                method="POST",
+            pay_link, checkout_id = _get_or_create_wave_checkout(
+                order,
+                amount_xof,
+                request,
             )
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-
-            pay_link = (data.get("wave_launch_url") or "").strip()
-            checkout_id = (data.get("id") or "").strip()
-
-            if checkout_id:
-                update_fields = []
-                if getattr(order, "payment_declared_reference", "") != checkout_id:
-                    order.payment_declared_reference = checkout_id
-                    update_fields.append("payment_declared_reference")
-                if getattr(order, "payment_declared_channel", "") != "wave":
-                    order.payment_declared_channel = "wave"
-                    update_fields.append("payment_declared_channel")
-                if update_fields:
-                    try:
-                        order.save(update_fields=update_fields)
-                    except Exception:
-                        order.save()
-
+            pay_link = (pay_link or "").strip()
+            checkout_id = (checkout_id or "").strip()
         except Exception:
-            # On ne casse pas la page: fallback ci-dessous
+            # Une indisponibilité Wave ne doit pas casser la page :
+            # le lien marchand statique reste disponible en repli.
             pay_link = ""
             checkout_id = ""
+
     # Fallback: lien marchand Wave (si pas de pay_link API)
     base_link = (getattr(settings, "WAVE_MERCHANT_LINK_BASE", "") or "").strip()
     if (not pay_link) and base_link:

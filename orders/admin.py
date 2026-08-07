@@ -695,7 +695,7 @@ class OrderAdmin(UnfoldModelAdmin):
                     apply_order_payment(
                         obj,
                         remaining,
-                        channel="admin",
+                        channel="manual",
                         reference=f"ADMIN-VERIFY-{obj.id}",
                         note="Validation paiement depuis admin",
                     )

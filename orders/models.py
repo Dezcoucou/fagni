@@ -2015,7 +2015,10 @@ class Order(models.Model):
         except Exception:
             return Decimal("0.00")
 
-        agg = Payment.objects.filter(order=self).aggregate(s=Sum("amount"))
+        agg = Payment.objects.filter(
+                order=self,
+                status=Payment.ACCOUNTING_STATUS_CONFIRMED,
+            ).aggregate(s=Sum("amount"))
         s = agg.get("s") or 0
         try:
             return Decimal(str(s))
@@ -2175,9 +2178,30 @@ class Order(models.Model):
         # Sinon le rejeu d'un paiement déjà appliqué serait interprété comme
         # un nouveau paiement sur le solde restant.
         if reference:
+            if channel in {"wave_webhook", "wave_ops"}:
+                conflicting_payment = (
+                    Payment.objects
+                    .filter(
+                        reference=reference,
+                    )
+                    .exclude(order=self)
+                    .order_by("id")
+                    .first()
+                )
+
+                if conflicting_payment is not None:
+                    raise ValidationError(
+                        "Cette référence Wave est déjà rattachée "
+                        "à une autre commande."
+                    )
+
             existing = (
                 Payment.objects
-                .filter(order=self, reference=reference)
+                .filter(
+                    order=self,
+                    reference=reference,
+                    status=Payment.ACCOUNTING_STATUS_CONFIRMED,
+                )
                 .order_by("id")
                 .first()
             )
@@ -2211,7 +2235,10 @@ class Order(models.Model):
 
         paid_sum = (
             Payment.objects
-            .filter(order=self)
+            .filter(
+                order=self,
+                status=Payment.ACCOUNTING_STATUS_CONFIRMED,
+            )
             .aggregate(total=Sum("amount"))
             .get("total")
             or 0
@@ -3401,11 +3428,26 @@ class Order(models.Model):
 
         try:
             Payment = apps.get_model("orders", "Payment")
-            if self.pk and Payment.objects.filter(order_id=self.pk).exists():
+            if (
+                self.pk
+                and Payment.objects.filter(
+                    order_id=self.pk,
+                    status=Payment.ACCOUNTING_STATUS_CONFIRMED,
+                ).exists()
+            ):
                 from django.db.models import Sum
 
                 total_ttc = Decimal(str(getattr(self, "total_client_ttc", 0) or 0))
-                paid_sum = Payment.objects.filter(order_id=self.pk).aggregate(s=Sum("amount")).get("s") or 0
+                paid_sum = (
+                    Payment.objects
+                    .filter(
+                        order_id=self.pk,
+                        status=Payment.ACCOUNTING_STATUS_CONFIRMED,
+                    )
+                    .aggregate(s=Sum("amount"))
+                    .get("s")
+                    or 0
+                )
                 paid_sum = Decimal(str(paid_sum))
 
                 if paid_sum < 0:
@@ -4312,10 +4354,26 @@ class OrderStatusHistory(models.Model):
 
 
 class Payment(models.Model):
+    ACCOUNTING_STATUS_CONFIRMED = "confirmed"
+    ACCOUNTING_STATUS_VOIDED = "voided"
+
+    ACCOUNTING_STATUS_CHOICES = [
+        (ACCOUNTING_STATUS_CONFIRMED, "Confirmé"),
+        (ACCOUNTING_STATUS_VOIDED, "Annulé"),
+    ]
+
     order = models.ForeignKey("Order", on_delete=models.CASCADE)
-    amount = models.DecimalField(max_digits=10, decimal_places=0, verbose_name="Montant")
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=0,
+        verbose_name="Montant",
+    )
     channel = models.CharField(max_length=20)  # orange, mtn, wave
-    reference = models.CharField(max_length=120, blank=True, verbose_name="Référence")
+    reference = models.CharField(
+        max_length=120,
+        blank=True,
+        verbose_name="Référence",
+    )
     confirmed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -4324,7 +4382,27 @@ class Payment(models.Model):
         related_name="confirmed_payments",
     )
     source = models.CharField(max_length=20, default="driver")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Créé le")
+
+    status = models.CharField(
+        max_length=20,
+        choices=ACCOUNTING_STATUS_CHOICES,
+        default=ACCOUNTING_STATUS_CONFIRMED,
+        db_index=True,
+    )
+    voided_at = models.DateTimeField(null=True, blank=True)
+    voided_reason = models.TextField(blank=True, default="")
+    voided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="voided_payments",
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Créé le",
+    )
 
     def __str__(self):
         return f"{self.order.code} - {self.amount} FCFA"
@@ -4357,7 +4435,16 @@ class Payment(models.Model):
                 raise ValidationError("Impossible d'enregistrer un paiement : total_client_ttc est à 0.")
 
             # somme payée actuelle (sans ce paiement)
-            paid_sum = type(self).objects.filter(order=o).aggregate(s=Sum("amount")).get("s") or 0
+            paid_sum = (
+                type(self).objects
+                .filter(
+                    order=o,
+                    status=self.ACCOUNTING_STATUS_CONFIRMED,
+                )
+                .aggregate(s=Sum("amount"))
+                .get("s")
+                or 0
+            )
             paid_sum = Decimal(str(paid_sum))
             if paid_sum < 0:
                 paid_sum = Decimal("0")
@@ -4386,7 +4473,16 @@ class Payment(models.Model):
         total_ttc_db = type(o).objects.filter(pk=o.pk).values_list("total_client_ttc", flat=True).first()
         total_ttc = Decimal(str(total_ttc_db or 0))
 
-        paid_sum = type(self).objects.filter(order=o).aggregate(s=Sum("amount")).get("s") or 0
+        paid_sum = (
+                type(self).objects
+                .filter(
+                    order=o,
+                    status=self.ACCOUNTING_STATUS_CONFIRMED,
+                )
+                .aggregate(s=Sum("amount"))
+                .get("s")
+                or 0
+            )
         paid_sum = Decimal(str(paid_sum))
         if paid_sum < 0:
             paid_sum = Decimal("0")

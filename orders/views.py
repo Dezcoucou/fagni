@@ -2450,8 +2450,26 @@ def order_mark_paid(request, order_id):
         return redirect("orders:detail", order_id=order.id)
 
     # Saisie optionnelle
-    method = (request.POST.get("payment_method") or "").strip() or None
+    method = (
+        request.POST.get("payment_method") or ""
+    ).strip().lower() or None
     ref = (request.POST.get("payment_reference") or "").strip() or None
+
+    # Sécurité pilote :
+    # cette route générique ne permet que l'encaissement CASH réellement
+    # constaté par un opérateur habilité.
+    #
+    # Wave, wallet et futurs PSP ont leurs workflows dédiés.
+    if method != "cash":
+        messages.error(
+            request,
+            (
+                "Encaissement générique refusé. "
+                "Cette action est réservée au CASH réellement encaissé. "
+                "Wave doit passer par le workflow sécurisé de vérification."
+            ),
+        )
+        return redirect("orders:detail", order_id=order.id)
 
     from decimal import Decimal
 
@@ -4863,8 +4881,22 @@ def detail(request, order_id):
 
         try:
             amt_raw = (request.POST.get("amount") or "").strip()
-            channel = (request.POST.get("channel") or "").strip() or "cash"
+            channel = (
+                request.POST.get("channel") or ""
+            ).strip().lower() or "cash"
             ref = (request.POST.get("reference") or "").strip()
+
+            # Sécurité pilote :
+            # l'ajout générique Back-office est réservé au CASH.
+            # Les paiements électroniques passent obligatoirement par
+            # leurs workflows de vérification dédiés.
+            if channel != "cash":
+                raise ValidationError({
+                    "channel": (
+                        "Seul un paiement CASH réellement encaissé peut "
+                        "être enregistré depuis cette action générique."
+                    )
+                })
 
             amount = Decimal(amt_raw)
             if amount <= 0:
@@ -6197,13 +6229,19 @@ def client_order_pay_simulate(request, order_id: int):
         resp["Cache-Control"] = "no-store"
         return resp
 
-    payment_result = apply_order_payment(
-        order,
-        total,
-        channel="simulate",
-        reference=f"SIM-{order.id}",
-        note="Paiement simulé MVP",
+    resp = JsonResponse(
+        {
+            "ok": False,
+            "error": "payment_simulation_disabled",
+            "message": (
+                "La simulation de paiement est désactivée. "
+                "Aucun paiement fictif ne peut être enregistré."
+            ),
+        },
+        status=403,
     )
+    resp["Cache-Control"] = "no-store"
+    return resp
 
     try:
         order.refresh_from_db()
@@ -6388,6 +6426,7 @@ def apply_order_payment(
         "wallet_auto",
         "wave_webhook",
         "wave_ops",
+        "wave_manual_verified",
         "cash",
         "manual",
     }
@@ -6397,7 +6436,11 @@ def apply_order_payment(
             f"Canal de paiement non autorisé : {channel}."
         )
 
-    if channel in {"wave_webhook", "wave_ops"} and not reference:
+    if channel in {
+        "wave_webhook",
+        "wave_ops",
+        "wave_manual_verified",
+    } and not reference:
         raise ValidationError(
             "Une référence Wave vérifiée est obligatoire."
         )
@@ -6460,7 +6503,11 @@ def apply_order_payment(
         # Idempotence stricte avant toute opération wallet ou DB
         # --------------------------------------------------------
         if reference:
-            if channel in {"wave_webhook", "wave_ops"}:
+            if channel in {
+                "wave_webhook",
+                "wave_ops",
+                "wave_manual_verified",
+            }:
                 conflicting_payment = (
                     Payment.objects
                     .filter(
@@ -7116,26 +7163,27 @@ def admin_confirm_declared_payment(request, order_id: int):
         messages.error(request, "Impossible de confirmer : total TTC nul ou invalide.")
         return _ops_redirect_back(request)
 
-    checkout_id = (
-        getattr(order, "wave_checkout_id", "") or ""
+    verified_reference = (
+        request.POST.get("verified_wave_reference") or ""
     ).strip()
 
-    if not checkout_id:
+    human_confirmation = (
+        request.POST.get("wave_human_verified") or ""
+    ).strip().lower()
+
+    if human_confirmation not in {"1", "true", "on", "yes"}:
         messages.error(
             request,
-            "Confirmation refusée : aucune session Wave vérifiable "
-            "n'est rattachée à cette commande.",
+            "Confirmation refusée : vous devez confirmer avoir "
+            "vérifié personnellement la transaction dans Wave.",
         )
         return _ops_redirect_back(request)
 
-    from orders.services import verify_wave_checkout_session
-
-    try:
-        verified_wave = verify_wave_checkout_session(checkout_id)
-    except ValidationError as exc:
+    if not verified_reference:
         messages.error(
             request,
-            f"Confirmation Wave refusée : {exc}",
+            "Confirmation refusée : la référence réellement constatée "
+            "dans Wave est obligatoire.",
         )
         return _ops_redirect_back(request)
 
@@ -7153,26 +7201,27 @@ def admin_confirm_declared_payment(request, order_id: int):
     if remaining < DECIMAL_ZERO:
         remaining = DECIMAL_ZERO
 
-    remote_amount = Decimal(
-        str(verified_wave.get("amount", 0) or 0)
-    )
-
     if remaining > DECIMAL_ZERO:
-        if remote_amount < remaining:
-            messages.error(
-                request,
-                "Confirmation refusée : le montant réellement confirmé "
-                "par Wave est inférieur au solde de la commande.",
-            )
-            return _ops_redirect_back(request)
-
         apply_order_payment(
             order,
             remaining,
-            channel="wave_ops",
-            reference=checkout_id,
-            note="Confirmation paiement Wave OPS vérifiée via API Wave",
+            channel="wave_manual_verified",
+            reference=verified_reference,
+            note=(
+                "Paiement Wave vérifié manuellement dans l'application "
+                f"Wave par {getattr(request.user, 'username', '')}"
+            ),
         )
+
+        try:
+            order.refresh_from_db()
+        except Exception:
+            import logging
+            logging.getLogger("fagni.orders.views").exception(
+                "Erreur refresh après validation Wave manuelle | "
+                "order_id=%s",
+                getattr(order, "id", None),
+            )
         try:
             order.refresh_from_db()
         except Exception:
@@ -15519,49 +15568,38 @@ def admin_payment_review_confirm(request, order_id: int):
     remaining = total - paid
 
     if remaining > 0:
-        checkout_id = (
-            getattr(order, "wave_checkout_id", "") or ""
+        verified_reference = (
+            request.POST.get("verified_wave_reference") or ""
         ).strip()
 
-        if not checkout_id:
+        human_confirmation = (
+            request.POST.get("wave_human_verified") or ""
+        ).strip().lower()
+
+        if human_confirmation not in {"1", "true", "on", "yes"}:
             messages.error(
                 request,
-                "Validation refusée : aucune session Wave vérifiable "
-                "n'est rattachée à cette commande.",
+                "Validation refusée : confirmez d'abord que la "
+                "transaction a été contrôlée dans Wave.",
             )
             return redirect("orders:admin_payment_review")
 
-        from orders.services import verify_wave_checkout_session
-
-        try:
-            verified_wave = verify_wave_checkout_session(checkout_id)
-        except ValidationError as exc:
+        if not verified_reference:
             messages.error(
                 request,
-                f"Validation Wave refusée : {exc}",
-            )
-            return redirect("orders:admin_payment_review")
-
-        remote_amount = Decimal(
-            str(verified_wave.get("amount", 0) or 0)
-        )
-
-        if remote_amount < remaining:
-            messages.error(
-                request,
-                "Validation refusée : le montant réellement confirmé "
-                "par Wave est inférieur au solde de la commande.",
+                "Validation refusée : la référence Wave réellement "
+                "vérifiée est obligatoire.",
             )
             return redirect("orders:admin_payment_review")
 
         apply_order_payment(
             order,
             remaining,
-            channel="wave_ops",
-            reference=checkout_id,
+            channel="wave_manual_verified",
+            reference=verified_reference,
             note=(
-                "Validation paiement Wave depuis cockpit admin "
-                "après vérification API Wave"
+                "Paiement Wave vérifié manuellement dans l'application "
+                f"Wave par {getattr(request.user, 'username', '')}"
             ),
         )
 

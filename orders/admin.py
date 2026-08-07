@@ -677,57 +677,28 @@ class OrderAdmin(UnfoldModelAdmin):
 
         self.message_user(request, f"{updated} commande(s) marquée(s) comme paiement déclaré.")
 
-    @admin.action(description="Marquer comme paiement vérifié")
+    @admin.action(description="⚠️ Vérification paiement via workflow dédié")
     def mark_payment_verified(self, request, queryset):
-        from decimal import Decimal
-        from orders.views import build_order_finance_summary, apply_order_payment
+        """
+        Sécurité P0.
 
-        updated = 0
+        Une action Admin générique ne constitue jamais une preuve de paiement.
+        En particulier, elle ne doit jamais fabriquer un Payment à partir
+        d'une référence interne ou d'un simple clic opérateur.
 
-        for obj in queryset:
-            try:
-                fs = build_order_finance_summary(obj)
-                total = Decimal(str(fs.get("total_client_ttc", 0) or 0))
-                paid = Decimal(str(getattr(obj, "amount_paid", 0) or 0))
-                remaining = total - paid
-
-                if remaining > 0:
-                    apply_order_payment(
-                        obj,
-                        remaining,
-                        channel="manual",
-                        reference=f"ADMIN-VERIFY-{obj.id}",
-                        note="Validation paiement depuis admin",
-                    )
-
-                obj.refresh_from_db()
-
-                fields = []
-
-                if getattr(obj, "payment_verification_status", None) != "verified":
-                    obj.payment_verification_status = "verified"
-                    fields.append("payment_verification_status")
-
-                if not getattr(obj, "payment_declared_at", None):
-                    obj.payment_declared_at = timezone.now()
-                    fields.append("payment_declared_at")
-
-                obj.payment_verified_at = timezone.now()
-                fields.append("payment_verified_at")
-
-                if getattr(obj, "payment_verified_by_id", None) != getattr(request.user, "id", None):
-                    obj.payment_verified_by = request.user
-                    fields.append("payment_verified_by")
-
-                if fields:
-                    obj.save(update_fields=list(dict.fromkeys(fields)))
-
-                updated += 1
-
-            except Exception as e:
-                self.message_user(request, f"Erreur commande {getattr(obj, 'id', '?')} : {e}", level=messages.ERROR)
-
-        self.message_user(request, f"{updated} commande(s) marquée(s) comme paiement vérifié.")
+        Les paiements Wave doivent passer par le workflow humain sécurisé
+        wave_manual_verified tant que l'API PSP n'est pas disponible.
+        """
+        self.message_user(
+            request,
+            (
+                "Validation directe désactivée. "
+                "Pour Wave, ouvrez la déclaration de paiement, vérifiez "
+                "réellement la transaction dans Wave puis utilisez le "
+                "workflow sécurisé de confirmation."
+            ),
+            level=messages.WARNING,
+        )
 
     @admin.action(description="Rejeter la déclaration de paiement")
     def reject_payment_declared(self, request, queryset):
@@ -762,53 +733,24 @@ class OrderAdmin(UnfoldModelAdmin):
     #  ACTIONS
     # ============================================================
 
-    @admin.action(description="✅ Valider paiement PSP")
+    @admin.action(description="⚠️ Validation PSP indisponible sans API")
     def admin_validate_paid_psp(self, request, queryset):
-        updated = 0
-        skipped = 0
+        """
+        Sécurité P0.
 
-        with transaction.atomic():
-            for order in queryset.select_for_update():
-                # déjà payé
-                if order.payment_status == "paid":
-                    skipped += 1
-                    continue
+        Une référence PSP saisie ou stockée dans FAGNI ne constitue jamais
+        une preuve de paiement.
 
-                # PSP sans référence -> skip
-                if not order.payment_reference:
-                    skipped += 1
-                    continue
-
-                # Recalcul financier AVANT paiement
-                try:
-                    order.update_financials(save=False)
-                except Exception:
-                    import logging
-                    logging.getLogger("fagni.orders.admin").exception("Exception silencieuse (auto-log) - fichier=orders/admin.py ligne=757")
-
-                paid_at = timezone.now()
-
-                # garder méthode / date / facture
-                order.payment_method = "psp"
-                order.payment_date = paid_at
-
-                if not getattr(order, "invoice_date", None):
-                    order.invoice_date = paid_at
-                if not getattr(order, "invoice_status", None) or order.invoice_status in ("draft", "issued"):
-                    order.invoice_status = "paid"
-
-                order.save(update_fields=["payment_method", "payment_date", "invoice_date", "invoice_status"])
-
-                # marquer payé
-                order.mark_paid(
-                    method="psp",
-                    reference=order.payment_reference,
-                    paid_at=paid_at,
-                    save=True,
-                )
-                updated += 1
-
-        messages.success(request, f"Paiement PSP validé : {updated} commande(s). Ignorées : {skipped}.")
+        Tant qu'aucune intégration PSP serveur-à-serveur n'est disponible,
+        cette action ne crée aucun Payment.
+        """
+        messages.warning(
+            request,
+            (
+                "Validation PSP directe désactivée : FAGNI ne dispose pas "
+                "encore d'une preuve serveur-à-serveur du prestataire."
+            ),
+        )
 
     @admin.action(description="🧾 Normaliser facture sur commandes payées")
     def admin_normalize_invoices_paid(self, request, queryset):

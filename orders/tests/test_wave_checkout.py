@@ -567,20 +567,117 @@ class WaveWebhookSignatureTests(TestCase):
         self.assertEqual(order.payment_status, "pending")
 
 
-class OpsMarkPaidUnchangedTests(TestCase):
-    """ops_mark_paid n'est touche par aucun changement de cette Wave :
-    non-regression simple."""
+class OpsMarkPaidWaveSecurityTests(TestCase):
+    """
+    Une référence Wave saisie librement par OPS n'est jamais
+    une preuve de paiement.
+    """
 
-    def test_ops_mark_paid_toujours_fonctionnel(self):
-        order = _make_order(total="5000", phone="0700009999", status="done")
+    def test_ops_mark_paid_wave_exige_workflow_verification(self):
+        from orders.models import Payment
+
+        order = _make_order(
+            total="5000",
+            phone="0700009999",
+            status="done",
+        )
 
         resp = self.client.post(
             reverse("api-ops-mark-paid", args=[order.id]),
-            data=json.dumps({"channel": "wave", "reference": "OPS-REF-1"}),
+            data=json.dumps({
+                "channel": "wave",
+                "reference": "OPS-REF-1",
+            }),
+            content_type="application/json",
+            **_ops_headers(),
+        )
+
+        self.assertEqual(resp.status_code, 400)
+
+        order.refresh_from_db()
+
+        self.assertNotEqual(order.payment_status, "paid")
+        self.assertEqual(order.amount_paid, 0)
+
+        self.assertFalse(
+            Payment.objects.filter(
+                order=order,
+                reference="OPS-REF-1",
+            ).exists()
+        )
+
+
+class OpsMarkPaidCashOnlySecurityTests(TestCase):
+    """
+    La route OPS générique d'encaissement est réservée au CASH.
+
+    Une simple référence saisie par OPS ne doit jamais permettre de
+    fabriquer un paiement électronique.
+    """
+
+    def test_ops_mark_paid_cash_reste_autorise(self):
+        from orders.models import Payment
+
+        order = _make_order(
+            total="5000",
+            phone="0700009988",
+            status="done",
+        )
+
+        resp = self.client.post(
+            reverse("api-ops-mark-paid", args=[order.id]),
+            data=json.dumps({
+                "channel": "cash",
+                "reference": "CASH-OPS-001",
+            }),
             content_type="application/json",
             **_ops_headers(),
         )
 
         self.assertEqual(resp.status_code, 200)
+
         order.refresh_from_db()
+
         self.assertEqual(order.payment_status, "paid")
+        self.assertEqual(order.amount_paid, Decimal("5000"))
+
+        self.assertTrue(
+            Payment.objects.filter(
+                order=order,
+                channel="cash",
+                reference="CASH-OPS-001",
+            ).exists()
+        )
+
+    def test_ops_mark_paid_refuse_canal_electronique_generique(self):
+        from orders.models import Payment
+
+        order = _make_order(
+            total="5000",
+            phone="0700009987",
+            status="done",
+        )
+
+        resp = self.client.post(
+            reverse("api-ops-mark-paid", args=[order.id]),
+            data=json.dumps({
+                "channel": "orange",
+                "reference": "FAUSSE-REF-ORANGE",
+            }),
+            content_type="application/json",
+            **_ops_headers(),
+        )
+
+        self.assertEqual(resp.status_code, 400)
+
+        order.refresh_from_db()
+
+        self.assertNotEqual(order.payment_status, "paid")
+        self.assertEqual(order.amount_paid, 0)
+
+        self.assertFalse(
+            Payment.objects.filter(
+                order=order,
+                reference="FAUSSE-REF-ORANGE",
+            ).exists()
+        )

@@ -709,21 +709,68 @@ def ops_mark_paid(request, order_id):
         order = Order.objects.get(id=order_id)
         if order.status not in ("done"):
             return Response({"error": "Paiement impossible — commande non livrée", "status": order.status}, status=400)
-        channel = request.data.get('channel', 'wave')
+        channel = (request.data.get('channel') or '').strip().lower()
         reference = (request.data.get('reference') or '').strip()
 
-        # C6 — mark_paid declenche SYSTEME 1 via signals (payout legs)
+        # ============================================================
+        # SÉCURITÉ P0 — route générique OPS = CASH uniquement.
+        #
+        # Cette route ne constitue aucune preuve d'un paiement
+        # électronique. Wave, Mobile Money et futurs PSP doivent
+        # obligatoirement passer par leurs workflows dédiés.
+        # ============================================================
+        if not channel:
+            return Response(
+                {
+                    "error": "payment_channel_required",
+                    "message": "Le moyen de paiement doit être précisé.",
+                },
+                status=400,
+            )
+
+        if channel != "cash":
+            return Response(
+                {
+                    "error": "dedicated_payment_verification_required",
+                    "message": (
+                        "Cette action générique est réservée au CASH "
+                        "réellement encaissé. Les paiements électroniques "
+                        "doivent passer par leur workflow sécurisé de "
+                        "vérification."
+                    ),
+                },
+                status=400,
+            )
+
+        # Aucun fallback ne doit pouvoir forcer payment_status='paid'.
+        # La source de vérité reste exclusivement Payment.
         try:
-            order.mark_paid(method=channel, reference=reference or None)
-        except Exception:
-            order.payment_status = 'paid'
-            order.amount_paid = order.total_client_ttc or order.total
-            order.payment_declared_channel = channel
-            order.payment_declared_reference = reference
-            order.save(update_fields=[
-                'payment_status', 'amount_paid',
-                'payment_declared_channel', 'payment_declared_reference', 'updated_at'
-            ])
+            order.mark_paid(
+                method=channel,
+                reference=reference or None,
+            )
+            order.refresh_from_db()
+        except Exception as exc:
+            return Response(
+                {
+                    "error": "payment_registration_failed",
+                    "message": str(exc),
+                },
+                status=400,
+            )
+
+        if order.payment_status != "paid":
+            return Response(
+                {
+                    "error": "payment_not_confirmed",
+                    "payment_status": order.payment_status,
+                    "message": (
+                        "Aucun paiement confirmé n'a permis de solder "
+                        "la commande."
+                    ),
+                },
+                status=400,
+            )
 
         try:
             from orders.models import log_event

@@ -25,7 +25,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from orders.client_api import WAVE_CHECKOUT_SESSION_TTL_SECONDS, _get_or_create_wave_checkout, _make_token
-from orders.models import Customer, Order, WaveEvent
+from orders.models import Customer, Order, WaveEvent, Payment
 
 
 def _make_order(total, amount_paid="0", phone="0700001111", **extra):
@@ -356,9 +356,14 @@ class WaveCheckoutConcurrencyTests(TransactionTestCase):
 
 
 class WaveWebhookAttachmentTests(TestCase):
-    """Rattachement commande <-> checkout_id : champ dedie, puis repli
-    retrocompatible sur payment_declared_reference (sessions legacy creees
-    par client_order_pay_wave_page)."""
+    """Rattachement sécurisé commande <-> checkout_id.
+
+    wave_checkout_id est l'unique clé locale autorisée pour rattacher
+    un webhook Wave à une commande.
+
+    payment_declared_reference est une donnée déclarative/legacy et ne
+    constitue jamais une preuve de rattachement PSP.
+    """
 
     def _post_debug_event(self, checkout_id, amount, event_id="evt_1"):
         body = {
@@ -391,18 +396,37 @@ class WaveWebhookAttachmentTests(TestCase):
         self.assertEqual(order.payment_status, "paid")
 
     @override_settings(DEBUG=True)
-    def test_rattachement_repli_payment_declared_reference(self):
-        """Session legacy (client_order_pay_wave_page) : wave_checkout_id
-        vide, id stocke seulement dans payment_declared_reference."""
+    def test_payment_declared_reference_ne_rattache_plus_un_webhook_wave(self):
+        """Une référence déclarée/localement saisie n'est jamais une preuve Wave."""
         order = _make_order(total="5000", phone="0700004444")
         order.payment_declared_reference = "checkout_test_legacy"
         order.save(update_fields=["payment_declared_reference"])
 
-        resp = self._post_debug_event("checkout_test_legacy", 5000)
+        resp = self._post_debug_event(
+            "checkout_test_legacy",
+            5000,
+            event_id="evt_legacy_rejected",
+        )
 
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 404)
+
         order.refresh_from_db()
-        self.assertEqual(order.payment_status, "paid")
+
+        self.assertNotEqual(order.payment_status, "paid")
+        self.assertEqual(order.amount_paid, Decimal("0"))
+
+        self.assertFalse(
+            Payment.objects.filter(
+                order=order,
+                reference="checkout_test_legacy",
+            ).exists()
+        )
+
+        self.assertFalse(
+            WaveEvent.objects.filter(
+                event_id="evt_legacy_rejected",
+            ).exists()
+        )
 
     @override_settings(DEBUG=True)
     def test_rejeu_idempotent(self):

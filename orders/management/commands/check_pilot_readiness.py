@@ -80,10 +80,10 @@ class Command(BaseCommand):
             # Preferred: Payment table sum (if exists)
             if Payment is not None:
                 try:
-                    q = Payment.objects.filter(order=order)
-                    # If there is a status field, keep only successful/paid
-                    if hasattr(Payment, "status"):
-                        q = q.filter(status__in=["paid", "success", "successful", "succeeded"])
+                    q = Payment.objects.filter(
+                        order=order,
+                        status=Payment.ACCOUNTING_STATUS_CONFIRMED,
+                    )
                     amt = q.aggregate(s=Sum("amount"))["s"]
                     if amt is not None:
                         return self._dec(amt)

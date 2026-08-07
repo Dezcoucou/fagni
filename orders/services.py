@@ -262,6 +262,404 @@ def completer_parrainage_pressing_si_applicable(order):
         _incrementer_parrainage_acteur("pressing", partner_id, _wallet_pressing, order)
 
 
+
+
+def verify_wave_checkout_session(checkout_id):
+    """
+    Vérifie directement auprès de Wave qu'une session Checkout est réellement
+    payée.
+
+    Cette fonction est la frontière de confiance PSP :
+    - ne fait confiance à aucune saisie OPS ;
+    - ne fait confiance à aucun libellé local ;
+    - interroge directement l'API Wave ;
+    - exige succeeded + complete + XOF + montant positif ;
+    - retourne les données vérifiées, sans créer de Payment.
+
+    Le caller reste responsable de vérifier que checkout_id correspond bien
+    au wave_checkout_id de la commande attendue.
+    """
+    import json
+    import urllib.request
+
+    from decimal import Decimal
+
+    from django.conf import settings
+    from django.core.exceptions import ValidationError
+
+    checkout_id = (checkout_id or "").strip()
+
+    if not checkout_id:
+        raise ValidationError(
+            "Identifiant de session Wave obligatoire."
+        )
+
+    api_key = (
+        getattr(settings, "WAVE_CHECKOUT_API_KEY", "") or ""
+    ).strip()
+
+    if not api_key:
+        raise ValidationError(
+            "Clé API Wave indisponible."
+        )
+
+    req = urllib.request.Request(
+        f"https://api.wave.com/v1/checkout/sessions/{checkout_id}",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+        },
+        method="GET",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=8) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+    except Exception as exc:
+        raise ValidationError(
+            "Impossible de vérifier la transaction auprès de Wave."
+        ) from exc
+
+    remote_id = (payload.get("id") or "").strip()
+    payment_status = (
+        payload.get("payment_status") or ""
+    ).strip()
+    checkout_status = (
+        payload.get("checkout_status") or ""
+    ).strip()
+    currency = (payload.get("currency") or "").strip()
+
+    try:
+        amount = Decimal(
+            str(payload.get("amount") or "0")
+        )
+    except Exception as exc:
+        raise ValidationError(
+            "Montant Wave invalide."
+        ) from exc
+
+    if remote_id != checkout_id:
+        raise ValidationError(
+            "La référence retournée par Wave ne correspond pas "
+            "à la session demandée."
+        )
+
+    if payment_status != "succeeded":
+        raise ValidationError(
+            "Le paiement Wave n'est pas confirmé."
+        )
+
+    if checkout_status != "complete":
+        raise ValidationError(
+            "La session Wave n'est pas terminée."
+        )
+
+    if currency != "XOF":
+        raise ValidationError(
+            "Devise Wave invalide."
+        )
+
+    if amount <= Decimal("0"):
+        raise ValidationError(
+            "Montant Wave invalide."
+        )
+
+    return {
+        "id": remote_id,
+        "amount": amount,
+        "currency": currency,
+        "payment_status": payment_status,
+        "checkout_status": checkout_status,
+        "raw": payload,
+    }
+
+
+
+def void_order_payment(
+    payment_id,
+    *,
+    reason,
+    voided_by=None,
+    reverse_cashback=True,
+):
+    """
+    Annule comptablement un Payment FAGNI sans le supprimer.
+
+    Garanties :
+    - transaction atomique ;
+    - verrouillage Payment + Order ;
+    - idempotence si le Payment est déjà annulé ;
+    - recalcul depuis les Payment encore CONFIRMED ;
+    - aucune suppression de Payment ;
+    - aucun changement des DeliveryLeg ;
+    - aucun changement de Order.status ;
+    - conservation de wash_complete_time ;
+    - conservation des payouts livreurs ;
+    - contre-passation du cashback client via le service wallet ;
+    - création d'une nouvelle trace OrderPaymentEvent.
+    """
+    import logging
+
+    from decimal import Decimal
+
+    from django.core.exceptions import ValidationError
+    from django.db import transaction
+    from django.db.models import Sum
+    from django.utils import timezone
+
+    from orders.models import Order, OrderPaymentEvent, Payment
+    from wallets.models import WalletTransaction
+    from wallets.services import debit_wallet
+
+    logger = logging.getLogger("payment_security")
+
+    reason = (reason or "").strip()
+
+    if not reason:
+        raise ValidationError(
+            "Le motif d'annulation du paiement est obligatoire."
+        )
+
+    with transaction.atomic():
+        payment = (
+            Payment.objects
+            .select_for_update()
+            .select_related("order")
+            .get(pk=payment_id)
+        )
+
+        order = (
+            Order.objects
+            .select_for_update()
+            .select_related("customer")
+            .get(pk=payment.order_id)
+        )
+
+        # =========================================================
+        # 0. IDEMPOTENCE
+        # =========================================================
+        if payment.status == Payment.ACCOUNTING_STATUS_VOIDED:
+            order.refresh_from_db(
+                fields=[
+                    "amount_paid",
+                    "payment_status",
+                    "payment_date",
+                    "status",
+                    "wash_complete_time",
+                ]
+            )
+
+            existing_reversal = (
+                WalletTransaction.objects
+                .filter(
+                    idempotency_key=f"payment_void:cashback:{payment.id}"
+                )
+                .first()
+            )
+
+            return {
+                "voided": False,
+                "already_voided": True,
+                "payment_id": payment.id,
+                "order_id": order.id,
+                "amount_paid": order.amount_paid,
+                "payment_status": order.payment_status,
+                "order_status": order.status,
+                "cashback_reversed": existing_reversal is not None,
+                "cashback_reversal_tx_id": (
+                    existing_reversal.id
+                    if existing_reversal is not None
+                    else None
+                ),
+            }
+
+        if payment.status != Payment.ACCOUNTING_STATUS_CONFIRMED:
+            raise ValidationError(
+                "Seul un paiement comptablement confirmé "
+                "peut être annulé."
+            )
+
+        payment_status_before = (
+            getattr(order, "payment_status", None) or "pending"
+        )
+
+        amount_paid_before = Decimal(
+            str(getattr(order, "amount_paid", 0) or 0)
+        )
+
+        # =========================================================
+        # 1. ANNULATION LOGIQUE DU PAYMENT
+        # =========================================================
+        Payment.objects.filter(pk=payment.pk).update(
+            status=Payment.ACCOUNTING_STATUS_VOIDED,
+            voided_at=timezone.now(),
+            voided_reason=reason,
+            voided_by=voided_by,
+        )
+
+        # =========================================================
+        # 2. RECALCUL DE LA SOURCE DE VÉRITÉ
+        # =========================================================
+        paid_sum = (
+            Payment.objects
+            .filter(
+                order_id=order.id,
+                status=Payment.ACCOUNTING_STATUS_CONFIRMED,
+            )
+            .aggregate(total=Sum("amount"))
+            .get("total")
+            or Decimal("0")
+        )
+
+        paid_sum = Decimal(str(paid_sum))
+
+        if paid_sum < 0:
+            paid_sum = Decimal("0")
+
+        total_ttc = Decimal(
+            str(getattr(order, "total_client_ttc", 0) or 0)
+        )
+
+        if total_ttc <= 0:
+            effective_paid = Decimal("0")
+            new_payment_status = "pending"
+        else:
+            effective_paid = min(paid_sum, total_ttc)
+
+            if paid_sum <= 0:
+                new_payment_status = "pending"
+            elif paid_sum < total_ttc:
+                new_payment_status = "partial"
+            else:
+                new_payment_status = "paid"
+
+        order_updates = {
+            "amount_paid": effective_paid,
+            "payment_status": new_payment_status,
+        }
+
+        if new_payment_status != "paid":
+            order_updates["payment_date"] = None
+
+        Order.objects.filter(pk=order.pk).update(**order_updates)
+
+        # =========================================================
+        # 3. CONTRE-PASSATION CASHBACK
+        # =========================================================
+        cashback_reversed = False
+        cashback_reversal_tx_id = None
+
+        if reverse_cashback:
+            cashback_tx = (
+                WalletTransaction.objects
+                .select_related("wallet")
+                .filter(
+                    order_id=order.id,
+                    wallet__owner_type="customer",
+                    type="credit",
+                    direction="in",
+                    leg__isnull=True,
+                    description__startswith="Cashback FAGNI commande",
+                )
+                .order_by("id")
+                .first()
+            )
+
+            if cashback_tx is not None:
+                reversal_key = (
+                    f"payment_void:cashback:{payment.id}"
+                )
+
+                existing_reversal = (
+                    WalletTransaction.objects
+                    .filter(idempotency_key=reversal_key)
+                    .first()
+                )
+
+                if existing_reversal is not None:
+                    cashback_reversed = True
+                    cashback_reversal_tx_id = existing_reversal.id
+
+                else:
+                    reversal_tx = debit_wallet(
+                        cashback_tx.wallet,
+                        cashback_tx.amount,
+                        description=(
+                            "Contre-passation cashback - "
+                            f"annulation Payment #{payment.id} "
+                            f"commande {order.code}"
+                        ),
+                        order=order,
+                        idempotency_key=reversal_key,
+                        tx_type="adjustment",
+                    )
+
+                    if reversal_tx is None:
+                        raise ValidationError(
+                            "La contre-passation du cashback "
+                            "n'a pas pu être enregistrée."
+                        )
+
+                    cashback_reversed = True
+                    cashback_reversal_tx_id = reversal_tx.id
+
+        # =========================================================
+        # 4. TRACE D'AUDIT
+        # =========================================================
+        OrderPaymentEvent.objects.create(
+            order=order,
+            channel="manual",
+            reference=f"VOID-PAYMENT-{payment.id}",
+            amount=Decimal("0.00"),
+            amount_paid_before=amount_paid_before,
+            amount_paid_after=effective_paid,
+            status_before=payment_status_before,
+            status_after=new_payment_status,
+            note=(
+                f"Annulation comptable Payment #{payment.id}. "
+                f"Motif : {reason}"
+            ),
+        )
+
+        logger.warning(
+            "PAYMENT_VOIDED | payment_id=%s | order_id=%s | "
+            "amount=%s | before=%s/%s | after=%s/%s | "
+            "cashback_reversed=%s",
+            payment.id,
+            order.id,
+            payment.amount,
+            amount_paid_before,
+            payment_status_before,
+            effective_paid,
+            new_payment_status,
+            cashback_reversed,
+        )
+
+        order.refresh_from_db(
+            fields=[
+                "amount_paid",
+                "payment_status",
+                "payment_date",
+                "status",
+                "wash_complete_time",
+            ]
+        )
+
+        return {
+            "voided": True,
+            "already_voided": False,
+            "payment_id": payment.id,
+            "order_id": order.id,
+            "amount_paid": order.amount_paid,
+            "payment_status": order.payment_status,
+            "order_status": order.status,
+            "cashback_reversed": cashback_reversed,
+            "cashback_reversal_tx_id": cashback_reversal_tx_id,
+        }
+
+
+
 def trigger_post_payment_auto_assignment(order_id):
     """
     Déclenche l'affectation automatique pressing + livreur collecte après

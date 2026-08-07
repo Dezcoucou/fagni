@@ -6383,6 +6383,25 @@ def apply_order_payment(
     reference = (reference or "").strip()
     channel = (channel or "manual").strip() or "manual"
 
+    allowed_channels = {
+        "wallet",
+        "wallet_auto",
+        "wave_webhook",
+        "wave_ops",
+        "cash",
+        "manual",
+    }
+
+    if channel not in allowed_channels:
+        raise ValidationError(
+            f"Canal de paiement non autorisé : {channel}."
+        )
+
+    if channel in {"wave_webhook", "wave_ops"} and not reference:
+        raise ValidationError(
+            "Une référence Wave vérifiée est obligatoire."
+        )
+
     if requested_amount <= DECIMAL_ZERO:
         return {
             "applied": DECIMAL_ZERO,
@@ -6441,9 +6460,30 @@ def apply_order_payment(
         # Idempotence stricte avant toute opération wallet ou DB
         # --------------------------------------------------------
         if reference:
+            if channel in {"wave_webhook", "wave_ops"}:
+                conflicting_payment = (
+                    Payment.objects
+                    .filter(
+                        reference=reference,
+                    )
+                    .exclude(order=order)
+                    .order_by("id")
+                    .first()
+                )
+
+                if conflicting_payment is not None:
+                    raise ValidationError(
+                        "Cette référence Wave est déjà rattachée "
+                        "à une autre commande."
+                    )
+
             existing_payment = (
                 Payment.objects
-                .filter(order=order, reference=reference)
+                .filter(
+                    order=order,
+                    reference=reference,
+                    status=Payment.ACCOUNTING_STATUS_CONFIRMED,
+                )
                 .order_by("id")
                 .first()
             )
@@ -6489,7 +6529,10 @@ def apply_order_payment(
 
         paid_sum = (
             Payment.objects
-            .filter(order=order)
+            .filter(
+                order=order,
+                status=Payment.ACCOUNTING_STATUS_CONFIRMED,
+            )
             .aggregate(total=Sum("amount"))
             .get("total")
             or 0
@@ -7073,11 +7116,36 @@ def admin_confirm_declared_payment(request, order_id: int):
         messages.error(request, "Impossible de confirmer : total TTC nul ou invalide.")
         return _ops_redirect_back(request)
 
+    checkout_id = (
+        getattr(order, "wave_checkout_id", "") or ""
+    ).strip()
+
+    if not checkout_id:
+        messages.error(
+            request,
+            "Confirmation refusée : aucune session Wave vérifiable "
+            "n'est rattachée à cette commande.",
+        )
+        return _ops_redirect_back(request)
+
+    from orders.services import verify_wave_checkout_session
+
+    try:
+        verified_wave = verify_wave_checkout_session(checkout_id)
+    except ValidationError as exc:
+        messages.error(
+            request,
+            f"Confirmation Wave refusée : {exc}",
+        )
+        return _ops_redirect_back(request)
+
     now_dt = timezone.now()
     update_fields = []
 
     try:
-        current_amount_paid = Decimal(str(getattr(order, "amount_paid", 0) or 0))
+        current_amount_paid = Decimal(
+            str(getattr(order, "amount_paid", 0) or 0)
+        )
     except Exception:
         current_amount_paid = DECIMAL_ZERO
 
@@ -7085,19 +7153,35 @@ def admin_confirm_declared_payment(request, order_id: int):
     if remaining < DECIMAL_ZERO:
         remaining = DECIMAL_ZERO
 
+    remote_amount = Decimal(
+        str(verified_wave.get("amount", 0) or 0)
+    )
+
     if remaining > DECIMAL_ZERO:
+        if remote_amount < remaining:
+            messages.error(
+                request,
+                "Confirmation refusée : le montant réellement confirmé "
+                "par Wave est inférieur au solde de la commande.",
+            )
+            return _ops_redirect_back(request)
+
         apply_order_payment(
             order,
             remaining,
             channel="wave_ops",
-            reference=f"WAVE-OPS-{order.id}",
-            note="Confirmation paiement OPS",
+            reference=checkout_id,
+            note="Confirmation paiement Wave OPS vérifiée via API Wave",
         )
         try:
             order.refresh_from_db()
         except Exception:
             import logging
-            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=6944")
+            logging.getLogger("fagni.orders.views").exception(
+                "Exception silencieuse après confirmation Wave OPS | "
+                "order_id=%s",
+                getattr(order, "id", None),
+            )
 
     if hasattr(order, "payment_verification_status"):
         if getattr(order, "payment_verification_status", "") != "verified":
@@ -14389,14 +14473,65 @@ def ops_order_confirm_wave_paid(request, order_id: int):
             })
         return redirect("orders:ops_dashboard")
 
-    ref = f"WAVE-OPS-{order.id}-SOLDE"
+    checkout_id = (
+        getattr(order, "wave_checkout_id", "") or ""
+    ).strip()
+
+    if not checkout_id:
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": "missing_wave_checkout_id",
+                "message": (
+                    "Aucune session Wave vérifiable n'est "
+                    "rattachée à cette commande."
+                ),
+            },
+            status=400,
+        )
+
+    from orders.services import verify_wave_checkout_session
+
+    try:
+        verified_wave = verify_wave_checkout_session(checkout_id)
+    except ValidationError as exc:
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": "wave_verification_failed",
+                "message": str(exc),
+            },
+            status=400,
+        )
+
+    remote_amount = Decimal(
+        str(verified_wave.get("amount", 0) or 0)
+    )
+
+    if remote_amount < remaining:
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": "wave_amount_insufficient",
+                "message": (
+                    "Le montant réellement confirmé par Wave "
+                    "est inférieur au solde de la commande."
+                ),
+            },
+            status=400,
+        )
+
+    ref = checkout_id
 
     payment_result = apply_order_payment(
         order,
         remaining,
         channel="wave_ops",
         reference=ref,
-        note=f"Confirmation OPS Wave par {getattr(request.user, 'username', '')}",
+        note=(
+            "Confirmation OPS Wave vérifiée via API Wave "
+            f"par {getattr(request.user, 'username', '')}"
+        ),
     )
 
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
@@ -15197,24 +15332,23 @@ def wave_webhook(request):
     if payment_status != "succeeded" or checkout_status != "complete":
         return JsonResponse({"ok": True, "ignored": True})
 
-    # Sprint P0, Wave 2 (BP1) — rattachement par le champ dédié en priorité ;
-    # repli rétrocompatible sur payment_declared_reference pour les sessions
-    # créées avant l'ajout de ce champ (client_order_pay_wave_page).
+    # Sécurité P0 — wave_checkout_id est l'unique clé de rattachement PSP.
+    #
+    # payment_declared_reference est une donnée déclarative/legacy et ne
+    # constitue jamais une preuve qu'une session Wave appartient à cette
+    # commande.
     order = (
         Order.objects
         .select_related("customer")
         .filter(wave_checkout_id=checkout_id)
         .first()
     )
+
     if not order:
-        order = (
-            Order.objects
-            .select_related("customer")
-            .filter(payment_declared_reference=checkout_id)
-            .first()
+        return JsonResponse(
+            {"ok": False, "error": "order_not_found"},
+            status=404,
         )
-    if not order:
-        return JsonResponse({"ok": False, "error": "order_not_found"}, status=404)
 
     # DEBUG local : on accepte checkout_test_xxx sans appel API Wave
     if settings.DEBUG and checkout_id.startswith("checkout_test_"):
@@ -15385,12 +15519,50 @@ def admin_payment_review_confirm(request, order_id: int):
     remaining = total - paid
 
     if remaining > 0:
+        checkout_id = (
+            getattr(order, "wave_checkout_id", "") or ""
+        ).strip()
+
+        if not checkout_id:
+            messages.error(
+                request,
+                "Validation refusée : aucune session Wave vérifiable "
+                "n'est rattachée à cette commande.",
+            )
+            return redirect("orders:admin_payment_review")
+
+        from orders.services import verify_wave_checkout_session
+
+        try:
+            verified_wave = verify_wave_checkout_session(checkout_id)
+        except ValidationError as exc:
+            messages.error(
+                request,
+                f"Validation Wave refusée : {exc}",
+            )
+            return redirect("orders:admin_payment_review")
+
+        remote_amount = Decimal(
+            str(verified_wave.get("amount", 0) or 0)
+        )
+
+        if remote_amount < remaining:
+            messages.error(
+                request,
+                "Validation refusée : le montant réellement confirmé "
+                "par Wave est inférieur au solde de la commande.",
+            )
+            return redirect("orders:admin_payment_review")
+
         apply_order_payment(
             order,
             remaining,
             channel="wave_ops",
-            reference=getattr(order, "payment_declared_reference", "") or f"ADMIN-WAVE-{order.id}",
-            note="Validation paiement Wave depuis cockpit admin",
+            reference=checkout_id,
+            note=(
+                "Validation paiement Wave depuis cockpit admin "
+                "après vérification API Wave"
+            ),
         )
 
     order.refresh_from_db()

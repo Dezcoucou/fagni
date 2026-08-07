@@ -1912,34 +1912,24 @@ class Order(models.Model):
             pay_amount_int = 0
 
         if pay_amount_int > 0 and hasattr(self, "add_payment"):
-            try:
-                self.add_payment(
-                    amount=pay_amount_int,
-                    channel=(method or "psp"),
-                    reference=(reference or ""),
-                    source="system",
-                    save=True,
-                )
-            except Exception:
-                # Ne jamais casser mark_paid si l'audit échoue
-                pass
+            self.add_payment(
+                amount=pay_amount_int,
+                channel=(method or "manual"),
+                reference=(reference or ""),
+                source="system",
+                save=True,
+            )
 
         # 4) Sync canonique depuis Payments (source de vérité)
-        just_became_paid = False
-        try:
-            just_became_paid = bool(self.sync_payment_status_from_payments(save=False))
-        except Exception:
-            # Fallback: si on a payé >= total => paid sinon partial/unpaid
-            if pay_amount_int >= int(total_ttc):
-                self.payment_status = "paid"
-                self.amount_paid = total_ttc
-                just_became_paid = True
-            elif pay_amount_int > 0:
-                self.payment_status = "partial"
-                self.amount_paid = Decimal(str(pay_amount_int))
-            else:
-                self.payment_status = "pending"
-                self.amount_paid = Decimal("0.00")
+        #
+        # Sécurité P0 :
+        # aucune erreur technique de synchronisation ne doit pouvoir
+        # fabriquer artificiellement un statut PAID.
+        #
+        # Payment confirmé reste l'unique preuve comptable.
+        just_became_paid = bool(
+            self.sync_payment_status_from_payments(save=False)
+        )
 
         # 5) Si on devient paid => préparer facture + recalcul finance (génère invoice_number etc.)
         if getattr(self, "payment_status", None) == "paid":
@@ -2044,8 +2034,16 @@ class Order(models.Model):
         if total_ttc <= 0:
             self.amount_paid = Decimal("0.00")
             self.payment_status = "pending"
+
             if save:
-                self.save(update_fields=["amount_paid", "payment_status"])
+                # Projection canonique Payment -> Order.
+                # Ne pas repasser par Order.save(), dont le garde-fou
+                # interdit volontairement les écritures paiement directes.
+                type(self).objects.filter(pk=self.pk).update(
+                    amount_paid=Decimal("0.00"),
+                    payment_status="pending",
+                )
+
             return False
 
         paid_sum = self.total_paid_from_payments()
@@ -2074,12 +2072,41 @@ class Order(models.Model):
                 self.invoice_status = "paid"
 
         if save:
-            fields = ["amount_paid", "payment_status"]
+            # ========================================================
+            # PROJECTION CANONIQUE PAYMENT -> ORDER
+            # ========================================================
+            #
+            # Ne jamais passer par Order.save() ici.
+            #
+            # Order.save() possède volontairement un garde-fou qui
+            # interdit les modifications directes de amount_paid /
+            # payment_status hors du moteur de paiement.
+            #
+            # Cette méthode EST précisément le moteur canonique de
+            # projection depuis les Payment confirmés.
+            #
+            # L'écriture DB directe est donc intentionnelle :
+            # Payment confirmé -> somme -> projection Order.
+            # ========================================================
+            updates = {
+                "amount_paid": self.amount_paid,
+                "payment_status": self.payment_status,
+            }
+
             if just_became_paid:
-                for f in ("payment_date", "invoice_date", "invoice_status"):
-                    if hasattr(self, f):
-                        fields.append(f)
-            self.save(update_fields=list(dict.fromkeys(fields)))
+                if hasattr(self, "payment_date"):
+                    updates["payment_date"] = self.payment_date
+                if hasattr(self, "invoice_date"):
+                    updates["invoice_date"] = self.invoice_date
+                if hasattr(self, "invoice_status"):
+                    updates["invoice_status"] = self.invoice_status
+
+            type(self).objects.filter(pk=self.pk).update(**updates)
+
+            # Maintenir également l'instance Python synchronisée avec
+            # les valeurs réellement persistées.
+            for field_name, field_value in updates.items():
+                setattr(self, field_name, field_value)
 
         return just_became_paid
     @property
@@ -2178,7 +2205,11 @@ class Order(models.Model):
         # Sinon le rejeu d'un paiement déjà appliqué serait interprété comme
         # un nouveau paiement sur le solde restant.
         if reference:
-            if channel in {"wave_webhook", "wave_ops"}:
+            if channel in {
+                "wave_webhook",
+                "wave_ops",
+                "wave_manual_verified",
+            }:
                 conflicting_payment = (
                     Payment.objects
                     .filter(
@@ -3340,17 +3371,17 @@ class Order(models.Model):
                     self.payment_date = None
 
             elif st == "partial":
-                # cohérence simple : partial ne peut pas être soldé
-                if total_ttc > 0 and amt >= total_ttc:
-                    self.payment_status = "paid"
-                    if getattr(self, "payment_date", None) is None:
-                        self.payment_date = timezone.now()
-                elif amt <= 0:
+                # Sécurité P0 :
+                # Order.save() ne décide jamais qu'une commande est payée.
+                #
+                # Même si amount_paid atteint total_client_ttc, la promotion
+                # vers "paid" doit exclusivement provenir du recalcul des
+                # Payment confirmés via sync_payment_status_from_payments().
+                if amt <= 0:
                     self.payment_status = "pending"
                     self.amount_paid = Decimal("0")
                     self.payment_date = None
                 else:
-                    # si partial avec montant >0 et pas de date, on peut dater
                     if getattr(self, "payment_date", None) is None:
                         self.payment_date = timezone.now()
 
@@ -4710,8 +4741,10 @@ class OrderUpsell(models.Model):
 class OrderPaymentEvent(models.Model):
     CHANNEL_CHOICES = [
         ("wallet", "Wallet"),
+        ("wallet_auto", "Wallet automatique"),
         ("wave_webhook", "Wave webhook"),
-        ("wave_ops", "Wave OPS"),
+        ("wave_ops", "Wave OPS vérifié API"),
+        ("wave_manual_verified", "Wave vérifié manuellement"),
         ("cash", "Cash"),
         ("manual", "Manuel"),
     ]

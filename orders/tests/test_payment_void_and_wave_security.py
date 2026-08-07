@@ -194,9 +194,9 @@ class PaymentReferenceSecurityTests(PaymentVoidTestBase):
             apply_order_payment(
                 order,
                 Decimal("1000"),
-                channel="wave_manual_verified",
-                reference="OLD-WAVE-REFERENCE",
-                note="Texte libre prétendant une vérification Wave",
+                channel="canal_totalement_invente",
+                reference="FAKE-CHANNEL-REFERENCE",
+                note="Un canal inconnu ne doit jamais créer un Payment.",
             )
 
         self.assertFalse(
@@ -1035,3 +1035,181 @@ class WaveOpsVerificationTests(TestCase):
 
         self.order.refresh_from_db()
         self.assertNotEqual(self.order.payment_status, "paid")
+
+
+class WaveManualVerificationWithoutApiTests(TestCase):
+    """
+    Sécurité Wave provisoire sans API PSP.
+
+    Une déclaration client n'est jamais un paiement.
+    Une référence Wave saisie par OPS n'est jamais une preuve suffisante.
+    Seule une vérification humaine explicite doit pouvoir produire
+    un Payment wave_manual_verified.
+    """
+
+    def setUp(self):
+        from decimal import Decimal
+        from django.contrib.auth import get_user_model
+        from orders.models import Customer, Order, OrderItem
+
+        self.customer = Customer.objects.create(
+            name="Client Wave manuel",
+            phone="0700554433",
+            address="Riviera 3",
+        )
+
+        self.order = Order.objects.create(
+            customer=self.customer,
+            status="done",
+            payment_status="pending",
+            pricing_mode="item",
+        )
+
+        OrderItem.objects.create(
+            order=self.order,
+            designation="Test paiement manuel Wave",
+            quantity=1,
+            unit_price=Decimal("5000"),
+            total=Decimal("5000"),
+        )
+
+        self.order.total_client_ttc = Decimal("5000")
+        self.order.save(update_fields=["total_client_ttc"])
+
+        User = get_user_model()
+        self.staff = User.objects.create_user(
+            username="ops_wave_manual_test",
+            password="test-password",
+            is_staff=True,
+        )
+
+    def test_ops_mark_paid_ne_peut_plus_valider_wave_avec_reference_libre(self):
+        import json
+        from django.urls import reverse
+        from orders.models import Payment
+        from orders.tests.test_wave_checkout import _ops_headers
+
+        response = self.client.post(
+            reverse("api-ops-mark-paid", args=[self.order.id]),
+            data=json.dumps({
+                "channel": "wave",
+                "reference": "FAUSSE-REFERENCE-WAVE",
+            }),
+            content_type="application/json",
+            **_ops_headers(),
+        )
+
+        self.order.refresh_from_db()
+
+        self.assertNotEqual(self.order.payment_status, "paid")
+        self.assertEqual(self.order.amount_paid, 0)
+        self.assertFalse(
+            Payment.objects.filter(
+                order=self.order,
+                reference="FAUSSE-REFERENCE-WAVE",
+            ).exists()
+        )
+
+    def test_apply_order_payment_accepte_wave_manual_verified(self):
+        from decimal import Decimal
+        from orders.views import apply_order_payment
+
+        result = apply_order_payment(
+            self.order,
+            Decimal("5000"),
+            channel="wave_manual_verified",
+            reference="WAVE-MANUAL-REAL-001",
+            note="Transaction vérifiée manuellement dans Wave",
+        )
+
+        self.order.refresh_from_db()
+
+        self.assertEqual(result["payment_status"], "paid")
+        self.assertEqual(self.order.payment_status, "paid")
+        self.assertEqual(self.order.amount_paid, Decimal("5000"))
+
+    def test_wave_manual_verified_exige_reference(self):
+        from decimal import Decimal
+        from django.core.exceptions import ValidationError
+        from orders.views import apply_order_payment
+
+        with self.assertRaises(ValidationError):
+            apply_order_payment(
+                self.order,
+                Decimal("5000"),
+                channel="wave_manual_verified",
+                reference="",
+                note="Doit échouer",
+            )
+
+    def test_declaration_client_ne_cree_toujours_pas_payment(self):
+        from orders.models import Payment
+
+        self.order.payment_status = "declared"
+        self.order.payment_verification_status = "pending_review"
+        self.order.payment_declared_reference = "REFERENCE-CLIENT-001"
+        self.order.save(update_fields=[
+            "payment_status",
+            "payment_verification_status",
+            "payment_declared_reference",
+        ])
+
+        self.order.refresh_from_db()
+
+        self.assertEqual(self.order.amount_paid, 0)
+        self.assertFalse(
+            Payment.objects.filter(order=self.order).exists()
+        )
+
+
+class OrderPaymentProjectionSecurityTests(PaymentVoidTestBase):
+    """
+    Order.amount_paid et Order.payment_status sont des projections.
+
+    Order.save() ne doit jamais transformer à lui seul un état partial
+    en paid sur la simple base de amount_paid.
+    """
+
+    def test_order_save_ne_promeut_pas_partial_en_paid_sans_payment(self):
+        from decimal import Decimal
+        from orders.models import Order, Payment
+
+        order = self.make_order()
+
+        total = Decimal(str(order.total_client_ttc or 0))
+        self.assertGreater(total, Decimal("0"))
+
+        self.assertFalse(
+            Payment.objects.filter(order=order).exists()
+        )
+
+        # Simule un état legacy/incohérent présent en base :
+        # amount_paid == total mais aucun Payment ne le justifie.
+        Order.objects.filter(pk=order.pk).update(
+            payment_status="partial",
+            amount_paid=total,
+        )
+
+        order.refresh_from_db()
+
+        self.assertEqual(order.payment_status, "partial")
+        self.assertEqual(order.amount_paid, total)
+
+        # Une sauvegarde ordinaire ne doit surtout pas fabriquer PAID.
+        order.save()
+        order.refresh_from_db()
+
+        self.assertEqual(order.payment_status, "partial")
+        self.assertEqual(order.amount_paid, total)
+
+        self.assertFalse(
+            Payment.objects.filter(order=order).exists()
+        )
+
+        # Le recalcul canonique depuis Payment corrige ensuite
+        # naturellement cet état incohérent.
+        order.sync_payment_status_from_payments(save=True)
+        order.refresh_from_db()
+
+        self.assertEqual(order.payment_status, "pending")
+        self.assertEqual(order.amount_paid, Decimal("0"))

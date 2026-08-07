@@ -1,65 +1,208 @@
 {% extends "admin/base_site.html" %}
 
 {% block content %}
-<h1>💳 Paiements à vérifier</h1>
+<h1>💳 Paiements Wave à vérifier</h1>
 
-<table border="1" cellpadding="10" cellspacing="0" style="width:100%;background:white;">
+<div style="
+    margin-bottom:18px;
+    padding:14px 16px;
+    background:#fff7ed;
+    border:1px solid #fed7aa;
+    border-radius:10px;
+    color:#9a3412;
+">
+    <strong>⚠️ Vérification humaine obligatoire</strong><br>
+    La référence et la capture fournies par le client ne constituent pas
+    une preuve suffisante de paiement.
+    Avant toute validation, vérifiez réellement la transaction dans
+    l'application Wave : montant, référence, destinataire et transaction reçue.
+</div>
+
+<table border="1" cellpadding="10" cellspacing="0"
+       style="width:100%;background:white;">
   <tr>
     <th>Commande</th>
     <th>Client</th>
-    <th>Montant</th>
-    <th>Référence</th>
-    <th>Confiance</th>
-    <th>Preuve</th>
-    <th>Date</th>
+    <th>Montant attendu</th>
+    <th>Référence déclarée</th>
+    <th>Contrôle</th>
+    <th>Preuve client</th>
+    <th>Déclaré le</th>
     <th>Actions</th>
   </tr>
 
   {% for o in orders %}
   <tr>
-    <td><strong>{{ o.code }}</strong></td>
-    <td>{{ o.customer }}</td>
-    <td><strong>{{ o.total_client_ttc }} FCFA</strong></td>
-    <td>{{ o.payment_declared_reference|default:"—" }}</td>
     <td>
-      {% if o.payment_declared_reference and o.payment_proof and o.amount_paid >= o.total_client_ttc %}
-        <span style="background:#dcfce7;color:#166534;padding:6px 10px;border-radius:999px;font-weight:700;">OK</span>
+      <strong>{{ o.code }}</strong>
+    </td>
+
+    <td>
+      {{ o.customer }}
+    </td>
+
+    <td>
+      <strong>{{ o.total_client_ttc }} FCFA</strong>
+    </td>
+
+    <td>
+      {{ o.payment_declared_reference|default:"—" }}
+    </td>
+
+    <td>
+      {% if o.payment_declared_reference and o.payment_proof %}
+        <span style="
+            background:#fef3c7;
+            color:#92400e;
+            padding:6px 10px;
+            border-radius:999px;
+            font-weight:700;
+        ">
+          À vérifier dans Wave
+        </span>
       {% elif o.payment_declared_reference or o.payment_proof %}
-        <span style="background:#fef3c7;color:#92400e;padding:6px 10px;border-radius:999px;font-weight:700;">À vérifier</span>
+        <span style="
+            background:#fee2e2;
+            color:#991b1b;
+            padding:6px 10px;
+            border-radius:999px;
+            font-weight:700;
+        ">
+          Preuve incomplète
+        </span>
       {% else %}
-        <span style="background:#fee2e2;color:#991b1b;padding:6px 10px;border-radius:999px;font-weight:700;">Risque</span>
+        <span style="
+            background:#fee2e2;
+            color:#991b1b;
+            padding:6px 10px;
+            border-radius:999px;
+            font-weight:700;
+        ">
+          Non vérifiable
+        </span>
       {% endif %}
     </td>
+
     <td>
       {% if o.payment_proof %}
-        <a href="{{ o.payment_proof.url }}" target="_blank">Voir preuve</a>
+        <a href="{{ o.payment_proof.url }}"
+           target="_blank"
+           rel="noopener noreferrer">
+          📸 Voir la capture
+        </a>
       {% else %}
         —
       {% endif %}
     </td>
-    <td>{{ o.payment_declared_at|default:"—" }}</td>
-    <td style="display:flex;gap:8px;align-items:center;">
-      <a href="/admin/orders/order/{{ o.id }}/change/">Voir</a>
 
-      <form method="post" action="{% url 'orders:admin_payment_review_confirm' o.id %}" style="display:inline;">
+    <td>
+      {{ o.payment_declared_at|default:"—" }}
+    </td>
+
+    <td style="
+        display:flex;
+        gap:8px;
+        align-items:center;
+        flex-wrap:wrap;
+    ">
+      <a href="/admin/orders/order/{{ o.id }}/change/">
+        Voir commande
+      </a>
+
+      <form method="post"
+            action="{% url 'orders:admin_payment_review_confirm' o.id %}"
+            style="display:inline;">
         {% csrf_token %}
-        <button type="submit" style="background:#16a34a;color:white;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;">
-          Valider
+
+        <input
+          type="text"
+          name="verified_wave_reference"
+          required
+          maxlength="120"
+          autocomplete="off"
+          placeholder="Référence réellement vue dans Wave"
+          style="
+              padding:8px 10px;
+              min-width:230px;
+              border:1px solid #d1d5db;
+              border-radius:8px;
+          "
+        >
+
+                  <label style="
+              display:flex;
+              gap:8px;
+              align-items:flex-start;
+              margin:10px 0;
+              font-size:12px;
+              line-height:1.4;
+          ">
+            <input
+              type="checkbox"
+              name="wave_human_verified"
+              value="1"
+              required
+              style="margin-top:2px;"
+            >
+            <span>
+              Je confirme avoir ouvert le compte Wave FAGNI et vérifié
+              personnellement la transaction reçue : montant,
+              référence et destinataire.
+            </span>
+          </label>
+
+<button
+          type="submit"
+          style="
+              background:#16a34a;
+              color:white;
+              border:0;
+              padding:8px 12px;
+              border-radius:8px;
+              cursor:pointer;
+          "
+          onclick="return confirm(
+              'Confirmez-vous avoir personnellement vérifié cette transaction dans Wave ?'
+          );"
+        >
+          ✅ Vérifiée dans Wave
         </button>
       </form>
 
-      <form method="post" action="{% url 'orders:admin_payment_review_reject' o.id %}" style="display:inline;">
+      <form method="post"
+            action="{% url 'orders:admin_payment_review_reject' o.id %}"
+            style="display:inline;">
         {% csrf_token %}
-        <button type="submit" style="background:#dc2626;color:white;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;">
-          Rejeter
+
+        <button
+          type="submit"
+          style="
+              background:#dc2626;
+              color:white;
+              border:0;
+              padding:8px 12px;
+              border-radius:8px;
+              cursor:pointer;
+          "
+          onclick="return confirm(
+              'Rejeter cette déclaration de paiement ?'
+          );"
+        >
+          ❌ Rejeter
         </button>
       </form>
     </td>
   </tr>
+
   {% empty %}
+
   <tr>
-    <td colspan="8">Aucun paiement en attente</td>
+    <td colspan="8">
+      Aucun paiement Wave en attente de vérification.
+    </td>
   </tr>
+
   {% endfor %}
 </table>
+
 {% endblock %}

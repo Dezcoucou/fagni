@@ -151,11 +151,54 @@
       <div class="divider"></div>
       <h3 class="card-subtitle">Validation OPS / Admin</h3>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
-        <form method="post" action="/orders/admin/orders/{{ order.id }}/payment/confirm-declared/" style="display:inline-flex;">
+        <form method="post"
+              action="/orders/admin/orders/{{ order.id }}/payment/confirm-declared/"
+              style="display:flex;flex-direction:column;gap:8px;min-width:300px;">
           {% csrf_token %}
-          <button type="submit" class="btn btn-primary"
-                  onclick="return confirm('Confirmer ce paiement déclaré ? Cette action validera le règlement et soldera la commande.');">
-            ✅ Confirmer le paiement
+
+          {% if order.payment_declared_reference %}
+            <div style="font-size:12px;">
+              Référence déclarée par le client :
+              <strong>{{ order.payment_declared_reference }}</strong>
+            </div>
+          {% endif %}
+
+          {% if order.payment_proof %}
+            <div style="font-size:12px;">
+              <a href="{{ order.payment_proof.url }}" target="_blank">
+                📸 Voir la preuve envoyée par le client
+              </a>
+            </div>
+          {% endif %}
+
+          <input
+            type="text"
+            name="verified_wave_reference"
+            maxlength="120"
+            required
+            placeholder="Référence réellement vue dans Wave"
+            style="padding:10px;border-radius:10px;border:1px solid #d1d5db;"
+          >
+
+          <label style="font-size:12px;display:flex;gap:7px;align-items:flex-start;">
+            <input
+              type="checkbox"
+              name="wave_human_verified"
+              value="1"
+              required
+            >
+            <span>
+              J’ai ouvert le compte Wave FAGNI et vérifié personnellement
+              cette transaction et son montant.
+            </span>
+          </label>
+
+          <button
+            type="submit"
+            class="btn btn-primary"
+            onclick="return confirm('Tu confirmes avoir réellement vérifié la transaction dans Wave ?');"
+          >
+            ✅ Paiement vérifié dans Wave
           </button>
         </form>
 

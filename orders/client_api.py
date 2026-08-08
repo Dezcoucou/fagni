@@ -492,6 +492,9 @@ def api_order_detail(request, order_id):
             if getattr(order, 'payment_declared_at', None)
             else None
         ),
+        'payment_declared_reference': (
+            getattr(order, 'payment_declared_reference', '') or ''
+        ),
         'has_payment_proof': bool(getattr(order, 'payment_proof', None)),
         'service_type':   getattr(order, 'service_type', None) or 'FAGNI',
         'total':          total,

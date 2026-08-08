@@ -322,3 +322,7 @@ class ClientWavePaymentDeclarationApiTests(TestCase):
         self.assertIsNotNone(
             body["payment_declared_at"]
         )
+        self.assertEqual(
+            body["payment_declared_reference"],
+            "WAVE-REF-001",
+        )

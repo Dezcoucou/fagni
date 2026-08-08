@@ -11,6 +11,20 @@ from orders.models import Customer, Order, Payment
 
 
 class ClientWavePaymentDeclarationApiTests(TestCase):
+    def test_declaration_sans_authentification_est_refusee(self):
+        response = self.client.post(
+            "/api/client/orders/999/payment/declare-wave/",
+            data={
+                "payment_reference": "WAVE-ANONYME-001",
+            },
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(
+            response.json()["error"],
+            "Authentification requise.",
+        )
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()

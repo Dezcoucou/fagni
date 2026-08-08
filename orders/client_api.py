@@ -512,6 +512,15 @@ def api_declare_wave_payment(request, order_id):
 
     customer = request.user
 
+    # Sécurité : ClientAuth retourne None lorsqu'aucun Bearer token
+    # n'est fourni. Cet endpoint modifie l'état de paiement d'une
+    # commande : une authentification client explicite est obligatoire.
+    if not isinstance(customer, Customer):
+        return Response(
+            {'error': 'Authentification requise.'},
+            status=401,
+        )
+
     reference = (
         request.data.get('payment_reference')
         or request.data.get('reference')

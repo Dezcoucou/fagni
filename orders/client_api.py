@@ -44,15 +44,32 @@ def _read_token(token):
 class ClientAuth(BaseAuthentication):
     def authenticate(self, request):
         header = request.headers.get('Authorization', '')
+
         if not header.startswith('Bearer '):
-            return None
-        payload = _read_token(header[7:])
+            raise AuthenticationFailed('Authentification requise.')
+
+        token = header[7:].strip()
+        if not token:
+            raise AuthenticationFailed('Authentification requise.')
+
+        payload = _read_token(token)
         if not payload:
             raise AuthenticationFailed('Token invalide')
-        customer = Customer.objects.filter(id=payload.get('cid')).first()
+
+        customer_id = payload.get('cid')
+        if not customer_id:
+            raise AuthenticationFailed('Token client invalide')
+
+        customer = Customer.objects.filter(id=customer_id).first()
         if not customer:
             raise AuthenticationFailed('Client introuvable')
-        return (customer, header[7:])
+
+        return (customer, token)
+
+    def authenticate_header(self, request):
+        # Permet à DRF de conserver un vrai HTTP 401 pour les erreurs
+        # d'authentification Bearer au lieu de les convertir en 403.
+        return 'Bearer'
 
 
 # ── HELPERS ───────────────────────────────────────────────

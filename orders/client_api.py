@@ -465,6 +465,17 @@ def api_order_detail(request, order_id):
         'status_emoji':   status_info['emoji'],
         'status_step':    status_info['step'],
         'payment_status': getattr(order, 'payment_status', 'unpaid'),
+        'payment_verification_status': getattr(
+            order,
+            'payment_verification_status',
+            'none',
+        ),
+        'payment_declared_at': (
+            order.payment_declared_at.isoformat()
+            if getattr(order, 'payment_declared_at', None)
+            else None
+        ),
+        'has_payment_proof': bool(getattr(order, 'payment_proof', None)),
         'service_type':   getattr(order, 'service_type', None) or 'FAGNI',
         'total':          total,
         'amount_paid':    amount_paid,
@@ -481,6 +492,182 @@ def api_order_detail(request, order_id):
 
 
 
+
+
+
+@api_view(['POST'])
+@authentication_classes([ClientAuth])
+@permission_classes([])
+def api_declare_wave_payment(request, order_id):
+    """
+    Déclaration client d'un paiement Wave manuel.
+
+    IMPORTANT :
+    - ne crée aucun Payment ;
+    - ne modifie pas amount_paid ;
+    - ne marque jamais automatiquement paid ;
+    - ne déclenche ni wallet ni payout.
+    """
+    from django.utils import timezone
+
+    customer = request.user
+
+    reference = (
+        request.data.get('payment_reference')
+        or request.data.get('reference')
+        or ''
+    ).strip()
+
+    payment_proof = request.FILES.get('payment_proof')
+
+    if not reference:
+        return Response(
+            {'error': 'Référence Wave obligatoire.'},
+            status=400,
+        )
+
+    if len(reference) > 120:
+        return Response(
+            {'error': 'Référence Wave trop longue.'},
+            status=400,
+        )
+
+    with transaction.atomic():
+        order = (
+            Order.objects
+            .select_for_update()
+            .filter(
+                id=order_id,
+                customer=customer,
+            )
+            .first()
+        )
+
+        if not order:
+            return Response(
+                {'error': 'Commande introuvable.'},
+                status=404,
+            )
+
+        status = (
+            getattr(order, 'status', '')
+            or ''
+        ).strip().lower()
+
+        payment_status = (
+            getattr(order, 'payment_status', '')
+            or ''
+        ).strip().lower()
+
+        if status == 'canceled':
+            return Response(
+                {
+                    'error':
+                    'Impossible de déclarer un paiement '
+                    'sur une commande annulée.'
+                },
+                status=400,
+            )
+
+        if payment_status == 'paid':
+            return Response(
+                {'error': 'Cette commande est déjà payée.'},
+                status=400,
+            )
+
+        existing_proof = bool(
+            getattr(order, 'payment_proof', None)
+        )
+
+        if not payment_proof and not existing_proof:
+            return Response(
+                {'error': 'Preuve de paiement obligatoire.'},
+                status=400,
+            )
+
+        if payment_proof:
+            if getattr(payment_proof, 'size', 0) > 5 * 1024 * 1024:
+                return Response(
+                    {
+                        'error':
+                        'La preuve de paiement ne doit pas dépasser 5 Mo.'
+                    },
+                    status=400,
+                )
+
+            allowed_types = {
+                'image/jpeg',
+                'image/png',
+                'image/webp',
+                'application/pdf',
+            }
+
+            content_type = (
+                getattr(payment_proof, 'content_type', '')
+                or ''
+            ).lower()
+
+            if content_type and content_type not in allowed_types:
+                return Response(
+                    {
+                        'error':
+                        'Format de preuve non accepté. '
+                        'Utilise JPG, PNG, WEBP ou PDF.'
+                    },
+                    status=400,
+                )
+
+        amount_before = Decimal(
+            str(getattr(order, 'amount_paid', 0) or 0)
+        )
+
+        order.payment_status = 'declared'
+        order.payment_verification_status = 'pending_review'
+        order.payment_declared_at = timezone.now()
+        order.payment_declared_channel = 'wave'
+        order.payment_declared_reference = reference
+
+        update_fields = [
+            'payment_status',
+            'payment_verification_status',
+            'payment_declared_at',
+            'payment_declared_channel',
+            'payment_declared_reference',
+        ]
+
+        if payment_proof:
+            order.payment_proof = payment_proof
+            update_fields.append('payment_proof')
+
+        order.save(update_fields=update_fields)
+
+        order.refresh_from_db()
+
+        amount_after = Decimal(
+            str(getattr(order, 'amount_paid', 0) or 0)
+        )
+
+        if amount_after != amount_before:
+            raise RuntimeError(
+                'Invariant paiement violé : '
+                'la déclaration Wave a modifié amount_paid.'
+            )
+
+    return Response(
+        {
+            'success': True,
+            'message': (
+                'Votre paiement a été déclaré. '
+                'La vérification est en cours.'
+            ),
+            'payment_status': order.payment_status,
+            'payment_verification_status':
+                order.payment_verification_status,
+            'has_payment_proof':
+                bool(getattr(order, 'payment_proof', None)),
+        },
+        status=200,
+    )
 
 
 def is_in_delivery_zone(lat, lng, address=""):

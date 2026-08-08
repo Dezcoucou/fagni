@@ -3,7 +3,7 @@ from orders.ops_api import api_ops_pilotbook, api_ops_pilotbook_detail, api_ops_
 from orders.driver_api import save_fcm_token, api_driver_dropoff, driver_login, driver_missions, driver_confirm_pickup, driver_delivery_proof, driver_wallet, driver_toggle_status, driver_pending_mission, driver_copilote, api_driver_profil_update, driver_update_location
 from orders.photo_api import driver_upload_photo, partner_upload_photo, order_photos
 from orders.config_api import api_config
-from orders.client_api import api_chatbot, api_login, api_home, api_orders, api_order_detail, api_pricing_bags, api_create_order, api_articles, api_wallet, api_parrainage, api_rate_order, api_register, api_report_litige, api_pricing_detail, api_order_tracking, api_cancel_order, api_abonnement_estimer, api_abonnement_reserver, api_mon_abonnement_v1, api_routine_essai, api_routine_essai_detail, api_client_accueil
+from orders.client_api import api_chatbot, api_login, api_home, api_orders, api_order_detail, api_declare_wave_payment, api_pricing_bags, api_create_order, api_articles, api_wallet, api_parrainage, api_rate_order, api_register, api_report_litige, api_pricing_detail, api_order_tracking, api_cancel_order, api_abonnement_estimer, api_abonnement_reserver, api_mon_abonnement_v1, api_routine_essai, api_routine_essai_detail, api_client_accueil
 from django.contrib import admin
 from django.urls import path, include
 from fagni.views import home, landing_riviera3, api_health
@@ -19,6 +19,11 @@ urlpatterns = [
     path("api/client/home/",       api_home,   name="api-client-home"),
     path("api/client/orders/",     api_orders,       name="api-client-orders"),
     path("api/client/orders/<int:order_id>/", api_order_detail, name="api-client-order-detail"),
+    path(
+        "api/client/orders/<int:order_id>/payment/declare-wave/",
+        api_declare_wave_payment,
+        name="api-client-declare-wave-payment",
+    ),
     path("api/client/pricing/bags/", api_pricing_bags,  name="api-client-pricing-bags"),
     path("api/client/orders/create/",  api_create_order, name="api-client-create-order"),
     path("api/client/articles/",          api_articles,     name="api-client-articles"),

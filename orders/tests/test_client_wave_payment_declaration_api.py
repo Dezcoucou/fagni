@@ -21,7 +21,7 @@ class ClientWavePaymentDeclarationApiTests(TestCase):
 
         self.assertEqual(response.status_code, 401)
         self.assertEqual(
-            response.json()["error"],
+            response.json()["detail"],
             "Authentification requise.",
         )
 

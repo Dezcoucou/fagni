@@ -9,6 +9,7 @@ class PartnerJobAdmin(UnfoldModelAdmin):
         "id",
         "code",
         "order",
+        "service_execution",
         "partner",
         "status",
         "received_at",
@@ -17,10 +18,27 @@ class PartnerJobAdmin(UnfoldModelAdmin):
         "handed_over_at",
         "created_at",
     )
-    search_fields = ("code", "order__id", "partner__name", "notes")
-    list_filter = ("status", "partner", "created_at", "ready_at")
+    search_fields = (
+        "code",
+        "order__id",
+        "service_execution__service__code",
+        "service_execution__service__name",
+        "partner__name",
+        "notes",
+    )
+    list_filter = (
+        "status",
+        "service_execution__execution_engine",
+        "partner",
+        "created_at",
+        "ready_at",
+    )
     ordering = ("-created_at",)
-    autocomplete_fields = ("order", "partner")
+    autocomplete_fields = (
+        "order",
+        "service_execution",
+        "partner",
+    )
 
 
 @admin.register(WeighingRecord)

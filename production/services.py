@@ -9,15 +9,72 @@ def _generate_partner_job_code(order_id: int) -> str:
     return f"JOB-{order_id}-{ts}"
 
 
+def _validate_service_execution_order(*, order, service_execution):
+    """
+    Garantit qu'un PartnerJob ne peut pas être rattaché à une
+    ServiceExecution appartenant à une autre commande.
+
+    Pendant la phase de strangulation, service_execution peut être None.
+    """
+    if service_execution is None:
+        return
+
+    execution_order_id = getattr(
+        service_execution,
+        "order_id",
+        None,
+    )
+
+    order_id = getattr(
+        order,
+        "id",
+        None,
+    )
+
+    if not order_id:
+        raise ValueError(
+            "Impossible de créer un PartnerJob : commande non persistée."
+        )
+
+    if execution_order_id != order_id:
+        raise ValueError(
+            "ServiceExecution incompatible : "
+            "l'exécution de service et le PartnerJob doivent appartenir "
+            "à la même commande."
+        )
+
+
 @transaction.atomic
-def create_partner_job(*, order, partner, notes=""):
+def create_partner_job(
+    *,
+    order,
+    partner,
+    service_execution=None,
+    notes="",
+):
+    """
+    Crée un PartnerJob partenaire.
+
+    Compatibilité :
+    - legacy : order + partner restent suffisants ;
+    - multiservices : service_execution peut être fourni.
+
+    Aucune ServiceExecution n'est créée implicitement ici.
+    """
+    _validate_service_execution_order(
+        order=order,
+        service_execution=service_execution,
+    )
+
     job = PartnerJob.objects.create(
         code=_generate_partner_job_code(order.id),
         order=order,
+        service_execution=service_execution,
         partner=partner,
         status="awaiting_reception",
         notes=notes or "",
     )
+
     return job
 
 

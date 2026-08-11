@@ -99,13 +99,17 @@ def create_partner_processing_flow(
     order,
     partner=None,
     mission=None,
+    service_execution=None,
 ):
     """
     Crée et exécute un flux minimal de traitement partenaire.
 
-    LOT 3B.6 :
-    PartnerJob reste encore lié directement à Order.
-    Son rattachement à ServiceExecution sera traité séparément.
+    Compatibilité :
+    - legacy : service_execution peut rester None ;
+    - multiservices : le PartnerJob est rattaché à la ServiceExecution.
+
+    L'invariant d'appartenance à la même Order est vérifié
+    par production.services.create_partner_job().
     """
 
     if partner is None:
@@ -114,6 +118,7 @@ def create_partner_processing_flow(
     partner_job = create_partner_job(
         order=order,
         partner=partner,
+        service_execution=service_execution,
         notes="PartnerJob créé par orchestrateur V2",
     )
 
@@ -152,6 +157,11 @@ def create_partner_processing_flow(
         metadata_json={
             "flow": "create_partner_processing_flow",
             "partner_job_code": partner_job.code,
+            "service_execution_id": (
+                service_execution.id
+                if service_execution is not None
+                else None
+            ),
             "weight": str(weighing_record.net_weight),
             "unit": weighing_record.unit,
         },
@@ -182,6 +192,7 @@ def run_minimal_v2_flow(
         order=order,
         partner=None,
         mission=mission,
+        service_execution=service_execution,
     )
 
     quote = create_estimated_quote(

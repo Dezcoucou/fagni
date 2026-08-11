@@ -9,14 +9,17 @@ class ServiceCategory(TimeStampedModel):
         unique=True,
         verbose_name="Code",
     )
+
     name = models.CharField(
         max_length=120,
         verbose_name="Nom",
     )
+
     description = models.TextField(
         blank=True,
         verbose_name="Description",
     )
+
     is_active = models.BooleanField(
         default=True,
         verbose_name="Actif",
@@ -224,3 +227,170 @@ class ServiceOption(TimeStampedModel):
 
     def __str__(self):
         return f"{self.service.name} - {self.name}"
+
+
+class ServiceExecution(TimeStampedModel):
+    """
+    Instance d'exécution d'un Service pour une commande FAGNI.
+
+    Service décrit CE QUI peut être vendu.
+    ServiceExecution décrit CE QUI est réellement en train d'être exécuté.
+
+    Ce modèle est volontairement indépendant des modèles métier spécialisés :
+    - aucune dépendance directe à LaundryPartner ;
+    - aucune dépendance directe à DeliveryPartner ;
+    - aucune dépendance obligatoire à Mission ;
+    - aucune logique pressing spécifique.
+
+    Pendant la migration progressive du legacy, Order reste l'agrégat commercial
+    et financier existant tandis que ServiceExecution devient l'agrégat
+    opérationnel multiservices.
+
+    Le moteur est figé au moment de la création afin de préserver l'historique,
+    même si la définition du Service change ultérieurement.
+    """
+
+    STATUS_PENDING = "pending"
+    STATUS_SCHEDULED = "scheduled"
+    STATUS_IN_PROGRESS = "in_progress"
+    STATUS_AWAITING_VALIDATION = "awaiting_validation"
+    STATUS_COMPLETED = "completed"
+    STATUS_CANCELED = "canceled"
+    STATUS_FAILED = "failed"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "En attente"),
+        (STATUS_SCHEDULED, "Planifiée"),
+        (STATUS_IN_PROGRESS, "En cours"),
+        (STATUS_AWAITING_VALIDATION, "En attente de validation"),
+        (STATUS_COMPLETED, "Terminée"),
+        (STATUS_CANCELED, "Annulée"),
+        (STATUS_FAILED, "Échouée"),
+    ]
+
+    ENGINE_PICKUP_RETURN = Service.ENGINE_PICKUP_RETURN
+    ENGINE_ONSITE = Service.ENGINE_ONSITE
+    ENGINE_APPOINTMENT = Service.ENGINE_APPOINTMENT
+
+    EXECUTION_ENGINE_CHOICES = Service.EXECUTION_ENGINE_CHOICES
+
+    order = models.ForeignKey(
+        "orders.Order",
+        on_delete=models.CASCADE,
+        related_name="service_executions",
+        verbose_name="Commande",
+    )
+
+    service = models.ForeignKey(
+        Service,
+        on_delete=models.PROTECT,
+        related_name="executions",
+        verbose_name="Service",
+    )
+
+    execution_engine = models.CharField(
+        max_length=30,
+        choices=EXECUTION_ENGINE_CHOICES,
+        db_index=True,
+        verbose_name="Moteur d'exécution",
+        help_text=(
+            "Snapshot du moteur utilisé pour cette exécution. "
+            "Ne doit pas dépendre dynamiquement de Service.primary_engine."
+        ),
+    )
+
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+        verbose_name="Statut",
+    )
+
+    sequence_index = models.PositiveIntegerField(
+        default=1,
+        verbose_name="Ordre d'exécution",
+        help_text=(
+            "Permet à une commande de contenir plusieurs exécutions "
+            "dans un ordre déterminé."
+        ),
+    )
+
+    planned_start_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Début planifié",
+    )
+
+    planned_end_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fin planifiée",
+    )
+
+    started_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Début réel",
+    )
+
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fin réelle",
+    )
+
+    canceled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Annulée le",
+    )
+
+    metadata_json = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Métadonnées métier",
+        help_text=(
+            "Données métier non structurelles et évolutives. "
+            "Les données fréquemment filtrées ou critiques doivent devenir "
+            "des colonnes ou modèles dédiés."
+        ),
+    )
+
+    service_snapshot_json = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Snapshot du service",
+        help_text=(
+            "Capture optionnelle de la configuration du service au moment "
+            "de la création de l'exécution."
+        ),
+    )
+
+    notes = models.TextField(
+        blank=True,
+        verbose_name="Notes internes",
+    )
+
+    def __str__(self):
+        order_code = getattr(self.order, "code", None) or f"#{self.order_id}"
+        return f"{order_code} · {self.service.name} · {self.status}"
+
+    class Meta:
+        verbose_name = "Exécution de service"
+        verbose_name_plural = "Exécutions de services"
+        ordering = ("order_id", "sequence_index", "id")
+        indexes = [
+            models.Index(
+                fields=("order", "status"),
+                name="svc_exec_order_status_idx",
+            ),
+            models.Index(
+                fields=("service", "status"),
+                name="svc_exec_service_status_idx",
+            ),
+            models.Index(
+                fields=("execution_engine", "status"),
+                name="svc_exec_engine_status_idx",
+            ),
+        ]

@@ -1,7 +1,12 @@
 from django.contrib import admin
 from django.contrib.admin import ModelAdmin as UnfoldModelAdmin
 
-from .models import Service, ServiceCategory, ServiceOption
+from .models import (
+    Service,
+    ServiceCategory,
+    ServiceExecution,
+    ServiceOption,
+)
 
 
 @admin.register(ServiceCategory)
@@ -152,4 +157,101 @@ class ServiceOptionAdmin(UnfoldModelAdmin):
     ordering = (
         "service",
         "name",
+    )
+
+
+@admin.register(ServiceExecution)
+class ServiceExecutionAdmin(UnfoldModelAdmin):
+    list_display = (
+        "id",
+        "order",
+        "service",
+        "execution_engine",
+        "status",
+        "sequence_index",
+        "planned_start_at",
+        "started_at",
+        "completed_at",
+        "created_at",
+    )
+
+    search_fields = (
+        "order__code",
+        "service__code",
+        "service__name",
+        "notes",
+    )
+
+    list_filter = (
+        "execution_engine",
+        "status",
+        "service",
+        "created_at",
+    )
+
+    autocomplete_fields = (
+        "order",
+        "service",
+    )
+
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
+
+    ordering = (
+        "-created_at",
+    )
+
+    fieldsets = (
+        (
+            "Référence",
+            {
+                "fields": (
+                    "order",
+                    "service",
+                    "sequence_index",
+                )
+            },
+        ),
+        (
+            "Exécution",
+            {
+                "fields": (
+                    "execution_engine",
+                    "status",
+                )
+            },
+        ),
+        (
+            "Planification",
+            {
+                "fields": (
+                    "planned_start_at",
+                    "planned_end_at",
+                    "started_at",
+                    "completed_at",
+                    "canceled_at",
+                )
+            },
+        ),
+        (
+            "Données métier",
+            {
+                "fields": (
+                    "metadata_json",
+                    "service_snapshot_json",
+                    "notes",
+                )
+            },
+        ),
+        (
+            "Audit",
+            {
+                "fields": (
+                    "created_at",
+                    "updated_at",
+                )
+            },
+        ),
     )

@@ -3,44 +3,53 @@ from decimal import Decimal
 from django.db import transaction
 
 from logistics.adapters import (
-    get_order_source_address_v2,
-    get_order_destination_address_v2,
     get_order_contact_name,
     get_order_contact_phone,
+    get_order_destination_address_v2,
+    get_order_source_address_v2,
     get_or_create_smoke_partner,
 )
 from logistics.services import (
+    complete_mission,
     create_mission_for_order,
     start_mission,
-    complete_mission,
 )
+from pricing.services import create_estimated_quote
 from production.services import (
     create_partner_job,
-    mark_partner_job_received,
     mark_partner_job_ready,
+    mark_partner_job_received,
     record_weighing,
 )
 from tracking.services import (
-    create_tracking_event,
     create_incident,
+    create_tracking_event,
 )
-from pricing.services import create_estimated_quote
 
 
 @transaction.atomic
-def create_pickup_flow_from_order(order):
+def create_pickup_flow_from_order(
+    order,
+    service_execution=None,
+):
     """
     Crée et exécute un flux minimal de collecte pour une commande.
-    Retourne la mission créée et terminée.
+
+    service_execution reste optionnel pendant la migration legacy.
     """
+
     source_address = get_order_source_address_v2(order)
     destination_address = get_order_destination_address_v2(order)
 
     if source_address is None or destination_address is None:
-        raise ValueError("Impossible de résoudre des adresses V2 compatibles pour cette commande.")
+        raise ValueError(
+            "Impossible de résoudre des adresses V2 compatibles "
+            "pour cette commande."
+        )
 
     mission = create_mission_for_order(
         order=order,
+        service_execution=service_execution,
         mission_type="pickup_from_customer",
         source_address=source_address,
         destination_address=destination_address,
@@ -62,6 +71,14 @@ def create_pickup_flow_from_order(order):
         action_type="completed",
     )
 
+    metadata = {
+        "flow": "create_pickup_flow_from_order",
+        "mission_code": mission.code,
+    }
+
+    if service_execution is not None:
+        metadata["service_execution_id"] = service_execution.id
+
     create_tracking_event(
         order=order,
         mission=mission,
@@ -71,21 +88,26 @@ def create_pickup_flow_from_order(order):
         description="Mission de collecte exécutée via orchestrateur V2",
         status_before="assigned",
         status_after="completed",
-        metadata_json={
-            "flow": "create_pickup_flow_from_order",
-            "mission_code": mission.code,
-        },
+        metadata_json=metadata,
     )
 
     return mission
 
 
 @transaction.atomic
-def create_partner_processing_flow(order, partner=None, mission=None):
+def create_partner_processing_flow(
+    order,
+    partner=None,
+    mission=None,
+):
     """
     Crée et exécute un flux minimal de traitement partenaire.
-    Retourne partner_job et weighing_record.
+
+    LOT 3B.6 :
+    PartnerJob reste encore lié directement à Order.
+    Son rattachement à ServiceExecution sera traité séparément.
     """
+
     if partner is None:
         partner = get_or_create_smoke_partner()
 
@@ -139,16 +161,22 @@ def create_partner_processing_flow(order, partner=None, mission=None):
 
 
 @transaction.atomic
-def run_minimal_v2_flow(order, create_incident_flag=False):
+def run_minimal_v2_flow(
+    order,
+    create_incident_flag=False,
+    service_execution=None,
+):
     """
-    Exécute un flux V2 minimal complet :
-    - collecte
-    - traitement partenaire
-    - tracking
-    - devis
-    - incident optionnel
+    Exécute le flux minimal V2.
+
+    Le paramètre service_execution est optionnel afin de conserver
+    la compatibilité avec les actions admin et commandes V2 historiques.
     """
-    mission = create_pickup_flow_from_order(order)
+
+    mission = create_pickup_flow_from_order(
+        order,
+        service_execution=service_execution,
+    )
 
     partner_job, weighing_record = create_partner_processing_flow(
         order=order,
@@ -162,6 +190,7 @@ def run_minimal_v2_flow(order, create_incident_flag=False):
     )
 
     incident = None
+
     if create_incident_flag:
         incident = create_incident(
             order=order,
@@ -175,6 +204,7 @@ def run_minimal_v2_flow(order, create_incident_flag=False):
 
     return {
         "order": order,
+        "service_execution": service_execution,
         "mission": mission,
         "partner_job": partner_job,
         "weighing_record": weighing_record,

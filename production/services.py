@@ -131,6 +131,18 @@ def handover_partner_job(*, partner_job, notes=""):
         partner_job.notes = (partner_job.notes + "\n" + notes).strip() if partner_job.notes else notes
 
     partner_job.save(update_fields=["status", "handed_over_at", "notes", "updated_at"])
+
+    if partner_job.service_execution_id is not None:
+        from services.services import complete_service_execution_if_ready
+
+        complete_service_execution_if_ready(
+            service_execution=partner_job.service_execution,
+            note=(
+                "ServiceExecution réévaluée après remise au livreur "
+                f"du PartnerJob {partner_job.code}."
+            ),
+        )
+
     return partner_job
 
 

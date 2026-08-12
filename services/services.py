@@ -399,3 +399,102 @@ def evaluate_service_execution_completion(*, service_execution):
         "missing": missing,
         "checks": checks,
     }
+
+
+@transaction.atomic
+def complete_service_execution_if_ready(
+    *,
+    service_execution,
+    note="",
+):
+    """
+    Réconcilie une ServiceExecution avec ses prérequis de complétion.
+
+    Cette fonction constitue l'unique porte automatique de clôture.
+
+    Principes :
+    - réutilise evaluate_service_execution_completion() ;
+    - ne démarre jamais implicitement une exécution ;
+    - ne force jamais une transition invalide ;
+    - est idempotente pour les statuts terminaux ;
+    - complète uniquement depuis in_progress ou awaiting_validation.
+
+    Retour :
+    {
+        "completed": bool,
+        "status": str,
+        "ready": bool,
+        "missing": [...],
+        "checks": {...},
+        "reason": str,
+    }
+    """
+
+    terminal_statuses = {
+        ServiceExecution.STATUS_COMPLETED,
+        ServiceExecution.STATUS_CANCELED,
+        ServiceExecution.STATUS_FAILED,
+    }
+
+    if service_execution.status in terminal_statuses:
+        evaluation = evaluate_service_execution_completion(
+            service_execution=service_execution,
+        )
+
+        return {
+            "completed": (
+                service_execution.status
+                == ServiceExecution.STATUS_COMPLETED
+            ),
+            "status": service_execution.status,
+            "ready": evaluation["ready"],
+            "missing": evaluation["missing"],
+            "checks": evaluation["checks"],
+            "reason": "terminal_status",
+        }
+
+    evaluation = evaluate_service_execution_completion(
+        service_execution=service_execution,
+    )
+
+    if not evaluation["ready"]:
+        return {
+            "completed": False,
+            "status": service_execution.status,
+            "ready": False,
+            "missing": evaluation["missing"],
+            "checks": evaluation["checks"],
+            "reason": "requirements_not_satisfied",
+        }
+
+    completable_statuses = {
+        ServiceExecution.STATUS_IN_PROGRESS,
+        ServiceExecution.STATUS_AWAITING_VALIDATION,
+    }
+
+    if service_execution.status not in completable_statuses:
+        return {
+            "completed": False,
+            "status": service_execution.status,
+            "ready": True,
+            "missing": [],
+            "checks": evaluation["checks"],
+            "reason": "status_not_completable",
+        }
+
+    complete_service_execution(
+        service_execution=service_execution,
+        note=note or (
+            "ServiceExecution complétée automatiquement "
+            "après validation des prérequis métier."
+        ),
+    )
+
+    return {
+        "completed": True,
+        "status": service_execution.status,
+        "ready": True,
+        "missing": [],
+        "checks": evaluation["checks"],
+        "reason": "completed",
+    }

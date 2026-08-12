@@ -15,6 +15,11 @@ from logistics.services import (
     start_mission,
 )
 from pricing.services import create_estimated_quote
+from services.models import ServiceExecution
+from services.services import (
+    schedule_service_execution,
+    start_service_execution,
+)
 from production.services import (
     create_partner_job,
     mark_partner_job_ready,
@@ -185,6 +190,19 @@ def run_minimal_v2_flow(
     Le paramètre service_execution est optionnel afin de conserver
     la compatibilité avec les actions admin et commandes V2 historiques.
     """
+
+    if service_execution is not None:
+        if service_execution.status == ServiceExecution.STATUS_PENDING:
+            service_execution = schedule_service_execution(
+                service_execution=service_execution,
+                note="ServiceExecution planifiée par orchestrateur V2",
+            )
+
+        if service_execution.status == ServiceExecution.STATUS_SCHEDULED:
+            service_execution = start_service_execution(
+                service_execution=service_execution,
+                note="ServiceExecution démarrée par orchestrateur V2",
+            )
 
     mission = create_pickup_flow_from_order(
         order,

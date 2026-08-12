@@ -131,6 +131,7 @@ def create_partner_processing_flow(
         order=order,
         partner_job=partner_job,
         mission=mission,
+        service_execution=service_execution,
         net_weight=Decimal("3.50"),
         gross_weight=Decimal("3.80"),
         weighing_stage="partner_reception",

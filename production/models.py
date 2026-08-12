@@ -141,7 +141,22 @@ class WeighingRecord(TimeStampedModel):
         ("system", "Système"),
     ]
 
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="weighing_records_v2", verbose_name="Commande")
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="weighing_records_v2",
+        verbose_name="Commande",
+    )
+
+    service_execution = models.ForeignKey(
+        "services.ServiceExecution",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="weighing_records",
+        verbose_name="Exécution de service",
+    )
+
     partner_job = models.ForeignKey(
         PartnerJob,
         on_delete=models.SET_NULL,
@@ -168,6 +183,76 @@ class WeighingRecord(TimeStampedModel):
 
     notes = models.TextField(blank=True, verbose_name="Notes")
     recorded_at = models.DateTimeField(auto_now_add=True)
+
+    def _validate_service_execution_order(self):
+        """
+        Invariant FAGNI :
+        une WeighingRecord et sa ServiceExecution doivent appartenir
+        à la même Order.
+
+        Les rattachements Mission / PartnerJob, lorsqu'ils existent,
+        doivent également être cohérents avec ServiceExecution.
+        """
+        if self.service_execution_id is None:
+            return
+
+        if self.order_id is None:
+            raise ValidationError(
+                {
+                    "order": (
+                        "Une commande persistée est requise avant de rattacher "
+                        "une exécution de service."
+                    )
+                }
+            )
+
+        if self.service_execution.order_id != self.order_id:
+            raise ValidationError(
+                {
+                    "service_execution": (
+                        "Cette exécution de service appartient à une autre "
+                        "commande."
+                    )
+                }
+            )
+
+        if (
+            self.partner_job_id is not None
+            and self.partner_job.service_execution_id is not None
+            and self.partner_job.service_execution_id
+            != self.service_execution_id
+        ):
+            raise ValidationError(
+                {
+                    "partner_job": (
+                        "Ce PartnerJob appartient à une autre "
+                        "exécution de service."
+                    )
+                }
+            )
+
+        if (
+            self.mission_id is not None
+            and self.mission.service_execution_id is not None
+            and self.mission.service_execution_id
+            != self.service_execution_id
+        ):
+            raise ValidationError(
+                {
+                    "mission": (
+                        "Cette Mission appartient à une autre "
+                        "exécution de service."
+                    )
+                }
+            )
+
+    def clean(self):
+        super().clean()
+        self._validate_service_execution_order()
+
+    def save(self, *args, **kwargs):
+        self._validate_service_execution_order()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.order_id} - {self.net_weight}{self.unit}"

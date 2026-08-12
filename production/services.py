@@ -142,13 +142,64 @@ def record_weighing(
     weighing_stage,
     partner_job=None,
     mission=None,
+    service_execution=None,
     gross_weight=None,
     performed_by_role="driver",
     unit="kg",
     notes="",
 ):
+    _validate_service_execution_order(
+        order=order,
+        service_execution=service_execution,
+    )
+
+    if (
+        partner_job is not None
+        and partner_job.order_id != order.id
+    ):
+        raise ValueError(
+            "PartnerJob incompatible : "
+            "le PartnerJob et la pesée doivent appartenir "
+            "à la même commande."
+        )
+
+    if (
+        mission is not None
+        and mission.order_id != order.id
+    ):
+        raise ValueError(
+            "Mission incompatible : "
+            "la Mission et la pesée doivent appartenir "
+            "à la même commande."
+        )
+
+    if (
+        service_execution is not None
+        and partner_job is not None
+        and partner_job.service_execution_id is not None
+        and partner_job.service_execution_id != service_execution.id
+    ):
+        raise ValueError(
+            "PartnerJob incompatible : "
+            "le PartnerJob appartient à une autre "
+            "ServiceExecution."
+        )
+
+    if (
+        service_execution is not None
+        and mission is not None
+        and mission.service_execution_id is not None
+        and mission.service_execution_id != service_execution.id
+    ):
+        raise ValueError(
+            "Mission incompatible : "
+            "la Mission appartient à une autre "
+            "ServiceExecution."
+        )
+
     record = WeighingRecord.objects.create(
         order=order,
+        service_execution=service_execution,
         partner_job=partner_job,
         mission=mission,
         performed_by_role=performed_by_role,

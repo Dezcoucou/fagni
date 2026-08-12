@@ -46,6 +46,7 @@ class WeighingRecordAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "order",
+        "service_execution",
         "partner_job",
         "mission",
         "performed_by_role",
@@ -55,7 +56,28 @@ class WeighingRecordAdmin(UnfoldModelAdmin):
         "unit",
         "recorded_at",
     )
-    search_fields = ("order__id", "partner_job__code", "mission__code", "notes")
-    list_filter = ("performed_by_role", "weighing_stage", "unit", "recorded_at")
+    search_fields = (
+        "order__id",
+        "service_execution__service__code",
+        "service_execution__service__name",
+        "partner_job__code",
+        "mission__code",
+        "notes",
+    )
+
+    list_filter = (
+        "performed_by_role",
+        "weighing_stage",
+        "service_execution__execution_engine",
+        "unit",
+        "recorded_at",
+    )
+
     ordering = ("-recorded_at",)
-    autocomplete_fields = ("order", "partner_job", "mission")
+
+    autocomplete_fields = (
+        "order",
+        "service_execution",
+        "partner_job",
+        "mission",
+    )

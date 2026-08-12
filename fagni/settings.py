@@ -153,14 +153,26 @@ TEMPLATES = [
 # ========================
 DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
 
-if DATABASE_URL:
+if TESTING:
+    # Les tests doivent être totalement isolés de la base de production,
+    # même lorsqu'un DATABASE_URL est chargé depuis .env.
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": ":memory:",
+        }
+    }
+elif DATABASE_URL:
     # PythonAnywhere / Prod (MySQL) ou override local via DATABASE_URL
     is_sqlite_url = DATABASE_URL.startswith("sqlite:")
     DATABASES = {
         "default": dj_database_url.parse(
             DATABASE_URL,
             conn_max_age=0,
-            ssl_require=(not is_sqlite_url and os.getenv("DB_SSL_REQUIRE", "1") == "1"),
+            ssl_require=(
+                not is_sqlite_url
+                and os.getenv("DB_SSL_REQUIRE", "1") == "1"
+            ),
         )
     }
 

@@ -108,6 +108,10 @@ urlpatterns = [
     path("dashboard/", include("dashboard.urls")),
     path("orders/", include(("orders.urls", "orders"), namespace="orders")),
     path("mlm/", include(("mlm.urls", "mlm"), namespace="mlm")),
+    path(
+        "logistics/",
+        include(("logistics.urls", "logistics"), namespace="logistics"),
+    ),
     path('favicon.ico', RedirectView.as_view(url='/static/favicon.ico')),
 ]
 

@@ -3,7 +3,6 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.utils import timezone
-from twilio.rest import Client
 
 
 def normalize_ci_phone(phone_number: str) -> str:
@@ -43,7 +42,17 @@ def generate_otp_code(length: int = 6) -> str:
 
 
 def _client():
-    return Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+    try:
+        from twilio.rest import Client
+    except ImportError as exc:
+        raise RuntimeError(
+            "Le SDK Twilio n'est pas installé dans cet environnement."
+        ) from exc
+
+    return Client(
+        settings.TWILIO_ACCOUNT_SID,
+        settings.TWILIO_AUTH_TOKEN,
+    )
 
 
 def send_whatsapp_otp(*, phone_number: str, otp_code: str):

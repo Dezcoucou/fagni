@@ -370,6 +370,18 @@ def mission_check_otp_whatsapp(request, mission_id):
         otp_record.verified_at = timezone.now()
         otp_record.last_error = ""
         otp_record.save(update_fields=["attempts", "status", "verified_at", "last_error", "updated_at"])
+
+        if mission.service_execution_id is not None:
+            from services.services import complete_service_execution_if_ready
+
+            complete_service_execution_if_ready(
+                service_execution=mission.service_execution,
+                note=(
+                    "ServiceExecution réévaluée après validation OTP "
+                    f"de la mission {mission.code}."
+                ),
+            )
+
         messages.success(request, "OTP WhatsApp validé.")
     else:
         otp_record.status = "failed"

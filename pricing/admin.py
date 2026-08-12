@@ -29,6 +29,7 @@ class PriceQuoteAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "order",
+        "service_execution",
         "quote_type",
         "subtotal_amount",
         "logistics_fee",
@@ -42,7 +43,7 @@ class PriceQuoteAdmin(UnfoldModelAdmin):
     search_fields = ("order__id", "notes")
     list_filter = ("quote_type", "is_final", "currency", "generated_at")
     ordering = ("-generated_at",)
-    autocomplete_fields = ("order",)
+    autocomplete_fields = ("order", "service_execution")
 
 
 

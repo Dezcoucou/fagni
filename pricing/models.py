@@ -55,7 +55,27 @@ class PriceQuote(TimeStampedModel):
         ("final", "Final"),
     ]
 
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="price_quotes_v2", verbose_name="Commande")
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="price_quotes_v2",
+        verbose_name="Commande",
+    )
+
+    # Nullable pendant la migration progressive multiservices.
+    #
+    # Cible :
+    # Order -> ServiceExecution -> PriceQuote(s)
+    #
+    # Un devis legacy peut rester lié uniquement à Order.
+    service_execution = models.ForeignKey(
+        "services.ServiceExecution",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="price_quotes",
+        verbose_name="Exécution de service",
+    )
 
     quote_type = models.CharField(max_length=20, choices=QUOTE_TYPE_CHOICES, default="estimated")
 
@@ -69,6 +89,49 @@ class PriceQuote(TimeStampedModel):
     is_final = models.BooleanField(default=False)
     generated_at = models.DateTimeField(auto_now_add=True)
     notes = models.TextField(blank=True, verbose_name="Notes")
+
+    def _validate_service_execution_order(self):
+        """
+        Invariant FAGNI :
+        un PriceQuote et sa ServiceExecution doivent appartenir
+        à la même Order.
+
+        service_execution=None reste autorisé pendant le strangler legacy.
+        """
+        if self.service_execution_id is None:
+            return
+
+        if self.order_id is None:
+            from django.core.exceptions import ValidationError
+
+            raise ValidationError(
+                {
+                    "order": (
+                        "Une commande persistée est requise avant de rattacher "
+                        "une exécution de service."
+                    )
+                }
+            )
+
+        if self.service_execution.order_id != self.order_id:
+            from django.core.exceptions import ValidationError
+
+            raise ValidationError(
+                {
+                    "service_execution": (
+                        "Cette exécution de service appartient à une autre "
+                        "commande."
+                    )
+                }
+            )
+
+    def clean(self):
+        super().clean()
+        self._validate_service_execution_order()
+
+    def save(self, *args, **kwargs):
+        self._validate_service_execution_order()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.order.code} - {self.quote_type}"

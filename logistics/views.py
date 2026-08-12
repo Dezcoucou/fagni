@@ -286,6 +286,7 @@ def create_proof_v2(request, mission_id):
     proof = ProofOfDelivery.objects.create(
         mission=mission,
         order=mission.order,
+        service_execution=mission.service_execution,
         photo=photo,
         notes=notes,
         created_by=request.user if request.user.is_authenticated else None,

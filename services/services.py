@@ -224,3 +224,178 @@ def fail_service_execution(*, service_execution, note=""):
         target_status=ServiceExecution.STATUS_FAILED,
         note=note,
     )
+
+
+def evaluate_service_execution_completion(*, service_execution):
+    """
+    Évalue si une ServiceExecution possède tous les éléments nécessaires
+    à sa complétion.
+
+    Cette fonction est volontairement READ-ONLY :
+    elle ne modifie aucun statut.
+
+    Retour :
+    {
+        "ready": bool,
+        "missing": [...],
+        "checks": {...},
+    }
+    """
+    service = service_execution.service
+
+    checks = {}
+    missing = []
+
+    # ---------------------------------------------------------
+    # LOGISTIQUE
+    # ---------------------------------------------------------
+    if service.requires_logistics:
+        missions = service_execution.missions.all()
+
+        has_missions = missions.exists()
+        all_completed = (
+            has_missions
+            and not missions.exclude(status="completed").exists()
+        )
+
+        checks["logistics"] = {
+            "required": True,
+            "has_objects": has_missions,
+            "satisfied": all_completed,
+        }
+
+        if not has_missions:
+            missing.append("logistics:no_mission")
+        elif not all_completed:
+            missing.append("logistics:missions_not_completed")
+    else:
+        checks["logistics"] = {
+            "required": False,
+            "has_objects": None,
+            "satisfied": True,
+        }
+
+    # ---------------------------------------------------------
+    # PARTENAIRE
+    # ---------------------------------------------------------
+    if service.requires_partner:
+        partner_jobs = service_execution.partner_jobs.all()
+
+        has_partner_jobs = partner_jobs.exists()
+        all_handed_over = (
+            has_partner_jobs
+            and not partner_jobs.exclude(status="handed_over").exists()
+        )
+
+        checks["partner"] = {
+            "required": True,
+            "has_objects": has_partner_jobs,
+            "satisfied": all_handed_over,
+        }
+
+        if not has_partner_jobs:
+            missing.append("partner:no_partner_job")
+        elif not all_handed_over:
+            missing.append("partner:jobs_not_handed_over")
+    else:
+        checks["partner"] = {
+            "required": False,
+            "has_objects": None,
+            "satisfied": True,
+        }
+
+    # ---------------------------------------------------------
+    # PESEE
+    # ---------------------------------------------------------
+    if service.requires_weighing:
+        has_final_weighing = service_execution.weighing_records.filter(
+            weighing_stage="final_validation",
+        ).exists()
+
+        checks["weighing"] = {
+            "required": True,
+            "has_objects": has_final_weighing,
+            "satisfied": has_final_weighing,
+        }
+
+        if not has_final_weighing:
+            missing.append("weighing:no_final_validation")
+    else:
+        checks["weighing"] = {
+            "required": False,
+            "has_objects": None,
+            "satisfied": True,
+        }
+
+    # ---------------------------------------------------------
+    # OTP
+    # Relations accessibles via Mission -> otp_records
+    # ---------------------------------------------------------
+    if service.requires_otp:
+        has_approved_otp = service_execution.missions.filter(
+            otp_records__status="approved",
+        ).exists()
+
+        checks["otp"] = {
+            "required": True,
+            "has_objects": has_approved_otp,
+            "satisfied": has_approved_otp,
+        }
+
+        if not has_approved_otp:
+            missing.append("otp:no_approved_otp")
+    else:
+        checks["otp"] = {
+            "required": False,
+            "has_objects": None,
+            "satisfied": True,
+        }
+
+    # ---------------------------------------------------------
+    # SIGNATURE
+    # Relations accessibles via Mission -> signatures
+    # ---------------------------------------------------------
+    if service.requires_signature:
+        has_validated_signature = service_execution.missions.filter(
+            signatures__status="validated",
+        ).exists()
+
+        checks["signature"] = {
+            "required": True,
+            "has_objects": has_validated_signature,
+            "satisfied": has_validated_signature,
+        }
+
+        if not has_validated_signature:
+            missing.append("signature:no_validated_signature")
+    else:
+        checks["signature"] = {
+            "required": False,
+            "has_objects": None,
+            "satisfied": True,
+        }
+
+    # ---------------------------------------------------------
+    # CAPACITES NON ENCORE MODELISABLES PAR SERVICEEXECUTION
+    # ---------------------------------------------------------
+    unresolved_capabilities = []
+
+    if service.requires_quote:
+        unresolved_capabilities.append("quote")
+
+    if service.requires_appointment:
+        unresolved_capabilities.append("appointment")
+
+    if service.requires_asset:
+        unresolved_capabilities.append("asset")
+
+    checks["unresolved_capabilities"] = unresolved_capabilities
+
+    for capability in unresolved_capabilities:
+        missing.append(f"unresolved:{capability}")
+
+    return {
+        "ready": not missing,
+        "missing": missing,
+        "checks": checks,
+    }

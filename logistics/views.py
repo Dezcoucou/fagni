@@ -430,6 +430,17 @@ def create_signature_v2(request, mission_id):
     signature.status = "validated"
     signature.save(update_fields=["status"])
 
+    if mission.service_execution_id is not None:
+        from services.services import complete_service_execution_if_ready
+
+        complete_service_execution_if_ready(
+            service_execution=mission.service_execution,
+            note=(
+                "ServiceExecution réévaluée après validation de la signature "
+                f"de la mission {mission.code}."
+            ),
+        )
+
     messages.success(request, "Signature enregistrée avec succès.")
     return redirect("logistics:driver_mission_v2", mission_id=mission.id)
 

@@ -376,12 +376,33 @@ def evaluate_service_execution_completion(*, service_execution):
         }
 
     # ---------------------------------------------------------
+    # DEVIS
+    # ---------------------------------------------------------
+    if service.requires_quote:
+        has_final_quote = service_execution.price_quotes.filter(
+            quote_type="final",
+            is_final=True,
+        ).exists()
+
+        checks["quote"] = {
+            "required": True,
+            "has_objects": has_final_quote,
+            "satisfied": has_final_quote,
+        }
+
+        if not has_final_quote:
+            missing.append("quote:no_final_quote")
+    else:
+        checks["quote"] = {
+            "required": False,
+            "has_objects": None,
+            "satisfied": True,
+        }
+
+    # ---------------------------------------------------------
     # CAPACITES NON ENCORE MODELISABLES PAR SERVICEEXECUTION
     # ---------------------------------------------------------
     unresolved_capabilities = []
-
-    if service.requires_quote:
-        unresolved_capabilities.append("quote")
 
     if service.requires_appointment:
         unresolved_capabilities.append("appointment")

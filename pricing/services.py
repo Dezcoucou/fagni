@@ -95,3 +95,47 @@ def create_estimated_quote(
         notes=notes or "Devis estimatif initial V2",
     )
     return quote
+
+
+@transaction.atomic
+def finalize_quote(*, quote, notes=""):
+    """
+    Finalise un PriceQuote puis réévalue sa ServiceExecution éventuelle.
+
+    Garanties :
+    - legacy : un devis sans ServiceExecution reste finalisable ;
+    - aucune ServiceExecution n'est créée implicitement ;
+    - la clôture éventuelle passe uniquement par
+      complete_service_execution_if_ready().
+    """
+    quote.quote_type = "final"
+    quote.is_final = True
+
+    update_fields = [
+        "quote_type",
+        "is_final",
+        "updated_at",
+    ]
+
+    if notes:
+        quote.notes = (
+            (quote.notes + "\n" + notes).strip()
+            if quote.notes
+            else notes
+        )
+        update_fields.append("notes")
+
+    quote.save(update_fields=update_fields)
+
+    if quote.service_execution_id is not None:
+        from services.services import complete_service_execution_if_ready
+
+        complete_service_execution_if_ready(
+            service_execution=quote.service_execution,
+            note=(
+                "ServiceExecution réévaluée après finalisation "
+                f"du PriceQuote #{quote.id}."
+            ),
+        )
+
+    return quote

@@ -112,3 +112,203 @@ class PriceQuoteServiceExecutionContractTests(TestCase):
                 order=self.order_b,
                 service_execution=self.execution_a,
             )
+
+
+class PriceQuoteServiceExecutionCompletionTests(TestCase):
+    def setUp(self):
+        self.category = ServiceCategory.objects.create(
+            code="quote-completion-category",
+            name="Quote Completion Category",
+            is_active=True,
+        )
+
+        self.service = Service.objects.create(
+            code="quote-completion-service",
+            category=self.category,
+            name="Quote Completion Service",
+            description="",
+            is_active=True,
+            primary_engine=Service.ENGINE_PICKUP_RETURN,
+            requires_partner=False,
+            requires_logistics=False,
+            requires_weighing=False,
+            requires_appointment=False,
+            requires_quote=True,
+            requires_asset=False,
+            requires_otp=False,
+            requires_signature=False,
+            pricing_mode="quote_required",
+            default_sla_hours=24,
+        )
+
+        self.customer = Customer.objects.create(
+            name="Client Quote Completion",
+            phone="0700009701",
+        )
+
+        self.order = Order.objects.create(
+            customer=self.customer,
+        )
+
+        self.execution = ServiceExecution.objects.create(
+            order=self.order,
+            service=self.service,
+            execution_engine=self.service.primary_engine,
+            status=ServiceExecution.STATUS_IN_PROGRESS,
+        )
+
+    def test_estimated_quote_does_not_satisfy_quote_requirement(self):
+        from services.services import evaluate_service_execution_completion
+
+        create_estimated_quote(
+            order=self.order,
+            service_execution=self.execution,
+        )
+
+        result = evaluate_service_execution_completion(
+            service_execution=self.execution,
+        )
+
+        self.assertFalse(result["ready"])
+        self.assertIn("quote:no_final_quote", result["missing"])
+        self.assertFalse(result["checks"]["quote"]["satisfied"])
+
+    def test_final_flag_without_final_type_does_not_satisfy_requirement(self):
+        from services.services import evaluate_service_execution_completion
+
+        PriceQuote.objects.create(
+            order=self.order,
+            service_execution=self.execution,
+            quote_type="estimated",
+            is_final=True,
+        )
+
+        result = evaluate_service_execution_completion(
+            service_execution=self.execution,
+        )
+
+        self.assertFalse(result["ready"])
+        self.assertIn("quote:no_final_quote", result["missing"])
+
+    def test_final_type_without_final_flag_does_not_satisfy_requirement(self):
+        from services.services import evaluate_service_execution_completion
+
+        PriceQuote.objects.create(
+            order=self.order,
+            service_execution=self.execution,
+            quote_type="final",
+            is_final=False,
+        )
+
+        result = evaluate_service_execution_completion(
+            service_execution=self.execution,
+        )
+
+        self.assertFalse(result["ready"])
+        self.assertIn("quote:no_final_quote", result["missing"])
+
+    def test_final_quote_satisfies_quote_requirement(self):
+        from services.services import evaluate_service_execution_completion
+
+        PriceQuote.objects.create(
+            order=self.order,
+            service_execution=self.execution,
+            quote_type="final",
+            is_final=True,
+        )
+
+        result = evaluate_service_execution_completion(
+            service_execution=self.execution,
+        )
+
+        self.assertTrue(result["ready"])
+        self.assertNotIn("quote:no_final_quote", result["missing"])
+        self.assertTrue(result["checks"]["quote"]["satisfied"])
+
+    def test_finalize_quote_completes_ready_execution(self):
+        from pricing.services import finalize_quote
+
+        quote = create_estimated_quote(
+            order=self.order,
+            service_execution=self.execution,
+        )
+
+        finalize_quote(
+            quote=quote,
+            notes="Validation finale B2D5B",
+        )
+
+        quote.refresh_from_db()
+        self.execution.refresh_from_db()
+
+        self.assertEqual(quote.quote_type, "final")
+        self.assertTrue(quote.is_final)
+
+        self.assertEqual(
+            self.execution.status,
+            ServiceExecution.STATUS_COMPLETED,
+        )
+        self.assertIsNotNone(self.execution.completed_at)
+
+    def test_finalize_quote_waits_for_other_required_capabilities(self):
+        from pricing.services import finalize_quote
+
+        self.service.requires_signature = True
+        self.service.save(update_fields=["requires_signature"])
+
+        quote = create_estimated_quote(
+            order=self.order,
+            service_execution=self.execution,
+        )
+
+        finalize_quote(
+            quote=quote,
+        )
+
+        self.execution.refresh_from_db()
+
+        self.assertEqual(
+            self.execution.status,
+            ServiceExecution.STATUS_IN_PROGRESS,
+        )
+        self.assertIsNone(self.execution.completed_at)
+
+    def test_finalize_legacy_quote_without_execution_still_works(self):
+        from pricing.services import finalize_quote
+
+        quote = create_estimated_quote(
+            order=self.order,
+        )
+
+        finalize_quote(
+            quote=quote,
+        )
+
+        quote.refresh_from_db()
+
+        self.assertEqual(quote.quote_type, "final")
+        self.assertTrue(quote.is_final)
+        self.assertIsNone(quote.service_execution_id)
+
+    def test_finalize_quote_does_not_reopen_terminal_execution(self):
+        from pricing.services import finalize_quote
+
+        self.execution.status = ServiceExecution.STATUS_CANCELED
+        self.execution.save(update_fields=["status"])
+
+        quote = create_estimated_quote(
+            order=self.order,
+            service_execution=self.execution,
+        )
+
+        finalize_quote(
+            quote=quote,
+        )
+
+        self.execution.refresh_from_db()
+
+        self.assertEqual(
+            self.execution.status,
+            ServiceExecution.STATUS_CANCELED,
+        )
+        self.assertIsNone(self.execution.completed_at)

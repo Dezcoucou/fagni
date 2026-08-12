@@ -268,7 +268,6 @@ class ServiceExecutionCompletionTests(TestCase):
 
     def test_unresolved_capabilities_block_completion(self):
         service = self.create_service(
-            requires_quote=True,
             requires_appointment=True,
             requires_asset=True,
         )
@@ -280,6 +279,5 @@ class ServiceExecutionCompletionTests(TestCase):
 
         self.assertFalse(result["ready"])
 
-        self.assertIn("unresolved:quote", result["missing"])
         self.assertIn("unresolved:appointment", result["missing"])
         self.assertIn("unresolved:asset", result["missing"])

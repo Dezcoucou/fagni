@@ -160,9 +160,58 @@ def record_weighing(
     unit="kg",
     notes="",
 ):
+    # ---------------------------------------------------------
+    # Résolution canonique de la ServiceExecution
+    # ---------------------------------------------------------
+    # Une pesée peut recevoir l'exécution :
+    # - explicitement ;
+    # - via le PartnerJob ;
+    # - via la Mission.
+    #
+    # Toutes les sources présentes doivent être cohérentes.
+    candidate_execution_ids = set()
+
+    if service_execution is not None:
+        candidate_execution_ids.add(service_execution.id)
+
+    if (
+        partner_job is not None
+        and partner_job.service_execution_id is not None
+    ):
+        candidate_execution_ids.add(partner_job.service_execution_id)
+
+    if (
+        mission is not None
+        and mission.service_execution_id is not None
+    ):
+        candidate_execution_ids.add(mission.service_execution_id)
+
+    if len(candidate_execution_ids) > 1:
+        raise ValueError(
+            "ServiceExecution incompatible : "
+            "les rattachements de la pesée désignent "
+            "plusieurs exécutions de service."
+        )
+
+    resolved_service_execution = service_execution
+
+    if (
+        resolved_service_execution is None
+        and partner_job is not None
+        and partner_job.service_execution_id is not None
+    ):
+        resolved_service_execution = partner_job.service_execution
+
+    if (
+        resolved_service_execution is None
+        and mission is not None
+        and mission.service_execution_id is not None
+    ):
+        resolved_service_execution = mission.service_execution
+
     _validate_service_execution_order(
         order=order,
-        service_execution=service_execution,
+        service_execution=resolved_service_execution,
     )
 
     if (
@@ -185,33 +234,9 @@ def record_weighing(
             "à la même commande."
         )
 
-    if (
-        service_execution is not None
-        and partner_job is not None
-        and partner_job.service_execution_id is not None
-        and partner_job.service_execution_id != service_execution.id
-    ):
-        raise ValueError(
-            "PartnerJob incompatible : "
-            "le PartnerJob appartient à une autre "
-            "ServiceExecution."
-        )
-
-    if (
-        service_execution is not None
-        and mission is not None
-        and mission.service_execution_id is not None
-        and mission.service_execution_id != service_execution.id
-    ):
-        raise ValueError(
-            "Mission incompatible : "
-            "la Mission appartient à une autre "
-            "ServiceExecution."
-        )
-
     record = WeighingRecord.objects.create(
         order=order,
-        service_execution=service_execution,
+        service_execution=resolved_service_execution,
         partner_job=partner_job,
         mission=mission,
         performed_by_role=performed_by_role,
@@ -225,5 +250,19 @@ def record_weighing(
     if partner_job and partner_job.status in {"awaiting_reception", "received"}:
         partner_job.status = "weighed"
         partner_job.save(update_fields=["status", "updated_at"])
+
+    if (
+        record.weighing_stage == "final_validation"
+        and record.service_execution_id is not None
+    ):
+        from services.services import complete_service_execution_if_ready
+
+        complete_service_execution_if_ready(
+            service_execution=record.service_execution,
+            note=(
+                "ServiceExecution réévaluée après pesée "
+                f"de validation finale #{record.id}."
+            ),
+        )
 
     return record

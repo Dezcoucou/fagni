@@ -81,6 +81,7 @@ def create_pickup_flow_from_order(
 
     create_tracking_event(
         order=order,
+        service_execution=service_execution,
         mission=mission,
         event_type="pickup_confirmed",
         actor_role="system",
@@ -147,6 +148,7 @@ def create_partner_processing_flow(
 
     create_tracking_event(
         order=order,
+        service_execution=service_execution,
         mission=mission,
         partner_job=partner_job,
         event_type="production_ready",
@@ -206,6 +208,7 @@ def run_minimal_v2_flow(
     if create_incident_flag:
         incident = create_incident(
             order=order,
+            service_execution=service_execution,
             mission=mission,
             partner_job=partner_job,
             incident_type="delay",

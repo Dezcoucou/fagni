@@ -98,6 +98,7 @@ def driver_mission_v2_start(request, mission_id):
             start_mission(mission=mission, notes="Mission démarrée depuis l'interface V2")
             create_tracking_event(
                 order=mission.order,
+                service_execution=mission.service_execution,
                 mission=mission,
                 event_type="mission_started",
                 actor_user=request.user if request.user.is_authenticated else None,
@@ -167,6 +168,7 @@ def driver_mission_v2_arrive(request, mission_id):
 
             create_tracking_event(
                 order=mission.order,
+                service_execution=mission.service_execution,
                 mission=mission,
                 event_type="mission_started",
                 actor_user=request.user if request.user.is_authenticated else None,
@@ -220,6 +222,7 @@ def driver_mission_v2_complete(request, mission_id):
             )
             create_tracking_event(
                 order=mission.order,
+                service_execution=mission.service_execution,
                 mission=mission,
                 event_type="delivery_completed",
                 actor_user=request.user if request.user.is_authenticated else None,
@@ -247,6 +250,7 @@ def driver_mission_v2_create_incident(request, mission_id):
         try:
             create_incident(
                 order=mission.order,
+                service_execution=mission.service_execution,
                 mission=mission,
                 incident_type="delay",
                 title="Incident déclaré depuis mission V2",
@@ -256,6 +260,7 @@ def driver_mission_v2_create_incident(request, mission_id):
             )
             create_tracking_event(
                 order=mission.order,
+                service_execution=mission.service_execution,
                 mission=mission,
                 event_type="issue_reported",
                 actor_user=request.user if request.user.is_authenticated else None,

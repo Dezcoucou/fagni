@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from core.models import TimeStampedModel
 from orders.models import Order
@@ -29,7 +30,22 @@ class TrackingEvent(TimeStampedModel):
         ("system", "Système"),
     ]
 
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="tracking_events_v2", verbose_name="Commande")
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="tracking_events_v2",
+        verbose_name="Commande",
+    )
+
+    service_execution = models.ForeignKey(
+        "services.ServiceExecution",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tracking_events",
+        verbose_name="Exécution de service",
+    )
+
     mission = models.ForeignKey(
         Mission,
         on_delete=models.SET_NULL,
@@ -64,6 +80,75 @@ class TrackingEvent(TimeStampedModel):
     title = models.CharField(max_length=150, verbose_name="Titre")
     description = models.TextField(blank=True, verbose_name="Description")
     metadata_json = models.JSONField(default=dict, blank=True, verbose_name="Métadonnées")
+
+    def _validate_service_execution_contract(self):
+        """
+        Invariant FAGNI :
+        TrackingEvent, Order, Mission, PartnerJob et ServiceExecution
+        doivent rester cohérents lorsqu'ils sont renseignés.
+
+        service_execution=None reste autorisé pendant le strangler legacy.
+        """
+        if self.service_execution_id is None:
+            return
+
+        if self.order_id is None:
+            raise ValidationError(
+                {
+                    "order": (
+                        "Une commande persistée est requise avant de rattacher "
+                        "une exécution de service."
+                    )
+                }
+            )
+
+        if self.service_execution.order_id != self.order_id:
+            raise ValidationError(
+                {
+                    "service_execution": (
+                        "Cette exécution de service appartient à une autre "
+                        "commande."
+                    )
+                }
+            )
+
+        if (
+            self.mission_id is not None
+            and self.mission.service_execution_id is not None
+            and self.mission.service_execution_id
+            != self.service_execution_id
+        ):
+            raise ValidationError(
+                {
+                    "mission": (
+                        "Cette Mission appartient à une autre "
+                        "exécution de service."
+                    )
+                }
+            )
+
+        if (
+            self.partner_job_id is not None
+            and self.partner_job.service_execution_id is not None
+            and self.partner_job.service_execution_id
+            != self.service_execution_id
+        ):
+            raise ValidationError(
+                {
+                    "partner_job": (
+                        "Ce PartnerJob appartient à une autre "
+                        "exécution de service."
+                    )
+                }
+            )
+
+    def clean(self):
+        super().clean()
+        self._validate_service_execution_contract()
+
+    def save(self, *args, **kwargs):
+        self._validate_service_execution_contract()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.order.code} - {self.event_type}"
@@ -151,7 +236,22 @@ class Incident(TimeStampedModel):
         ("critical", "Critique"),
     ]
 
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="incidents_v2", verbose_name="Commande")
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="incidents_v2",
+        verbose_name="Commande",
+    )
+
+    service_execution = models.ForeignKey(
+        "services.ServiceExecution",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="incidents",
+        verbose_name="Exécution de service",
+    )
+
     mission = models.ForeignKey(
         Mission,
         on_delete=models.SET_NULL,
@@ -196,6 +296,75 @@ class Incident(TimeStampedModel):
 
     reported_at = models.DateTimeField(auto_now_add=True, verbose_name="Signalé le")
     resolved_at = models.DateTimeField(null=True, blank=True, verbose_name="Résolu le")
+
+    def _validate_service_execution_contract(self):
+        """
+        Invariant FAGNI :
+        Incident, Order, Mission, PartnerJob et ServiceExecution
+        doivent rester cohérents lorsqu'ils sont renseignés.
+
+        service_execution=None reste autorisé pendant le strangler legacy.
+        """
+        if self.service_execution_id is None:
+            return
+
+        if self.order_id is None:
+            raise ValidationError(
+                {
+                    "order": (
+                        "Une commande persistée est requise avant de rattacher "
+                        "une exécution de service."
+                    )
+                }
+            )
+
+        if self.service_execution.order_id != self.order_id:
+            raise ValidationError(
+                {
+                    "service_execution": (
+                        "Cette exécution de service appartient à une autre "
+                        "commande."
+                    )
+                }
+            )
+
+        if (
+            self.mission_id is not None
+            and self.mission.service_execution_id is not None
+            and self.mission.service_execution_id
+            != self.service_execution_id
+        ):
+            raise ValidationError(
+                {
+                    "mission": (
+                        "Cette Mission appartient à une autre "
+                        "exécution de service."
+                    )
+                }
+            )
+
+        if (
+            self.partner_job_id is not None
+            and self.partner_job.service_execution_id is not None
+            and self.partner_job.service_execution_id
+            != self.service_execution_id
+        ):
+            raise ValidationError(
+                {
+                    "partner_job": (
+                        "Ce PartnerJob appartient à une autre "
+                        "exécution de service."
+                    )
+                }
+            )
+
+    def clean(self):
+        super().clean()
+        self._validate_service_execution_contract()
+
+    def save(self, *args, **kwargs):
+        self._validate_service_execution_contract()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.order.code} - {self.incident_type}"

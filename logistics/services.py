@@ -209,4 +209,15 @@ def complete_mission(
         notes=notes or "Mission terminée",
     )
 
+    if mission.service_execution_id is not None:
+        from services.services import complete_service_execution_if_ready
+
+        complete_service_execution_if_ready(
+            service_execution=mission.service_execution,
+            note=(
+                "ServiceExecution réévaluée après complétion "
+                f"de la mission {mission.code}."
+            ),
+        )
+
     return mission

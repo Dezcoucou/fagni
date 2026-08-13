@@ -279,7 +279,6 @@ class ServiceExecutionCompletionTests(TestCase):
 
         self.assertFalse(result["ready"])
 
-        self.assertIn("unresolved:asset", result["missing"])
 
 
 class ServiceExecutionAppointmentCompletionTests(TestCase):
@@ -401,3 +400,154 @@ class ServiceExecutionAppointmentCompletionTests(TestCase):
         self.assertTrue(result["ready"])
         self.assertFalse(result["checks"]["appointment"]["required"])
         self.assertTrue(result["checks"]["appointment"]["satisfied"])
+
+
+class ServiceExecutionAssetCompletionTests(TestCase):
+    def setUp(self):
+        from orders.models import Customer, Order
+        from services.models import CustomerAsset, Service, ServiceCategory
+
+        self.CustomerAsset = CustomerAsset
+
+        self.category = ServiceCategory.objects.create(
+            code="asset-completion-category",
+            name="Asset Completion Category",
+            is_active=True,
+        )
+
+        self.service = Service.objects.create(
+            code="asset-completion-service",
+            category=self.category,
+            name="Asset Completion Service",
+            description="",
+            is_active=True,
+            primary_engine=Service.ENGINE_ONSITE,
+            requires_partner=False,
+            requires_logistics=False,
+            requires_weighing=False,
+            requires_appointment=False,
+            requires_quote=False,
+            requires_asset=True,
+            requires_otp=False,
+            requires_signature=False,
+            pricing_mode="fixed",
+            default_sla_hours=24,
+        )
+
+        self.customer_a = Customer.objects.create(
+            name="Client Asset A",
+            phone="0700009801",
+        )
+
+        self.customer_b = Customer.objects.create(
+            name="Client Asset B",
+            phone="0700009802",
+        )
+
+        self.order_a = Order.objects.create(
+            customer=self.customer_a,
+        )
+
+        self.order_b = Order.objects.create(
+            customer=self.customer_b,
+        )
+
+        self.asset_a = CustomerAsset.objects.create(
+            customer=self.customer_a,
+            asset_type=CustomerAsset.ASSET_TYPE_VEHICLE,
+            name="Véhicule Client A",
+            reference="CI-TEST-9801",
+        )
+
+    def create_execution(self, *, order=None, asset=None):
+        from services.models import ServiceExecution
+
+        return ServiceExecution.objects.create(
+            order=order or self.order_a,
+            service=self.service,
+            asset=asset,
+            execution_engine=self.service.primary_engine,
+            status=ServiceExecution.STATUS_IN_PROGRESS,
+        )
+
+    def test_required_asset_without_asset_blocks_completion(self):
+        execution = self.create_execution()
+
+        result = evaluate_service_execution_completion(
+            service_execution=execution,
+        )
+
+        self.assertFalse(result["ready"])
+        self.assertIn("asset:no_asset", result["missing"])
+        self.assertTrue(result["checks"]["asset"]["required"])
+        self.assertFalse(result["checks"]["asset"]["satisfied"])
+
+    def test_matching_asset_satisfies_requirement(self):
+        execution = self.create_execution(
+            asset=self.asset_a,
+        )
+
+        result = evaluate_service_execution_completion(
+            service_execution=execution,
+        )
+
+        self.assertTrue(result["ready"])
+        self.assertNotIn("asset:no_asset", result["missing"])
+        self.assertTrue(result["checks"]["asset"]["satisfied"])
+
+    def test_non_required_asset_is_satisfied_by_default(self):
+        self.service.requires_asset = False
+        self.service.save(update_fields=["requires_asset"])
+
+        execution = self.create_execution()
+
+        result = evaluate_service_execution_completion(
+            service_execution=execution,
+        )
+
+        self.assertTrue(result["ready"])
+        self.assertFalse(result["checks"]["asset"]["required"])
+        self.assertTrue(result["checks"]["asset"]["satisfied"])
+
+    def test_execution_rejects_asset_from_another_customer(self):
+        from django.core.exceptions import ValidationError
+        from services.models import ServiceExecution
+
+        asset_b = self.CustomerAsset.objects.create(
+            customer=self.customer_b,
+            asset_type=self.CustomerAsset.ASSET_TYPE_VEHICLE,
+            name="Véhicule Client B",
+            reference="CI-TEST-9802",
+        )
+
+        execution = ServiceExecution(
+            order=self.order_a,
+            service=self.service,
+            asset=asset_b,
+            execution_engine=self.service.primary_engine,
+            status=ServiceExecution.STATUS_IN_PROGRESS,
+        )
+
+        with self.assertRaises(ValidationError):
+            execution.save()
+
+    def test_full_clean_rejects_asset_from_another_customer(self):
+        from django.core.exceptions import ValidationError
+        from services.models import ServiceExecution
+
+        asset_b = self.CustomerAsset.objects.create(
+            customer=self.customer_b,
+            asset_type=self.CustomerAsset.ASSET_TYPE_EQUIPMENT,
+            name="Équipement Client B",
+        )
+
+        execution = ServiceExecution(
+            order=self.order_a,
+            service=self.service,
+            asset=asset_b,
+            execution_engine=self.service.primary_engine,
+            status=ServiceExecution.STATUS_IN_PROGRESS,
+        )
+
+        with self.assertRaises(ValidationError):
+            execution.full_clean()

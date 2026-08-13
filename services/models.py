@@ -229,6 +229,99 @@ class ServiceOption(TimeStampedModel):
         return f"{self.service.name} - {self.name}"
 
 
+class CustomerAsset(TimeStampedModel):
+    """
+    Actif / équipement appartenant à un client FAGNI.
+
+    Exemples :
+    - véhicule ;
+    - climatiseur ;
+    - machine ;
+    - équipement professionnel ;
+    - autre bien nécessitant une intervention.
+
+    Le modèle reste volontairement générique afin de ne pas enfermer
+    le moteur multiservices dans un domaine métier particulier.
+    """
+
+    ASSET_TYPE_OTHER = "other"
+    ASSET_TYPE_VEHICLE = "vehicle"
+    ASSET_TYPE_EQUIPMENT = "equipment"
+    ASSET_TYPE_MACHINE = "machine"
+
+    ASSET_TYPE_CHOICES = [
+        (ASSET_TYPE_VEHICLE, "Véhicule"),
+        (ASSET_TYPE_EQUIPMENT, "Équipement"),
+        (ASSET_TYPE_MACHINE, "Machine"),
+        (ASSET_TYPE_OTHER, "Autre"),
+    ]
+
+    customer = models.ForeignKey(
+        "orders.Customer",
+        on_delete=models.PROTECT,
+        related_name="service_assets",
+        verbose_name="Client",
+    )
+
+    asset_type = models.CharField(
+        max_length=30,
+        choices=ASSET_TYPE_CHOICES,
+        default=ASSET_TYPE_OTHER,
+        db_index=True,
+        verbose_name="Type d'actif",
+    )
+
+    name = models.CharField(
+        max_length=150,
+        verbose_name="Nom / désignation",
+    )
+
+    reference = models.CharField(
+        max_length=120,
+        blank=True,
+        verbose_name="Référence",
+        help_text=(
+            "Exemple : immatriculation, numéro de série ou référence client."
+        ),
+    )
+
+    description = models.TextField(
+        blank=True,
+        verbose_name="Description",
+    )
+
+    metadata_json = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Métadonnées",
+        help_text=(
+            "Données descriptives variables selon le type d'actif. "
+            "Les informations critiques ou fréquemment filtrées devront "
+            "devenir des champs dédiés."
+        ),
+    )
+
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Actif",
+    )
+
+    def __str__(self):
+        reference = f" · {self.reference}" if self.reference else ""
+        return f"{self.customer} · {self.name}{reference}"
+
+    class Meta:
+        verbose_name = "Actif client"
+        verbose_name_plural = "Actifs clients"
+        ordering = ("customer_id", "name", "id")
+        indexes = [
+            models.Index(
+                fields=("customer", "asset_type"),
+                name="cust_asset_customer_type_idx",
+            ),
+        ]
+
+
 class ServiceExecution(TimeStampedModel):
     """
     Instance d'exécution d'un Service pour une commande FAGNI.
@@ -286,6 +379,20 @@ class ServiceExecution(TimeStampedModel):
         on_delete=models.PROTECT,
         related_name="executions",
         verbose_name="Service",
+    )
+
+
+    asset = models.ForeignKey(
+        CustomerAsset,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="service_executions",
+        verbose_name="Actif client",
+        help_text=(
+            "Actif concerné par cette exécution lorsque le service "
+            "requiert un équipement client."
+        ),
     )
 
     execution_engine = models.CharField(
@@ -371,6 +478,51 @@ class ServiceExecution(TimeStampedModel):
         blank=True,
         verbose_name="Notes internes",
     )
+
+    def _validate_asset_customer(self):
+        """
+        Invariant FAGNI :
+        l'actif d'une ServiceExecution doit appartenir au client
+        propriétaire de la commande.
+
+        asset=None reste autorisé :
+        - pour les services qui n'exigent pas d'actif ;
+        - pendant la migration progressive du legacy.
+        """
+        if self.asset_id is None:
+            return
+
+        if self.order_id is None:
+            from django.core.exceptions import ValidationError
+
+            raise ValidationError(
+                {
+                    "order": (
+                        "Une commande persistée est requise avant "
+                        "de rattacher un actif."
+                    )
+                }
+            )
+
+        if self.asset.customer_id != self.order.customer_id:
+            from django.core.exceptions import ValidationError
+
+            raise ValidationError(
+                {
+                    "asset": (
+                        "Cet actif appartient à un autre client "
+                        "que celui de la commande."
+                    )
+                }
+            )
+
+    def clean(self):
+        super().clean()
+        self._validate_asset_customer()
+
+    def save(self, *args, **kwargs):
+        self._validate_asset_customer()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         order_code = getattr(self.order, "code", None) or f"#{self.order_id}"

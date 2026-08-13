@@ -421,12 +421,30 @@ def evaluate_service_execution_completion(*, service_execution):
         }
 
     # ---------------------------------------------------------
+    # ACTIF / EQUIPEMENT CLIENT
+    # ---------------------------------------------------------
+    if service.requires_asset:
+        has_asset = service_execution.asset_id is not None
+
+        checks["asset"] = {
+            "required": True,
+            "has_objects": has_asset,
+            "satisfied": has_asset,
+        }
+
+        if not has_asset:
+            missing.append("asset:no_asset")
+    else:
+        checks["asset"] = {
+            "required": False,
+            "has_objects": None,
+            "satisfied": True,
+        }
+
+    # ---------------------------------------------------------
     # CAPACITES NON ENCORE MODELISABLES PAR SERVICEEXECUTION
     # ---------------------------------------------------------
     unresolved_capabilities = []
-
-    if service.requires_asset:
-        unresolved_capabilities.append("asset")
 
     checks["unresolved_capabilities"] = unresolved_capabilities
 

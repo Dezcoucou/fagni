@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.admin import ModelAdmin as UnfoldModelAdmin
 
 from .models import (
+    CustomerAsset,
     Service,
     ServiceCategory,
     ServiceExecution,
@@ -160,12 +161,49 @@ class ServiceOptionAdmin(UnfoldModelAdmin):
     )
 
 
+@admin.register(CustomerAsset)
+class CustomerAssetAdmin(UnfoldModelAdmin):
+    list_display = (
+        "id",
+        "customer",
+        "asset_type",
+        "name",
+        "reference",
+        "is_active",
+        "created_at",
+    )
+
+    search_fields = (
+        "customer__name",
+        "customer__phone",
+        "name",
+        "reference",
+        "description",
+    )
+
+    list_filter = (
+        "asset_type",
+        "is_active",
+        "created_at",
+    )
+
+    autocomplete_fields = (
+        "customer",
+    )
+
+    ordering = (
+        "customer",
+        "name",
+    )
+
+
 @admin.register(ServiceExecution)
 class ServiceExecutionAdmin(UnfoldModelAdmin):
     list_display = (
         "id",
         "order",
         "service",
+        "asset",
         "execution_engine",
         "status",
         "sequence_index",
@@ -192,6 +230,7 @@ class ServiceExecutionAdmin(UnfoldModelAdmin):
     autocomplete_fields = (
         "order",
         "service",
+        "asset",
     )
 
     readonly_fields = (
@@ -210,6 +249,7 @@ class ServiceExecutionAdmin(UnfoldModelAdmin):
                 "fields": (
                     "order",
                     "service",
+                    "asset",
                     "sequence_index",
                 )
             },

@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.test import TestCase
+from django.utils import timezone
 
 from logistics.models import Mission
 from logistics.models_otp import MissionOTP
@@ -268,7 +269,6 @@ class ServiceExecutionCompletionTests(TestCase):
 
     def test_unresolved_capabilities_block_completion(self):
         service = self.create_service(
-            requires_appointment=True,
             requires_asset=True,
         )
         execution = self.create_execution(service)
@@ -279,5 +279,125 @@ class ServiceExecutionCompletionTests(TestCase):
 
         self.assertFalse(result["ready"])
 
-        self.assertIn("unresolved:appointment", result["missing"])
         self.assertIn("unresolved:asset", result["missing"])
+
+
+class ServiceExecutionAppointmentCompletionTests(TestCase):
+    def setUp(self):
+        self.category = ServiceCategory.objects.create(
+            code="appointment-completion-category",
+            name="Appointment Completion Category",
+            is_active=True,
+        )
+
+        self.customer = Customer.objects.create(
+            name="Client Appointment Completion",
+            phone="0700009801",
+        )
+
+        self.order = Order.objects.create(
+            customer=self.customer,
+        )
+
+    def create_service(self, **overrides):
+        values = {
+            "code": "appointment-completion-service",
+            "category": self.category,
+            "name": "Appointment Completion Service",
+            "description": "",
+            "is_active": True,
+            "primary_engine": Service.ENGINE_APPOINTMENT,
+            "requires_partner": False,
+            "requires_logistics": False,
+            "requires_weighing": False,
+            "requires_appointment": True,
+            "requires_quote": False,
+            "requires_asset": False,
+            "requires_otp": False,
+            "requires_signature": False,
+            "pricing_mode": "fixed",
+            "default_sla_hours": 24,
+        }
+        values.update(overrides)
+        return Service.objects.create(**values)
+
+    def create_execution(self, service):
+        return ServiceExecution.objects.create(
+            order=self.order,
+            service=service,
+            execution_engine=service.primary_engine,
+            status=ServiceExecution.STATUS_IN_PROGRESS,
+        )
+
+    def test_required_appointment_without_start_blocks_completion(self):
+        service = self.create_service(
+            code="appointment-not-started-service",
+        )
+        execution = self.create_execution(service)
+
+        result = evaluate_service_execution_completion(
+            service_execution=execution,
+        )
+
+        self.assertFalse(result["ready"])
+        self.assertIn("appointment:not_started", result["missing"])
+        self.assertTrue(result["checks"]["appointment"]["required"])
+        self.assertFalse(result["checks"]["appointment"]["satisfied"])
+
+    def test_planned_appointment_without_start_does_not_satisfy_requirement(self):
+        service = self.create_service(
+            code="appointment-planned-only-service",
+        )
+        execution = self.create_execution(service)
+
+        execution.planned_start_at = timezone.now()
+        execution.save(
+            update_fields=[
+                "planned_start_at",
+                "updated_at",
+            ]
+        )
+
+        result = evaluate_service_execution_completion(
+            service_execution=execution,
+        )
+
+        self.assertFalse(result["ready"])
+        self.assertIn("appointment:not_started", result["missing"])
+
+    def test_started_appointment_satisfies_requirement(self):
+        service = self.create_service(
+            code="appointment-started-service",
+        )
+        execution = self.create_execution(service)
+
+        execution.started_at = timezone.now()
+        execution.save(
+            update_fields=[
+                "started_at",
+                "updated_at",
+            ]
+        )
+
+        result = evaluate_service_execution_completion(
+            service_execution=execution,
+        )
+
+        self.assertTrue(result["ready"])
+        self.assertNotIn("appointment:not_started", result["missing"])
+        self.assertTrue(result["checks"]["appointment"]["satisfied"])
+
+    def test_non_required_appointment_is_satisfied_by_default(self):
+        service = self.create_service(
+            code="appointment-not-required-service",
+            requires_appointment=False,
+        )
+        execution = self.create_execution(service)
+
+        result = evaluate_service_execution_completion(
+            service_execution=execution,
+        )
+
+        self.assertTrue(result["ready"])
+        self.assertFalse(result["checks"]["appointment"]["required"])
+        self.assertTrue(result["checks"]["appointment"]["satisfied"])

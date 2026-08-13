@@ -400,12 +400,30 @@ def evaluate_service_execution_completion(*, service_execution):
         }
 
     # ---------------------------------------------------------
+    # RENDEZ-VOUS
+    # ---------------------------------------------------------
+    if service.requires_appointment:
+        has_started_appointment = service_execution.started_at is not None
+
+        checks["appointment"] = {
+            "required": True,
+            "has_objects": has_started_appointment,
+            "satisfied": has_started_appointment,
+        }
+
+        if not has_started_appointment:
+            missing.append("appointment:not_started")
+    else:
+        checks["appointment"] = {
+            "required": False,
+            "has_objects": None,
+            "satisfied": True,
+        }
+
+    # ---------------------------------------------------------
     # CAPACITES NON ENCORE MODELISABLES PAR SERVICEEXECUTION
     # ---------------------------------------------------------
     unresolved_capabilities = []
-
-    if service.requires_appointment:
-        unresolved_capabilities.append("appointment")
 
     if service.requires_asset:
         unresolved_capabilities.append("asset")

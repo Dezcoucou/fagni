@@ -7,6 +7,12 @@ from logistics.models import Mission
 from logistics.models_signature import MissionSignature
 from orders.models import Customer, Order
 from services.models import Service, ServiceCategory, ServiceExecution
+from services.services import (
+    cancel_service_execution,
+    create_service_execution,
+    schedule_service_execution,
+    start_service_execution,
+)
 
 
 class SignatureServiceExecutionAutoCompletionTests(TestCase):
@@ -53,11 +59,36 @@ class SignatureServiceExecutionAutoCompletionTests(TestCase):
         service,
         status=ServiceExecution.STATUS_IN_PROGRESS,
     ):
-        return ServiceExecution.objects.create(
+        execution = create_service_execution(
             order=self.order,
             service=service,
-            execution_engine=service.primary_engine,
-            status=status,
+        )
+
+        if status == ServiceExecution.STATUS_PENDING:
+            return execution
+
+        if status == ServiceExecution.STATUS_CANCELED:
+            return cancel_service_execution(
+                service_execution=execution,
+            )
+
+        schedule_service_execution(
+            service_execution=execution,
+        )
+
+        if status == ServiceExecution.STATUS_SCHEDULED:
+            return execution
+
+        start_service_execution(
+            service_execution=execution,
+        )
+
+        if status == ServiceExecution.STATUS_IN_PROGRESS:
+            return execution
+
+        raise ValueError(
+            "Statut ServiceExecution de test non supporté : "
+            f"{status}."
         )
 
     def create_mission(

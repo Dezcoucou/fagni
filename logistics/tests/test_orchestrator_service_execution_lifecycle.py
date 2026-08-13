@@ -3,6 +3,11 @@ from django.test import TestCase
 from logistics.orchestrator import run_minimal_v2_flow
 from orders.models import Customer, Order
 from services.models import Service, ServiceCategory, ServiceExecution
+from services.services import (
+    create_service_execution,
+    schedule_service_execution,
+    start_service_execution,
+)
 
 
 class OrchestratorServiceExecutionLifecycleTests(TestCase):
@@ -44,11 +49,31 @@ class OrchestratorServiceExecutionLifecycleTests(TestCase):
         )
 
     def create_execution(self, status=ServiceExecution.STATUS_PENDING):
-        return ServiceExecution.objects.create(
+        execution = create_service_execution(
             order=self.order,
             service=self.service,
-            execution_engine=self.service.primary_engine,
-            status=status,
+        )
+
+        if status == ServiceExecution.STATUS_PENDING:
+            return execution
+
+        schedule_service_execution(
+            service_execution=execution,
+        )
+
+        if status == ServiceExecution.STATUS_SCHEDULED:
+            return execution
+
+        start_service_execution(
+            service_execution=execution,
+        )
+
+        if status == ServiceExecution.STATUS_IN_PROGRESS:
+            return execution
+
+        raise ValueError(
+            "Statut ServiceExecution de test non supporté : "
+            f"{status}."
         )
 
     def test_legacy_flow_without_service_execution_still_works(self):
@@ -113,8 +138,6 @@ class OrchestratorServiceExecutionLifecycleTests(TestCase):
         execution = self.create_execution(
             status=ServiceExecution.STATUS_SCHEDULED,
         )
-
-        from services.services import start_service_execution
 
         start_service_execution(
             service_execution=execution,

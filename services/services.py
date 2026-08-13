@@ -51,6 +51,57 @@ def _build_service_execution_snapshot(*, service):
     }
 
 
+def _get_service_execution_snapshot_requirements(*, service_execution):
+    """
+    Retourne les requirements contractuels d'une ServiceExecution.
+
+    Le snapshot constitue la source de vérité historique de l'exécution.
+    Aucun fallback vers le Service courant n'est autorisé : une
+    ServiceExecution sans snapshot valide est considérée comme invalide.
+    """
+    snapshot = service_execution.service_snapshot_json
+
+    if not isinstance(snapshot, dict):
+        raise ValueError(
+            "ServiceExecution sans service_snapshot_json valide."
+        )
+
+    requirements = snapshot.get("requirements")
+
+    if not isinstance(requirements, dict):
+        raise ValueError(
+            "ServiceExecution sans snapshot requirements valide."
+        )
+
+    missing_fields = [
+        field_name
+        for field_name in SERVICE_SNAPSHOT_REQUIREMENT_FIELDS
+        if field_name not in requirements
+    ]
+
+    if missing_fields:
+        raise ValueError(
+            "Snapshot ServiceExecution incomplet : requirements manquants : "
+            + ", ".join(sorted(missing_fields))
+            + "."
+        )
+
+    invalid_fields = [
+        field_name
+        for field_name in SERVICE_SNAPSHOT_REQUIREMENT_FIELDS
+        if not isinstance(requirements[field_name], bool)
+    ]
+
+    if invalid_fields:
+        raise ValueError(
+            "Snapshot ServiceExecution invalide : requirements non booléens : "
+            + ", ".join(sorted(invalid_fields))
+            + "."
+        )
+
+    return requirements
+
+
 @transaction.atomic
 def create_service_execution(
     *,
@@ -361,7 +412,9 @@ def evaluate_service_execution_completion(*, service_execution):
         "checks": {...},
     }
     """
-    service = service_execution.service
+    requirements = _get_service_execution_snapshot_requirements(
+        service_execution=service_execution,
+    )
 
     checks = {}
     missing = []
@@ -369,7 +422,7 @@ def evaluate_service_execution_completion(*, service_execution):
     # ---------------------------------------------------------
     # LOGISTIQUE
     # ---------------------------------------------------------
-    if service.requires_logistics:
+    if requirements["requires_logistics"]:
         missions = service_execution.missions.all()
 
         has_missions = missions.exists()
@@ -398,7 +451,7 @@ def evaluate_service_execution_completion(*, service_execution):
     # ---------------------------------------------------------
     # PARTENAIRE
     # ---------------------------------------------------------
-    if service.requires_partner:
+    if requirements["requires_partner"]:
         partner_jobs = service_execution.partner_jobs.all()
 
         has_partner_jobs = partner_jobs.exists()
@@ -427,7 +480,7 @@ def evaluate_service_execution_completion(*, service_execution):
     # ---------------------------------------------------------
     # PESEE
     # ---------------------------------------------------------
-    if service.requires_weighing:
+    if requirements["requires_weighing"]:
         has_final_weighing = service_execution.weighing_records.filter(
             weighing_stage="final_validation",
         ).exists()
@@ -451,7 +504,7 @@ def evaluate_service_execution_completion(*, service_execution):
     # OTP
     # Relations accessibles via Mission -> otp_records
     # ---------------------------------------------------------
-    if service.requires_otp:
+    if requirements["requires_otp"]:
         has_approved_otp = service_execution.missions.filter(
             otp_records__status="approved",
         ).exists()
@@ -475,7 +528,7 @@ def evaluate_service_execution_completion(*, service_execution):
     # SIGNATURE
     # Relations accessibles via Mission -> signatures
     # ---------------------------------------------------------
-    if service.requires_signature:
+    if requirements["requires_signature"]:
         has_validated_signature = service_execution.missions.filter(
             signatures__status="validated",
         ).exists()
@@ -498,7 +551,7 @@ def evaluate_service_execution_completion(*, service_execution):
     # ---------------------------------------------------------
     # DEVIS
     # ---------------------------------------------------------
-    if service.requires_quote:
+    if requirements["requires_quote"]:
         has_final_quote = service_execution.price_quotes.filter(
             quote_type="final",
             is_final=True,
@@ -522,7 +575,7 @@ def evaluate_service_execution_completion(*, service_execution):
     # ---------------------------------------------------------
     # RENDEZ-VOUS
     # ---------------------------------------------------------
-    if service.requires_appointment:
+    if requirements["requires_appointment"]:
         has_started_appointment = service_execution.started_at is not None
 
         checks["appointment"] = {
@@ -543,7 +596,7 @@ def evaluate_service_execution_completion(*, service_execution):
     # ---------------------------------------------------------
     # ACTIF / EQUIPEMENT CLIENT
     # ---------------------------------------------------------
-    if service.requires_asset:
+    if requirements["requires_asset"]:
         has_asset = service_execution.asset_id is not None
 
         checks["asset"] = {

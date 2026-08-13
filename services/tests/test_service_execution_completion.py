@@ -10,7 +10,10 @@ from orders.models import Customer, Order
 from partners.models import LaundryPartner
 from production.models import PartnerJob, WeighingRecord
 from services.models import Service, ServiceCategory, ServiceExecution
-from services.services import evaluate_service_execution_completion
+from services.services import (
+    create_service_execution,
+    evaluate_service_execution_completion,
+)
 
 
 class ServiceExecutionCompletionTests(TestCase):
@@ -58,11 +61,9 @@ class ServiceExecutionCompletionTests(TestCase):
         return Service.objects.create(**values)
 
     def create_execution(self, service):
-        return ServiceExecution.objects.create(
+        return create_service_execution(
             order=self.order,
             service=service,
-            execution_engine=service.primary_engine,
-            status=ServiceExecution.STATUS_IN_PROGRESS,
         )
 
     def create_mission(self, execution, status="completed"):
@@ -84,6 +85,173 @@ class ServiceExecutionCompletionTests(TestCase):
 
         self.assertTrue(result["ready"])
         self.assertEqual(result["missing"], [])
+
+    def test_snapshot_requirements_survive_catalogue_requirement_removal(
+        self,
+    ):
+        requirement_fields = (
+            "requires_partner",
+            "requires_logistics",
+            "requires_weighing",
+            "requires_appointment",
+            "requires_quote",
+            "requires_asset",
+            "requires_otp",
+            "requires_signature",
+        )
+
+        service = self.create_service(
+            **{
+                field_name: True
+                for field_name in requirement_fields
+            }
+        )
+        execution = self.create_execution(service)
+
+        for field_name in requirement_fields:
+            setattr(service, field_name, False)
+
+        service.save(update_fields=list(requirement_fields))
+
+        result = evaluate_service_execution_completion(
+            service_execution=execution,
+        )
+
+        requirement_to_check = {
+            "requires_partner": "partner",
+            "requires_logistics": "logistics",
+            "requires_weighing": "weighing",
+            "requires_appointment": "appointment",
+            "requires_quote": "quote",
+            "requires_asset": "asset",
+            "requires_otp": "otp",
+            "requires_signature": "signature",
+        }
+
+        self.assertFalse(result["ready"])
+
+        for field_name, check_name in requirement_to_check.items():
+            self.assertTrue(
+                execution.service_snapshot_json[
+                    "requirements"
+                ][field_name]
+            )
+            self.assertTrue(
+                result["checks"][check_name]["required"]
+            )
+
+    def test_catalogue_requirement_addition_does_not_change_old_execution(
+        self,
+    ):
+        requirement_fields = (
+            "requires_partner",
+            "requires_logistics",
+            "requires_weighing",
+            "requires_appointment",
+            "requires_quote",
+            "requires_asset",
+            "requires_otp",
+            "requires_signature",
+        )
+
+        service = self.create_service()
+        execution = self.create_execution(service)
+
+        for field_name in requirement_fields:
+            setattr(service, field_name, True)
+
+        service.save(update_fields=list(requirement_fields))
+
+        result = evaluate_service_execution_completion(
+            service_execution=execution,
+        )
+
+        requirement_to_check = {
+            "requires_partner": "partner",
+            "requires_logistics": "logistics",
+            "requires_weighing": "weighing",
+            "requires_appointment": "appointment",
+            "requires_quote": "quote",
+            "requires_asset": "asset",
+            "requires_otp": "otp",
+            "requires_signature": "signature",
+        }
+
+        self.assertTrue(result["ready"])
+        self.assertEqual(result["missing"], [])
+
+        for field_name, check_name in requirement_to_check.items():
+            self.assertFalse(
+                execution.service_snapshot_json[
+                    "requirements"
+                ][field_name]
+            )
+            self.assertFalse(
+                result["checks"][check_name]["required"]
+            )
+
+    def test_execution_without_snapshot_requirements_is_rejected(self):
+        service = self.create_service()
+
+        execution = ServiceExecution.objects.create(
+            order=self.order,
+            service=service,
+            execution_engine=service.primary_engine,
+            status=ServiceExecution.STATUS_PENDING,
+            service_snapshot_json={},
+        )
+
+        with self.assertRaises(ValueError):
+            evaluate_service_execution_completion(
+                service_execution=execution,
+            )
+
+    def test_execution_with_incomplete_snapshot_requirements_is_rejected(
+        self,
+    ):
+        service = self.create_service()
+
+        execution = ServiceExecution.objects.create(
+            order=self.order,
+            service=service,
+            execution_engine=service.primary_engine,
+            status=ServiceExecution.STATUS_PENDING,
+            service_snapshot_json={
+                "requirements": {
+                    "requires_logistics": False,
+                }
+            },
+        )
+
+        with self.assertRaises(ValueError):
+            evaluate_service_execution_completion(
+                service_execution=execution,
+            )
+
+    def test_execution_with_non_boolean_snapshot_requirement_is_rejected(
+        self,
+    ):
+        service = self.create_service()
+        execution = create_service_execution(
+            order=self.order,
+            service=service,
+        )
+
+        execution.service_snapshot_json[
+            "requirements"
+        ]["requires_logistics"] = "false"
+
+        execution.save(
+            update_fields=[
+                "service_snapshot_json",
+                "updated_at",
+            ]
+        )
+
+        with self.assertRaises(ValueError):
+            evaluate_service_execution_completion(
+                service_execution=execution,
+            )
 
     def test_logistics_requires_at_least_one_mission(self):
         service = self.create_service(
@@ -321,11 +489,9 @@ class ServiceExecutionAppointmentCompletionTests(TestCase):
         return Service.objects.create(**values)
 
     def create_execution(self, service):
-        return ServiceExecution.objects.create(
+        return create_service_execution(
             order=self.order,
             service=service,
-            execution_engine=service.primary_engine,
-            status=ServiceExecution.STATUS_IN_PROGRESS,
         )
 
     def test_required_appointment_without_start_blocks_completion(self):
@@ -460,14 +626,10 @@ class ServiceExecutionAssetCompletionTests(TestCase):
         )
 
     def create_execution(self, *, order=None, asset=None):
-        from services.models import ServiceExecution
-
-        return ServiceExecution.objects.create(
+        return create_service_execution(
             order=order or self.order_a,
             service=self.service,
             asset=asset,
-            execution_engine=self.service.primary_engine,
-            status=ServiceExecution.STATUS_IN_PROGRESS,
         )
 
     def test_required_asset_without_asset_blocks_completion(self):

@@ -5,6 +5,11 @@ from orders.models import Customer, Order
 from pricing.models import PriceQuote
 from pricing.services import create_estimated_quote
 from services.models import Service, ServiceCategory, ServiceExecution
+from services.services import (
+    create_service_execution,
+    schedule_service_execution,
+    start_service_execution,
+)
 
 
 class PriceQuoteServiceExecutionContractTests(TestCase):
@@ -50,18 +55,14 @@ class PriceQuoteServiceExecutionContractTests(TestCase):
             customer=self.customer_b,
         )
 
-        self.execution_a = ServiceExecution.objects.create(
+        self.execution_a = create_service_execution(
             order=self.order_a,
             service=self.service,
-            execution_engine=self.service.primary_engine,
-            status=ServiceExecution.STATUS_PENDING,
         )
 
-        self.execution_b = ServiceExecution.objects.create(
+        self.execution_b = create_service_execution(
             order=self.order_b,
             service=self.service,
-            execution_engine=self.service.primary_engine,
-            status=ServiceExecution.STATUS_PENDING,
         )
 
     def test_legacy_quote_without_service_execution_is_allowed(self):
@@ -150,11 +151,15 @@ class PriceQuoteServiceExecutionCompletionTests(TestCase):
             customer=self.customer,
         )
 
-        self.execution = ServiceExecution.objects.create(
+        self.execution = create_service_execution(
             order=self.order,
             service=self.service,
-            execution_engine=self.service.primary_engine,
-            status=ServiceExecution.STATUS_IN_PROGRESS,
+        )
+        schedule_service_execution(
+            service_execution=self.execution,
+        )
+        start_service_execution(
+            service_execution=self.execution,
         )
 
     def test_estimated_quote_does_not_satisfy_quote_requirement(self):
@@ -250,7 +255,9 @@ class PriceQuoteServiceExecutionCompletionTests(TestCase):
         )
         self.assertIsNotNone(self.execution.completed_at)
 
-    def test_finalize_quote_waits_for_other_required_capabilities(self):
+    def test_catalogue_change_after_creation_does_not_add_signature_requirement(
+        self,
+    ):
         from pricing.services import finalize_quote
 
         self.service.requires_signature = True
@@ -267,11 +274,57 @@ class PriceQuoteServiceExecutionCompletionTests(TestCase):
 
         self.execution.refresh_from_db()
 
+        self.assertFalse(
+            self.execution.service_snapshot_json[
+                "requirements"
+            ]["requires_signature"]
+        )
         self.assertEqual(
             self.execution.status,
+            ServiceExecution.STATUS_COMPLETED,
+        )
+        self.assertIsNotNone(self.execution.completed_at)
+
+    def test_finalize_quote_waits_for_signature_required_in_snapshot(
+        self,
+    ):
+        from pricing.services import finalize_quote
+
+        self.service.requires_signature = True
+        self.service.save(update_fields=["requires_signature"])
+
+        execution = create_service_execution(
+            order=self.order,
+            service=self.service,
+        )
+        schedule_service_execution(
+            service_execution=execution,
+        )
+        start_service_execution(
+            service_execution=execution,
+        )
+
+        quote = create_estimated_quote(
+            order=self.order,
+            service_execution=execution,
+        )
+
+        finalize_quote(
+            quote=quote,
+        )
+
+        execution.refresh_from_db()
+
+        self.assertTrue(
+            execution.service_snapshot_json[
+                "requirements"
+            ]["requires_signature"]
+        )
+        self.assertEqual(
+            execution.status,
             ServiceExecution.STATUS_IN_PROGRESS,
         )
-        self.assertIsNone(self.execution.completed_at)
+        self.assertIsNone(execution.completed_at)
 
     def test_finalize_legacy_quote_without_execution_still_works(self):
         from pricing.services import finalize_quote

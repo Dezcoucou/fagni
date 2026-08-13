@@ -3,7 +3,14 @@ from django.test import TestCase
 from orders.models import Customer, Order
 from services.models import Service, ServiceCategory, ServiceExecution
 from services.services import (
+    await_service_execution_validation,
+    cancel_service_execution,
+    complete_service_execution,
     complete_service_execution_if_ready,
+    create_service_execution,
+    fail_service_execution,
+    schedule_service_execution,
+    start_service_execution,
 )
 
 
@@ -52,11 +59,51 @@ class ServiceExecutionAutoCompletionTests(TestCase):
         service,
         status=ServiceExecution.STATUS_IN_PROGRESS,
     ):
-        return ServiceExecution.objects.create(
+        execution = create_service_execution(
             order=self.order,
             service=service,
-            execution_engine=service.primary_engine,
-            status=status,
+        )
+
+        if status == ServiceExecution.STATUS_PENDING:
+            return execution
+
+        if status == ServiceExecution.STATUS_CANCELED:
+            return cancel_service_execution(
+                service_execution=execution,
+            )
+
+        if status == ServiceExecution.STATUS_FAILED:
+            return fail_service_execution(
+                service_execution=execution,
+            )
+
+        schedule_service_execution(
+            service_execution=execution,
+        )
+
+        if status == ServiceExecution.STATUS_SCHEDULED:
+            return execution
+
+        start_service_execution(
+            service_execution=execution,
+        )
+
+        if status == ServiceExecution.STATUS_IN_PROGRESS:
+            return execution
+
+        if status == ServiceExecution.STATUS_AWAITING_VALIDATION:
+            return await_service_execution_validation(
+                service_execution=execution,
+            )
+
+        if status == ServiceExecution.STATUS_COMPLETED:
+            return complete_service_execution(
+                service_execution=execution,
+            )
+
+        raise ValueError(
+            "Statut de test ServiceExecution non supporté : "
+            f"{status}."
         )
 
     def test_ready_in_progress_execution_is_completed(self):

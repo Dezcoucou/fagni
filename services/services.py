@@ -4,6 +4,126 @@ from django.utils import timezone
 from services.models import ServiceExecution
 
 
+
+SERVICE_SNAPSHOT_REQUIREMENT_FIELDS = (
+    "requires_partner",
+    "requires_logistics",
+    "requires_weighing",
+    "requires_appointment",
+    "requires_quote",
+    "requires_asset",
+    "requires_otp",
+    "requires_signature",
+)
+
+
+def _build_service_execution_snapshot(*, service):
+    """
+    Construit la photographie minimale et durable du Service au moment
+    de la création d'une ServiceExecution.
+
+    Le snapshot ne remplace pas la FK Service :
+    il protège l'historique opérationnel contre les modifications
+    futures du catalogue.
+    """
+    category = service.category
+
+    return {
+        "service_id": service.id,
+        "code": service.code,
+        "name": service.name,
+        "category": (
+            {
+                "id": category.id,
+                "code": category.code,
+                "name": category.name,
+            }
+            if category is not None
+            else None
+        ),
+        "primary_engine": service.primary_engine,
+        "pricing_mode": service.pricing_mode,
+        "default_sla_hours": service.default_sla_hours,
+        "requirements": {
+            field_name: getattr(service, field_name)
+            for field_name in SERVICE_SNAPSHOT_REQUIREMENT_FIELDS
+        },
+    }
+
+
+@transaction.atomic
+def create_service_execution(
+    *,
+    order,
+    service,
+    asset=None,
+    metadata_json=None,
+    notes="",
+):
+    """
+    Porte canonique de création d'une ServiceExecution.
+
+    Garanties :
+    - statut initial pending ;
+    - moteur d'exécution snapshoté depuis Service.primary_engine ;
+    - séquence calculée par commande ;
+    - allocation de séquence sérialisée par verrou sur la commande ;
+    - configuration du Service snapshotée ;
+    - aucun sous-objet métier créé implicitement.
+    """
+    if order.pk is None:
+        raise ValueError(
+            "Une commande persistée est requise pour créer "
+            "une ServiceExecution."
+        )
+
+    if service.pk is None:
+        raise ValueError(
+            "Un Service persisté est requis pour créer "
+            "une ServiceExecution."
+        )
+
+    # Verrou transactionnel sur l'agrégat commercial.
+    # Il sérialise l'allocation des sequence_index pour cette commande.
+    locked_order = (
+        order.__class__.objects
+        .select_for_update()
+        .get(pk=order.pk)
+    )
+
+    last_execution = (
+        ServiceExecution.objects
+        .filter(order=locked_order)
+        .order_by("-sequence_index", "-id")
+        .first()
+    )
+
+    next_sequence_index = (
+        last_execution.sequence_index + 1
+        if last_execution is not None
+        else 1
+    )
+
+    service_execution = ServiceExecution(
+        order=locked_order,
+        service=service,
+        asset=asset,
+        execution_engine=service.primary_engine,
+        status=ServiceExecution.STATUS_PENDING,
+        sequence_index=next_sequence_index,
+        metadata_json=dict(metadata_json or {}),
+        service_snapshot_json=_build_service_execution_snapshot(
+            service=service,
+        ),
+        notes=notes or "",
+    )
+
+    # save() applique notamment l'invariant asset/customer.
+    service_execution.save()
+
+    return service_execution
+
+
 ALLOWED_SERVICE_EXECUTION_TRANSITIONS = {
     ServiceExecution.STATUS_PENDING: {
         ServiceExecution.STATUS_SCHEDULED,

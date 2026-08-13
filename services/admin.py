@@ -199,6 +199,13 @@ class CustomerAssetAdmin(UnfoldModelAdmin):
 
 @admin.register(ServiceExecution)
 class ServiceExecutionAdmin(UnfoldModelAdmin):
+    def has_add_permission(self, request):
+        """
+        Les ServiceExecution doivent être créées exclusivement via
+        services.services.create_service_execution().
+        """
+        return False
+
     list_display = (
         "id",
         "order",

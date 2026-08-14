@@ -253,6 +253,48 @@ def materialize_service_executions_for_order(*, order):
     return tuple(materialized)
 
 
+
+@transaction.atomic
+def finalize_commercial_order(*, order):
+    """
+    Finalise commercialement une Order après matérialisation
+    réussie de toutes ses ServiceExecution canoniques.
+
+    Garanties :
+    - exige une Order persistée ;
+    - verrouille l'Order pendant la finalisation ;
+    - matérialise toutes les exécutions avant de sortir du mode draft ;
+    - conserve l'idempotence de la matérialisation ;
+    - si la résolution ou la matérialisation échoue, is_draft reste inchangé ;
+    - aucune logique d'affectation, paiement ou logistique n'est déclenchée ici.
+    """
+    if order is None or order.pk is None:
+        raise ValueError(
+            "Une commande persistée est requise pour "
+            "la finalisation commerciale."
+        )
+
+    locked_order = (
+        order.__class__.objects
+        .select_for_update()
+        .get(pk=order.pk)
+    )
+
+    executions = materialize_service_executions_for_order(
+        order=locked_order,
+    )
+
+    if getattr(locked_order, "is_draft", False):
+        locked_order.is_draft = False
+        locked_order.save(
+            update_fields=[
+                "is_draft",
+            ]
+        )
+
+    return executions
+
+
 ALLOWED_SERVICE_EXECUTION_TRANSITIONS = {
     ServiceExecution.STATUS_PENDING: {
         ServiceExecution.STATUS_SCHEDULED,

@@ -466,3 +466,257 @@ class OrderMultiserviceExecutionMaterializationTests(TestCase):
             self.order.service_executions.count(),
             0,
         )
+
+
+class OrderCommercialFinalizationTests(TestCase):
+    """
+    Contrat canonique de finalisation commerciale FAGNI.
+
+    Une commande ne doit devenir commercialement confirmée
+    qu'après matérialisation réussie de ses ServiceExecution.
+    """
+
+    def setUp(self):
+        from decimal import Decimal
+        from orders.models import OrderItem
+
+        self.Decimal = Decimal
+        self.OrderItem = OrderItem
+
+        self.category = ServiceCategory.objects.create(
+            code="commercial-finalization-category",
+            name="Commercial Finalization Category",
+            is_active=True,
+        )
+
+        self.customer = Customer.objects.create(
+            name="Client Commercial Finalization",
+            phone="0700009950",
+        )
+
+    def create_service(
+        self,
+        *,
+        code,
+        name,
+        is_active=True,
+    ):
+        return Service.objects.create(
+            code=code,
+            category=self.category,
+            name=name,
+            description="",
+            is_active=is_active,
+            primary_engine=Service.ENGINE_PICKUP_RETURN,
+            requires_partner=False,
+            requires_logistics=False,
+            requires_weighing=False,
+            requires_appointment=False,
+            requires_quote=False,
+            requires_asset=False,
+            requires_otp=False,
+            requires_signature=False,
+            pricing_mode="fixed",
+            default_sla_hours=24,
+        )
+
+    def create_draft_order(self):
+        return Order.objects.create(
+            customer=self.customer,
+            pricing_mode="item",
+            is_draft=True,
+            status="pending",
+        )
+
+    def add_item(
+        self,
+        order,
+        *,
+        designation,
+        service_type,
+    ):
+        return self.OrderItem.objects.create(
+            order=order,
+            designation=designation,
+            quantity=1,
+            unit_price=self.Decimal("1000"),
+            total=self.Decimal("1000"),
+            service_type=service_type,
+        )
+
+    def test_finalization_materializes_services_before_unlocking_order(self):
+        from services.services import finalize_commercial_order
+
+        self.create_service(
+            code="pressing_article",
+            name="Pressing Article",
+        )
+        self.create_service(
+            code="retouche_simple",
+            name="Retouche",
+        )
+
+        order = self.create_draft_order()
+
+        self.add_item(
+            order,
+            designation="Chemise",
+            service_type="pressing",
+        )
+        self.add_item(
+            order,
+            designation="Pantalon retouche",
+            service_type="retouche",
+        )
+
+        executions = finalize_commercial_order(order=order)
+
+        order.refresh_from_db()
+
+        self.assertFalse(order.is_draft)
+
+        self.assertEqual(
+            tuple(
+                execution.service.code
+                for execution in executions
+            ),
+            (
+                "pressing_article",
+                "retouche_simple",
+            ),
+        )
+
+        self.assertEqual(
+            order.service_executions.count(),
+            2,
+        )
+
+    def test_finalization_is_idempotent(self):
+        from services.services import finalize_commercial_order
+
+        self.create_service(
+            code="pressing_article",
+            name="Pressing Article",
+        )
+
+        order = self.create_draft_order()
+
+        self.add_item(
+            order,
+            designation="Chemise",
+            service_type="pressing",
+        )
+
+        first = finalize_commercial_order(order=order)
+        second = finalize_commercial_order(order=order)
+
+        order.refresh_from_db()
+
+        self.assertFalse(order.is_draft)
+
+        self.assertEqual(
+            tuple(execution.id for execution in first),
+            tuple(execution.id for execution in second),
+        )
+
+        self.assertEqual(
+            order.service_executions.count(),
+            1,
+        )
+
+    def test_catalogue_failure_keeps_order_draft_and_creates_nothing(self):
+        from services.resolution import ServiceCatalogResolutionError
+        from services.services import finalize_commercial_order
+
+        self.create_service(
+            code="pressing_article",
+            name="Pressing Article",
+        )
+
+        order = self.create_draft_order()
+
+        self.add_item(
+            order,
+            designation="Chemise",
+            service_type="pressing",
+        )
+        self.add_item(
+            order,
+            designation="Chaussure",
+            service_type="cordonnerie",
+        )
+
+        with self.assertRaises(ServiceCatalogResolutionError):
+            finalize_commercial_order(order=order)
+
+        order.refresh_from_db()
+
+        self.assertTrue(order.is_draft)
+        self.assertEqual(
+            order.service_executions.count(),
+            0,
+        )
+
+    def test_finalization_reuses_existing_execution(self):
+        from services.services import (
+            create_service_execution,
+            finalize_commercial_order,
+        )
+
+        pressing = self.create_service(
+            code="pressing_article",
+            name="Pressing Article",
+        )
+        self.create_service(
+            code="retouche_simple",
+            name="Retouche",
+        )
+
+        order = self.create_draft_order()
+
+        self.add_item(
+            order,
+            designation="Chemise",
+            service_type="pressing",
+        )
+        self.add_item(
+            order,
+            designation="Pantalon retouche",
+            service_type="retouche",
+        )
+
+        existing = create_service_execution(
+            order=order,
+            service=pressing,
+        )
+
+        executions = finalize_commercial_order(order=order)
+
+        self.assertEqual(
+            executions[0].id,
+            existing.id,
+        )
+
+        self.assertEqual(
+            order.service_executions.count(),
+            2,
+        )
+
+    def test_failed_finalization_never_exposes_confirmed_order(self):
+        from services.resolution import ServiceCatalogResolutionError
+        from services.services import finalize_commercial_order
+
+        order = self.create_draft_order()
+
+        self.add_item(
+            order,
+            designation="Article pressing",
+            service_type="pressing",
+        )
+
+        with self.assertRaises(ServiceCatalogResolutionError):
+            finalize_commercial_order(order=order)
+
+        order.refresh_from_db()
+
+        self.assertTrue(order.is_draft)

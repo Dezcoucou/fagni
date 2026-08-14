@@ -58,11 +58,61 @@ def _client_with_phone(phone):
     return c
 
 
-def _confirm(client, order, accepted_cgu="1"):
+def _ensure_canonical_bag_service():
+    from services.models import Service, ServiceCategory
+
+    category, _ = ServiceCategory.objects.get_or_create(
+        code="confirmation-test-catalogue",
+        defaults={
+            "name": "Confirmation Test Catalogue",
+            "is_active": True,
+        },
+    )
+
+    Service.objects.get_or_create(
+        code="pressing_bag",
+        defaults={
+            "category": category,
+            "name": "Pressing Bag",
+            "description": "",
+            "is_active": True,
+            "primary_engine": Service.ENGINE_PICKUP_RETURN,
+            "requires_partner": False,
+            "requires_logistics": False,
+            "requires_weighing": False,
+            "requires_appointment": False,
+            "requires_quote": False,
+            "requires_asset": False,
+            "requires_otp": False,
+            "requires_signature": False,
+            "pricing_mode": "fixed",
+            "default_sla_hours": 24,
+        },
+    )
+
+
+def _confirm(
+    client,
+    order,
+    accepted_cgu="1",
+    *,
+    ensure_catalog=True,
+):
+    if ensure_catalog:
+        _ensure_canonical_bag_service()
+
     data = {"bag_size": "medium"}
+
     if accepted_cgu is not None:
         data["accepted_cgu"] = accepted_cgu
-    return client.post(reverse("orders:client_new_order_step4", args=[order.id]), data=data)
+
+    return client.post(
+        reverse(
+            "orders:client_new_order_step4",
+            args=[order.id],
+        ),
+        data=data,
+    )
 
 
 class ConfirmationCguGuardTests(TestCase):
@@ -285,3 +335,100 @@ class CanceledOrderNeverConfirmedTests(TestCase):
         self.assertEqual(order.status, "canceled", "une commande annulee ne doit jamais etre reactivee par la confirmation")
         self.assertTrue(order.is_draft, "une commande annulee ne doit jamais pouvoir etre confirmee (is_draft doit rester True)")
         self.assertFalse(DeliveryLeg.objects.filter(order=order).exists())
+
+
+class HtmlCommercialFinalizationIntegrationTests(TestCase):
+    def _create_canonical_bag_service(self):
+        from services.models import Service, ServiceCategory
+
+        category, _ = ServiceCategory.objects.get_or_create(
+            code="html-finalization",
+            defaults={
+                "name": "HTML Finalization",
+                "is_active": True,
+            },
+        )
+
+        return Service.objects.create(
+            code="pressing_bag",
+            category=category,
+            name="Pressing Bag",
+            description="",
+            is_active=True,
+            primary_engine=Service.ENGINE_PICKUP_RETURN,
+            requires_partner=False,
+            requires_logistics=False,
+            requires_weighing=False,
+            requires_appointment=False,
+            requires_quote=False,
+            requires_asset=False,
+            requires_otp=False,
+            requires_signature=False,
+            pricing_mode="fixed",
+            default_sla_hours=24,
+        )
+
+    def test_html_confirmation_materializes_before_leaving_draft(self):
+        customer = _make_customer("0700100020")
+        order = _make_draft_order(customer)
+        client = _client_with_phone("0700100020")
+
+        self._create_canonical_bag_service()
+
+        _confirm(client, order)
+
+        order.refresh_from_db()
+
+        self.assertFalse(order.is_draft)
+        self.assertEqual(
+            order.service_executions.count(),
+            1,
+        )
+        self.assertEqual(
+            order.service_executions.first().service.code,
+            "pressing_bag",
+        )
+
+    def test_html_confirmation_catalogue_failure_keeps_order_draft(self):
+        customer = _make_customer("0700100021")
+        order = _make_draft_order(customer)
+        client = _client_with_phone("0700100021")
+
+        _confirm(
+            client,
+            order,
+            ensure_catalog=False,
+        )
+
+        order.refresh_from_db()
+
+        self.assertTrue(
+            order.is_draft,
+            "la confirmation HTML ne doit jamais sortir du draft "
+            "si la matérialisation canonique échoue",
+        )
+
+        self.assertEqual(
+            order.service_executions.count(),
+            0,
+        )
+
+    def test_html_confirmation_uses_canonical_finalizer(self):
+        customer = _make_customer("0700100022")
+        order = _make_draft_order(customer)
+        client = _client_with_phone("0700100022")
+
+        self._create_canonical_bag_service()
+
+        with patch(
+            "services.services.finalize_commercial_order"
+        ) as mocked_finalize:
+            mocked_finalize.return_value = ()
+
+            _confirm(client, order)
+
+        self.assertTrue(
+            mocked_finalize.called,
+            "client_new_order_step4 doit déléguer la finalisation "
+            "à services.services.finalize_commercial_order",
+        )

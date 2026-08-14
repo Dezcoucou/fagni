@@ -13910,19 +13910,48 @@ def client_new_order_step4(request, order_id: int):
                     logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13461")
                 return redirect('orders:client_new_order_step3', order_id=order.id)
 
+        # Finalisation commerciale canonique :
+        # les ServiceExecution doivent exister AVANT que la commande
+        # puisse sortir du mode draft.
+        try:
+            from services.resolution import ServiceCatalogResolutionError
+            from services.services import finalize_commercial_order
+
+            finalize_commercial_order(order=order)
+            order.refresh_from_db()
+        except ServiceCatalogResolutionError as exc:
+            from django.contrib import messages
+
+            logger.warning(
+                "Finalisation commerciale refusee : catalogue V2 incomplet | "
+                "order_id=%s | error=%s",
+                getattr(order, "id", None),
+                exc,
+            )
+            messages.error(
+                request,
+                "Cette commande ne peut pas encore être confirmée : "
+                "le service sélectionné n'est pas disponible.",
+            )
+            return redirect(
+                "orders:client_new_order_step3",
+                order_id=order.id,
+            )
+
+        # Les ressources logistiques ne sont créées qu'après
+        # finalisation commerciale réussie.
         from orders.models import DeliveryLeg
 
-        DeliveryLeg.objects.get_or_create(order=order, leg_type="pickup", defaults={"status":"pending"})
-        DeliveryLeg.objects.get_or_create(order=order, leg_type="return", defaults={"status":"pending"})
-
-        if hasattr(order, "is_draft"):
-            order.is_draft = False
-
-        try:
-            order.save()
-        except Exception:
-            import logging
-            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=13475")
+        DeliveryLeg.objects.get_or_create(
+            order=order,
+            leg_type="pickup",
+            defaults={"status": "pending"},
+        )
+        DeliveryLeg.objects.get_or_create(
+            order=order,
+            leg_type="return",
+            defaults={"status": "pending"},
+        )
 
         try:
             order.update_financials(save=True)

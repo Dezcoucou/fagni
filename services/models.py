@@ -50,6 +50,7 @@ class Service(TimeStampedModel):
     PRICING_MODE_CHOICES = [
         ("per_item", "Par article"),
         ("per_kg", "Par kilo"),
+        ("bag", "Par sac"),
         ("fixed", "Forfait"),
         ("quote_required", "Devis requis"),
         ("hybrid", "Hybride"),

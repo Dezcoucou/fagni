@@ -60,6 +60,25 @@ class Command(BaseCommand):
         # =========================
         services = [
             {
+                "code": "pressing_bag",
+                "category": "pressing",
+                "name": "Pressing par sac",
+                "description": (
+                    "Traitement du linge selon une formule de sac FAGNI."
+                ),
+                "primary_engine": "pickup_return",
+                "requires_partner": True,
+                "requires_logistics": True,
+                "requires_weighing": False,
+                "requires_appointment": False,
+                "requires_quote": False,
+                "requires_asset": False,
+                "requires_otp": False,
+                "requires_signature": False,
+                "pricing_mode": "bag",
+                "default_sla_hours": 48,
+            },
+            {
                 "code": "pressing_article",
                 "category": "pressing",
                 "name": "Pressing par article",
@@ -136,9 +155,33 @@ class Command(BaseCommand):
                     "name": data["name"],
                     "description": data["description"],
                     "is_active": True,
+                    "primary_engine": data.get(
+                        "primary_engine",
+                        Service.ENGINE_PICKUP_RETURN,
+                    ),
                     "requires_partner": data["requires_partner"],
                     "requires_logistics": data["requires_logistics"],
                     "requires_weighing": data["requires_weighing"],
+                    "requires_appointment": data.get(
+                        "requires_appointment",
+                        False,
+                    ),
+                    "requires_quote": data.get(
+                        "requires_quote",
+                        False,
+                    ),
+                    "requires_asset": data.get(
+                        "requires_asset",
+                        False,
+                    ),
+                    "requires_otp": data.get(
+                        "requires_otp",
+                        False,
+                    ),
+                    "requires_signature": data.get(
+                        "requires_signature",
+                        False,
+                    ),
                     "pricing_mode": data["pricing_mode"],
                     "default_sla_hours": data["default_sla_hours"],
                 },

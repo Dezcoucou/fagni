@@ -66,20 +66,27 @@ def _load_order_items(order):
             return list(manager)
 
 
-def _resolve_service_code_for_item(item):
+def resolve_v2_service_code_for_order_item(item) -> str | None:
     """
-    Résout UNE ligne OrderItem vers un code Service V2.
+    Résout UNE ligne OrderItem vers son code Service V2 canonique.
 
     Priorité locale :
     1. catégorie legacy connue liée à cette ligne ;
     2. sinon ré-inférence canonique de cette ligne.
 
-    Cette priorité ligne par ligne évite deux erreurs :
-    - une catégorie legacy fiable ne doit pas être contredite par
-      une désignation générique de la même ligne ;
-    - une catégorie legacy présente sur une ligne ne doit pas masquer
-      un service différent détecté sur une autre ligne non liée.
+    Cette fonction ne tient volontairement pas compte du pricing_mode
+    de la commande :
+    - elle décrit la famille métier propre de la ligne ;
+    - le cas particulier d'une commande "bag" reste gouverné au niveau
+      de resolve_v2_service_codes_for_order() et de la matérialisation.
+
+    Aucun accès au catalogue services.Service n'est effectué ici.
     """
+    if item is None:
+        raise ServiceResolutionError(
+            "Une ligne OrderItem est requise pour résoudre le service V2."
+        )
+
     service = getattr(item, "service", None)
     category = (
         getattr(service, "category", None)
@@ -109,6 +116,16 @@ def _resolve_service_code_for_item(item):
     )
 
 
+def _resolve_service_code_for_item(item):
+    """
+    Alias interne conservé temporairement pour compatibilité.
+
+    Toute nouvelle logique doit utiliser
+    resolve_v2_service_code_for_order_item().
+    """
+    return resolve_v2_service_code_for_order_item(item)
+
+
 def _resolve_codes_from_items(items):
     """
     Agrège les familles métier détectées dans les lignes d'une commande.
@@ -122,7 +139,7 @@ def _resolve_codes_from_items(items):
     seen_codes = set()
 
     for item in items:
-        code = _resolve_service_code_for_item(item)
+        code = resolve_v2_service_code_for_order_item(item)
 
         if code and code not in seen_codes:
             seen_codes.add(code)

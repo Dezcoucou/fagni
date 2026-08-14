@@ -720,3 +720,320 @@ class OrderCommercialFinalizationTests(TestCase):
         order.refresh_from_db()
 
         self.assertTrue(order.is_draft)
+
+
+class OrderItemExecutionLinkMaterializationTests(TestCase):
+    """
+    Contrat de matérialisation du bridge pendant la création
+    des ServiceExecution d'une commande.
+    """
+
+    def setUp(self):
+        from decimal import Decimal
+
+        from orders.models import OrderItem
+
+        self.Decimal = Decimal
+        self.OrderItem = OrderItem
+
+        self.category = ServiceCategory.objects.create(
+            code="link-materialization-category",
+            name="Link Materialization Category",
+            is_active=True,
+        )
+
+        self.customer = Customer.objects.create(
+            name="Client Link Materialization",
+            phone="0700009970",
+        )
+
+        self.order = Order.objects.create(
+            customer=self.customer,
+            pricing_mode="item",
+        )
+
+        self.services = {}
+
+        for code, name in (
+            ("pressing_article", "Pressing article"),
+            ("retouche_simple", "Retouche simple"),
+            ("cordonnerie_standard", "Cordonnerie standard"),
+        ):
+            self.services[code] = Service.objects.create(
+                code=code,
+                category=self.category,
+                name=name,
+                description="",
+                is_active=True,
+                primary_engine=Service.ENGINE_PICKUP_RETURN,
+                requires_partner=False,
+                requires_logistics=False,
+                requires_weighing=False,
+                requires_appointment=False,
+                requires_quote=False,
+                requires_asset=False,
+                requires_otp=False,
+                requires_signature=False,
+                pricing_mode="fixed",
+                default_sla_hours=24,
+            )
+
+    def add_item(self, designation):
+        return self.OrderItem.objects.create(
+            order=self.order,
+            designation=designation,
+            quantity=1,
+            unit_price=self.Decimal("1000"),
+        )
+
+    def test_each_item_is_linked_to_matching_execution(self):
+        from services.services import (
+            materialize_service_executions_for_order,
+        )
+
+        pressing_item = self.add_item("Chemise")
+        retouche_item = self.add_item("Ourlet pantalon")
+        cordonnerie_item = self.add_item("Réparation talon")
+
+        executions = materialize_service_executions_for_order(
+            order=self.order,
+        )
+
+        executions_by_code = {
+            execution.service.code: execution
+            for execution in executions
+        }
+
+        pressing_item.refresh_from_db()
+        retouche_item.refresh_from_db()
+        cordonnerie_item.refresh_from_db()
+
+        self.assertEqual(
+            pressing_item.service_execution_link.service_execution_id,
+            executions_by_code["pressing_article"].id,
+        )
+
+        self.assertEqual(
+            retouche_item.service_execution_link.service_execution_id,
+            executions_by_code["retouche_simple"].id,
+        )
+
+        self.assertEqual(
+            cordonnerie_item.service_execution_link.service_execution_id,
+            executions_by_code["cordonnerie_standard"].id,
+        )
+
+    def test_multiple_same_family_items_share_same_execution(self):
+        from services.services import (
+            materialize_service_executions_for_order,
+        )
+
+        chemise = self.add_item("Chemise")
+        pantalon = self.add_item("Pantalon")
+
+        executions = materialize_service_executions_for_order(
+            order=self.order,
+        )
+
+        self.assertEqual(len(executions), 1)
+
+        chemise.refresh_from_db()
+        pantalon.refresh_from_db()
+
+        self.assertEqual(
+            chemise.service_execution_link.service_execution_id,
+            executions[0].id,
+        )
+
+        self.assertEqual(
+            pantalon.service_execution_link.service_execution_id,
+            executions[0].id,
+        )
+
+        self.assertEqual(
+            executions[0].item_links.count(),
+            2,
+        )
+
+    def test_link_materialization_is_idempotent(self):
+        from services.models import ServiceExecutionItem
+        from services.services import (
+            materialize_service_executions_for_order,
+        )
+
+        self.add_item("Chemise")
+        self.add_item("Ourlet pantalon")
+
+        first = materialize_service_executions_for_order(
+            order=self.order,
+        )
+
+        first_links = tuple(
+            ServiceExecutionItem.objects
+            .filter(service_execution__order=self.order)
+            .order_by("order_item_id")
+            .values_list(
+                "id",
+                "order_item_id",
+                "service_execution_id",
+            )
+        )
+
+        second = materialize_service_executions_for_order(
+            order=self.order,
+        )
+
+        second_links = tuple(
+            ServiceExecutionItem.objects
+            .filter(service_execution__order=self.order)
+            .order_by("order_item_id")
+            .values_list(
+                "id",
+                "order_item_id",
+                "service_execution_id",
+            )
+        )
+
+        self.assertEqual(
+            tuple(execution.id for execution in first),
+            tuple(execution.id for execution in second),
+        )
+
+        self.assertEqual(first_links, second_links)
+        self.assertEqual(len(second_links), 2)
+
+    def test_existing_correct_link_is_reused(self):
+        from services.models import ServiceExecutionItem
+        from services.services import (
+            create_service_execution,
+            materialize_service_executions_for_order,
+        )
+
+        item = self.add_item("Chemise")
+
+        execution = create_service_execution(
+            order=self.order,
+            service=self.services["pressing_article"],
+        )
+
+        existing_link = ServiceExecutionItem.objects.create(
+            service_execution=execution,
+            order_item=item,
+        )
+
+        executions = materialize_service_executions_for_order(
+            order=self.order,
+        )
+
+        persisted_link = ServiceExecutionItem.objects.get(
+            order_item=item,
+        )
+
+        self.assertEqual(executions[0].id, execution.id)
+        self.assertEqual(persisted_link.id, existing_link.id)
+        self.assertEqual(
+            persisted_link.service_execution_id,
+            execution.id,
+        )
+
+    def test_existing_wrong_link_is_rejected_not_moved(self):
+        from services.models import ServiceExecutionItem
+        from services.services import (
+            create_service_execution,
+            materialize_service_executions_for_order,
+        )
+
+        item = self.add_item("Chemise")
+
+        wrong_execution = create_service_execution(
+            order=self.order,
+            service=self.services["retouche_simple"],
+        )
+
+        existing_link = ServiceExecutionItem.objects.create(
+            service_execution=wrong_execution,
+            order_item=item,
+        )
+
+        with self.assertRaises(ValueError):
+            materialize_service_executions_for_order(
+                order=self.order,
+            )
+
+        persisted_link = ServiceExecutionItem.objects.get(
+            order_item=item,
+        )
+
+        self.assertEqual(
+            persisted_link.id,
+            existing_link.id,
+        )
+
+        self.assertEqual(
+            persisted_link.service_execution_id,
+            wrong_execution.id,
+        )
+
+    def test_bag_order_links_all_items_to_pressing_bag_execution(self):
+        from services.services import (
+            materialize_service_executions_for_order,
+        )
+
+        pressing_bag = Service.objects.create(
+            code="pressing_bag",
+            category=self.category,
+            name="Pressing bag",
+            description="",
+            is_active=True,
+            primary_engine=Service.ENGINE_PICKUP_RETURN,
+            requires_partner=False,
+            requires_logistics=False,
+            requires_weighing=False,
+            requires_appointment=False,
+            requires_quote=False,
+            requires_asset=False,
+            requires_otp=False,
+            requires_signature=False,
+            pricing_mode="bag",
+            default_sla_hours=24,
+        )
+
+        self.order.pricing_mode = "bag"
+        self.order.bag_size = "small"
+        self.order.save(
+            update_fields=[
+                "pricing_mode",
+                "bag_size",
+            ]
+        )
+
+        chemise = self.add_item("Chemise")
+        ourlet = self.add_item("Ourlet pantalon")
+        talon = self.add_item("Réparation talon")
+
+        executions = materialize_service_executions_for_order(
+            order=self.order,
+        )
+
+        self.assertEqual(len(executions), 1)
+        self.assertEqual(
+            executions[0].service_id,
+            pressing_bag.id,
+        )
+
+        for item in (
+            chemise,
+            ourlet,
+            talon,
+        ):
+            item.refresh_from_db()
+
+            self.assertEqual(
+                item.service_execution_link.service_execution_id,
+                executions[0].id,
+            )
+
+        self.assertEqual(
+            executions[0].item_links.count(),
+            3,
+        )

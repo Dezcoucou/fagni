@@ -1,7 +1,10 @@
 from django.db import transaction
 from django.utils import timezone
 
-from services.models import ServiceExecution
+from services.models import (
+    ServiceExecution,
+    ServiceExecutionItem,
+)
 
 
 
@@ -249,6 +252,85 @@ def materialize_service_executions_for_order(*, order):
             existing_by_service_id[service.id] = execution
 
         materialized.append(execution)
+
+    # ---------------------------------------------------------
+    # MATERIALISATION DU BRIDGE ORDERITEM -> SERVICEEXECUTION
+    # ---------------------------------------------------------
+    #
+    # Une ligne commerciale doit être rattachée exactement à
+    # l'exécution qui porte sa famille métier.
+    #
+    # Important :
+    # - aucun déplacement silencieux d'un lien existant ;
+    # - bag rattache volontairement toutes les lignes à pressing_bag ;
+    # - item utilise le resolver canonique ligne par ligne.
+    from services.resolution import (
+        SERVICE_CODE_PRESSING_BAG,
+        resolve_v2_service_code_for_order_item,
+    )
+
+    executions_by_service_code = {
+        execution.service.code: execution
+        for execution in materialized
+    }
+
+    pricing_mode = str(
+        getattr(locked_order, "pricing_mode", None) or "bag"
+    ).strip().lower()
+
+    order_items = list(
+        locked_order.items
+        .select_related("service__category")
+        .all()
+    )
+
+    for order_item in order_items:
+        if pricing_mode == "bag":
+            service_code = SERVICE_CODE_PRESSING_BAG
+        else:
+            service_code = resolve_v2_service_code_for_order_item(
+                order_item
+            )
+
+            if not service_code:
+                raise ValueError(
+                    "Impossible de résoudre le Service V2 de "
+                    f"OrderItem #{order_item.pk}."
+                )
+
+        execution = executions_by_service_code.get(service_code)
+
+        if execution is None:
+            raise ValueError(
+                "Aucune ServiceExecution matérialisée pour "
+                f"OrderItem #{order_item.pk} et le code "
+                f"{service_code!r}."
+            )
+
+        existing_link = (
+            ServiceExecutionItem.objects
+            .filter(order_item=order_item)
+            .select_related(
+                "service_execution__service",
+            )
+            .first()
+        )
+
+        if existing_link is None:
+            ServiceExecutionItem.objects.create(
+                service_execution=execution,
+                order_item=order_item,
+            )
+            continue
+
+        if existing_link.service_execution_id != execution.id:
+            raise ValueError(
+                "OrderItem déjà rattaché à une autre "
+                "ServiceExecution : "
+                f"OrderItem #{order_item.pk}, "
+                f"execution actuelle #{existing_link.service_execution_id}, "
+                f"execution attendue #{execution.id}."
+            )
 
     return tuple(materialized)
 

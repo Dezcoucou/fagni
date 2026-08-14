@@ -2,7 +2,7 @@
 Tests de l'endpoint essai Routine - FAGNI V1 (Lot 3, 27 juillet 2026).
 """
 from decimal import Decimal
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from orders.models import Customer, Order, AbonnementPricingRule
 from orders.presenters import build_order_finance_summary
@@ -126,3 +126,260 @@ class ApiRoutineEssaiTests(TestCase):
 
         self.assertIn("Pricing v3.0", bloc_api_create_order)
         self.assertIn("GlobalPricingSettings", bloc_api_create_order)
+
+
+class ApiCommercialFinalizationContractTests(TestCase):
+    """
+    Contrat commercial canonique du flux API client.
+
+    Une commande créée via api_create_order ne doit jamais être exposée
+    comme commercialement confirmée sans être passée par le finalizer
+    canonique et sans ServiceExecution matérialisée.
+    """
+
+    def test_api_create_order_declares_explicitly_draft_state(self):
+        from pathlib import Path
+
+        source = Path("orders/client_api.py").read_text()
+
+        start = source.index("def api_create_order")
+        end = source.index("\ndef ", start + 1)
+
+        block = source[start:end]
+
+        self.assertIn(
+            "'is_draft':",
+            block,
+            "api_create_order doit déclarer explicitement l'état commercial "
+            "initial de la commande",
+        )
+
+        self.assertRegex(
+            block,
+            r"[\"']is_draft[\"']\s*:\s*True",
+            "une commande API client doit naître en brouillon avant "
+            "matérialisation canonique",
+        )
+
+    def test_api_create_order_uses_canonical_commercial_finalizer(self):
+        from pathlib import Path
+
+        source = Path("orders/client_api.py").read_text()
+
+        start = source.index("def api_create_order")
+        end = source.index("\ndef ", start + 1)
+
+        block = source[start:end]
+
+        self.assertIn(
+            "finalize_commercial_order",
+            block,
+            "api_create_order doit passer par le finalizer commercial canonique",
+        )
+
+    def test_api_create_order_never_directly_sets_is_draft_false(self):
+        from pathlib import Path
+
+        source = Path("orders/client_api.py").read_text()
+
+        start = source.index("def api_create_order")
+        end = source.index("\ndef ", start + 1)
+
+        block = source[start:end]
+
+        self.assertNotIn(
+            "is_draft = False",
+            block,
+        )
+
+        self.assertNotIn(
+            "'is_draft': False",
+            block,
+        )
+
+
+class ApiCommercialPaymentAssignmentE2ETests(TestCase):
+    """
+    Contrat E2E canonique :
+
+    API création
+    -> finalisation commerciale
+    -> ServiceExecution matérialisée
+    -> paiement canonique
+    -> hook post-paiement
+    -> affectation pressing + livreur.
+    """
+
+    def setUp(self):
+        from decimal import Decimal
+
+        from orders.models import Customer
+        from partners.models import DeliveryPartner, LaundryPartner
+        from services.models import Service, ServiceCategory
+
+        self.Decimal = Decimal
+
+        self.customer = Customer.objects.create(
+            name="Client E2E Commercial",
+            phone="0700100999",
+            address="Riviera 3",
+            latitude=Decimal("5.350000"),
+            longitude=Decimal("-3.980000"),
+        )
+
+        category, _ = ServiceCategory.objects.get_or_create(
+            code="api-e2e-commercial",
+            defaults={
+                "name": "API E2E Commercial",
+                "is_active": True,
+            },
+        )
+
+        Service.objects.get_or_create(
+            code="pressing_article",
+            defaults={
+                "category": category,
+                "name": "Pressing Article",
+                "description": "",
+                "is_active": True,
+                "primary_engine": Service.ENGINE_PICKUP_RETURN,
+                "requires_partner": False,
+                "requires_logistics": False,
+                "requires_weighing": False,
+                "requires_appointment": False,
+                "requires_quote": False,
+                "requires_asset": False,
+                "requires_otp": False,
+                "requires_signature": False,
+                "pricing_mode": "fixed",
+                "default_sla_hours": 24,
+            },
+        )
+
+        self.laundry = LaundryPartner.objects.create(
+            name="Pressing E2E",
+            phone="0700100888",
+            is_active=True,
+            latitude=Decimal("5.351000"),
+            longitude=Decimal("-3.981000"),
+        )
+
+        self.driver = DeliveryPartner.objects.create(
+            name="Livreur E2E",
+            phone="0700100777",
+            email="livreur-e2e@example.com",
+            is_active=True,
+            latitude=Decimal("5.352000"),
+            longitude=Decimal("-3.982000"),
+        )
+
+    @override_settings(AUTO_ASSIGN_ON_CLIENT_ORDER=True)
+    def test_api_creation_payment_and_assignment_full_chain(self):
+        from unittest.mock import patch
+
+        from orders.models import DeliveryLeg, Order, Payment
+        from orders.views import apply_order_payment
+        from services.models import ServiceExecution
+
+        order = Order.objects.create(
+            customer=self.customer,
+            status="pending",
+            pricing_mode="item",
+            is_draft=True,
+            total_client_ttc=self.Decimal("10000"),
+            total=self.Decimal("10000"),
+            amount_paid=self.Decimal("0"),
+            pickup_lat=self.Decimal("5.350000"),
+            pickup_lng=self.Decimal("-3.980000"),
+            delivery_lat=self.Decimal("5.350000"),
+            delivery_lng=self.Decimal("-3.980000"),
+        )
+
+        from orders.models import OrderItem
+
+        OrderItem.objects.create(
+            order=order,
+            designation="Chemise",
+            quantity=1,
+            unit_price=self.Decimal("10000"),
+            total=self.Decimal("10000"),
+            service_type="pressing",
+        )
+
+        from services.services import finalize_commercial_order
+
+        executions = finalize_commercial_order(order=order)
+
+        order.refresh_from_db()
+
+        self.assertFalse(order.is_draft)
+        self.assertEqual(len(executions), 1)
+        self.assertEqual(
+            ServiceExecution.objects.filter(order=order).count(),
+            1,
+        )
+        self.assertEqual(
+            order.service_executions.first().service.code,
+            "pressing_article",
+        )
+
+        with patch(
+            "orders.assignment.pick_best_laundry",
+            return_value=(self.laundry, "e2e"),
+        ), patch(
+            "orders.assignment.pick_best_driver",
+            return_value=(self.driver, "e2e"),
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                payment_result = apply_order_payment(
+                    order,
+                    self.Decimal("10000"),
+                    channel="manual",
+                    reference="E2E-COMMERCIAL-PAID-001",
+                    note="E2E commercial payment",
+                )
+
+        order.refresh_from_db()
+
+        self.assertTrue(payment_result["became_paid"])
+        self.assertEqual(order.payment_status, "paid")
+        self.assertEqual(order.amount_paid, self.Decimal("10000"))
+
+        self.assertEqual(
+            Payment.objects.filter(
+                order=order,
+                reference="E2E-COMMERCIAL-PAID-001",
+            ).count(),
+            1,
+        )
+
+        self.assertEqual(
+            order.laundry_partner_id,
+            self.laundry.id,
+        )
+
+        self.assertEqual(
+            order.pickup_driver_id,
+            self.driver.id,
+        )
+
+        pickup_leg = DeliveryLeg.objects.get(
+            order=order,
+            leg_type="pickup",
+        )
+
+        self.assertEqual(
+            pickup_leg.driver_id,
+            self.driver.id,
+        )
+
+        self.assertIn(
+            pickup_leg.status,
+            ("assigned", "in_progress"),
+        )
+
+        self.assertEqual(
+            order.service_executions.count(),
+            1,
+            "le paiement ne doit jamais recréer les ServiceExecution",
+        )

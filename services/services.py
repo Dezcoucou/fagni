@@ -175,6 +175,84 @@ def create_service_execution(
     return service_execution
 
 
+
+@transaction.atomic
+def materialize_service_executions_for_order(*, order):
+    """
+    Matérialise les ServiceExecution canoniques correspondant aux
+    familles métier résolues pour une Order.
+
+    Garanties :
+    - résolution complète du catalogue avant toute création ;
+    - une ServiceExecution maximum créée par Service résolu ;
+    - réutilisation des exécutions déjà existantes ;
+    - ordre du resolver multiservice conservé ;
+    - idempotence sous verrou transactionnel sur l'Order ;
+    - création exclusivement via create_service_execution().
+    """
+    if order is None or order.pk is None:
+        raise ValueError(
+            "Une commande persistée est requise pour matérialiser "
+            "ses ServiceExecution."
+        )
+
+    from services.resolution import resolve_v2_services_for_order
+
+    # Résoudre d'abord TOUS les Services.
+    #
+    # Si le catalogue est incomplet ou contient un Service inactif,
+    # resolve_v2_services_for_order() échoue avant toute matérialisation.
+    resolved_services = resolve_v2_services_for_order(order)
+
+    locked_order = (
+        order.__class__.objects
+        .select_for_update()
+        .get(pk=order.pk)
+    )
+
+    resolved_service_ids = tuple(
+        service.id
+        for service in resolved_services
+    )
+
+    existing_executions = (
+        ServiceExecution.objects
+        .filter(
+            order=locked_order,
+            service_id__in=resolved_service_ids,
+        )
+        .order_by(
+            "sequence_index",
+            "id",
+        )
+    )
+
+    existing_by_service_id = {}
+
+    for execution in existing_executions:
+        existing_by_service_id.setdefault(
+            execution.service_id,
+            execution,
+        )
+
+    materialized = []
+
+    for service in resolved_services:
+        execution = existing_by_service_id.get(service.id)
+
+        if execution is None:
+            execution = create_service_execution(
+                order=locked_order,
+                service=service,
+            )
+
+            existing_by_service_id[service.id] = execution
+
+        materialized.append(execution)
+
+    return tuple(materialized)
+
+
 ALLOWED_SERVICE_EXECUTION_TRANSITIONS = {
     ServiceExecution.STATUS_PENDING: {
         ServiceExecution.STATUS_SCHEDULED,

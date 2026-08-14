@@ -235,3 +235,234 @@ class ServiceExecutionCreationTests(TestCase):
             execution.status,
             ServiceExecution.STATUS_PENDING,
         )
+
+
+class OrderMultiserviceExecutionMaterializationTests(TestCase):
+    def setUp(self):
+        from decimal import Decimal
+        from orders.models import OrderItem
+
+        self.Decimal = Decimal
+        self.OrderItem = OrderItem
+
+        self.category = ServiceCategory.objects.create(
+            code="materialization-category",
+            name="Materialization Category",
+            is_active=True,
+        )
+
+        self.customer = Customer.objects.create(
+            name="Client Materialization",
+            phone="0700009940",
+        )
+
+        self.order = Order.objects.create(
+            customer=self.customer,
+            pricing_mode="item",
+        )
+
+        self.services = {}
+
+        for code, name in (
+            ("pressing_article", "Pressing article"),
+            ("retouche_simple", "Retouche simple"),
+            ("cordonnerie_standard", "Cordonnerie standard"),
+        ):
+            self.services[code] = Service.objects.create(
+                code=code,
+                category=self.category,
+                name=name,
+                description="",
+                is_active=True,
+                primary_engine=Service.ENGINE_PICKUP_RETURN,
+                requires_partner=False,
+                requires_logistics=False,
+                requires_weighing=False,
+                requires_appointment=False,
+                requires_quote=False,
+                requires_asset=False,
+                requires_otp=False,
+                requires_signature=False,
+                pricing_mode="fixed",
+                default_sla_hours=24,
+            )
+
+    def add_item(self, designation):
+        return self.OrderItem.objects.create(
+            order=self.order,
+            designation=designation,
+            quantity=1,
+            unit_price=self.Decimal("1000"),
+        )
+
+    def test_materializes_one_execution_per_resolved_service(self):
+        from services.services import (
+            materialize_service_executions_for_order,
+        )
+
+        self.add_item("Chemise")
+        self.add_item("Ourlet pantalon")
+        self.add_item("Réparation talon")
+
+        executions = materialize_service_executions_for_order(
+            order=self.order,
+        )
+
+        self.assertEqual(
+            tuple(execution.service.code for execution in executions),
+            (
+                "pressing_article",
+                "retouche_simple",
+                "cordonnerie_standard",
+            ),
+        )
+
+        self.assertEqual(
+            tuple(execution.sequence_index for execution in executions),
+            (1, 2, 3),
+        )
+
+    def test_materialization_is_idempotent(self):
+        from services.services import (
+            materialize_service_executions_for_order,
+        )
+
+        self.add_item("Chemise")
+        self.add_item("Ourlet pantalon")
+
+        first = materialize_service_executions_for_order(
+            order=self.order,
+        )
+
+        second = materialize_service_executions_for_order(
+            order=self.order,
+        )
+
+        self.assertEqual(
+            tuple(execution.id for execution in first),
+            tuple(execution.id for execution in second),
+        )
+
+        self.assertEqual(
+            self.order.service_executions.count(),
+            2,
+        )
+
+    def test_existing_execution_is_reused_and_missing_one_created(self):
+        from services.services import (
+            create_service_execution,
+            materialize_service_executions_for_order,
+        )
+
+        self.add_item("Chemise")
+        self.add_item("Ourlet pantalon")
+
+        existing = create_service_execution(
+            order=self.order,
+            service=self.services["pressing_article"],
+        )
+
+        executions = materialize_service_executions_for_order(
+            order=self.order,
+        )
+
+        self.assertEqual(executions[0].id, existing.id)
+
+        self.assertEqual(
+            tuple(execution.service.code for execution in executions),
+            (
+                "pressing_article",
+                "retouche_simple",
+            ),
+        )
+
+        self.assertEqual(
+            self.order.service_executions.count(),
+            2,
+        )
+
+    def test_single_family_creates_single_execution(self):
+        from services.services import (
+            materialize_service_executions_for_order,
+        )
+
+        self.add_item("Chemise")
+        self.add_item("Pantalon")
+
+        executions = materialize_service_executions_for_order(
+            order=self.order,
+        )
+
+        self.assertEqual(len(executions), 1)
+
+        self.assertEqual(
+            executions[0].service.code,
+            "pressing_article",
+        )
+
+    def test_bag_order_materializes_only_pressing_bag(self):
+        from services.services import (
+            materialize_service_executions_for_order,
+        )
+
+        pressing_bag = Service.objects.create(
+            code="pressing_bag",
+            category=self.category,
+            name="Pressing bag",
+            description="",
+            is_active=True,
+            primary_engine=Service.ENGINE_PICKUP_RETURN,
+            requires_partner=False,
+            requires_logistics=False,
+            requires_weighing=False,
+            requires_appointment=False,
+            requires_quote=False,
+            requires_asset=False,
+            requires_otp=False,
+            requires_signature=False,
+            pricing_mode="fixed",
+            default_sla_hours=24,
+        )
+
+        self.order.pricing_mode = "bag"
+        self.order.bag_size = "small"
+        self.order.save(
+            update_fields=[
+                "pricing_mode",
+                "bag_size",
+            ]
+        )
+
+        self.add_item("Chemise")
+        self.add_item("Ourlet pantalon")
+
+        executions = materialize_service_executions_for_order(
+            order=self.order,
+        )
+
+        self.assertEqual(len(executions), 1)
+        self.assertEqual(
+            executions[0].service_id,
+            pressing_bag.id,
+        )
+
+    def test_missing_catalogue_service_creates_nothing(self):
+        from services.resolution import ServiceCatalogResolutionError
+        from services.services import (
+            materialize_service_executions_for_order,
+        )
+
+        self.add_item("Chemise")
+        self.add_item("Ourlet pantalon")
+
+        self.services["retouche_simple"].delete()
+
+        with self.assertRaises(ServiceCatalogResolutionError):
+            materialize_service_executions_for_order(
+                order=self.order,
+            )
+
+        self.assertEqual(
+            self.order.service_executions.count(),
+            0,
+        )

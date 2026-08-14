@@ -515,3 +515,422 @@ class V2ServiceCatalogueResolutionTests(TestCase):
             ServiceCatalogResolutionError
         ):
             resolve_v2_service_for_order(order)
+
+
+class OrderToV2MultiserviceResolutionContractTests(TestCase):
+    """
+    Contrat cible FAGNI multiservice.
+
+    Une Order constitue l'enveloppe commerciale.
+    Chaque famille métier canonique détectée dans ses OrderItem doit
+    pouvoir devenir une ServiceExecution indépendante.
+
+    Ce lot ne matérialise encore aucune ServiceExecution.
+    Il verrouille uniquement le contrat de résolution plurielle.
+    """
+
+    def setUp(self):
+        self.customer = Customer.objects.create(
+            name="Client Multiservice Resolution",
+            phone="0700009920",
+        )
+
+    def make_order(
+        self,
+        *,
+        pricing_mode="item",
+        bag_size=None,
+    ):
+        return Order.objects.create(
+            customer=self.customer,
+            pricing_mode=pricing_mode,
+            bag_size=bag_size,
+        )
+
+    def add_item(
+        self,
+        order,
+        *,
+        designation,
+    ):
+        return OrderItem.objects.create(
+            order=order,
+            designation=designation,
+            quantity=1,
+            unit_price=Decimal("1000"),
+        )
+
+    def test_single_pressing_family_returns_one_code(self):
+        from services.resolution import (
+            resolve_v2_service_codes_for_order,
+        )
+
+        order = self.make_order()
+
+        self.add_item(
+            order,
+            designation="Chemise",
+        )
+        self.add_item(
+            order,
+            designation="Pantalon",
+        )
+
+        self.assertEqual(
+            resolve_v2_service_codes_for_order(order),
+            ("pressing_article",),
+        )
+
+    def test_pressing_and_retouche_return_two_codes(self):
+        from services.resolution import (
+            resolve_v2_service_codes_for_order,
+        )
+
+        order = self.make_order()
+
+        self.add_item(
+            order,
+            designation="Chemise",
+        )
+        self.add_item(
+            order,
+            designation="Ourlet pantalon",
+        )
+
+        self.assertEqual(
+            resolve_v2_service_codes_for_order(order),
+            (
+                "pressing_article",
+                "retouche_simple",
+            ),
+        )
+
+    def test_retouche_and_cordonnerie_return_two_codes(self):
+        from services.resolution import (
+            resolve_v2_service_codes_for_order,
+        )
+
+        order = self.make_order()
+
+        self.add_item(
+            order,
+            designation="Ourlet pantalon",
+        )
+        self.add_item(
+            order,
+            designation="Réparation talon",
+        )
+
+        self.assertEqual(
+            resolve_v2_service_codes_for_order(order),
+            (
+                "retouche_simple",
+                "cordonnerie_standard",
+            ),
+        )
+
+    def test_three_distinct_families_are_supported(self):
+        from services.resolution import (
+            resolve_v2_service_codes_for_order,
+        )
+
+        order = self.make_order()
+
+        self.add_item(
+            order,
+            designation="Chemise",
+        )
+        self.add_item(
+            order,
+            designation="Ourlet pantalon",
+        )
+        self.add_item(
+            order,
+            designation="Réparation talon",
+        )
+
+        self.assertEqual(
+            resolve_v2_service_codes_for_order(order),
+            (
+                "pressing_article",
+                "retouche_simple",
+                "cordonnerie_standard",
+            ),
+        )
+
+    def test_duplicate_family_is_deduplicated(self):
+        from services.resolution import (
+            resolve_v2_service_codes_for_order,
+        )
+
+        order = self.make_order()
+
+        self.add_item(
+            order,
+            designation="Chemise",
+        )
+        self.add_item(
+            order,
+            designation="Pantalon",
+        )
+        self.add_item(
+            order,
+            designation="T-shirt",
+        )
+
+        self.assertEqual(
+            resolve_v2_service_codes_for_order(order),
+            ("pressing_article",),
+        )
+
+    def test_bag_order_remains_one_pressing_bag_service(self):
+        from services.resolution import (
+            resolve_v2_service_codes_for_order,
+        )
+
+        order = self.make_order(
+            pricing_mode="bag",
+            bag_size="small",
+        )
+
+        self.assertEqual(
+            resolve_v2_service_codes_for_order(order),
+            ("pressing_bag",),
+        )
+
+    def test_bag_order_does_not_split_from_legacy_item_content(self):
+        from services.resolution import (
+            resolve_v2_service_codes_for_order,
+        )
+
+        order = self.make_order(
+            pricing_mode="bag",
+            bag_size="medium",
+        )
+
+        self.add_item(
+            order,
+            designation="Chemise",
+        )
+        self.add_item(
+            order,
+            designation="Ourlet pantalon",
+        )
+
+        self.assertEqual(
+            resolve_v2_service_codes_for_order(order),
+            ("pressing_bag",),
+        )
+
+    def test_item_order_without_items_preserves_pressing_fallback(self):
+        from services.resolution import (
+            resolve_v2_service_codes_for_order,
+        )
+
+        order = self.make_order()
+
+        self.assertEqual(
+            resolve_v2_service_codes_for_order(order),
+            ("pressing_article",),
+        )
+
+
+class V2MultiserviceCatalogueResolutionTests(TestCase):
+    """
+    Contrat catalogue multiservice FAGNI.
+
+    Le resolver pluriel métier fournit des codes ordonnés.
+    Ce contrat exige leur matérialisation en objets Service actifs,
+    dans le même ordre, sans encore créer de ServiceExecution.
+    """
+
+    def setUp(self):
+        self.customer = Customer.objects.create(
+            name="Client Multiservice Catalogue",
+            phone="0700009930",
+        )
+
+        self.category = ServiceCategory.objects.create(
+            code="multiservice-catalogue",
+            name="Multiservice Catalogue",
+            is_active=True,
+        )
+
+    def make_order(self):
+        return Order.objects.create(
+            customer=self.customer,
+            pricing_mode="item",
+        )
+
+    def add_item(self, order, *, designation):
+        return OrderItem.objects.create(
+            order=order,
+            designation=designation,
+            quantity=1,
+            unit_price=Decimal("1000"),
+        )
+
+    def create_service(self, *, code, is_active=True):
+        return Service.objects.create(
+            code=code,
+            category=self.category,
+            name=code,
+            is_active=is_active,
+            pricing_mode="fixed",
+        )
+
+    def test_single_code_returns_one_service(self):
+        from services.resolution import resolve_v2_services_for_order
+
+        service = self.create_service(
+            code="pressing_article",
+        )
+
+        order = self.make_order()
+        self.add_item(
+            order,
+            designation="Chemise",
+        )
+
+        resolved = resolve_v2_services_for_order(order)
+
+        self.assertEqual(
+            tuple(item.pk for item in resolved),
+            (service.pk,),
+        )
+
+    def test_multiple_codes_return_services_in_resolution_order(self):
+        from services.resolution import resolve_v2_services_for_order
+
+        pressing = self.create_service(
+            code="pressing_article",
+        )
+        retouche = self.create_service(
+            code="retouche_simple",
+        )
+        cordonnerie = self.create_service(
+            code="cordonnerie_standard",
+        )
+
+        order = self.make_order()
+
+        self.add_item(
+            order,
+            designation="Chemise",
+        )
+        self.add_item(
+            order,
+            designation="Ourlet pantalon",
+        )
+        self.add_item(
+            order,
+            designation="Réparation talon",
+        )
+
+        resolved = resolve_v2_services_for_order(order)
+
+        self.assertEqual(
+            tuple(item.pk for item in resolved),
+            (
+                pressing.pk,
+                retouche.pk,
+                cordonnerie.pk,
+            ),
+        )
+
+    def test_duplicate_family_does_not_duplicate_service(self):
+        from services.resolution import resolve_v2_services_for_order
+
+        pressing = self.create_service(
+            code="pressing_article",
+        )
+
+        order = self.make_order()
+
+        self.add_item(
+            order,
+            designation="Chemise",
+        )
+        self.add_item(
+            order,
+            designation="Pantalon",
+        )
+
+        resolved = resolve_v2_services_for_order(order)
+
+        self.assertEqual(
+            tuple(item.pk for item in resolved),
+            (pressing.pk,),
+        )
+
+    def test_missing_catalogue_service_rejects_whole_resolution(self):
+        from services.resolution import (
+            ServiceCatalogResolutionError,
+            resolve_v2_services_for_order,
+        )
+
+        self.create_service(
+            code="pressing_article",
+        )
+
+        order = self.make_order()
+
+        self.add_item(
+            order,
+            designation="Chemise",
+        )
+        self.add_item(
+            order,
+            designation="Ourlet pantalon",
+        )
+
+        with self.assertRaises(ServiceCatalogResolutionError):
+            resolve_v2_services_for_order(order)
+
+    def test_inactive_catalogue_service_rejects_whole_resolution(self):
+        from services.resolution import (
+            ServiceCatalogResolutionError,
+            resolve_v2_services_for_order,
+        )
+
+        self.create_service(
+            code="pressing_article",
+        )
+        self.create_service(
+            code="retouche_simple",
+            is_active=False,
+        )
+
+        order = self.make_order()
+
+        self.add_item(
+            order,
+            designation="Chemise",
+        )
+        self.add_item(
+            order,
+            designation="Ourlet pantalon",
+        )
+
+        with self.assertRaises(ServiceCatalogResolutionError):
+            resolve_v2_services_for_order(order)
+
+    def test_bag_resolution_returns_pressing_bag_service(self):
+        from services.resolution import resolve_v2_services_for_order
+
+        pressing_bag = self.create_service(
+            code="pressing_bag",
+        )
+
+        order = Order.objects.create(
+            customer=self.customer,
+            pricing_mode="bag",
+            bag_size="medium",
+        )
+
+        resolved = resolve_v2_services_for_order(order)
+
+        self.assertEqual(
+            tuple(item.pk for item in resolved),
+            (pressing_bag.pk,),
+        )

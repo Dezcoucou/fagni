@@ -109,60 +109,68 @@ def _resolve_service_code_for_item(item):
     )
 
 
-def _resolve_from_items(items):
+def _resolve_codes_from_items(items):
     """
-    Agrège la résolution de toutes les lignes d'une commande item.
+    Agrège les familles métier détectées dans les lignes d'une commande.
 
-    Une seule famille métier -> service V2 résolu.
-    Plusieurs familles incompatibles -> ambiguïté explicite.
-    Aucun signal -> None, laissant le fallback legacy s'appliquer.
+    Les codes sont :
+    - dédupliqués ;
+    - conservés dans l'ordre de première apparition ;
+    - issus exclusivement du resolver canonique ligne par ligne.
     """
-    resolved_codes = set()
+    resolved_codes = []
+    seen_codes = set()
 
     for item in items:
         code = _resolve_service_code_for_item(item)
 
-        if code:
-            resolved_codes.add(code)
+        if code and code not in seen_codes:
+            seen_codes.add(code)
+            resolved_codes.append(code)
+
+    return tuple(resolved_codes)
+
+
+def _resolve_from_items(items):
+    """
+    Compatibilité avec le contrat historique mono-service.
+
+    Une seule famille métier -> service V2 résolu.
+    Plusieurs familles -> ambiguïté explicite.
+    Aucun signal -> None.
+    """
+    resolved_codes = _resolve_codes_from_items(items)
 
     if len(resolved_codes) > 1:
         raise AmbiguousServiceResolutionError(
             "Commande ambiguë : plusieurs lignes correspondent "
             "à des services V2 différents : "
-            f"{sorted(resolved_codes)}."
+            f"{list(resolved_codes)}."
         )
 
     if resolved_codes:
-        return next(iter(resolved_codes))
+        return resolved_codes[0]
 
     return None
 
 
-def resolve_v2_service_code_for_order(order) -> str:
+def resolve_v2_service_codes_for_order(order) -> tuple[str, ...]:
     """
-    Résout une orders.Order legacy vers le code canonique du Service V2.
+    Résout une Order legacy vers UNE OU PLUSIEURS familles Service V2.
 
-    Contrat de résolution :
-
-    1. pricing_mode='bag'
-       -> pressing_bag
-
-    2. pricing_mode='item'
-       -> catégorie ServiceItem legacy si elle fournit un signal fiable ;
-
-    3. sinon
-       -> ré-inférence métier des OrderItem avec le resolver canonique ;
-
-    4. aucun signal exploitable
-       -> pressing_article pour compatibilité legacy.
+    Contrat multiservice :
+    - bag reste volontairement mono-service pressing_bag ;
+    - item peut produire plusieurs familles métier ;
+    - les doublons sont supprimés ;
+    - l'ordre de première apparition des familles est conservé ;
+    - aucun signal exploitable conserve le fallback pressing_article.
 
     Cette fonction ne consulte volontairement PAS services.Service.
-    Elle reste donc utilisable même si le catalogue V2 n'a pas encore
-    été seedé.
+    Elle résout uniquement les codes métier canoniques.
     """
     if order is None:
         raise ServiceResolutionError(
-            "Une commande est requise pour résoudre le service V2."
+            "Une commande est requise pour résoudre les services V2."
         )
 
     pricing_mode = _normalize(
@@ -170,7 +178,7 @@ def resolve_v2_service_code_for_order(order) -> str:
     ) or "bag"
 
     if pricing_mode == "bag":
-        return SERVICE_CODE_PRESSING_BAG
+        return (SERVICE_CODE_PRESSING_BAG,)
 
     if pricing_mode != "item":
         raise ServiceResolutionError(
@@ -179,13 +187,77 @@ def resolve_v2_service_code_for_order(order) -> str:
         )
 
     items = _load_order_items(order)
+    resolved_codes = _resolve_codes_from_items(items)
 
-    resolved_code = _resolve_from_items(items)
+    if resolved_codes:
+        return resolved_codes
 
-    if resolved_code:
-        return resolved_code
+    return (SERVICE_CODE_PRESSING_ARTICLE,)
 
-    return SERVICE_CODE_PRESSING_ARTICLE
+
+def resolve_v2_service_code_for_order(order) -> str:
+    """
+    Résout une orders.Order legacy vers UN code Service V2.
+
+    Cette API conserve volontairement le contrat historique mono-service :
+    lorsqu'une commande contient plusieurs familles canoniques, elle reste
+    ambiguë pour ce resolver singulier.
+
+    Les nouveaux flux multiservices doivent utiliser
+    resolve_v2_service_codes_for_order().
+    """
+    resolved_codes = resolve_v2_service_codes_for_order(order)
+
+    if len(resolved_codes) > 1:
+        raise AmbiguousServiceResolutionError(
+            "Commande ambiguë : plusieurs lignes correspondent "
+            "à des services V2 différents : "
+            f"{list(resolved_codes)}."
+        )
+
+    return resolved_codes[0]
+
+
+def resolve_v2_services_for_order(order):
+    """
+    Résout une Order vers les objets Service V2 actifs correspondant
+    à toutes les familles métier canoniques détectées.
+
+    Garanties :
+    - s'appuie sur resolve_v2_service_codes_for_order() ;
+    - conserve exactement l'ordre des codes résolus ;
+    - ne retourne aucun doublon ;
+    - exige que TOUS les Services correspondants existent et soient actifs ;
+    - ne crée aucune ServiceExecution.
+    """
+    from services.models import Service
+
+    service_codes = resolve_v2_service_codes_for_order(order)
+
+    services_by_code = {
+        service.code: service
+        for service in Service.objects.filter(
+            code__in=service_codes,
+            is_active=True,
+        )
+    }
+
+    missing_codes = tuple(
+        code
+        for code in service_codes
+        if code not in services_by_code
+    )
+
+    if missing_codes:
+        raise ServiceCatalogResolutionError(
+            "Services V2 actifs introuvables pour les codes résolus : "
+            f"{list(missing_codes)}."
+        )
+
+    return tuple(
+        services_by_code[code]
+        for code in service_codes
+    )
 
 
 def resolve_v2_service_for_order(order):

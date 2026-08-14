@@ -382,7 +382,6 @@ class ServiceExecution(TimeStampedModel):
         verbose_name="Service",
     )
 
-
     asset = models.ForeignKey(
         CustomerAsset,
         on_delete=models.PROTECT,
@@ -547,3 +546,79 @@ class ServiceExecution(TimeStampedModel):
                 name="svc_exec_engine_status_idx",
             ),
         ]
+
+
+class ServiceExecutionItem(TimeStampedModel):
+    """
+    Bridge canonique entre une ligne commerciale OrderItem
+    et son unité opérationnelle ServiceExecution.
+
+    Contrat FAGNI :
+    - une ServiceExecution peut regrouper plusieurs OrderItem ;
+    - un OrderItem ne peut appartenir qu'à une seule ServiceExecution ;
+    - les deux objets doivent obligatoirement appartenir à la même Order.
+
+    Le bridge vit volontairement dans l'application services afin d'éviter
+    que le modèle legacy orders.OrderItem dépende du nouveau moteur V2.
+    """
+
+    service_execution = models.ForeignKey(
+        ServiceExecution,
+        on_delete=models.CASCADE,
+        related_name="item_links",
+        verbose_name="Exécution de service",
+    )
+
+    order_item = models.OneToOneField(
+        "orders.OrderItem",
+        on_delete=models.CASCADE,
+        related_name="service_execution_link",
+        verbose_name="Ligne de commande",
+    )
+
+    def _validate_same_order(self):
+        """
+        Invariant structurel :
+        l'OrderItem et la ServiceExecution doivent appartenir
+        à exactement la même commande.
+        """
+        if self.service_execution_id is None or self.order_item_id is None:
+            return
+
+        if (
+            self.service_execution.order_id
+            != self.order_item.order_id
+        ):
+            from django.core.exceptions import ValidationError
+
+            raise ValidationError(
+                {
+                    "order_item": (
+                        "La ligne de commande et la ServiceExecution "
+                        "doivent appartenir à la même commande."
+                    )
+                }
+            )
+
+    def clean(self):
+        super().clean()
+        self._validate_same_order()
+
+    def save(self, *args, **kwargs):
+        self._validate_same_order()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return (
+            f"Execution #{self.service_execution_id}"
+            f" · OrderItem #{self.order_item_id}"
+        )
+
+    class Meta:
+        verbose_name = "Ligne d'exécution de service"
+        verbose_name_plural = "Lignes d'exécution de service"
+        ordering = (
+            "service_execution_id",
+            "order_item_id",
+            "id",
+        )

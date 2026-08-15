@@ -237,6 +237,55 @@ class ServiceExecutionCreationTests(TestCase):
         )
 
 
+    def test_inactive_service_is_rejected_at_execution_creation(self):
+        self.service.is_active = False
+        self.service.save(update_fields=["is_active"])
+
+        with self.assertRaises(ValueError):
+            create_service_execution(
+                order=self.order,
+                service=self.service,
+                asset=self.asset,
+            )
+
+        self.assertEqual(
+            self.order.service_executions.count(),
+            0,
+        )
+
+    def test_invalid_primary_engine_is_rejected_at_execution_creation(self):
+        self.service.primary_engine = "invalid_engine"
+        self.service.save(update_fields=["primary_engine"])
+
+        with self.assertRaises(ValidationError):
+            create_service_execution(
+                order=self.order,
+                service=self.service,
+                asset=self.asset,
+            )
+
+        self.assertEqual(
+            self.order.service_executions.count(),
+            0,
+        )
+
+    def test_invalid_pricing_mode_is_rejected_at_execution_creation(self):
+        self.service.pricing_mode = "invalid_pricing_mode"
+        self.service.save(update_fields=["pricing_mode"])
+
+        with self.assertRaises(ValidationError):
+            create_service_execution(
+                order=self.order,
+                service=self.service,
+                asset=self.asset,
+            )
+
+        self.assertEqual(
+            self.order.service_executions.count(),
+            0,
+        )
+
+
 class OrderMultiserviceExecutionMaterializationTests(TestCase):
     def setUp(self):
         from decimal import Decimal

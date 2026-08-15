@@ -137,6 +137,20 @@ def create_service_execution(
             "une ServiceExecution."
         )
 
+    # Le Service est un contrat catalogue : une nouvelle exécution
+    # ne peut être créée qu'à partir d'une définition valide.
+    #
+    # full_clean() reste volontairement ici, à la frontière de création
+    # opérationnelle, afin de ne pas modifier globalement le comportement
+    # de Service.save() pendant la strangulation du legacy.
+    service.full_clean()
+
+    if not service.is_active:
+        raise ValueError(
+            "Impossible de créer une ServiceExecution "
+            "à partir d'un Service inactif."
+        )
+
     # Verrou transactionnel sur l'agrégat commercial.
     # Il sérialise l'allocation des sequence_index pour cette commande.
     locked_order = (

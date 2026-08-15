@@ -218,6 +218,7 @@ def run_minimal_v2_flow(
 
     quote = create_estimated_quote(
         order=order,
+        service_execution=service_execution,
         notes="Devis estimatif généré par orchestrateur V2",
     )
 

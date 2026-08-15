@@ -86,6 +86,7 @@ class OrchestratorServiceExecutionLifecycleTests(TestCase):
         self.assertIsNone(result["mission"].service_execution)
         self.assertIsNone(result["partner_job"].service_execution)
         self.assertIsNone(result["weighing_record"].service_execution)
+        self.assertIsNone(result["quote"].service_execution)
 
     def test_pending_execution_is_started_by_orchestrator(self):
         execution = self.create_execution()
@@ -113,6 +114,10 @@ class OrchestratorServiceExecutionLifecycleTests(TestCase):
         )
         self.assertEqual(
             result["weighing_record"].service_execution_id,
+            execution.id,
+        )
+        self.assertEqual(
+            result["quote"].service_execution_id,
             execution.id,
         )
 

@@ -516,6 +516,65 @@ class OrderMultiserviceExecutionMaterializationTests(TestCase):
             0,
         )
 
+    def test_duplicate_existing_execution_for_resolved_service_is_rejected(self):
+        from services.services import (
+            create_service_execution,
+            materialize_service_executions_for_order,
+        )
+
+        self.add_item("Chemise")
+
+        create_service_execution(
+            order=self.order,
+            service=self.services["pressing_article"],
+        )
+        create_service_execution(
+            order=self.order,
+            service=self.services["pressing_article"],
+        )
+
+        with self.assertRaises(ValueError):
+            materialize_service_executions_for_order(
+                order=self.order,
+            )
+
+        self.assertEqual(
+            self.order.service_executions.filter(
+                service=self.services["pressing_article"],
+            ).count(),
+            2,
+        )
+
+    def test_duplicate_existing_execution_creates_no_item_link(self):
+        from services.models import ServiceExecutionItem
+        from services.services import (
+            create_service_execution,
+            materialize_service_executions_for_order,
+        )
+
+        item = self.add_item("Chemise")
+
+        create_service_execution(
+            order=self.order,
+            service=self.services["pressing_article"],
+        )
+        create_service_execution(
+            order=self.order,
+            service=self.services["pressing_article"],
+        )
+
+        with self.assertRaises(ValueError):
+            materialize_service_executions_for_order(
+                order=self.order,
+            )
+
+        self.assertFalse(
+            ServiceExecutionItem.objects.filter(
+                order_item=item,
+            ).exists()
+        )
+
+
 
 class OrderCommercialFinalizationTests(TestCase):
     """
@@ -769,6 +828,44 @@ class OrderCommercialFinalizationTests(TestCase):
         order.refresh_from_db()
 
         self.assertTrue(order.is_draft)
+
+    def test_finalization_rejects_duplicate_execution_for_resolved_service(self):
+        from services.services import (
+            create_service_execution,
+            finalize_commercial_order,
+        )
+
+        pressing = self.create_service(
+            code="pressing_article",
+            name="Pressing Article",
+        )
+
+        order = self.create_draft_order()
+
+        self.add_item(
+            order,
+            designation="Chemise",
+            service_type="pressing",
+        )
+
+        create_service_execution(
+            order=order,
+            service=pressing,
+        )
+        create_service_execution(
+            order=order,
+            service=pressing,
+        )
+
+        with self.assertRaises(ValueError):
+            finalize_commercial_order(
+                order=order,
+            )
+
+        order.refresh_from_db()
+
+        self.assertTrue(order.is_draft)
+
 
 
 class OrderItemExecutionLinkMaterializationTests(TestCase):

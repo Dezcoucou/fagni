@@ -247,10 +247,21 @@ def materialize_service_executions_for_order(*, order):
     existing_by_service_id = {}
 
     for execution in existing_executions:
-        existing_by_service_id.setdefault(
-            execution.service_id,
-            execution,
-        )
+        if execution.service_id in existing_by_service_id:
+            first_execution = existing_by_service_id[
+                execution.service_id
+            ]
+
+            raise ValueError(
+                "Matérialisation ServiceExecution ambiguë : "
+                f"Order #{locked_order.pk} possède plusieurs "
+                "ServiceExecution pour le même Service "
+                f"#{execution.service_id} "
+                f"(executions #{first_execution.pk} "
+                f"et #{execution.pk})."
+            )
+
+        existing_by_service_id[execution.service_id] = execution
 
     materialized = []
 

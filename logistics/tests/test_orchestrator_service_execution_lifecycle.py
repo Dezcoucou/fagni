@@ -183,3 +183,198 @@ class OrchestratorServiceExecutionLifecycleTests(TestCase):
             ServiceExecution.STATUS_IN_PROGRESS,
         )
         self.assertIsNone(execution.completed_at)
+
+
+class OrchestratorServiceExecutionResolutionTests(TestCase):
+    """
+    Contrat d'entrée de l'orchestrateur multiservices.
+
+    Le moteur ne doit jamais choisir arbitrairement une exécution
+    lorsqu'une Order en possède plusieurs.
+    """
+
+    def setUp(self):
+        from logistics.orchestrator import (
+            resolve_service_execution_for_orchestration,
+        )
+
+        self.resolve = resolve_service_execution_for_orchestration
+
+        self.category = ServiceCategory.objects.create(
+            code="orchestration-resolution-category",
+            name="Orchestration Resolution Category",
+            is_active=True,
+        )
+
+        self.service_a = Service.objects.create(
+            code="orchestration-resolution-service-a",
+            category=self.category,
+            name="Orchestration Resolution Service A",
+            description="",
+            is_active=True,
+            primary_engine=Service.ENGINE_PICKUP_RETURN,
+            requires_partner=False,
+            requires_logistics=False,
+            requires_weighing=False,
+            requires_appointment=False,
+            requires_quote=False,
+            requires_asset=False,
+            requires_otp=False,
+            requires_signature=False,
+            pricing_mode="fixed",
+            default_sla_hours=24,
+        )
+
+        self.service_b = Service.objects.create(
+            code="orchestration-resolution-service-b",
+            category=self.category,
+            name="Orchestration Resolution Service B",
+            description="",
+            is_active=True,
+            primary_engine=Service.ENGINE_PICKUP_RETURN,
+            requires_partner=False,
+            requires_logistics=False,
+            requires_weighing=False,
+            requires_appointment=False,
+            requires_quote=False,
+            requires_asset=False,
+            requires_otp=False,
+            requires_signature=False,
+            pricing_mode="fixed",
+            default_sla_hours=24,
+        )
+
+        self.customer = Customer.objects.create(
+            name="Client Orchestration Resolution",
+            phone="0700007002",
+        )
+
+        self.order_a = Order.objects.create(
+            customer=self.customer,
+            pickup_address="Cocody",
+            delivery_address="Riviera",
+        )
+
+        self.order_b = Order.objects.create(
+            customer=self.customer,
+            pickup_address="Cocody",
+            delivery_address="Riviera",
+        )
+
+    def test_no_execution_preserves_legacy_none(self):
+        resolved = self.resolve(
+            order=self.order_a,
+            service_execution=None,
+        )
+
+        self.assertIsNone(resolved)
+
+    def test_single_execution_is_resolved_automatically(self):
+        execution = create_service_execution(
+            order=self.order_a,
+            service=self.service_a,
+        )
+
+        resolved = self.resolve(
+            order=self.order_a,
+            service_execution=None,
+        )
+
+        self.assertEqual(
+            resolved.id,
+            execution.id,
+        )
+
+    def test_explicit_execution_from_same_order_is_used(self):
+        execution = create_service_execution(
+            order=self.order_a,
+            service=self.service_a,
+        )
+
+        resolved = self.resolve(
+            order=self.order_a,
+            service_execution=execution,
+        )
+
+        self.assertEqual(
+            resolved.id,
+            execution.id,
+        )
+
+    def test_explicit_execution_from_other_order_is_rejected(self):
+        from logistics.orchestrator import (
+            ServiceExecutionOrchestrationError,
+        )
+
+        execution = create_service_execution(
+            order=self.order_b,
+            service=self.service_a,
+        )
+
+        with self.assertRaises(
+            ServiceExecutionOrchestrationError
+        ):
+            self.resolve(
+                order=self.order_a,
+                service_execution=execution,
+            )
+
+    def test_multiple_executions_without_explicit_choice_are_rejected(self):
+        from logistics.orchestrator import (
+            AmbiguousServiceExecutionError,
+        )
+
+        create_service_execution(
+            order=self.order_a,
+            service=self.service_a,
+        )
+
+        create_service_execution(
+            order=self.order_a,
+            service=self.service_b,
+        )
+
+        with self.assertRaises(
+            AmbiguousServiceExecutionError
+        ):
+            self.resolve(
+                order=self.order_a,
+                service_execution=None,
+            )
+
+    def test_explicit_execution_resolves_multiservice_ambiguity(self):
+        execution_a = create_service_execution(
+            order=self.order_a,
+            service=self.service_a,
+        )
+
+        create_service_execution(
+            order=self.order_a,
+            service=self.service_b,
+        )
+
+        resolved = self.resolve(
+            order=self.order_a,
+            service_execution=execution_a,
+        )
+
+        self.assertEqual(
+            resolved.id,
+            execution_a.id,
+        )
+
+    def test_unsaved_order_is_rejected(self):
+        from logistics.orchestrator import (
+            ServiceExecutionOrchestrationError,
+        )
+
+        unsaved_order = Order(
+            customer=self.customer,
+        )
+
+        with self.assertRaises(
+            ServiceExecutionOrchestrationError
+        ):
+            self.resolve(
+                order=unsaved_order,
+            )

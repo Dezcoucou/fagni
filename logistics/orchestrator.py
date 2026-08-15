@@ -32,6 +32,81 @@ from tracking.services import (
 )
 
 
+class ServiceExecutionOrchestrationError(ValueError):
+    """Erreur contractuelle de résolution d'une ServiceExecution."""
+
+
+class AmbiguousServiceExecutionError(ServiceExecutionOrchestrationError):
+    """
+    Plusieurs ServiceExecution existent pour une même Order alors
+    qu'aucune exécution explicite n'a été fournie à l'orchestrateur.
+    """
+
+
+def resolve_service_execution_for_orchestration(
+    *,
+    order,
+    service_execution=None,
+):
+    """
+    Résout la ServiceExecution canonique à utiliser par l'orchestrateur.
+
+    Contrat FAGNI :
+    - une Order persistée est obligatoire ;
+    - une ServiceExecution explicitement fournie doit être persistée
+      et appartenir exactement à cette Order ;
+    - aucune exécution existante conserve le mode legacy avec None ;
+    - une seule exécution existante est résolue automatiquement ;
+    - plusieurs exécutions sans choix explicite sont ambiguës et refusées.
+
+    Cette fonction est READ-ONLY :
+    elle ne crée, ne modifie et ne démarre aucune ServiceExecution.
+    """
+    if order is None or getattr(order, "pk", None) is None:
+        raise ServiceExecutionOrchestrationError(
+            "Une commande persistée est requise pour résoudre "
+            "la ServiceExecution d'orchestration."
+        )
+
+    if service_execution is not None:
+        if getattr(service_execution, "pk", None) is None:
+            raise ServiceExecutionOrchestrationError(
+                "Une ServiceExecution persistée est requise "
+                "lorsqu'elle est fournie explicitement."
+            )
+
+        if service_execution.order_id != order.pk:
+            raise ServiceExecutionOrchestrationError(
+                "ServiceExecution incompatible : "
+                f"l'exécution #{service_execution.pk} appartient "
+                f"à Order #{service_execution.order_id}, "
+                f"pas à Order #{order.pk}."
+            )
+
+        return service_execution
+
+    executions = list(
+        order.service_executions
+        .order_by(
+            "sequence_index",
+            "id",
+        )[:2]
+    )
+
+    if not executions:
+        return None
+
+    if len(executions) == 1:
+        return executions[0]
+
+    raise AmbiguousServiceExecutionError(
+        "Commande multiservice ambiguë : "
+        f"Order #{order.pk} possède plusieurs ServiceExecution. "
+        "Une ServiceExecution explicite doit être fournie "
+        "à l'orchestrateur."
+    )
+
+
 @transaction.atomic
 def create_pickup_flow_from_order(
     order,
@@ -190,6 +265,11 @@ def run_minimal_v2_flow(
     Le paramètre service_execution est optionnel afin de conserver
     la compatibilité avec les actions admin et commandes V2 historiques.
     """
+
+    service_execution = resolve_service_execution_for_orchestration(
+        order=order,
+        service_execution=service_execution,
+    )
 
     if service_execution is not None:
         if service_execution.status == ServiceExecution.STATUS_PENDING:

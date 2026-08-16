@@ -218,6 +218,19 @@ def partner_update_status(request, order_id):
     except Exception:
         return Response({'error': 'Commande non trouvée'}, status=404)
 
+    # Frontière d'autorité V2 :
+    # le pressing legacy ne pilote plus directement Order.status dès
+    # qu'une ServiceExecution canonique existe.
+    from services.services import order_uses_canonical_service_executions
+    if order_uses_canonical_service_executions(order=order):
+        return Response({
+            'error': 'autorite_v2',
+            'message': (
+                'Le statut de cette commande est piloté par '
+                'ses ServiceExecution.'
+            ),
+        }, status=409)
+
     raw_status = request.data.get('status', '').strip()
     STATUS_MAP = {
         'received': 'in_progress',
@@ -322,6 +335,24 @@ def partner_refuse_order(request, order_id):
         import urllib.parse
 
         order = Order.objects.get(id=order_id, laundry_partner=driver)
+
+        # Frontière d'autorité V2 :
+        # cette route appartient au workflow pressing legacy.
+        #
+        # Une fois la commande matérialisée en ServiceExecution,
+        # le refus/réaffectation du prestataire doit être géré par
+        # le moteur V2 et ne doit plus réécrire Order.status ni
+        # Order.laundry_partner directement.
+        from services.services import order_uses_canonical_service_executions
+        if order_uses_canonical_service_executions(order=order):
+            return Response({
+                'error': 'autorite_v2',
+                'message': (
+                    'Cette commande est pilotée par le moteur '
+                    'ServiceExecution. Le refus pressing legacy '
+                    'n’est plus autorisé.'
+                ),
+            }, status=409)
 
         if order.status not in ['pending', 'assigned']:
             return Response({'error': 'Commande ne peut pas être refusée'}, status=400)

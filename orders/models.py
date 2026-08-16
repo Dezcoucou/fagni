@@ -417,6 +417,29 @@ def sync_order_status_from_legs(order, save=False):
       - sinon => pending
     """
 
+    # Frontière d'autorité V2 :
+    # dès qu'une Order possède au moins une ServiceExecution canonique,
+    # son statut agrégé est projeté exclusivement depuis ces exécutions.
+    # Les DeliveryLeg restent des états logistiques locaux et ne doivent
+    # plus pouvoir réécrire Order.status.
+    #
+    # IMPORTANT :
+    # l'instance `order` reçue peut être stale après une projection V2
+    # effectuée via update() dans une autre porte métier. On relit donc
+    # explicitement le statut courant en base avant de répondre.
+    if order.service_executions.exists():
+        current_status = (
+            order.__class__.objects
+            .filter(pk=order.pk)
+            .values_list("status", flat=True)
+            .first()
+        )
+
+        if current_status is not None:
+            order.status = current_status
+
+        return current_status
+
     # Ne jamais toucher une commande annulée, ni "ready" (étape pilotée
     # explicitement par le pressing via partner_update_status, pas par les
     # legs - cette fonction ne connaît que pending/in_progress/done et

@@ -2124,6 +2124,20 @@ def ops_update_step(request, order_id, action):
     """
     order = get_object_or_404(Order, pk=order_id)
 
+    # Frontière d'autorité V2 :
+    # cette ancienne route OPS pilote des timestamps et des DeliveryLeg
+    # selon le workflow V1. Dès qu'une ServiceExecution canonique existe,
+    # elle ne doit plus pouvoir piloter l'état opérationnel de la commande.
+    from services.services import order_uses_canonical_service_executions
+    if order_uses_canonical_service_executions(order=order):
+        return JsonResponse({
+            "error": "autorite_v2",
+            "message": (
+                "Cette commande est pilotée par le moteur "
+                "ServiceExecution."
+            ),
+        }, status=409)
+
     
     # POST only (évite clic direct / appels GET)
     if request.method != "POST":
@@ -7983,6 +7997,26 @@ def update(request, order_id):
         pk=order_id,
     )
 
+    # Frontière d'autorité V2 :
+    # le verrou historique basé sur OrderItem reste utile,
+    # mais il ne couvre pas toutes les matérialisations possibles.
+    #
+    # La présence d'une ServiceExecution est désormais le critère
+    # canonique d'entrée sous autorité V2.
+    from services.services import order_uses_canonical_service_executions
+    if order_uses_canonical_service_executions(order=order):
+        messages.error(
+            request,
+            (
+                "Cette commande est pilotée par le moteur "
+                "ServiceExecution. L'éditeur legacy est verrouillé."
+            ),
+        )
+        return redirect(
+            "orders:detail",
+            order_id=order.id,
+        )
+
     # 🔒 A5-E3 — HARD LOCK POST-MATERIALISATION
     #
     # Une fois qu'une ligne commerciale est rattachée à une
@@ -13092,6 +13126,19 @@ def laundry_weighing(request, order_id):
 
     # POST: note/démarrer
     if request.method == "POST":
+        # Frontière d'autorité V2.
+        # Le garde est volontairement placé avant toute écriture, y compris
+        # les notes, afin qu'un POST refusé soit sans effet de bord.
+        from services.services import order_uses_canonical_service_executions
+        if order_uses_canonical_service_executions(order=order):
+            return JsonResponse({
+                "error": "autorite_v2",
+                "message": (
+                    "Le statut de cette commande est piloté par "
+                    "ses ServiceExecution."
+                ),
+            }, status=409)
+
         action = (request.POST.get("action") or "").strip()
         note = (request.POST.get("notes") or "").strip()[:250]
 
@@ -13147,6 +13194,17 @@ def laundry_weighing_confirm(request, order_id):
     # --- Validations (aucune écriture avant ce point) ---
     if getattr(order, "laundry_partner_id", None) != laundry.id:
         return redirect(f"{reverse('orders:laundry_app')}?laundry_id={laundry.id}")
+
+    # Frontière d'autorité V2 avant toute mutation métier.
+    from services.services import order_uses_canonical_service_executions
+    if order_uses_canonical_service_executions(order=order):
+        return JsonResponse({
+            "error": "autorite_v2",
+            "message": (
+                "Le statut de cette commande est piloté par "
+                "ses ServiceExecution."
+            ),
+        }, status=409)
 
     if order.status == "canceled":
         messages.warning(request, "Une commande annulée ne peut plus être marquée prête.")
@@ -13986,10 +14044,10 @@ def client_new_order_step4(request, order_id: int):
             try:
                 has_laundry = bool(getattr(order, "laundry_partner_id", None))
                 has_driver = bool(getattr(order, "delivery_partner_id", None))
-                if getattr(order, "status", None) == "pending" and (has_laundry or has_driver):
-                    order.status = "in_progress"
-                    order.save(update_fields=["status"])
-
+                # A5-E5 :
+                # une affectation de ressource ne signifie pas
+                # qu'une ServiceExecution a démarré.
+                if has_laundry or has_driver:
                     try:
                         from orders.models import sync_delivery_legs_for_order, DeliveryLeg
                         from orders.service_layer.legs import normalize_order_legs
@@ -14291,6 +14349,17 @@ def laundry_order_detail(request, order_id):
 
     # Actions V1 (bloquées par règles)
     if request.method == "POST":
+        # Frontière d'autorité V2 avant toute écriture de statut legacy.
+        from services.services import order_uses_canonical_service_executions
+        if order_uses_canonical_service_executions(order=order):
+            return JsonResponse({
+                "error": "autorite_v2",
+                "message": (
+                    "Le statut de cette commande est piloté par "
+                    "ses ServiceExecution."
+                ),
+            }, status=409)
+
         action = (request.POST.get("action") or "").strip()
 
         choices = getattr(Order._meta.get_field("status"), "choices", []) or []
@@ -14579,6 +14648,17 @@ def laundry_update_status(request, order_id):
             "error": "acces_refuse",
             "message": "Cette commande n'est pas attribuee a ta blanchisserie.",
         }, status=403)
+
+    # Frontière d'autorité V2.
+    from services.services import order_uses_canonical_service_executions
+    if order_uses_canonical_service_executions(order=order):
+        return JsonResponse({
+            "error": "autorite_v2",
+            "message": (
+                "Le statut de cette commande est piloté par "
+                "ses ServiceExecution."
+            ),
+        }, status=409)
 
     if getattr(order, "status", None) == "canceled":
         return JsonResponse({

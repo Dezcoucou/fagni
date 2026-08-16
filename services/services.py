@@ -402,6 +402,115 @@ def finalize_commercial_order(*, order):
     return executions
 
 
+def order_uses_canonical_service_executions(*, order):
+    """
+    Indique si une Order est passée sous l'autorité d'exécution V2.
+
+    Dès qu'au moins une ServiceExecution canonique existe :
+    - ServiceExecution devient la source de vérité opérationnelle ;
+    - Order.status n'est plus un état métier directement pilotable ;
+    - Order.status devient une projection agrégée.
+
+    Cette fonction ne modifie aucun état.
+    """
+    if order is None or order.pk is None:
+        return False
+
+    return ServiceExecution.objects.filter(
+        order_id=order.pk,
+    ).exists()
+
+
+def project_order_status_from_service_executions(*, order):
+    """
+    Projette le statut commercial agrégé d'une Order depuis ses
+    ServiceExecution canoniques.
+
+    Contrat V2 :
+    - aucune ServiceExecution => aucune autorité V2, statut inchangé ;
+    - Order canceled => terminal, jamais réactivée ;
+    - toute exécution completed => Order done ;
+    - au moins une exécution réellement engagée
+      (in_progress / awaiting_validation / completed)
+      => Order in_progress tant que toutes ne sont pas completed ;
+    - uniquement pending / scheduled => Order pending ;
+    - présence de canceled / failed => aucune décision agrégée implicite :
+      le statut courant est conservé en attendant une politique métier
+      multiservice explicite.
+
+    La ligne Order est verrouillée pendant la projection afin d'éviter
+    deux projections concurrentes contradictoires.
+    """
+    if order is None or order.pk is None:
+        raise ValueError(
+            "Une commande persistée est requise pour projeter son statut."
+        )
+
+    locked_order = (
+        order.__class__.objects
+        .select_for_update()
+        .get(pk=order.pk)
+    )
+
+    current_status = locked_order.status
+
+    if current_status == "canceled":
+        order.status = current_status
+        return current_status
+
+    statuses = list(
+        ServiceExecution.objects
+        .filter(order_id=locked_order.pk)
+        .values_list("status", flat=True)
+    )
+
+    if not statuses:
+        order.status = current_status
+        return current_status
+
+    blocking_terminal_statuses = {
+        ServiceExecution.STATUS_CANCELED,
+        ServiceExecution.STATUS_FAILED,
+    }
+
+    if any(
+        status in blocking_terminal_statuses
+        for status in statuses
+    ):
+        order.status = current_status
+        return current_status
+
+    if all(
+        status == ServiceExecution.STATUS_COMPLETED
+        for status in statuses
+    ):
+        target_status = "done"
+
+    elif any(
+        status in {
+            ServiceExecution.STATUS_IN_PROGRESS,
+            ServiceExecution.STATUS_AWAITING_VALIDATION,
+            ServiceExecution.STATUS_COMPLETED,
+        }
+        for status in statuses
+    ):
+        target_status = "in_progress"
+
+    else:
+        target_status = "pending"
+
+    if current_status != target_status:
+        locked_order.__class__.objects.filter(
+            pk=locked_order.pk,
+        ).update(
+            status=target_status,
+            updated_at=timezone.now(),
+        )
+
+    order.status = target_status
+    return target_status
+
+
 ALLOWED_SERVICE_EXECUTION_TRANSITIONS = {
     ServiceExecution.STATUS_PENDING: {
         ServiceExecution.STATUS_SCHEDULED,
@@ -485,6 +594,10 @@ def _save_transition(
         update_fields=sorted(update_fields),
     )
 
+    project_order_status_from_service_executions(
+        order=service_execution.order,
+    )
+
     return service_execution
 
 
@@ -521,6 +634,10 @@ def schedule_service_execution(
         ]
     )
 
+    project_order_status_from_service_executions(
+        order=service_execution.order,
+    )
+
     return service_execution
 
 
@@ -545,6 +662,10 @@ def start_service_execution(*, service_execution, note=""):
             "notes",
             "updated_at",
         ]
+    )
+
+    project_order_status_from_service_executions(
+        order=service_execution.order,
     )
 
     return service_execution
@@ -586,6 +707,10 @@ def complete_service_execution(*, service_execution, note=""):
         ]
     )
 
+    project_order_status_from_service_executions(
+        order=service_execution.order,
+    )
+
     return service_execution
 
 
@@ -610,6 +735,10 @@ def cancel_service_execution(*, service_execution, note=""):
             "notes",
             "updated_at",
         ]
+    )
+
+    project_order_status_from_service_executions(
+        order=service_execution.order,
     )
 
     return service_execution

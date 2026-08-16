@@ -525,6 +525,20 @@ def ops_update_status(request, order_id):
     TERMINAL = ('done', 'canceled')
     try:
         order = Order.objects.get(id=order_id)
+
+        # Frontière d'autorité V2 :
+        # une commande matérialisée en ServiceExecution ne peut plus être
+        # pilotée par cette ancienne route générique de statut.
+        from services.services import order_uses_canonical_service_executions
+        if order_uses_canonical_service_executions(order=order):
+            return Response({
+                'error': 'autorite_v2',
+                'message': (
+                    'Le statut de cette commande est piloté par '
+                    'ses ServiceExecution.'
+                ),
+            }, status=409)
+
         new_status = request.data.get('status','')
         if new_status not in ALLOWED:
             return Response({'error': 'Statut invalide'}, status=400)

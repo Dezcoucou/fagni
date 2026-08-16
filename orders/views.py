@@ -7598,39 +7598,6 @@ def delete(request):
     return HttpResponse("delete - placeholder", content_type="text/plain; charset=utf-8")
 
 
-@require_POST
-def update_status(request, order_id):
-    order = get_object_or_404(Order, pk=order_id)
-
-    
-    new_status = request.POST.get("status")
-    valid_status = dict(Order.STATUS_CHOICES).keys()
-
-    if new_status not in valid_status:
-        messages.error(request, "Statut invalide.")
-        return redirect("orders:detail", order_id=order.id)
-
-    old_status = order.status
-    if new_status == old_status:
-        messages.info(request, "Le statut est déjà à cette valeur.")
-        return redirect("orders:detail", order_id=order.id)
-
-    order.status = new_status
-    order.update_financials(save=True)  # ✅ moteur unique compute_order_financials + sauvegarde
-
-    from orders.models import sync_legs_status_from_order
-    sync_legs_status_from_order(order, save=True)
-
-    OrderStatusHistory.objects.create(
-        order=order,
-        previous_status=old_status,
-        new_status=new_status,
-        changed_by=request.user if request.user.is_authenticated else None,
-    )
-
-    messages.success(request, "Statut de la commande mis à jour.")
-    return redirect("orders:detail", order_id=order.id)
-
 
 def _build_order_public_url(request, order, viewname="orders:detail"):
     """
@@ -12415,73 +12382,6 @@ def export_top_clients_xlsx(request):
     resp["Content-Disposition"] = 'attachment; filename="fagni_top_clients.xlsx"'
     return resp
 
-
-# ============================================================
-#  CHANGEMENT DE STATUT SIMPLE
-# ============================================================
-@transaction.atomic
-def change_status(request, order_id):
-    """
-    Change proprement le statut d'une commande + timestamps automatiques.
-    """
-    order = get_object_or_404(Order, pk=order_id)
-
-    
-    new_status = request.POST.get("status")
-    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or "/"
-
-    # Sécurité statuts valides
-    valid = ["pending", "in_progress", "done", "canceled"]
-    if new_status not in valid:
-        messages.error(request, "Statut invalide.")
-        return redirect(next_url)
-
-    # --- garde métier : commande chiffrée obligatoire ---
-    items_count = 0
-    try:
-        items_count = order.items.count()
-    except Exception:
-        items_count = 0
-
-    total_client = Decimal("0")
-    try:
-        total_client = Decimal(str(getattr(order, "total_client_ttc", 0) or 0))
-    except Exception:
-        total_client = Decimal("0")
-
-    if new_status in ("in_progress", "done"):
-        if items_count <= 0:
-            messages.error(request, "Commande vide : ajoute au moins un article avant de continuer.")
-            return redirect(next_url)
-
-        if total_client <= 0:
-            try:
-                order.update_financials(save=True)
-                total_client = Decimal(str(getattr(order, "total_client_ttc", 0) or 0))
-            except Exception:
-                total_client = Decimal("0")
-
-        if total_client <= 0:
-            messages.error(request, "Commande non chiffrée : total client égal à 0. Recalcule les montants avant de continuer.")
-            return redirect(next_url)
-
-    # --- workflow logique ---
-    if new_status == "in_progress":
-        # ne passer en cours que si pending
-        if order.status == "pending":
-            order.pickup_time = timezone.now()
-
-    if new_status == "done":
-        # ne terminer que si déjà en cours
-        if order.status == "in_progress":
-            order.delivered_time = timezone.now()
-
-    # Mise à jour statut
-    order.status = new_status
-    order.save()
-
-    messages.success(request, f"Statut mis à jour : {order.get_status_display()}")
-    return redirect(next_url)
 
 
 @login_required

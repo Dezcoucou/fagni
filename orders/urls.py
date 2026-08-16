@@ -33,7 +33,6 @@ urlpatterns = [
     # Détail / édition / suppression simple (Back-office)
     path("<int:order_id>/", views.detail, name="detail"),
     path("<int:order_id>/live/", views.order_live_status, name="order_live"),
-    path("<int:order_id>/status/", views.update_status, name="update_status"),
     path("<int:order_id>/edit/", views.update, name="update"),
     path("<int:order_id>/delete/", views.delete, name="delete"),
 
@@ -119,7 +118,6 @@ urlpatterns = [
     path("top-clients/export/xlsx/", views.export_top_clients_xlsx, name="export_top_clients_xlsx"),
 
     # Changement simple de statut
-    path("<int:order_id>/status/change/", views.change_status, name="change_status"),
 
     # Tableau de bord livreurs
     path("drivers/dashboard/", views.driver_dashboard, name="driver_dashboard"),

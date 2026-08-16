@@ -107,13 +107,13 @@
 {% block topbar %}
 <header class="fagni-topbar">
 <div class="fagni-topbar-left">
-        <a href="{% url 'orders:driver_hub' %}" class="fagni-logo">
+        <a href="{% block topbar_logo_url %}{% url 'home' %}{% endblock %}" class="fagni-logo">
             <span class="fagni-logo-mark">
                 <img src="{% static 'img/fagni_logo_ok.png' %}" alt="FAGNI">
             </span>
             <span class="fagni-logo-text">
                 <span class="fagni-logo-text-main">FAGNI</span>
-                <span class="fagni-logo-text-sub">Mon espace livreur</span>
+                <span class="fagni-logo-text-sub">{% block topbar_subtitle %}Super-App{% endblock %}</span>
             </span>
         </a>
         <span class="fagni-topbar-tag">🚀 Super-App</span>

@@ -3989,12 +3989,90 @@ class OrderItem(models.Model):
         p = self.unit_price or Decimal("0.00")
         return (q * p).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
+    def _materialized_commercial_snapshot(self):
+        """
+        Retourne le contrat commercial persisté lorsque cette ligne est déjà
+        matérialisée dans une ServiceExecution.
+
+        Une ligne non matérialisée reste librement éditable pendant la phase
+        de construction commerciale de la commande.
+        """
+        if not self.pk:
+            return None
+
+        return (
+            type(self).objects
+            .filter(
+                pk=self.pk,
+                service_execution_link__isnull=False,
+            )
+            .values(
+                "order_id",
+                "service_id",
+                "service_type",
+                "designation",
+                "quantity",
+                "unit_price",
+            )
+            .first()
+        )
+
+    def _validate_materialized_commercial_contract(self):
+        """
+        Une fois l'OrderItem matérialisé dans une ServiceExecution, les champs
+        qui définissent son contrat commercial deviennent immuables.
+
+        Le total n'est pas comparé séparément : il est dérivé exclusivement
+        de quantity * unit_price dans save().
+        """
+        snapshot = self._materialized_commercial_snapshot()
+
+        if snapshot is None:
+            return False
+
+        current = {
+            "order_id": self.order_id,
+            "service_id": self.service_id,
+            "service_type": self.service_type or "",
+            "designation": self.designation,
+            "quantity": self.quantity,
+            "unit_price": self.unit_price,
+        }
+
+        changed_fields = [
+            field
+            for field, persisted_value in snapshot.items()
+            if current[field] != persisted_value
+        ]
+
+        if changed_fields:
+            from django.core.exceptions import ValidationError
+
+            raise ValidationError(
+                {
+                    field: (
+                        "Cette ligne de commande est déjà matérialisée dans "
+                        "une exécution de service et son contrat commercial "
+                        "ne peut plus être modifié."
+                    )
+                    for field in changed_fields
+                }
+            )
+
+        return True
+
     def save(self, *args, **kwargs):
-        if not (self.service_type or "").strip():
+        is_materialized = self._validate_materialized_commercial_contract()
+
+        # Une ligne matérialisée conserve strictement son service_type
+        # persisté. L'inférence automatique reste réservée aux lignes encore
+        # éditables avant matérialisation.
+        if not is_materialized and not (self.service_type or "").strip():
             try:
                 self.service_type = infer_service_type_from_order_item(self)
             except Exception:
                 self.service_type = "pressing"
+
         self.total = self.line_total
         super().save(*args, **kwargs)
 

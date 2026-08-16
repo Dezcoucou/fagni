@@ -7993,26 +7993,60 @@ def safe_decimal(value, default=Decimal("0")):
         return default
 
 
+@login_required
 def update(request, order_id):
     """
-    Édition d'une commande EXISTANTE.
+    Édition legacy d'une commande EXISTANTE.
 
-    Objectifs :
-    - Garder les OrderItem existants + leurs photos.
-    - Permettre :
-        * mise à jour du statut, partenaires, notes
-        * ajout de nouvelles lignes
-        * suppression de lignes (diff entre DB et lignes postées)
-        * ajout de nouvelles photos par ligne
+    Contrat A5-E3 :
+    - cette route reste disponible uniquement pour les commandes encore
+      pré-matérialisation ;
+    - dès qu'au moins un OrderItem appartient à une ServiceExecution,
+      le contrat commercial de la commande est considéré comme matérialisé
+      et l'éditeur legacy devient interdit en GET comme en POST ;
+    - le verrou modèle OrderItem reste la dernière ligne de défense contre
+      toute mutation commerciale post-matérialisation.
     """
     order = get_object_or_404(
-        Order.objects.select_related("customer", "laundry_partner", "delivery_partner"),
+        Order.objects.select_related(
+            "customer",
+            "laundry_partner",
+            "delivery_partner",
+        ),
         pk=order_id,
     )
 
-    # 🔒 HARD LOCK : une commande payée ne doit plus être modifiable (GET + POST)
+    # 🔒 A5-E3 — HARD LOCK POST-MATERIALISATION
+    #
+    # Une fois qu'une ligne commerciale est rattachée à une
+    # ServiceExecution, l'ancien éditeur ne doit plus pouvoir :
+    # - modifier les OrderItem ;
+    # - ajouter/supprimer des OrderItem ;
+    # - modifier les métadonnées de commande dans le même POST ;
+    # - recalculer les montants via son ancien workflow.
+    #
+    # Le test est fait AVANT toute mutation de l'objet Order.
+    is_materialized = order.items.filter(
+        service_execution_link__isnull=False,
+    ).exists()
+
+    if is_materialized:
+        messages.error(
+            request,
+            (
+                "Cette commande est déjà matérialisée dans le moteur "
+                "d'exécution FAGNI. L'éditeur legacy est verrouillé."
+            ),
+        )
+        return redirect("orders:detail", order_id=order.id)
+
+    # 🔒 HARD LOCK historique : une commande payée ne doit plus être
+    # modifiable, même lorsqu'elle n'a pas encore de matérialisation V2.
     if getattr(order, "payment_status", None) == "paid":
-        messages.error(request, "Commande payée : modification interdite.")
+        messages.error(
+            request,
+            "Commande payée : modification interdite.",
+        )
         return redirect("orders:detail", order_id=order.id)
 
     # Pour l'affichage (GET) : catalogue de services

@@ -571,7 +571,7 @@ class ServiceExecutionItem(TimeStampedModel):
 
     order_item = models.OneToOneField(
         "orders.OrderItem",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         related_name="service_execution_link",
         verbose_name="Ligne de commande",
     )

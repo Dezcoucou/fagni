@@ -1116,58 +1116,133 @@ def api_create_order(request):
             'a_perte'
         )
 
-        order = Order.objects.create(**order_data)
-
-        # Application du coupon (ADR-025, Pilot Growth Plan, 9 juillet 2026)
-        coupon_code_input = (request.data.get('coupon_code') or '').strip()
-        if coupon_code_input:
-            try:
-                from orders.views import validate_and_get_coupon_discount
-                from orders.models import CouponUsage
-                discount, error, coupon = validate_and_get_coupon_discount(order, coupon_code_input)
-                if coupon and not error and discount > 0:
-                    order.coupon_code = coupon.code
-                    order.coupon_discount_applied = discount
-                    order.save(update_fields=['coupon_code', 'coupon_discount_applied'])
-                    CouponUsage.objects.create(coupon=coupon, customer=customer, order=order, discount_amount=discount)
-            except Exception:
-                import logging
-                logging.getLogger("fagni.client_api").exception("Echec application coupon order_id=%s", order.id)
-        try:
-            from orders.models import OrderItem
-            if articles:
-                for a in articles:
-                    _qty=int(a.get('quantity',1))
-                    _aid=str(a.get('id',''))
-                    _des=str(a.get('name',a.get('designation','')))
-                    if not _des and _aid:
-                        try:
-                            from orders.models import ArticleConfig
-                            _des = ArticleConfig.objects.get(article_id=_aid).label
-                        except: _des = f'Article {_aid}'
-                    if not _des: _des = 'Article'
-                    OrderItem.objects.create(order=order,designation=_des,quantity=_qty,unit_price=int(_pa),total=_qty*int(_pa))
-            elif nb_articles>0:
-                OrderItem.objects.create(order=order,designation='Articles pressing',quantity=nb_articles,unit_price=int(_pa),total=nb_articles*int(_pa))
-        except Exception:
-            import logging
-            logging.getLogger(
-                "fagni.orders.client_api"
-            ).exception(
-                "Echec creation OrderItem | order_id=%s",
-                getattr(order, "id", None),
-            )
-            raise
-
-        # Finalisation commerciale canonique.
-        # Toutes les OrderItem existent avant la résolution des services.
-        # Si le catalogue V2 est incomplet ou la matérialisation échoue,
-        # la transaction de création échoue et la commande ne peut jamais
-        # être exposée comme commercialement confirmée.
+        from services.resolution import ServiceCatalogResolutionError
         from services.services import finalize_commercial_order
 
-        finalize_commercial_order(order=order)
-        order.refresh_from_db()
+        try:
+            with transaction.atomic():
+                order = Order.objects.create(**order_data)
+
+                # Application du coupon (ADR-025, Pilot Growth Plan, 9 juillet 2026)
+                coupon_code_input = (request.data.get('coupon_code') or '').strip()
+                if coupon_code_input:
+                    try:
+                        from orders.views import validate_and_get_coupon_discount
+                        from orders.models import CouponUsage
+
+                        discount, error, coupon = validate_and_get_coupon_discount(
+                            order,
+                            coupon_code_input,
+                        )
+
+                        if coupon and not error and discount > 0:
+                            order.coupon_code = coupon.code
+                            order.coupon_discount_applied = discount
+                            order.save(
+                                update_fields=[
+                                    'coupon_code',
+                                    'coupon_discount_applied',
+                                ]
+                            )
+                            CouponUsage.objects.create(
+                                coupon=coupon,
+                                customer=customer,
+                                order=order,
+                                discount_amount=discount,
+                            )
+                    except Exception:
+                        import logging
+
+                        logging.getLogger(
+                            "fagni.client_api"
+                        ).exception(
+                            "Echec application coupon order_id=%s",
+                            order.id,
+                        )
+
+                try:
+                    from orders.models import OrderItem
+
+                    if articles:
+                        for a in articles:
+                            _qty = int(a.get('quantity', 1))
+                            _aid = str(a.get('id', ''))
+                            _des = str(
+                                a.get(
+                                    'name',
+                                    a.get('designation', ''),
+                                )
+                            )
+
+                            if not _des and _aid:
+                                try:
+                                    from orders.models import ArticleConfig
+
+                                    _des = ArticleConfig.objects.get(
+                                        article_id=_aid
+                                    ).label
+                                except Exception:
+                                    _des = f'Article {_aid}'
+
+                            if not _des:
+                                _des = 'Article'
+
+                            OrderItem.objects.create(
+                                order=order,
+                                designation=_des,
+                                quantity=_qty,
+                                unit_price=int(_pa),
+                                total=_qty * int(_pa),
+                            )
+
+                    elif nb_articles > 0:
+                        OrderItem.objects.create(
+                            order=order,
+                            designation='Articles pressing',
+                            quantity=nb_articles,
+                            unit_price=int(_pa),
+                            total=nb_articles * int(_pa),
+                        )
+
+                except Exception:
+                    import logging
+
+                    logging.getLogger(
+                        "fagni.orders.client_api"
+                    ).exception(
+                        "Echec creation OrderItem | order_id=%s",
+                        getattr(order, "id", None),
+                    )
+                    raise
+
+                # Finalisation commerciale canonique.
+                # Toutes les OrderItem existent avant la résolution des services.
+                # Si le catalogue V2 est incomplet ou la matérialisation échoue,
+                # toute la création commerciale est rollbackée.
+                finalize_commercial_order(order=order)
+                order.refresh_from_db()
+
+        except ServiceCatalogResolutionError as exc:
+            import logging
+
+            logging.getLogger(
+                "fagni.orders.client_api"
+            ).warning(
+                "Finalisation commerciale refusee : catalogue V2 incomplet | "
+                "order_id=%s | error=%s",
+                getattr(locals().get("order"), "id", None),
+                exc,
+            )
+
+            return Response(
+                {
+                    'error': (
+                        "Ce service n'est pas encore disponible, "
+                        "merci de reessayer plus tard."
+                    ),
+                },
+                status=503,
+            )
 
         # Sprint P0, Wave 3 (BC1) — auto-affectation additive, desactivee par
         # defaut. Placee ici (apres les OrderItem, pas juste apres le create())

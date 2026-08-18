@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 
 import firebase_admin
 from firebase_admin import credentials, messaging
@@ -9,16 +10,47 @@ logger = logging.getLogger("fagni.notifications")
 _app = None
 
 
+def _firebase_credentials_path():
+    configured_path = (
+        os.getenv("FIREBASE_CREDENTIALS_PATH", "") or ""
+    ).strip()
+
+    candidates = []
+
+    if configured_path:
+        candidates.append(Path(configured_path))
+
+    candidates.extend(
+        [
+            Path("/etc/secrets/firebase_credentials.json"),
+            Path(__file__).resolve().parent / "firebase_credentials.json",
+        ]
+    )
+
+    for path in candidates:
+        if path.is_file():
+            return path
+
+    searched = ", ".join(str(path) for path in candidates)
+
+    raise RuntimeError(
+        "Firebase credentials introuvables. "
+        f"Emplacements vérifiés : {searched}"
+    )
+
+
 def get_firebase_app():
     global _app
 
     if _app is None:
-        cred_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "firebase_credentials.json",
-        )
-        cred = credentials.Certificate(cred_path)
+        cred_path = _firebase_credentials_path()
+        cred = credentials.Certificate(str(cred_path))
         _app = firebase_admin.initialize_app(cred)
+
+        logger.info(
+            "[FCM] Firebase Admin initialisé | credentials=%s",
+            cred_path,
+        )
 
     return _app
 

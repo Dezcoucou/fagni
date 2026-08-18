@@ -2342,7 +2342,8 @@ def ops_assign_return_driver(request, order_id):
 @permission_classes([AllowAny])
 def api_simulateur_notify(request):
     """
-    POST /api/simulateur/notify?key=<SIMULATEUR_NOTIFY_KEY>
+    POST /api/simulateur/notify/
+    Authentification via header X-FAGNI-SIMULATEUR-KEY.
     Appele par le backend V2 (fagni-platform) apres une reservation via
     /estimation - fire-and-forget, jamais bloquant pour la reservation
     elle-meme si cet appel echoue. Exception consciente au principe
@@ -2351,8 +2352,7 @@ def api_simulateur_notify(request):
     de logique metier.
     """
     key = (
-        request.GET.get('key', '')
-        or request.data.get('key', '')
+        request.headers.get('X-FAGNI-SIMULATEUR-KEY', '')
         or ''
     ).strip()
     expected = (

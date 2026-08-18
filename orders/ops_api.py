@@ -48,6 +48,7 @@ def _send_notif_client_livraison(order):
     except Exception as e:
         print(f"[NOTIF] client livraison: {e}")
 """API Opérateur FAGNI — Dashboard de pilotage"""
+import hmac
 import jwt
 from django.conf import settings
 from rest_framework.decorators import api_view, permission_classes
@@ -69,8 +70,16 @@ def _check_ops(request):
 def ops_login(request):
     """POST /api/ops/login/ — {password} → JWT ops"""
     password = request.data.get('password','').strip()
-    ops_password = getattr(settings, 'OPS_PASSWORD', 'fagni2025')
-    if password != ops_password:
+    ops_password = (getattr(settings, 'OPS_PASSWORD', '') or '').strip()
+
+    # Fail closed : aucun accès opérateur si le secret n'est pas configuré.
+    if not ops_password:
+        return Response(
+            {'error': 'Configuration opérateur indisponible'},
+            status=503,
+        )
+
+    if not hmac.compare_digest(password, ops_password):
         return Response({'error': 'Mot de passe incorrect'}, status=401)
     token = jwt.encode({'ops': True, 'name': 'Opérateur FAGNI'}, settings.SECRET_KEY, algorithm='HS256')
     return Response({'access': token})
@@ -2341,9 +2350,23 @@ def api_simulateur_notify(request):
     car non-critique (une simple alerte), contrairement a une dependance
     de logique metier.
     """
-    key = request.GET.get('key', '') or request.data.get('key', '')
-    expected = getattr(settings, 'SIMULATEUR_NOTIFY_KEY', 'fagni_simulateur_notify_2026')
-    if key != expected:
+    key = (
+        request.GET.get('key', '')
+        or request.data.get('key', '')
+        or ''
+    ).strip()
+    expected = (
+        getattr(settings, 'SIMULATEUR_NOTIFY_KEY', '')
+        or ''
+    ).strip()
+
+    if not expected:
+        return Response(
+            {'error': 'Configuration simulateur indisponible'},
+            status=503,
+        )
+
+    if not hmac.compare_digest(key, expected):
         return Response({'error': 'Cle invalide'}, status=401)
 
     from fagni.notifications import notif_ops_retrait

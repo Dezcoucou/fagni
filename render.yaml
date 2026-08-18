@@ -16,5 +16,13 @@ services:
         sync: false
       - key: OPS_PASSWORD
         sync: false
+      - key: SIMULATEUR_NOTIFY_KEY
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
       - key: ALLOWED_HOSTS
         sync: false

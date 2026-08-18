@@ -20,7 +20,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ========================
 #  CONFIG DE BASE
 # ========================
-SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-change-me")
+SECRET_KEY = (os.getenv("SECRET_KEY") or "").strip()
+if not SECRET_KEY:
+    if TESTING:
+        SECRET_KEY = "django-test-only-secret-key-not-for-production"
+    else:
+        raise RuntimeError("SECRET_KEY environment variable is required")
 DEBUG = False
 
 CLIENT_SESSION_KEY = "fagni_client_phone"
@@ -570,8 +575,12 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 
-OPS_PASSWORD = os.getenv('OPS_PASSWORD', 'fagni2025')
-SIMULATEUR_NOTIFY_KEY = os.getenv('SIMULATEUR_NOTIFY_KEY', 'fagni_simulateur_notify_2026')
+OPS_PASSWORD = (os.getenv('OPS_PASSWORD') or '').strip()
+SIMULATEUR_NOTIFY_KEY = (os.getenv('SIMULATEUR_NOTIFY_KEY') or '').strip()
+
+DEFAULT_ADMIN_USERNAME = (os.getenv('DEFAULT_ADMIN_USERNAME') or 'admin').strip()
+DEFAULT_ADMIN_EMAIL = (os.getenv('DEFAULT_ADMIN_EMAIL') or 'admin@fagni.com').strip()
+DEFAULT_ADMIN_PASSWORD = (os.getenv('DEFAULT_ADMIN_PASSWORD') or '').strip()
 
 # Cloudinary
 import cloudinary

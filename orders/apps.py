@@ -26,7 +26,14 @@ class OrdersConfig(AppConfig):
 
             username = getattr(settings, "DEFAULT_ADMIN_USERNAME", "admin")
             email = getattr(settings, "DEFAULT_ADMIN_EMAIL", "admin@fagni.com")
-            password = getattr(settings, "DEFAULT_ADMIN_PASSWORD", "Admin1234!")
+            password = (
+                getattr(settings, "DEFAULT_ADMIN_PASSWORD", "") or ""
+            ).strip()
+
+            # Sécurité : ne jamais créer automatiquement un superuser
+            # avec un mot de passe par défaut ou vide.
+            if not password:
+                return
 
             if not User.objects.filter(username=username).exists():
                 User.objects.create_superuser(

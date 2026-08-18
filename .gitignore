@@ -183,3 +183,11 @@ ANTHROPIC_API_KEY
 firebase_credentials.json
 *.backup_*
 secrets/
+*.sqlite
+*.sqlite3
+*.db
+*.sqlite.bak*
+*.sqlite3.bak*
+db_backup_*
+db.before_*
+db.backup.*

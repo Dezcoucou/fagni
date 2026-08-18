@@ -1,11 +1,12 @@
 import os
 
-os.environ["DJANGO_SETTINGS_MODULE"] = "fagni.settings"
-os.environ["CLOUDINARY_CLOUD_NAME"]  = "***REMOVED***"
-os.environ["CLOUDINARY_API_KEY"]     = "***REMOVED***"
-os.environ["CLOUDINARY_API_SECRET"]  = "***REMOVED***"
-
 from dotenv import load_dotenv
-load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "fagni.settings")
+
 from django.core.wsgi import get_wsgi_application
+
 application = get_wsgi_application()

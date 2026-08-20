@@ -3,7 +3,7 @@ from orders.ops_api import api_ops_pilotbook, api_ops_pilotbook_detail, api_ops_
 from orders.driver_api import save_fcm_token, api_driver_dropoff, driver_login, driver_missions, driver_confirm_pickup, driver_delivery_proof, driver_wallet, driver_toggle_status, driver_pending_mission, driver_copilote, api_driver_profil_update, driver_update_location
 from orders.photo_api import driver_upload_photo, partner_upload_photo, order_photos
 from orders.config_api import api_config
-from orders.client_api import api_chatbot, api_login, api_home, api_orders, api_order_detail, api_declare_wave_payment, api_pricing_bags, api_create_order, api_articles, api_wallet, api_parrainage, api_rate_order, api_register, api_report_litige, api_pricing_detail, api_order_tracking, api_cancel_order, api_abonnement_estimer, api_abonnement_reserver, api_mon_abonnement_v1, api_routine_essai, api_routine_essai_detail, api_client_accueil
+from orders.client_api import api_chatbot, api_login, api_home, api_orders, api_order_detail, api_declare_wave_payment, api_pricing_bags, api_create_order, api_coupon_preview, api_articles, api_wallet, api_parrainage, api_rate_order, api_register, api_report_litige, api_pricing_detail, api_order_tracking, api_cancel_order, api_abonnement_estimer, api_abonnement_reserver, api_mon_abonnement_v1, api_routine_essai, api_routine_essai_detail, api_client_accueil
 from django.contrib import admin
 from django.urls import path, include
 from fagni.views import home, landing_riviera3, api_health
@@ -26,6 +26,7 @@ urlpatterns = [
     ),
     path("api/client/pricing/bags/", api_pricing_bags,  name="api-client-pricing-bags"),
     path("api/client/orders/create/",  api_create_order, name="api-client-create-order"),
+    path("api/client/coupon/preview/", api_coupon_preview, name="api-client-coupon-preview"),
     path("api/client/articles/",          api_articles,     name="api-client-articles"),
     path("api/client/wallet/",             api_wallet,       name="api-client-wallet"),
     path("api/client/parrainage/",         api_parrainage,   name="api-client-parrainage"),

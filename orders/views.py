@@ -15247,12 +15247,25 @@ def get_child_referral_discount(customer, order=None):
         return 0
 
 
-def validate_and_get_coupon_discount(order, coupon_code):
+def validate_and_get_coupon_discount(customer, prestation_total, coupon_code, exclude_order_pk=None):
     """
     Valide un coupon et calcule la reduction (ADR-025, Pilot Growth Plan, 9 juillet 2026).
     La reduction est toujours calculee sur le montant HORS livraison (prestation seule),
     et absorbee entierement par la marge FAGNI - jamais par les commissions
     partenaire/livreur, deja verrouillees a la creation de la commande (ADR-001).
+
+    Fonction pure lecture : aucune ecriture, aucun CouponUsage cree ici. Peut donc
+    etre appelee en apercu (avant creation de commande, cf api_coupon_preview) sans
+    consommer un usage reel du coupon - seule la creation de commande reelle
+    (api_create_order, plus bas dans ce module) cree un CouponUsage et fait donc
+    progresser max_uses_per_customer/max_total_uses.
+
+    `prestation_total` : montant HORS livraison/service (le meme calcul que
+    articlesTotal cote frontend - deja soustrait par l'appelant, jamais recalcule
+    ici a partir d'une Order). `exclude_order_pk` : optionnel, exclut une commande
+    du controle "premiere commande payee" - utilise par le chemin de creation de
+    commande reelle, ou l'order courante existe deja en base au moment de l'appel ;
+    laisser None pour un apercu avant creation (aucune commande a exclure).
 
     Retourne (discount_amount: Decimal, error: str|None, coupon: Coupon|None)
     """
@@ -15271,7 +15284,6 @@ def validate_and_get_coupon_discount(order, coupon_code):
     if not coupon.is_currently_valid():
         return Decimal("0"), "coupon_invalide_ou_expire", coupon
 
-    customer = getattr(order, "customer", None)
     if not customer:
         return Decimal("0"), "client_introuvable", coupon
 
@@ -15288,7 +15300,7 @@ def validate_and_get_coupon_discount(order, coupon_code):
                 customer=customer,
                 payment_status="paid",
             )
-            .exclude(pk=getattr(order, "pk", None))
+            .exclude(pk=exclude_order_pk)
             .exists()
         )
 
@@ -15299,7 +15311,7 @@ def validate_and_get_coupon_discount(order, coupon_code):
     if already_used >= coupon.max_uses_per_customer:
         return Decimal("0"), "deja_utilise", coupon
 
-    prestation_total = _safe_dec(getattr(order, "total_client_ttc", 0)) - _safe_dec(getattr(order, "delivery_fee", 0)) - _safe_dec(getattr(order, "service_fee", 0))
+    prestation_total = _safe_dec(prestation_total)
 
     if coupon.discount_type == "percent":
         discount = (prestation_total * coupon.discount_value / Decimal("100")).quantize(Decimal("1"))

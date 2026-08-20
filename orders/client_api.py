@@ -1130,9 +1130,16 @@ def api_create_order(request):
                         from orders.views import validate_and_get_coupon_discount
                         from orders.models import CouponUsage
 
+                        _prestation_total = (
+                            (order.total_client_ttc or 0)
+                            - (order.delivery_fee or 0)
+                            - (order.service_fee or 0)
+                        )
                         discount, error, coupon = validate_and_get_coupon_discount(
-                            order,
+                            customer,
+                            _prestation_total,
                             coupon_code_input,
+                            exclude_order_pk=order.pk,
                         )
 
                         if coupon and not error and discount > 0:
@@ -1350,6 +1357,47 @@ def api_create_order(request):
         return Response({'error': str(e)}, status=400)
 
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
+def api_coupon_preview(request):
+    """
+    POST /api/client/coupon/preview/ — apercu d'une reduction avant confirmation
+    de commande (le client tape/valide un code, ex FAGNI30, avant de commander).
+
+    Fonction pure lecture : reutilise validate_and_get_coupon_discount (meme
+    regles que la creation de commande reelle - premiere commande payee,
+    max_uses_per_customer, max_total_uses, fenetre de validite) sans jamais
+    creer de CouponUsage. Un client qui teste ou hesite ne consomme donc pas
+    une des utilisations de la campagne.
+
+    Le total previsualise ici n'est qu'un apercu, pas un engagement : le
+    calcul autoritaire reste celui de api_create_order, recalcule cote
+    serveur a partir du catalogue au moment de la creation reelle - pas de
+    ce prestation_total envoye par le client.
+    """
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        import jwt
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        from orders.models import Customer
+        customer = Customer.objects.get(id=payload['cid'])
+    except Exception:
+        return Response({'error': 'Non autorisé'}, status=401)
+
+    coupon_code = (request.data.get('coupon_code') or '').strip()
+    prestation_total = request.data.get('prestation_total') or 0
+
+    from orders.views import validate_and_get_coupon_discount
+    discount, error, coupon = validate_and_get_coupon_discount(
+        customer, prestation_total, coupon_code,
+    )
+
+    return Response({
+        'valid': bool(coupon) and not error and discount > 0,
+        'discount_amount': float(discount),
+        'error': error,
+    })
 
 
 @api_view(['GET'])

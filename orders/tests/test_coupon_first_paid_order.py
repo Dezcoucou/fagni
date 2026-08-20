@@ -64,13 +64,19 @@ class CouponFirstPaidOrderTests(TestCase):
         order.refresh_from_db()
         return order
 
+    @staticmethod
+    def _prestation_total(order):
+        return (order.total_client_ttc or 0) - (order.delivery_fee or 0) - (order.service_fee or 0)
+
     def test_previous_unpaid_order_does_not_block_first_order_coupon(self):
         self._make_order(payment_status="pending")
         current_order = self._make_order(payment_status="pending")
 
         discount, error, coupon = validate_and_get_coupon_discount(
-            current_order,
+            current_order.customer,
+            self._prestation_total(current_order),
             "FAGNI30",
+            exclude_order_pk=current_order.pk,
         )
 
         self.assertIsNone(error)
@@ -82,8 +88,10 @@ class CouponFirstPaidOrderTests(TestCase):
         current_order = self._make_order(payment_status="pending")
 
         discount, error, coupon = validate_and_get_coupon_discount(
-            current_order,
+            current_order.customer,
+            self._prestation_total(current_order),
             "FAGNI30",
+            exclude_order_pk=current_order.pk,
         )
 
         self.assertEqual(discount, Decimal("0"))
@@ -103,10 +111,26 @@ class CouponFirstPaidOrderTests(TestCase):
         current_order = self._make_order(payment_status="pending")
 
         discount, error, coupon = validate_and_get_coupon_discount(
-            current_order,
+            current_order.customer,
+            self._prestation_total(current_order),
             "FAGNI30",
+            exclude_order_pk=current_order.pk,
         )
 
         self.assertEqual(discount, Decimal("0"))
         self.assertEqual(error, "deja_utilise")
         self.assertEqual(coupon, self.coupon)
+
+    def test_preview_does_not_exclude_current_order_when_none_given(self):
+        # Apercu avant creation de commande : aucune order a exclure. S'assure
+        # que exclude_order_pk=None (le defaut) ne casse pas la requete
+        # d'exclusion et ne bloque pas un premier apercu legitime.
+        discount, error, coupon = validate_and_get_coupon_discount(
+            self.customer,
+            Decimal("6500"),
+            "FAGNI30",
+        )
+
+        self.assertIsNone(error)
+        self.assertEqual(coupon, self.coupon)
+        self.assertEqual(discount, Decimal("1950"))

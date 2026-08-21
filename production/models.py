@@ -16,6 +16,7 @@ class PartnerJob(TimeStampedModel):
         ("ready", "Prêt"),
         ("handed_over", "Remis au livreur"),
         ("issue", "Incident"),
+        ("canceled", "Annulé"),
     ]
 
     code = models.CharField(
@@ -75,6 +76,12 @@ class PartnerJob(TimeStampedModel):
     processing_started_at = models.DateTimeField(null=True, blank=True)
     ready_at = models.DateTimeField(null=True, blank=True)
     handed_over_at = models.DateTimeField(null=True, blank=True)
+
+    canceled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Annulé le",
+    )
 
     notes = models.TextField(blank=True, verbose_name="Notes")
 

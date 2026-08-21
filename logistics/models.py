@@ -26,6 +26,7 @@ class Mission(TimeStampedModel):
         ("awaiting_validation", "En attente de validation"),
         ("completed", "Terminée"),
         ("failed", "Échouée"),
+        ("canceled", "Annulée"),
         ("issue_reported", "Incident signalé"),
     ]
 
@@ -146,6 +147,12 @@ class Mission(TimeStampedModel):
         blank=True,
     )
 
+    canceled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Annulée le",
+    )
+
     priority = models.CharField(
         max_length=20,
         choices=PRIORITY_CHOICES,
@@ -219,6 +226,7 @@ class MissionActionLog(TimeStampedModel):
         ("photo_added", "Photo ajoutée"),
         ("issue_reported", "Incident signalé"),
         ("completed", "Terminée"),
+        ("canceled", "Annulée"),
     ]
 
     mission = models.ForeignKey(

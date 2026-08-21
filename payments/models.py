@@ -86,3 +86,132 @@ class Payout(TimeStampedModel):
     class Meta:
         verbose_name = 'Versement'
         verbose_name_plural = 'Versements'
+
+
+class CustomerCharge(TimeStampedModel):
+    """
+    Créance financière due par un client à FAGNI.
+
+    Ce modèle est volontairement distinct :
+    - du total commercial de la commande ;
+    - des paiements encaissés ;
+    - du wallet client.
+
+    Une créance peut donc rester due même si le wallet client est vide
+    et même si la commande source est déjà annulée.
+    """
+
+    class ChargeType(models.TextChoices):
+        LATE_CANCELLATION = (
+            "late_cancellation",
+            "Annulation tardive",
+        )
+        ADJUSTMENT = (
+            "adjustment",
+            "Ajustement",
+        )
+        OTHER = (
+            "other",
+            "Autre",
+        )
+
+    class Status(models.TextChoices):
+        DUE = "due", "À payer"
+        PAID = "paid", "Payée"
+        WAIVED = "waived", "Remise / abandonnée"
+        CANCELED = "canceled", "Annulée"
+
+    customer = models.ForeignKey(
+        "orders.Customer",
+        on_delete=models.PROTECT,
+        related_name="customer_charges",
+        verbose_name="Client",
+    )
+
+    order = models.ForeignKey(
+        "orders.Order",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="customer_charges",
+        verbose_name="Commande source",
+    )
+
+    charge_type = models.CharField(
+        "Type de créance",
+        max_length=40,
+        choices=ChargeType.choices,
+    )
+
+    amount = models.DecimalField(
+        "Montant",
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    currency = models.CharField(
+        "Devise",
+        max_length=10,
+        default="XOF",
+    )
+
+    status = models.CharField(
+        "Statut",
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DUE,
+        db_index=True,
+    )
+
+    reason = models.TextField(
+        "Motif",
+        blank=True,
+        default="",
+    )
+
+    idempotency_key = models.CharField(
+        "Clé d'idempotence",
+        max_length=120,
+        unique=True,
+    )
+
+    paid_at = models.DateTimeField(
+        "Payée le",
+        null=True,
+        blank=True,
+    )
+
+    waived_at = models.DateTimeField(
+        "Abandonnée le",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = "Créance client"
+        verbose_name_plural = "Créances clients"
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(
+                fields=["customer", "status"],
+                name="pay_charge_customer_status",
+            ),
+            models.Index(
+                fields=["order", "charge_type"],
+                name="pay_charge_order_type",
+            ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(amount__gt=0),
+                name="customercharge_amount_gt_zero",
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.customer} — "
+            f"{self.get_charge_type_display()} — "
+            f"{self.amount} {self.currency} — "
+            f"{self.get_status_display()}"
+        )

@@ -186,7 +186,7 @@ def complete_mission(
     notes="",
     action_type="completed",
 ):
-    if mission.status in {"completed", "failed"}:
+    if mission.status in {"completed", "failed", "canceled"}:
         raise ValueError(
             "La mission est déjà finalisée avec le statut "
             f"{mission.status}"
@@ -219,5 +219,72 @@ def complete_mission(
                 f"de la mission {mission.code}."
             ),
         )
+
+    return mission
+
+
+@transaction.atomic
+def cancel_mission(
+    *,
+    mission,
+    reason="",
+    notes="",
+):
+    """
+    Annule une Mission logistique FAGNI.
+
+    Contrat :
+    - completed : annulation interdite ;
+    - failed : annulation interdite ;
+    - canceled : opération idempotente ;
+    - autres états : annulables ;
+    - reason obligatoire lors de la première annulation ;
+    - canceled_at horodaté ;
+    - MissionActionLog conserve le motif structuré.
+    """
+
+    if mission.status == "canceled":
+        return mission
+
+    if mission.status in {"completed", "failed"}:
+        raise ValueError(
+            "Impossible d'annuler une mission déjà finalisée "
+            f"avec le statut {mission.status}"
+        )
+
+    reason = str(reason or "").strip()
+
+    if not reason:
+        raise ValueError(
+            "Le motif d'annulation (reason) est obligatoire "
+            "pour garantir l'auditabilité."
+        )
+
+    mission.status = "canceled"
+
+    if mission.canceled_at is None:
+        mission.canceled_at = timezone.now()
+
+    mission.save(
+        update_fields=[
+            "status",
+            "canceled_at",
+            "updated_at",
+        ]
+    )
+
+    log_notes = f"Motif : {reason}"
+
+    if notes:
+        log_notes = f"{log_notes}\n{notes}"
+
+    MissionActionLog.objects.create(
+        mission=mission,
+        action_type="canceled",
+        notes=log_notes,
+        payload_json={
+            "reason": reason,
+        },
+    )
 
     return mission

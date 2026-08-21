@@ -1800,91 +1800,120 @@ def api_cancel_order(request, order_id):
         from orders.models import Order
         from django.utils import timezone
         import datetime
+        from services.cancellation import (
+            CommercialOrderCancellationError,
+            cancel_commercial_order,
+        )
 
         order = Order.objects.get(id=order_id, customer=customer)
 
-        # Vérifier statut
+        # 1. Garde-fou terminal (rapide, sans cascade)
         if order.status in ['done', 'canceled']:
-            return Response({'error': 'Cette commande ne peut plus être annulée'}, status=400)
+            return Response(
+                {'error': 'Cette commande ne peut plus être annulée'},
+                status=400,
+            )
 
-        # Vérifier délai 2h avant collecte
+        # 2. Détection frais d'annulation tardive (< 2h avant collecte)
+        late_fee = False
         if order.pickup_scheduled_date and order.pickup_scheduled_time:
             pickup_dt = datetime.datetime.combine(
                 order.pickup_scheduled_date,
-                order.pickup_scheduled_time
+                order.pickup_scheduled_time,
             )
             pickup_dt = timezone.make_aware(pickup_dt)
             now = timezone.now()
-            diff = (pickup_dt - now).total_seconds() / 3600
+            diff_hours = (pickup_dt - now).total_seconds() / 3600
 
-            if diff < 2:
-                # Frais annulation tardive
-                order.notes = (order.notes or '') + '\nANNULATION_TARDIVE:1000 FCFA'
-                order.status = 'canceled'
-                order.save(update_fields=['status', 'notes', 'updated_at'])
-                return Response({
-                    'canceled': True,
-                    'late_fee': True,
-                    'message': 'Commande annulée. Frais d\'annulation tardive : 1 000 FCFA applicable.'
-                })
+            if diff_hours < 2:
+                late_fee = True
 
-        order.status = 'canceled'
-        order.save(update_fields=['status', 'updated_at'])
-        return Response({'canceled': True, 'late_fee': False, 'message': 'Commande annulée sans frais.'})
-    except Exception as e:
-        return Response({'error': str(e)}, status=400)
+        # 3. Construction du motif et des notes
+        if late_fee:
+            reason = "Annulation tardive client (< 2h avant collecte)"
+            notes = "ANNULATION_TARDIVE:1000 FCFA"
+        else:
+            reason = "Annulation client"
+            notes = ""
 
+        # 4. Annulation + éventuelle créance dans une seule transaction.
+        # Une pénalité ne doit jamais exister sans annulation, et une
+        # annulation tardive ne doit jamais être validée sans sa créance.
+        from decimal import Decimal
+        from django.db import transaction
 
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def api_cancel_order(request, order_id):
-    """POST /api/client/orders/<id>/cancel/ — annuler commande"""
-    token = request.headers.get('Authorization', '').replace('Bearer ', '')
-    try:
-        import jwt
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-        from orders.models import Customer
-        customer = Customer.objects.get(id=payload['cid'])
-    except Exception:
-        return Response({'error': 'Non autorisé'}, status=401)
+        try:
+            with transaction.atomic():
+                result = cancel_commercial_order(
+                    order=order,
+                    reason=reason,
+                    notes=notes,
+                )
 
-    try:
-        from orders.models import Order
-        from django.utils import timezone
-        import datetime
+                charge = None
 
-        order = Order.objects.get(id=order_id, customer=customer)
+                if late_fee:
+                    from payments.models import CustomerCharge
+                    from payments.services import apply_customer_charge
 
-        # Vérifier statut
-        if order.status in ['done', 'canceled']:
-            return Response({'error': 'Cette commande ne peut plus être annulée'}, status=400)
+                    charge, _ = apply_customer_charge(
+                        customer=customer,
+                        order=order,
+                        charge_type=(
+                            CustomerCharge.ChargeType.LATE_CANCELLATION
+                        ),
+                        amount=Decimal("1000.00"),
+                        reason=(
+                            f"Annulation tardive commande #{order.id} "
+                            f"(< 2h avant collecte)"
+                        ),
+                    )
 
-        # Vérifier délai 2h avant collecte
-        if order.pickup_scheduled_date and order.pickup_scheduled_time:
-            pickup_dt = datetime.datetime.combine(
-                order.pickup_scheduled_date,
-                order.pickup_scheduled_time
+        except CommercialOrderCancellationError as exc:
+            return Response(
+                {'error': str(exc)},
+                status=409,
             )
-            pickup_dt = timezone.make_aware(pickup_dt)
-            now = timezone.now()
-            diff = (pickup_dt - now).total_seconds() / 3600
 
-            if diff < 2:
-                # Frais annulation tardive
-                order.notes = (order.notes or '') + '\nANNULATION_TARDIVE:1000 FCFA'
-                order.status = 'canceled'
-                order.save(update_fields=['status', 'notes', 'updated_at'])
-                return Response({
-                    'canceled': True,
-                    'late_fee': True,
-                    'message': 'Commande annulée. Frais d\'annulation tardive : 1 000 FCFA applicable.'
-                })
+        # 5. Réponse API
+        message = (
+            "Commande annulée. Frais d'annulation tardive : "
+            "1 000 FCFA applicable."
+            if late_fee
+            else "Commande annulée sans frais."
+        )
 
-        order.status = 'canceled'
-        order.save(update_fields=['status', 'updated_at'])
-        return Response({'canceled': True, 'late_fee': False, 'message': 'Commande annulée sans frais.'})
+        return Response({
+            'canceled': True,
+            'late_fee': late_fee,
+            'late_fee_amount': 1000 if late_fee else 0,
+            'customer_charge_id': (
+                charge.id
+                if late_fee and charge is not None
+                else None
+            ),
+            'customer_charge_status': (
+                charge.status
+                if late_fee and charge is not None
+                else None
+            ),
+            'message': message,
+            'service_executions_canceled': result.get(
+                'service_executions_canceled', 0
+            ),
+            'missions_canceled': result.get('missions_canceled', 0),
+            'partner_jobs_canceled': result.get('partner_jobs_canceled', 0),
+            'delivery_legs_canceled': result.get(
+                'delivery_legs_canceled',
+                0,
+            ),
+        })
+
+    except Order.DoesNotExist:
+        return Response({'error': 'Commande introuvable'}, status=404)
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
 
 
 @api_view(['GET'])

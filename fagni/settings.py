@@ -415,7 +415,11 @@ WAVE_MERCHANT_LINK_BASE = "https://pay.wave.com/m/M_ci_8SO-R9nJg71k/c/ci/"
 # ========================
 #  SECURITY (PROD)
 # ========================
-if not DEBUG and not TESTING:
+# Le serveur de développement local utilise HTTP.
+# La sécurité HTTPS reste active dès que SITE_BASE_URL est en HTTPS.
+_IS_LOCAL_HTTP = SITE_BASE_URL.startswith("http://127.0.0.1") or SITE_BASE_URL.startswith("http://localhost")
+
+if not DEBUG and not TESTING and not _IS_LOCAL_HTTP:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_SSL_REDIRECT = True
 
@@ -425,6 +429,8 @@ if not DEBUG and not TESTING:
 
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+else:
+    SECURE_SSL_REDIRECT = False
 
 # --- DEV: disable template cached loader (avoid stale templates / blank pages) ---
 try:

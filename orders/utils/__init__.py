@@ -53,3 +53,6 @@ from .canonical_snapshot import (
     canonical_payment_status,
     build_order_canonical_snapshot,
 )
+
+# Compatibilité legacy : API d'assignation déléguée au moteur canonique.
+from .assign import auto_assign_laundry, auto_assign_delivery

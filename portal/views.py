@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.conf import settings
+from django.db import transaction
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, Http404
 
@@ -14,6 +15,8 @@ from orders.models import (
 )
 from orders.utils import auto_assign_laundry, auto_assign_delivery
 from mlm.services import attach_customer_to_sponsor
+from services.services import finalize_commercial_order
+from services.resolution import ServiceCatalogResolutionError
 
 
 def public_create_order(request):
@@ -22,7 +25,8 @@ def public_create_order(request):
     - Client (nom, téléphone, adresse, lat/lng)
     - Lignes de prestations issues du catalogue
     - Photos multiples par ligne (photos_0, photos_1, ...)
-    - Assignation automatique blanchisserie + livreur
+    - Finalisation commerciale V2 (ServiceExecution)
+    - Assignation automatique blanchisserie + livreur APRÈS finalisation
     - Calcul des frais de livraison
     - Rattachement éventuel à un code affilié (MLM)
     """
@@ -36,7 +40,7 @@ def public_create_order(request):
         "service_categories": service_categories,
         "service_items": service_items,
         "error": None,
-        # pré-remplissage en cas d’erreur
+        # pré-remplissage en cas d'erreur
         "client_phone": request.POST.get("client_phone", "") if request.method == "POST" else "",
         "client_name": request.POST.get("client_name", "") if request.method == "POST" else "",
         "client_address": request.POST.get("client_address", "") if request.method == "POST" else "",
@@ -96,19 +100,14 @@ def public_create_order(request):
         if affiliate_code:
             attach_customer_to_sponsor(customer, affiliate_code)
 
-        # 4) Création commande
-        order = Order.objects.create(
-            customer=customer,
-            status="pending",
-        )
-
-        # 5) Lignes de commande
+        # 4) Collecte des lignes de commande AVANT transaction
         service_ids = request.POST.getlist("service_id[]")
         designations = request.POST.getlist("designation[]")
         quantities = request.POST.getlist("quantity[]")
         unit_prices = request.POST.getlist("unit_price[]")
 
-        created_any_item = False
+        items_data = []
+        photos_by_idx = {}
 
         for idx, (sid, desc, qty_str, pu_str) in enumerate(
             zip(service_ids, designations, quantities, unit_prices)
@@ -137,46 +136,88 @@ def public_create_order(request):
                 except (ServiceItem.DoesNotExist, ValueError, TypeError):
                     service_obj = None
 
-            item = OrderItem.objects.create(
-                order=order,
-                service=service_obj,
-                designation=desc,
-                quantity=qty,
-                unit_price=pu,
-            )
-            created_any_item = True
+            items_data.append({
+                "service": service_obj,
+                "designation": desc,
+                "quantity": qty,
+                "unit_price": pu,
+            })
 
             # photos multiples pour cette ligne
             photos_field_name = f"photos_{idx}"
             files = request.FILES.getlist(photos_field_name)
-            for f in files:
-                OrderItemPhoto.objects.create(
-                    order_item=item,
-                    image=f,
-                )
+            if files:
+                photos_by_idx[len(items_data) - 1] = files
 
-        if not created_any_item:
-            order.delete()
+        if not items_data:
             context["error"] = (
                 "Ajoute au moins une prestation avec quantité et prix unitaire > 0."
             )
             return render(request, "portal/create_order.html", context)
 
-        # 6) Assignation blanchisserie + livreur
-        laundry_partner = auto_assign_laundry(order)
-        if laundry_partner:
-            order.laundry_partner = laundry_partner
+        # 5) Transaction atomique : Order + OrderItem + finalisation V2
+        try:
+            with transaction.atomic():
+                # Créer Order en mode draft
+                order = Order.objects.create(
+                    customer=customer,
+                    status="pending",
+                    is_draft=True,
+                    pricing_mode="item",
+                )
 
-        delivery_partner = auto_assign_delivery(order)
-        if delivery_partner:
-            order.delivery_partner = delivery_partner
+                # Créer les OrderItem
+                for idx, item_data in enumerate(items_data):
+                    item = OrderItem.objects.create(
+                        order=order,
+                        service=item_data["service"],
+                        designation=item_data["designation"],
+                        quantity=item_data["quantity"],
+                        unit_price=item_data["unit_price"],
+                    )
 
-        # 7) Modèle pressing pilote FAGNI : livraison aller-retour fixe facturée au client
-        if order.laundry_partner:
-            order.delivery_fee = 2000
+                    # Créer les photos
+                    if idx in photos_by_idx:
+                        for f in photos_by_idx[idx]:
+                            OrderItemPhoto.objects.create(
+                                order_item=item,
+                                image=f,
+                            )
 
-        # 8) Sauvegarde finale (total + service_fee + signaux)
-        order.save()
+                # Finalisation commerciale V2
+                # Cette étape crée les ServiceExecution et passe is_draft=False
+                try:
+                    finalize_commercial_order(order=order)
+                except ServiceCatalogResolutionError as e:
+                    # Rollback complet : aucune commande partiellement créée
+                    raise
+
+                # Refresh pour récupérer l'état post-finalisation
+                order.refresh_from_db()
+
+                # 6) Assignation blanchisserie + livreur APRÈS finalisation
+                laundry_partner = auto_assign_laundry(order)
+                if laundry_partner:
+                    order.laundry_partner = laundry_partner
+
+                delivery_partner = auto_assign_delivery(order)
+                if delivery_partner:
+                    order.delivery_partner = delivery_partner
+
+                # 7) Modèle pressing pilote FAGNI : livraison aller-retour fixe
+                if order.laundry_partner:
+                    order.delivery_fee = 2000
+
+                # 8) Sauvegarde finale
+                order.save()
+
+        except ServiceCatalogResolutionError:
+            # Message utilisateur propre, aucune commande en base
+            context["error"] = (
+                "Cette commande ne peut pas encore être confirmée : "
+                "le service sélectionné n'est pas disponible."
+            )
+            return render(request, "portal/create_order.html", context)
 
         # Redirection vers page "merci"
         return redirect("portal:public_thanks", order_code=order.code)

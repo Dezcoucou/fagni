@@ -104,6 +104,10 @@ urlpatterns = [
 
     path("admin/", admin.site.urls),
     path("", home, name="home"),
+    path(
+        "commande/",
+        include(("portal.urls", "portal"), namespace="portal"),
+    ),
     path("riviera3/", landing_riviera3),
     path("dashboard/", include("dashboard.urls")),
     path("orders/", include(("orders.urls", "orders"), namespace="orders")),

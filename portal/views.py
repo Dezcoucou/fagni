@@ -112,38 +112,72 @@ def public_create_order(request):
         for idx, (sid, desc, qty_str, pu_str) in enumerate(
             zip(service_ids, designations, quantities, unit_prices)
         ):
-            desc = (desc or "").strip()
-            if not desc:
-                continue
+            # =====================================================
+            # SOURCE DE VÉRITÉ COMMERCIALE V2
+            # =====================================================
+            # Le navigateur peut afficher le prix du catalogue,
+            # mais il ne doit jamais pouvoir le fixer.
+            #
+            # La source de vérité est exclusivement :
+            # ServiceItem.default_price côté serveur.
+            # =====================================================
+
+            try:
+                service_obj = ServiceItem.objects.select_related(
+                    "category"
+                ).get(
+                    pk=int(sid),
+                    is_active=True,
+                )
+            except (
+                ServiceItem.DoesNotExist,
+                ValueError,
+                TypeError,
+            ):
+                context["error"] = (
+                    "Une prestation sélectionnée n'est plus disponible."
+                )
+                return render(
+                    request,
+                    "portal/create_order.html",
+                    context,
+                )
 
             try:
                 qty = int(qty_str or "0")
-            except Exception:
+            except (TypeError, ValueError):
                 qty = 0
 
-            try:
-                pu = Decimal(pu_str or "0")
-            except Exception:
-                pu = Decimal("0.00")
-
-            if qty <= 0 or pu <= 0:
+            if qty <= 0:
                 continue
 
-            service_obj = None
-            if sid:
-                try:
-                    service_obj = ServiceItem.objects.get(pk=int(sid))
-                except (ServiceItem.DoesNotExist, ValueError, TypeError):
-                    service_obj = None
+            # IMPORTANT :
+            # pu_raw / unit_price[] provenant du navigateur est
+            # volontairement ignoré.
+            pu = service_obj.default_price
+
+            if pu is None or pu <= 0:
+                context["error"] = (
+                    f"La prestation « {service_obj.name} » "
+                    "n'a pas de prix catalogue valide."
+                )
+                return render(
+                    request,
+                    "portal/create_order.html",
+                    context,
+                )
+
+            # La désignation commerciale provient également du catalogue.
+            designation = service_obj.name
 
             items_data.append({
                 "service": service_obj,
-                "designation": desc,
+                "designation": designation,
                 "quantity": qty,
                 "unit_price": pu,
             })
 
-            # photos multiples pour cette ligne
+            # Photos multiples pour cette ligne.
             photos_field_name = f"photos_{idx}"
             files = request.FILES.getlist(photos_field_name)
             if files:

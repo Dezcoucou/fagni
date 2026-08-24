@@ -172,6 +172,85 @@ class PortalCreateOrderV2Tests(TestCase):
             execution.id,
         )
 
+    def test_client_cannot_manipulate_catalog_price_or_designation(self):
+        """
+        Contrat de sécurité commerciale V2 :
+
+        Le client peut envoyer unit_price[] et designation[] depuis
+        le navigateur, mais ces valeurs ne constituent jamais la
+        source de vérité.
+
+        La commande doit utiliser exclusivement :
+        - ServiceItem.default_price pour le prix ;
+        - ServiceItem.name pour la désignation.
+        """
+        response = self._post_order(
+            phone="0700000006",
+            name="Client Anti Fraude",
+            service_items=[self.pressing_item],
+            designations=["PRIX TRUQUÉ À 1 FCFA"],
+            quantities=["2"],
+            unit_prices=["1"],
+        )
+
+        self.assertEqual(
+            response.status_code,
+            302,
+        )
+
+        order = Order.objects.get(
+            customer__phone="0700000006"
+        )
+
+        item = order.items.get()
+
+        # Le navigateur a envoyé 1 FCFA :
+        # le serveur doit conserver le prix catalogue.
+        self.assertEqual(
+            item.unit_price,
+            Decimal("500"),
+        )
+
+        # Le navigateur a envoyé une fausse désignation :
+        # le serveur doit conserver le nom catalogue.
+        self.assertEqual(
+            item.designation,
+            "Chemise",
+        )
+
+        # Contrat complémentaire :
+        # la quantité reste bien celle demandée par le client.
+        self.assertEqual(
+            item.quantity,
+            2,
+        )
+
+        self.assertEqual(
+            item.service_id,
+            self.pressing_item.id,
+        )
+
+        self.assertFalse(order.is_draft)
+
+        execution = ServiceExecution.objects.get(
+            order=order,
+        )
+
+        self.assertEqual(
+            execution.service.code,
+            "pressing_article",
+        )
+
+        link = ServiceExecutionItem.objects.get(
+            order_item=item,
+        )
+
+        self.assertEqual(
+            link.service_execution_id,
+            execution.id,
+        )
+
+
     def test_multiservice_creates_multiple_executions(self):
         """
         Pressing + retouche doivent produire deux

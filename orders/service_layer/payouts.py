@@ -101,21 +101,16 @@ def trigger_driver_payout_for_leg(leg):
     )
 
     if amount <= 0:
-        # ✅ fallback: si driver_amount n’est pas sur la jambe
-        fallback = Decimal(str(getattr(order, "amount_driver_partner", 0) or 0))
-        if fallback > 0:
-            try:
-                from orders.models import DeliveryLeg
-                done_count = DeliveryLeg.objects.filter(order=order, status="done").count()
-                if done_count == 1:
-                    amount = fallback
-            except Exception:
-                import logging
-                logging.getLogger("fagni.orders.service_layer.payouts").exception("Exception silencieuse (auto-log) - fichier=orders/service_layer/payouts.py ligne=101")
-
-        if amount <= 0:
-            _dbg("SKIP: amount <= 0")
-            return None
+        # P0.4 (A11.30) : suppression du fallback Order.amount_driver_partner.
+        # Si leg.driver_amount est nul, c'est une anomalie a logger.
+        # Aucun payout n'est cree, aucune WalletTransaction n'est generee.
+        import logging
+        logging.getLogger("fagni.payouts").warning(
+            "Payout ignore : leg.driver_amount=0 | leg_id=%s | order_id=%s",
+            getattr(leg, "id", None),
+            getattr(order, "id", None),
+        )
+        return None
 
     from wallets.services import get_or_create_wallet_for_delivery_partner, credit_wallet
     from wallets.models import WalletTransaction

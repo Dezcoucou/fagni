@@ -540,3 +540,52 @@ class DeliveryLegPayoutTests(TestCase):
         self.assertEqual(leg.driver_amount, frozen_driver)
         self.assertEqual(leg.client_fee_share, frozen_client)
         self.assertEqual(leg.fagni_margin, frozen_margin)
+
+
+    def test_payout_ignored_when_leg_driver_amount_zero(self):
+        """
+        F.10 - P0.4 (A11.30) : si leg.driver_amount=0, aucun payout n'est cree,
+        meme si order.amount_driver_partner > 0.
+        """
+        o = Order.objects.create(
+            customer=Customer.objects.create(name="Test F.10", phone="0700000999"),
+            status="pending",
+            payment_status="paid",
+            total_client_ttc=Decimal("1000"),
+            amount_paid=Decimal("1000"),
+            amount_driver_partner=Decimal("500"),
+        )
+
+        # La création de Order peut auto-créer les legs.
+        # Supprimer ces legs pour respecter uniq(order, leg_type)
+        # avant de créer explicitement le leg F.10.
+        DeliveryLeg.objects.filter(order=o).delete()
+
+        # Leg pickup done avec driver_amount=0 (anomalie)
+        leg = DeliveryLeg.objects.create(
+            order=o,
+            leg_type="pickup",
+            status="done",
+            driver_amount=Decimal("0"),
+        )
+
+        from orders.service_layer.payouts import trigger_driver_payout_for_leg
+        from wallets.models import WalletTransaction
+
+        result = trigger_driver_payout_for_leg(leg)
+
+        # Aucun payout cree
+        self.assertIsNone(result, "Payout doit etre ignore si leg.driver_amount=0")
+
+        # Aucune WalletTransaction payout
+        payout_count = WalletTransaction.objects.filter(
+            order=o, leg=leg, type="payout", direction="in"
+        ).count()
+        self.assertEqual(payout_count, 0, "Aucune WalletTransaction payout")
+
+        # order.amount_driver_partner inchange
+        o.refresh_from_db()
+        self.assertEqual(
+            o.amount_driver_partner, Decimal("500"),
+            "order.amount_driver_partner ne doit pas etre modifie"
+        )

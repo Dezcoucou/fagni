@@ -2686,6 +2686,34 @@ class Order(models.Model):
                 self.save(update_fields=["amount_driver_partner", "logistic_margin", "distance_km", "driver_logistic_cost"])
             return
 
+        # --- P0.3 : Protection du supplément express contre la dilution par distance ---
+        express_fee_total = Decimal(str(getattr(self, "express_extra_fee", 0) or 0))
+        express_driver_part = Decimal("0")
+
+        # On isole la part express du pool avant la répartition par distance.
+        # P0.3 : hypothèse ciblée = supplément express affecté au DRIVER.
+        active_legs = [
+            lg for lg in legs
+            if (lg.status or "").lower() != "canceled"
+        ]
+
+        if express_fee_total > 0 and active_legs:
+            express_per_leg = (
+                express_fee_total / len(active_legs)
+            ).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP
+            )
+
+            # Retirer l'express du pool normal afin qu'il ne soit
+            # pas redistribué selon la distance.
+            driver_total = max(
+                Decimal("0"),
+                driver_total - express_fee_total
+            )
+
+            express_driver_part = express_per_leg
+
         # 2) Poids (distance sinon égal)
         distances = [Decimal(str(leg.distance_km or 0)) for leg in legs]
         total_dist = sum(distances)
@@ -2765,7 +2793,24 @@ class Order(models.Model):
 
         # 🔒 Réalité > théorie : si payouts existent, on ne doit jamais réduire les totaux sous le lock
         # driver_total
-        driver_shares, driver_total_adj = allocate_total(driver_total, locked_driver_amount)
+        driver_shares, driver_total_adj = allocate_total(
+            driver_total,
+            locked_driver_amount
+        )
+
+        # --- P0.3 : Réinjection de la part express équitable ---
+        if express_fee_total > 0 and active_legs:
+            for i, leg in enumerate(legs):
+                if (leg.status or "").lower() != "canceled":
+                    driver_shares[i] = (
+                        driver_shares[i] + express_driver_part
+                    ).quantize(
+                        Decimal("0.01"),
+                        rounding=ROUND_HALF_UP
+                    )
+
+            # Le total driver conserve le supplément express.
+            driver_total_adj = driver_total_adj + express_fee_total
         driver_total = driver_total_adj
 
         # delivery_fee (client) - pas de verrou, répartition libre

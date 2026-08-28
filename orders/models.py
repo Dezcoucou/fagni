@@ -2705,10 +2705,8 @@ class Order(models.Model):
                 import logging
                 logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=2374")
 
-        # 3) Verrouillage payout par jambe
+        # 3) Verrouillage payout par jambe (seul driver_amount est verrouillé)
         locked_driver_amount = {}
-        locked_client_share = {}
-        locked_margin = {}
 
         try:
             from wallets.models import WalletTransaction
@@ -2725,13 +2723,8 @@ class Order(models.Model):
                 )
                 if tx:
                     locked_driver_amount[leg.id] = Decimal(str(tx.amount or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-                    # FIGER client/marge = valeurs DB actuelles
-                    locked_client_share[leg.id] = Decimal(str(getattr(leg, "client_fee_share", 0) or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-                    locked_margin[leg.id] = Decimal(str(getattr(leg, "fagni_margin", 0) or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         except Exception:
             locked_driver_amount = {}
-            locked_client_share = {}
-            locked_margin = {}
 
         def allocate_total(total: Decimal, locked: dict):
             """
@@ -2775,12 +2768,12 @@ class Order(models.Model):
         driver_shares, driver_total_adj = allocate_total(driver_total, locked_driver_amount)
         driver_total = driver_total_adj
 
-        # delivery_fee (client)
-        client_shares, delivery_fee_adj = allocate_total(delivery_fee, locked_client_share)
+        # delivery_fee (client) - pas de verrou, répartition libre
+        client_shares, delivery_fee_adj = allocate_total(delivery_fee, {})
         delivery_fee = delivery_fee_adj
 
-        # margin_total
-        margin_shares, margin_total_adj = allocate_total(margin_total, locked_margin)
+        # margin_total - pas de verrou, répartition libre
+        margin_shares, margin_total_adj = allocate_total(margin_total, {})
         margin_total = margin_total_adj
 
         # 4) Appliquer sur les legs
@@ -3880,24 +3873,13 @@ class DeliveryLeg(models.Model):
                 import logging
                 logging.getLogger("fagni.models.payout").exception("Echec silencieux: driver_amount = tx.amount (source de verite paiement) | order_id=%s", getattr(self, "id", None) if hasattr(self, "id") else getattr(self, "pk", None))
 
-            # figer les autres montants sur la DB (ne plus bouger après paiement)
-            if old:
-                try:
-                    self.client_fee_share = old.get("client_fee_share")
-                except Exception:
-                    import logging
-                    logging.getLogger("fagni.models.payout").exception("Echec silencieux: gel montants apres paiement (client_fee_share) | order_id=%s", getattr(self, "id", None) if hasattr(self, "id") else getattr(self, "pk", None))
-                try:
-                    self.fagni_margin = old.get("fagni_margin")
-                except Exception:
-                    import logging
-                    logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=3534")
-
+            # P0.1/P0.2 : seul driver_amount est verrouillé après paiement
+            # client_fee_share et fagni_margin restent recalculables
             # forcer update_fields à inclure les champs verrouillés
             uf = kwargs.get("update_fields", None)
             if uf is not None:
                 uf = set(list(uf))
-                uf.update({"status", "driver_amount", "client_fee_share", "fagni_margin"})
+                uf.update({"status", "driver_amount"})
                 kwargs["update_fields"] = list(uf)
 
         # 🔒 Guard: sans driver, pas de assigned/in_progress/done (sauf si payout lock)

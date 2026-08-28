@@ -443,10 +443,10 @@ class DeliveryLegPayoutTests(TestCase):
         self.assertEqual(leg.status, "done")
 
 
-    def test_payout_lock_freezes_fee_share_and_margin(self):
+    def test_payout_lock_freezes_only_driver_amount(self):
         """
-        Si payout existe, driver_amount est tx.amount et les champs client_fee_share/fagni_margin
-        doivent rester figés (valeurs DB) même si on tente de les changer.
+        P0.1/P0.2 : Si payout existe, seul driver_amount est verrouillé.
+        client_fee_share et fagni_margin restent recalculables.
         """
         from wallets.models import WalletTransaction
 
@@ -470,10 +470,8 @@ class DeliveryLegPayoutTests(TestCase):
         tx = WalletTransaction.objects.filter(order=o, leg=leg, type="payout", direction="in").order_by("-id").first()
         self.assertIsNotNone(tx)
 
-        # snapshot valeurs figées
+        # snapshot driver_amount (seul verrouillé)
         leg.refresh_from_db()
-        frozen_client_share = leg.client_fee_share
-        frozen_margin = leg.fagni_margin
         frozen_driver_amount = leg.driver_amount
 
         # tentative de modification "après paiement"
@@ -486,15 +484,15 @@ class DeliveryLegPayoutTests(TestCase):
         leg.refresh_from_db()
         self.assertEqual(leg.status, "done")
         self.assertEqual(leg.driver_amount, tx.amount)          # source de vérité payout
-        self.assertEqual(leg.client_fee_share, frozen_client_share)
-        self.assertEqual(leg.fagni_margin, frozen_margin)
+        # client_fee_share et fagni_margin PEUVENT être modifiés (pas de verrou)
+        self.assertEqual(leg.client_fee_share, Decimal("9999"))
+        self.assertEqual(leg.fagni_margin, Decimal("8888"))
         self.assertEqual(frozen_driver_amount, tx.amount)        # cohérence
 
-    def test_recompute_does_not_modify_locked_leg_finance(self):
+    def test_recompute_recalculates_fee_share_and_margin_after_payout(self):
         """
-        Si payout existe pour une jambe, un appel à
-        order.recompute_logistics_from_legs()
-        ne doit pas modifier client_fee_share ni fagni_margin.
+        P0.1/P0.2 : Si payout existe pour une jambe, recompute_logistics_from_legs()
+        recalcule client_fee_share et fagni_margin, mais verrouille driver_amount.
         """
         from wallets.models import WalletTransaction
 
@@ -519,8 +517,6 @@ class DeliveryLegPayoutTests(TestCase):
         self.assertIsNotNone(tx)
 
         leg.refresh_from_db()
-        frozen_client = leg.client_fee_share
-        frozen_margin = leg.fagni_margin
         frozen_driver = leg.driver_amount
 
         # 2) Modifier artificiellement le pool commande
@@ -537,9 +533,10 @@ class DeliveryLegPayoutTests(TestCase):
         leg.refresh_from_db()
 
         # 4) Vérifications
-        self.assertEqual(leg.driver_amount, frozen_driver)
-        self.assertEqual(leg.client_fee_share, frozen_client)
-        self.assertEqual(leg.fagni_margin, frozen_margin)
+        self.assertEqual(leg.driver_amount, frozen_driver)  # driver_amount verrouillé
+        # client_fee_share et fagni_margin sont RECALCULÉS (pas de verrou)
+        self.assertNotEqual(leg.client_fee_share, Decimal("1000"))  # valeur initiale
+        self.assertNotEqual(leg.fagni_margin, Decimal("200"))       # valeur initiale
 
 
     def test_payout_ignored_when_leg_driver_amount_zero(self):

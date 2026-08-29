@@ -4774,13 +4774,13 @@ def create(request):
             order.save()
         order.update_financials(save=True)
     except Exception as e:
-        print("Erreur update_financials:", e)
+        logging.getLogger("fagni.orders.views").exception("Erreur update_financials")
 
     try:
         # distances (si ta méthode existe)
         order.recompute_distances_from_positions()
     except Exception as e:
-        print("Erreur recompute_distances_from_positions:", e)
+        logging.getLogger("fagni.orders.views").exception("Erreur recompute_distances_from_positions")
 
     try:
         from orders.models import DeliveryLeg, sync_delivery_legs_for_order
@@ -15213,7 +15213,7 @@ def handle_referral_reward(order):
         )
 
     except Exception as e:
-        print("Referral error:", e)
+        logging.getLogger("fagni.orders.views").exception("Referral error")
 
 
 # =========================================
@@ -15466,7 +15466,7 @@ def wave_webhook(request):
             with urllib.request.urlopen(req, timeout=8) as resp:
                 remote = json.loads(resp.read().decode("utf-8"))
         except Exception as e:
-            print("[WAVE ERROR]", e)
+            logging.getLogger("fagni.orders.views").exception("[WAVE ERROR]")
             return JsonResponse({"ok": False, "error": f"checkout_retrieve_failed:{e}"}, status=502)
 
         remote_id = (remote.get("id") or "").strip()
@@ -15502,7 +15502,7 @@ def wave_webhook(request):
             try:
                 obj, created = WaveEvent.objects.get_or_create(event_id=event_id)
             except Exception:
-                print(f"[WAVE WEBHOOK] race condition caught event_id={event_id}")
+                logging.getLogger("fagni.orders.views").warning(f"[WAVE WEBHOOK] race condition caught event_id={event_id}")
                 return JsonResponse({
                     "ok": True,
                     "idempotent": True,
@@ -15510,7 +15510,7 @@ def wave_webhook(request):
                 })
 
             if not created:
-                print(f"[WAVE WEBHOOK] idempotent replay ignored event_id={event_id}")
+                logging.getLogger("fagni.orders.views").info(f"[WAVE WEBHOOK] idempotent replay ignored event_id={event_id}")
                 return JsonResponse({
                     "ok": True,
                     "idempotent": True,
@@ -15562,7 +15562,7 @@ def wave_webhook(request):
             note=f"Webhook Wave event_id={event_id}",
         )
 
-    print(
+    logging.getLogger("fagni.orders.views").info(
         f"[WAVE WEBHOOK] applied event_id={event_id} "
         f"checkout_id={checkout_id} amount={payment_result['applied']} "
         f"order_id={order.id} payment_status={payment_result['payment_status']}"

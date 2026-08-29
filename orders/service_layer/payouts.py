@@ -17,7 +17,7 @@ def trigger_driver_payout_for_leg(leg):
 
     def _dbg(*args):
         if os.environ.get("PAYOUT_DEBUG") == "1":
-            print("[payouts.trigger]", *args)
+            pass  # debug supprimé
 
     _dbg("ENTER leg_id=", getattr(leg, "id", None), "status=", getattr(leg, "status", None))
 

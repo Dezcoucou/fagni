@@ -168,17 +168,6 @@ def format_receipt(pricing):
 
 
 # Test rapide
-if __name__ == '__main__':
-    print("=== TEST PRICING FAGNI v3.0 ===\n")
-    for articles, bag in [(12,'small'),(15,'small'),(25,'medium'),(40,'large'),(50,'large')]:
-        p = calculate_order(articles, bag)
-        print(f"{p['bag_label']} — {articles} articles")
-        print(f"  Pressing   : {p['part_pressing']:,} FCFA ({articles} × 200)")
-        print(f"  Livraison  : {p['delivery_fee']:,} FCFA")
-        print(f"  Service fee: {p['service_fee']:,} FCFA")
-        print(f"  TOTAL      : {p['total_client']:,} FCFA")
-        print(f"  FAGNI      : {p['total_fagni']:,} FCFA")
-        print()
 
 calculate_bag_pricing = lambda bag_size, zone='standard': calculate_order(
     BAG_CONFIG.get(bag_size, BAG_CONFIG['small'])['max_items'], bag_size)

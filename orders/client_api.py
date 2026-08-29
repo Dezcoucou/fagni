@@ -13,6 +13,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
+import logging
+logger = logging.getLogger(__name__)
 
 from .models import Order, Customer, PilotWhitelist
 
@@ -1333,7 +1335,7 @@ def api_create_order(request):
                     {"type": "ops_new_order", "order_id": order.id, "order_code": order.code or str(order.id)}
                 )
         except Exception as e:
-            print(f"[NOTIF] ops new order: {e}")
+            logger.error(f"[NOTIF] ops new order: {e}")
 
         return Response({
             'order_id':      order.id,

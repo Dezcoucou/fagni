@@ -40,8 +40,3 @@ def calculate_order_total(articles_count: int) -> dict:
 
 
 # Tests rapides
-if __name__ == "__main__":
-    for n in [1, 5, 10, 50]:
-        r = calculate_order_total(n)
-        print(f"{n:2d} articles → {r['total']:,} FCFA "
-              f"({r['articles_total']} + {r['delivery_fee']} + {r['service_fee']})")

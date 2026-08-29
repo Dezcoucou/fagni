@@ -1477,7 +1477,6 @@ try:
             OrderAdmin.fieldsets = tuple(fieldsets)
 
 except NameError:
-    print("OrderAdmin introuvable dans orders/admin.py")
     raise
 
 from orders.models import PricingConfig

@@ -11,7 +11,7 @@ def _send_notif_ops(order, title="FAGNI OPS", body=None):
         for t in tokens:
             send_push(t.token, title, body, {"type": "ops", "order_id": getattr(order, "id", ""), "order_code": code})
     except Exception as e:
-        print(f"[NOTIF] ops: {e}")
+        logger.error(f"[NOTIF] ops: {e}")
 
 
 def _send_notif_mission(order, driver):
@@ -22,7 +22,7 @@ def _send_notif_mission(order, driver):
         if t:
             notif_mission_assignee(t.token, getattr(order, 'code', str(order.id)))
     except Exception as e:
-        print(f"[NOTIF] mission: {e}")
+        logger.error(f"[NOTIF] mission: {e}")
 
 def _send_notif_pressing(order):
     try:
@@ -34,7 +34,7 @@ def _send_notif_pressing(order):
             if t:
                 notif_pressing_commande(t.token, getattr(order, 'code', str(order.id)))
     except Exception as e:
-        print(f"[NOTIF] pressing: {e}")
+        logger.error(f"[NOTIF] pressing: {e}")
 
 def _send_notif_client_livraison(order):
     try:
@@ -46,7 +46,7 @@ def _send_notif_client_livraison(order):
             if t:
                 notif_client_livraison(t.token, getattr(order, 'code', str(order.id)))
     except Exception as e:
-        print(f"[NOTIF] client livraison: {e}")
+        logger.error(f"[NOTIF] client livraison: {e}")
 """API Opérateur FAGNI — Dashboard de pilotage"""
 import hmac
 import jwt
@@ -54,6 +54,8 @@ from django.conf import settings
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+import logging
+logger = logging.getLogger(__name__)
 from django.utils import timezone
 
 
@@ -2061,7 +2063,7 @@ def api_wallet_retrait(request):
         try:
             notif_ops_retrait(wr.get_beneficiary_display(), montant, wallet.id)
         except Exception as e:
-            print(f"[RETRAIT] Erreur notif FCM: {e}")
+            logger.error(f"[RETRAIT] Erreur notif FCM: {e}")
 
         return Response({
             'success': True,

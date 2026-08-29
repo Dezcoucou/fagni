@@ -3105,7 +3105,7 @@ class Order(models.Model):
                     raise
                 # log soft en console serveur (utile en dev)
                 try:
-                    print(f"[MLM] Order {self.id} failed: {e}")
+                    logging.getLogger("fagni.orders.models").exception(f"[MLM] Order {self.id} failed: {e}")
                 except Exception:
                     import logging
                     logging.getLogger("fagni.orders.models").exception("Exception silencieuse (auto-log) - fichier=orders/models.py ligne=2738")

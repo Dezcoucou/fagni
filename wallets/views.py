@@ -1,4 +1,5 @@
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
+import logging
 from django.shortcuts import get_object_or_404, render, redirect
 from django.db.models.functions import Coalesce
 from django.db.models import Sum, Case, When, F, Value, DecimalField
@@ -151,7 +152,7 @@ def driver_wallet_dashboard(request):
             from fagni.notifications import notif_ops_retrait
             notif_ops_retrait(wr.get_beneficiary_display(), amount, wallet.id)
         except Exception as e:
-            print(f"[RETRAIT] Erreur notif FCM: {e}")
+            logging.getLogger("fagni.wallets.views").exception("[RETRAIT] Erreur notif FCM")
 
         messages.success(
             request,
@@ -283,7 +284,7 @@ def laundry_wallet_dashboard(request):
             from fagni.notifications import notif_ops_retrait
             notif_ops_retrait(wr.get_beneficiary_display(), amount, wallet.id)
         except Exception as e:
-            print(f"[RETRAIT PRESSING] Erreur notif FCM: {e}")
+            logging.getLogger("fagni.wallets.views").exception("[RETRAIT PRESSING] Erreur notif FCM")
 
         messages.success(request, "Ta demande de retrait a été enregistrée. Elle sera traitée par l'équipe FAGNI.")
         return redirect(f"{reverse('wallets:laundry_wallet_dashboard')}?laundry_id={laundry.id}")

@@ -342,3 +342,6 @@ def notify_partner_on_assignment(sender, instance, created, **kwargs):
     except Exception:
         import logging
         logging.getLogger("fagni.orders.signals").exception("Exception silencieuse (auto-log) - fichier=orders/signals.py ligne=321")
+
+# ====================================================================
+# P0.3 FIX : Auto-recompute & Payout on Leg Status Change

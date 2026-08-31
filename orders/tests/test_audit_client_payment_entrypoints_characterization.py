@@ -276,14 +276,14 @@ class PaymentOrchestratorIdempotencyTests(TestCase):
         apply_order_payment(
             order,
             Decimal("5000"),
-            channel="api",
+            channel="manual",
             reference="RETRY-TOKEN-1",
             note="",
         )
         apply_order_payment(
             order,
             Decimal("5000"),
-            channel="api",
+            channel="manual",
             reference="RETRY-TOKEN-1",
             note="",
         )

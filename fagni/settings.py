@@ -232,7 +232,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 # Django >= 4.2/5.x: STORAGES remplace STATICFILES_STORAGE (deprecated)
 STORAGES = {
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage" if TESTING else "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",

@@ -90,6 +90,11 @@ def trigger_driver_payout_for_leg(leg):
         _dbg("SKIP: order not paid", "order.payment_status=", getattr(order, "payment_status", None))
         return None
 
+    # 🔄 P0.4 FIX: Refresh from DB to ensure driver_amount is up-to-date after signal recompute
+    try:
+        leg.refresh_from_db(fields=["driver_amount", "fagni_margin"])
+    except Exception:
+        pass
     amount = Decimal(str(getattr(leg, "driver_amount", 0) or 0))
     _dbg(
         "CTX:",

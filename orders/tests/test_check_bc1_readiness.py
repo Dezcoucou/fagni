@@ -27,6 +27,7 @@ import json
 
 from django.core.management import call_command
 from django.test import TestCase, override_settings
+from orders.tests._v2_catalog_helper import seed_catalog_v2
 from django.urls import reverse
 from io import StringIO
 
@@ -65,6 +66,9 @@ def _run_check():
 class Bc1ReadinessRootCauseTests(TestCase):
     """Reproduit la cause racine confirmee : AssignmentSettings en mode manuel."""
 
+    def setUp(self):
+        seed_catalog_v2()
+
     def _make_active_partners(self):
         LaundryPartner.objects.create(
             name="Pressing 1", phone="0700000001", is_active=True,
@@ -102,21 +106,55 @@ class Bc1ReadinessRootCauseTests(TestCase):
         self.assertIsNone(order.pickup_driver, "aucun livreur affecte : reproduit le symptome production")
 
     @override_settings(AUTO_ASSIGN_ON_CLIENT_ORDER=True)
+    @override_settings(AUTO_ASSIGN_ON_CLIENT_ORDER=True)
+    @override_settings(AUTO_ASSIGN_ON_CLIENT_ORDER=True)
     def test_mode_auto_closest_fonctionne_avec_les_memes_donnees(self):
-        """Preuve que le probleme est bien le mode, pas les partenaires/GPS : memes donnees, mode par defaut -> ca marche."""
+        """Preuve que le probleme est bien le mode, pas les partenaires/GPS."""
         self._make_active_partners()
-        # AssignmentSettings.get_solo() cree la ligne avec les defauts modele : auto/closest.
 
-        customer = _customer(phone="0700009002")
-        resp = self.client.post(
-            reverse('api-client-create-order'),
-            data=json.dumps(_payload()),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Bearer {_make_token(customer)}',
+        cfg = AssignmentSettings.get_solo()
+        print(
+            f"\n[DIAG AUTO] cfg.id={cfg.id} "
+            f"driver={cfg.driver_assignment_mode!r} "
+            f"laundry={cfg.laundry_selection_mode!r}"
         )
 
+        laundries = list(
+            LaundryPartner.objects.values(
+                "id", "name", "is_active", "latitude", "longitude"
+            )
+        )
+        drivers = list(
+            DeliveryPartner.objects.values(
+                "id", "name", "is_active", "latitude", "longitude"
+            )
+        )
+
+        print(f"[DIAG AUTO] laundries={laundries}")
+        print(f"[DIAG AUTO] drivers={drivers}")
+
+        customer = _customer(phone="0700009002")
+
+        resp = self.client.post(
+            reverse("api-client-create-order"),
+            data=json.dumps(_payload()),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {_make_token(customer)}",
+        )
+
+        print(f"[DIAG AUTO] HTTP={resp.status_code}")
+        print(f"[DIAG AUTO] RESPONSE={resp.json()}")
+
         self.assertEqual(resp.status_code, 201)
-        order = Order.objects.get(id=resp.json()['order_id'])
+
+        order = Order.objects.get(id=resp.json()["order_id"])
+
+        print(
+            f"[DIAG AUTO] order={order.id} "
+            f"laundry_partner_id={order.laundry_partner_id} "
+            f"pickup_driver_id={order.pickup_driver_id}"
+        )
+
         self.assertIsNotNone(order.laundry_partner)
         self.assertIsNotNone(order.pickup_driver)
 

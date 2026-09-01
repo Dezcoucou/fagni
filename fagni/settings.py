@@ -99,6 +99,7 @@ INSTALLED_APPS = [
     'api',
     'portal',
     'wallets.apps.WalletsConfig',
+    'crowd',
     'bonuses',
     'core',
     'accounts',

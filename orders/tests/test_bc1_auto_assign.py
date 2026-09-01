@@ -17,6 +17,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.test import TestCase, override_settings
+from orders.tests._v2_catalog_helper import seed_catalog_v2
 from django.urls import reverse
 
 from orders.client_api import (
@@ -154,6 +155,9 @@ def _record_full_payment(order, reference=None):
 
 @override_settings(AUTO_ASSIGN_ON_CLIENT_ORDER=False)
 class ClientOrderCreationWithFlagDisabledTests(TestCase):
+    def setUp(self):
+        seed_catalog_v2()
+
     def test_creation_ne_mobilise_aucune_ressource(self):
         customer = _make_customer()
         _make_laundry()
@@ -180,6 +184,9 @@ class ClientOrderCreationWithFlagDisabledTests(TestCase):
 
 @override_settings(AUTO_ASSIGN_ON_CLIENT_ORDER=True)
 class ClientOrderCreationWithFlagEnabledTests(TestCase):
+    def setUp(self):
+        seed_catalog_v2()
+
     def test_flag_active_ne_contourne_pas_le_garde_paiement(self):
         customer = _make_customer()
         _make_laundry()

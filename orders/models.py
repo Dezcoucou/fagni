@@ -3711,6 +3711,63 @@ class DeliveryLeg(models.Model):
         blank=True,
     )
 
+    # ======================
+    #  CROWD (Cotransportage)
+    # ======================
+    
+    ACTOR_TYPE_CHOICES = [
+        ("professional", "Livreur professionnel"),
+        ("cotransporter", "Cotransporteur"),
+    ]
+    
+    actor_type = models.CharField(
+        "Type d'acteur",
+        max_length=20,
+        choices=ACTOR_TYPE_CHOICES,
+        default="professional",
+        help_text="professional = DeliveryPartner, cotransporter = Cotransporter",
+    )
+    
+    cotransporter = models.ForeignKey(
+        'crowd.Cotransporter',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="delivery_legs",
+        verbose_name="Cotransporteur",
+        help_text="Rempli uniquement si actor_type='cotransporter'",
+    )
+
+    def clean(self):
+        """
+        Valide l'intégrité actor_type / driver / cotransporter.
+        
+        Règles :
+        - professional ⇒ driver obligatoire, cotransporter NULL
+        - cotransporter ⇒ cotransporter obligatoire, driver NULL
+        """
+        from django.core.exceptions import ValidationError
+        
+        if self.actor_type == "professional":
+            if not self.driver_id:
+                raise ValidationError({
+                    "driver": "Un livreur professionnel (driver) est obligatoire pour actor_type='professional'."
+                })
+            if self.cotransporter_id:
+                raise ValidationError({
+                    "cotransporter": "Le champ cotransporter doit être NULL pour actor_type='professional'."
+                })
+        
+        elif self.actor_type == "cotransporter":
+            if not self.cotransporter_id:
+                raise ValidationError({
+                    "cotransporter": "Un cotransporteur est obligatoire pour actor_type='cotransporter'."
+                })
+            if self.driver_id:
+                raise ValidationError({
+                    "driver": "Le champ driver doit être NULL pour actor_type='cotransporter'."
+                })
+
     leg_type = models.CharField(
         "Type de jambe",
         max_length=20,

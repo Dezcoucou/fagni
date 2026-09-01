@@ -97,8 +97,10 @@ class ClientOrderPaySimulateProductionGuardTests(TestCase):
 
     @override_settings(DEBUG=True)
     def test_simulate_allowed_when_debug_true(self):
-        """Caracterise le comportement MVP actuel en environnement de dev,
-        pour bien isoler que le probleme est specifique a DEBUG=False."""
+        """
+        La simulation de paiement est désormais désactivée même en DEBUG.
+        La vue retourne systématiquement 403 pour des raisons de sécurité.
+        """
         customer = _make_customer("0700070002")
         order = _make_order(customer)
         client = _client_with_phone("0700070002")
@@ -106,8 +108,10 @@ class ClientOrderPaySimulateProductionGuardTests(TestCase):
         resp = _pay_simulate(client, order)
 
         order.refresh_from_db()
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(order.payment_status, "paid")
+        # La simulation est toujours refusée (sécurité)
+        self.assertEqual(resp.status_code, 403)
+        # Aucun paiement créé
+        self.assertNotEqual(order.payment_status, "paid")
 
 
 class ClientCannotAutoConfirmCashTests(TestCase):

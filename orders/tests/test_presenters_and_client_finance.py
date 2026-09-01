@@ -85,36 +85,15 @@ class PresenterAndClientFinanceTests(TestCase):
         )
 
     def test_client_order_pay_cash_partial(self):
-        finance_before = build_order_finance_summary(self.order_bag)
-        total_before = finance_before["total_client_ttc"]
-
+        """
+        Le client ne peut plus déclarer lui-même un paiement cash.
+        La vue refuse avec 403 (comportement métier sécurisé).
+        """
         url = reverse("orders:client_order_pay_cash", args=[self.order_bag.id])
         resp = self.client_http.post(url, {
             "amount": "5000",
             "note": "Acompte test",
         })
 
-        self.assertEqual(resp.status_code, 200)
-        data = resp.json()
-        self.assertTrue(data["ok"])
-
-        self.order_bag.refresh_from_db()
-        finance_after = build_order_finance_summary(self.order_bag)
-
-        self.assertEqual(self.order_bag.amount_paid, Decimal("5000"))
-        self.assertEqual(getattr(self.order_bag, "payment_status", None), "partial")
-        self.assertEqual(finance_after["total_client_ttc"], total_before)
-        self.assertEqual(finance_after["amount_paid"], Decimal("5000"))
-        self.assertEqual(
-            finance_after["amount_remaining"],
-            total_before - Decimal("5000")
-        )
-
-        self.assertEqual(
-            Decimal(str(data["amounts"]["amount_paid"])),
-            Decimal("5000")
-        )
-        self.assertEqual(
-            Decimal(str(data["amounts"]["amount_remaining"])),
-            total_before - Decimal("5000")
-        )
+        # Le client ne peut pas se déclarer payé cash lui-même
+        self.assertEqual(resp.status_code, 403)

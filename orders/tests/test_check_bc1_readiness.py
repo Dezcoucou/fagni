@@ -68,6 +68,11 @@ class Bc1ReadinessRootCauseTests(TestCase):
 
     def setUp(self):
         seed_catalog_v2()
+        # Réinitialiser les settings aux valeurs par défaut pour chaque test
+        cfg = AssignmentSettings.get_solo()
+        cfg.driver_assignment_mode = "auto"
+        cfg.laundry_selection_mode = "closest"
+        cfg.save()
 
     def _make_active_partners(self):
         LaundryPartner.objects.create(
@@ -106,35 +111,15 @@ class Bc1ReadinessRootCauseTests(TestCase):
         self.assertIsNone(order.pickup_driver, "aucun livreur affecte : reproduit le symptome production")
 
     @override_settings(AUTO_ASSIGN_ON_CLIENT_ORDER=True)
-    @override_settings(AUTO_ASSIGN_ON_CLIENT_ORDER=True)
-    @override_settings(AUTO_ASSIGN_ON_CLIENT_ORDER=True)
     def test_mode_auto_closest_fonctionne_avec_les_memes_donnees(self):
-        """Preuve que le probleme est bien le mode, pas les partenaires/GPS."""
+        """
+        Preuve que le moteur d'assignation fonctionne en mode auto/closest.
+        Note : L'assignation est bloquée à la création si non payée (garde-fou métier).
+        Ce test appelle le moteur manuellement après paiement pour vérifier le mode.
+        """
         self._make_active_partners()
 
-        cfg = AssignmentSettings.get_solo()
-        print(
-            f"\n[DIAG AUTO] cfg.id={cfg.id} "
-            f"driver={cfg.driver_assignment_mode!r} "
-            f"laundry={cfg.laundry_selection_mode!r}"
-        )
-
-        laundries = list(
-            LaundryPartner.objects.values(
-                "id", "name", "is_active", "latitude", "longitude"
-            )
-        )
-        drivers = list(
-            DeliveryPartner.objects.values(
-                "id", "name", "is_active", "latitude", "longitude"
-            )
-        )
-
-        print(f"[DIAG AUTO] laundries={laundries}")
-        print(f"[DIAG AUTO] drivers={drivers}")
-
         customer = _customer(phone="0700009002")
-
         resp = self.client.post(
             reverse("api-client-create-order"),
             data=json.dumps(_payload()),
@@ -142,19 +127,31 @@ class Bc1ReadinessRootCauseTests(TestCase):
             HTTP_AUTHORIZATION=f"Bearer {_make_token(customer)}",
         )
 
-        print(f"[DIAG AUTO] HTTP={resp.status_code}")
-        print(f"[DIAG AUTO] RESPONSE={resp.json()}")
-
         self.assertEqual(resp.status_code, 201)
-
         order = Order.objects.get(id=resp.json()["order_id"])
 
-        print(
-            f"[DIAG AUTO] order={order.id} "
-            f"laundry_partner_id={order.laundry_partner_id} "
-            f"pickup_driver_id={order.pickup_driver_id}"
-        )
+        # À la création, pas d'assignation car non payé (garde-fou métier)
+        self.assertIsNone(order.laundry_partner)
+        self.assertIsNone(order.pickup_driver)
 
+        # Simuler un paiement pour débloquer l'assignation
+        from orders.models import Payment
+        Payment.objects.create(
+            order=order,
+            amount=order.total_client_ttc,
+            channel="test",
+            reference="TEST-PAID"
+        )
+        order.sync_payment_status_from_payments(save=True)
+        order.refresh_from_db()
+
+        # Appel manuel du moteur d'assignation (comme le ferait le signal post-paiement)
+        from orders.client_api import _bc1_auto_assign_pickup_and_laundry
+        result = _bc1_auto_assign_pickup_and_laundry(order)
+
+        order.refresh_from_db()
+        self.assertTrue(result["laundry_assigned"], "Pressing doit être assigné en mode auto")
+        self.assertTrue(result["driver_assigned"], "Livreur doit être assigné en mode auto")
         self.assertIsNotNone(order.laundry_partner)
         self.assertIsNotNone(order.pickup_driver)
 

@@ -5274,7 +5274,7 @@ def log_event(event_type, order=None, actor_type="system", actor_id=None, **payl
 # FCM Push Notifications
 # =====================
 class FCMToken(models.Model):
-    USER_TYPES = [('client','Client'),('driver','Livreur'),('partner','Pressing'),('ops','OPS')]
+    USER_TYPES = [('client','Client'),('driver','Livreur'),('partner','Pressing'),('ops','OPS'),('cotransporter','Cotransporteur')]
     user_type = models.CharField(max_length=20, choices=USER_TYPES)
     user_id = models.IntegerField()
     token = models.TextField()

@@ -23,6 +23,7 @@ from django.utils import timezone
 from crowd.models import CrowdSettings
 from crowd.matching import pick_best_cotransporter
 from orders.assignment import pick_best_driver
+from crowd.notifications import notify_cotransporter_of_offer
 
 
 def dispatch_delivery_leg(leg) -> Tuple[Optional[object], str, str]:
@@ -72,6 +73,16 @@ def dispatch_delivery_leg(leg) -> Tuple[Optional[object], str, str]:
                     ])
                 
                 leg.refresh_from_db()
+                
+                # Notifier le cotransporteur de l'offre
+                try:
+                    notify_cotransporter_of_offer(leg, crowd)
+                except Exception:
+                    import logging
+                    logging.getLogger("fagni.crowd.dispatch").exception(
+                        "Erreur notification offre | leg_id=%s", leg.id
+                    )
+                
                 return (crowd, reason, "offered")
         except Exception as e:
             import logging

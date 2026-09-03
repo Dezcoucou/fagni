@@ -213,3 +213,37 @@ def api_crowd_missions(request):
         'count': len(result),
         'missions': result,
     })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
+def api_crowd_save_fcm_token(request):
+    """
+    POST /api/crowd/fcm-token/
+    
+    Enregistre le token FCM du cotransporteur authentifié.
+    """
+    cotransporter, error = _authenticate_cotransporter(request)
+    if error:
+        return error
+    
+    token = request.data.get('token')
+    if not token:
+        return Response({'error': 'token requis'}, status=400)
+    
+    from orders.models import FCMToken
+    
+    # Un même token ne doit pas être attaché à plusieurs profils
+    FCMToken.objects.filter(token=token).exclude(
+        user_type='cotransporter',
+        user_id=cotransporter.id,
+    ).delete()
+    
+    FCMToken.objects.update_or_create(
+        user_type='cotransporter',
+        user_id=cotransporter.id,
+        defaults={'token': token},
+    )
+    
+    return Response({'status': 'ok'})

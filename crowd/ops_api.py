@@ -18,6 +18,7 @@ from rest_framework.response import Response
 
 from orders.models import DeliveryLeg, Order
 from crowd.models import CrowdSettings, Cotransporter
+from crowd.analytics import get_crowd_kpis, get_crowd_daily_trend
 
 
 def _check_ops(request):
@@ -301,3 +302,33 @@ def ops_crowd_force_pro(request, leg_id):
             'leg_id': leg.id,
             'reason': reason or 'Aucun livreur Pro disponible',
         }, status=400)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+@authentication_classes([])
+def ops_crowd_analytics(request):
+    """
+    GET /api/ops/crowd/analytics/
+    
+    Retourne les KPIs Crowd et la tendance journalière.
+    
+    Query params:
+    - days: période d'analyse (défaut: 30)
+    - trend_days: période de tendance (défaut: 14)
+    """
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorisé'}, status=401)
+    
+    days = min(int(request.GET.get('days', 30)), 365)
+    trend_days = min(int(request.GET.get('trend_days', 14)), 90)
+    
+    kpis = get_crowd_kpis(days=days)
+    trend = get_crowd_daily_trend(days=trend_days)
+    
+    return Response({
+        'kpis': kpis,
+        'trend': trend,
+    })

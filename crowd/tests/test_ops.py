@@ -164,3 +164,86 @@ class OpsCrowdTests(TestCase):
         )
         
         self.assertEqual(response.status_code, 400)
+
+
+class OpsCrowdAnalyticsTests(TestCase):
+
+    def setUp(self):
+        self.settings = CrowdSettings.get_solo()
+        self.settings.crowd_enabled = True
+        self.settings.crowd_priority_over_pro = True
+        self.settings.crowd_pickup_amount = Decimal('400')
+        self.settings.crowd_max_detour_km = Decimal('3.00')
+        self.settings.crowd_min_score = Decimal('70.00')
+        self.settings.crowd_acceptance_timeout_seconds = 120
+        self.settings.save()
+
+        self.user = User.objects.create_user(username='test_ops_analytics', password='test')
+        self.cotransporter = Cotransporter.objects.create(
+            user=self.user,
+            is_active=True,
+            is_verified=True,
+            score=Decimal('100'),
+            capacity_kg=Decimal('10'),
+        )
+        CotransporterRoute.objects.create(
+            cotransporter=self.cotransporter,
+            origin_lat=Decimal('5.360000'),
+            origin_lng=Decimal('-3.950000'),
+            destination_lat=Decimal('5.370000'),
+            destination_lng=Decimal('-3.940000'),
+            departure_time=time(8, 0),
+            max_detour_km=Decimal('3.00'),
+            time_window_minutes=60,
+            is_active=True,
+            valid_from=timezone.now().date(),
+        )
+        self.customer = Customer.objects.create(name='Client', phone='0700000099')
+        self.ops_token = _make_ops_token()
+
+    def test_analytics_authenticated(self):
+        """GET /api/ops/crowd/analytics/ avec token OPS → 200."""
+        response = self.client.get(
+            '/api/ops/crowd/analytics/',
+            HTTP_AUTHORIZATION=f'Bearer {self.ops_token}',
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('kpis', data)
+        self.assertIn('trend', data)
+        self.assertIn('period_days', data['kpis'])
+
+    def test_analytics_with_data(self):
+        """Les KPIs reflètent les données réelles."""
+        # Créer une offre et l'accepter
+        order = Order.objects.create(
+            customer=self.customer,
+            status='pending',
+            pickup_lat=5.36,
+            pickup_lng=-3.95,
+            delivery_lat=5.37,
+            delivery_lng=-3.94,
+            pickup_scheduled_date=timezone.now().date(),
+            pickup_scheduled_time=time(8, 0),
+        )
+        leg = DeliveryLeg.objects.create(order=order, leg_type='pickup', status='pending')
+        dispatch_delivery_leg(leg)
+        
+        # Simuler acceptation
+        leg.status = 'assigned'
+        leg.actor_type = 'cotransporter'
+        leg.cotransporter = self.cotransporter
+        leg.accepted_at = timezone.now()
+        leg.save()
+        
+        response = self.client.get(
+            '/api/ops/crowd/analytics/',
+            HTTP_AUTHORIZATION=f'Bearer {self.ops_token}',
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['kpis']['total_offers'], 1)
+        self.assertEqual(data['kpis']['accepted'], 1)
+        self.assertEqual(data['kpis']['acceptance_rate'], 100.0)

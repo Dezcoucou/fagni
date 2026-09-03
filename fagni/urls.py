@@ -15,6 +15,7 @@ from django.contrib.staticfiles.storage import staticfiles_storage
 urlpatterns = [
     # ── API CROWD (COTRANSPORTEURS) ─────────────────────
     path('api/crowd/', include('crowd.urls')),
+    path('crowd/', include('crowd.urls')),
     # ── API OPS CROWD ─────────────────────────────────────
     path('api/ops/crowd/offers/', ops_crowd_offers, name='ops-crowd-offers'),
     path('api/ops/crowd/stats/', ops_crowd_stats, name='ops-crowd-stats'),

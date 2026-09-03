@@ -12,6 +12,9 @@ from django.contrib.staticfiles.storage import staticfiles_storage
 
 
 urlpatterns = [
+    # ── API CROWD (COTRANSPORTEURS) ─────────────────────
+    path('api/crowd/', include('crowd.urls')),
+
     # ── API CLIENT FAGNI ──────────────────────────────────
     path("api/client/auth/login/",    api_login,    name="api-client-login"),
     path("api/client/auth/register/", api_register, name="api-client-register"),

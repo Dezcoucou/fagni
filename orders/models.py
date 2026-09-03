@@ -3738,6 +3738,53 @@ class DeliveryLeg(models.Model):
         help_text="Rempli uniquement si actor_type='cotransporter'",
     )
 
+    # ======================
+    #  TRAÇABILITÉ ASSIGNATION
+    # ======================
+    
+    ASSIGNMENT_SOURCE_CHOICES = [
+        ("crowd", "Crowd (Cotransporteur)"),
+        ("professional", "Professionnel"),
+        ("manual", "Manuel (OPS)"),
+        ("ops", "OPS (non assigné)"),
+    ]
+    
+    assignment_source = models.CharField(
+        "Source d'assignation",
+        max_length=20,
+        choices=ASSIGNMENT_SOURCE_CHOICES,
+        default="professional",
+        help_text="Qui a assigné cette jambe",
+    )
+    
+    assignment_reason = models.CharField(
+        "Raison d'assignation",
+        max_length=100,
+        blank=True,
+        help_text="Code standardisé (MATCHED, DETOUR_TOO_HIGH, etc.)",
+    )
+    
+    offered_at = models.DateTimeField(
+        "Offre envoyée le",
+        null=True,
+        blank=True,
+        help_text="Date/heure de l'offre Crowd (si applicable)",
+    )
+    
+    accepted_at = models.DateTimeField(
+        "Offre acceptée le",
+        null=True,
+        blank=True,
+        help_text="Date/heure d'acceptation par le cotransporteur",
+    )
+    
+    offer_expires_at = models.DateTimeField(
+        "Offre expire le",
+        null=True,
+        blank=True,
+        help_text="Date/heure d'expiration de l'offre Crowd",
+    )
+
     def clean(self):
         """
         Valide l'intégrité actor_type / driver / cotransporter.
@@ -3984,13 +4031,14 @@ class DeliveryLeg(models.Model):
                 uf.update({"status", "driver_amount"})
                 kwargs["update_fields"] = list(uf)
 
-        # 🔒 Guard: sans driver, pas de assigned/in_progress/done (sauf si payout lock)
+        # 🔒 Guard: sans driver ET sans cotransporter, pas de assigned/in_progress/done (sauf si payout lock)
         try:
-            if (not has_payout) and self.driver_id is None and (self.status or "").lower() in ("assigned", "in_progress", "done"):
+            has_actor = (self.driver_id is not None) or (getattr(self, 'cotransporter_id', None) is not None)
+            if (not has_payout) and (not has_actor) and (self.status or "").lower() in ("assigned", "in_progress", "done"):
                 self.status = "pending"
         except Exception:
             import logging
-            logging.getLogger("fagni.models.legs").exception("Echec silencieux: Guard sans driver - blocage assigned/in_progress/done | pk=%s", getattr(self, "pk", None) if "self" in dir() else None)
+            logging.getLogger("fagni.models.legs").exception("Echec silencieux: Guard sans driver/cotransporter - blocage assigned/in_progress/done | pk=%s", getattr(self, "pk", None) if "self" in dir() else None)
 
         # 🔒 Freeze: canceled ne peut pas être réouvert
         try:

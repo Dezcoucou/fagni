@@ -29,6 +29,7 @@ class Wallet(models.Model):
         ("driver", "Livreur partenaire"),
         ("relay", "Point relais partenaire"),
         ("internal", "Interne FAGNI"),
+        ("cotransporter", "Cotransporteur Crowd"),
     ]
 
     owner_type = models.CharField(
@@ -71,6 +72,15 @@ class Wallet(models.Model):
         on_delete=models.CASCADE,
         related_name="wallets",
         verbose_name="Point relais partenaire",
+    )
+
+    cotransporter = models.ForeignKey(
+        "crowd.Cotransporter",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="wallets",
+        verbose_name="Cotransporteur Crowd",
     )
 
     user = models.ForeignKey(

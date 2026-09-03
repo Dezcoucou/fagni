@@ -117,7 +117,7 @@ class PickBestCotransporterTests(TestCase):
                   leg_type='pickup'):
         from orders.models import Order, Customer, DeliveryLeg
         customer = Customer.objects.create(
-            name='Test', 
+            name='Test',
             phone='0700000099',
             latitude=pickup_lat,
             longitude=pickup_lng

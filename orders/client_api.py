@@ -868,100 +868,40 @@ def _bc1_auto_assign_pickup_and_laundry(
 
     if assign_driver:
         try:
-            driver, reason = pick_best_driver(order)
+            # 1. Créer ou récupérer la DeliveryLeg AVANT le dispatch
+            leg, created = DeliveryLeg.objects.get_or_create(
+                order=order,
+                leg_type="pickup",
+                defaults={"status": "pending"}
+            )
 
-            if driver:
-                logger.info(
-                    "BC1 livreur: candidat trouve | "
-                    "order_id=%s | driver_id=%s | driver_name=%s",
-                    order.id,
-                    driver.id,
-                    driver.name,
-                )
+            # 2. Dispatch hybride : Crowd -> Pro -> OPS
+            from crowd.dispatch import dispatch_delivery_leg
+            actor, reason, mode = dispatch_delivery_leg(leg)
 
+            if mode == "offered":
+                logger.info("BC1 Crowd: offre créée | order_id=%s | leg_id=%s | reason=%s", order.id, leg.id, reason)
+                result["driver_assigned"] = False
+
+            elif mode == "professional" and actor:
                 from orders.config_models import GlobalPricingSettings
                 from decimal import Decimal as _D
-
-                driver_amount = _D(
-                    str(
-                        GlobalPricingSettings
-                        .get_solo()
-                        .driver_amount_per_leg
-                    )
-                )
-
-                order.pickup_driver = driver
+                driver_amount = _D(str(GlobalPricingSettings.get_solo().driver_amount_per_leg))
+                order.pickup_driver = actor
                 order.cost_driver_pickup = int(driver_amount)
-                order.save(
-                    update_fields=[
-                        "pickup_driver",
-                        "cost_driver_pickup",
-                    ]
-                )
-
-                leg, created = DeliveryLeg.objects.get_or_create(
-                    order=order,
-                    leg_type="pickup",
-                    defaults={
-                        "driver": driver,
-                        "status": "pending",
-                        "driver_amount": driver_amount,
-                    },
-                )
-
-                if not created:
-                    leg.driver = driver
-
-                if leg.status == "pending":
-                    leg.status = "assigned"
-
+                order.save(update_fields=["pickup_driver", "cost_driver_pickup"])
+                leg.driver = actor
                 leg.driver_amount = driver_amount
-                leg.save(
-                    update_fields=[
-                        "driver",
-                        "status",
-                        "driver_amount",
-                    ]
-                )
-
+                leg.save(update_fields=["driver", "driver_amount"])
+                logger.info("BC1 livreur pro: assigné | order_id=%s | driver_id=%s | leg_id=%s", order.id, actor.id, leg.id)
                 result["driver_assigned"] = True
+
             else:
-                logger.warning(
-                    "BC1 livreur: aucun candidat | "
-                    "order_id=%s | raison=%s",
-                    order.id,
-                    reason or (
-                        "raison non renseignee par le moteur"
-                    ),
-                )
+                logger.warning("BC1 OPS fallback: aucun candidat | order_id=%s | leg_id=%s | reason=%s", order.id, leg.id, reason or "NO_MATCH")
+                result["driver_assigned"] = False
+
         except Exception:
-            logger.exception(
-                "BC1 livreur: EXCEPTION moteur d'affectation | "
-                "order_id=%s",
-                getattr(order, "id", None),
-            )
-    else:
-        result["driver_assigned"] = bool(
-            getattr(order, "pickup_driver_id", None)
-        )
-
-    # Les notifications ne sont envoyées que pour les ressources
-    # réellement affectées pendant cet appel. Une ressource déjà affectée
-    # ne doit pas recevoir une seconde notification.
-    try:
-        if assign_laundry and result["laundry_assigned"]:
-            _send_notif_pressing(order)
-
-        if assign_driver and result["driver_assigned"]:
-            _send_notif_mission(
-                order,
-                order.pickup_driver,
-            )
-    except Exception:
-        logger.exception(
-            "BC1 notification en echec | order_id=%s",
-            getattr(order, "id", None),
-        )
+            logger.exception("BC1 livreur: EXCEPTION moteur d'affectation | order_id=%s", getattr(order, "id", None))
 
     return result
 

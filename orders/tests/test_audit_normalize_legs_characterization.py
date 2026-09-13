@@ -54,11 +54,16 @@ def _make_order(phone, delivery_partner=None):
 
 
 class ViewsNormalizeOrderLegsDedupCharacterizationTests(TestCase):
-    def test_previous_driver_leg_is_canceled_when_order_reassigned_to_new_driver(self):
+    def test_previous_return_driver_leg_is_canceled_when_return_is_reassigned(self):
         driver_old = _make_driver("0700009201")
         driver_new = _make_driver("0700009202")
         order = _make_order("0700009010", delivery_partner=driver_old)
-        leg = DeliveryLeg.objects.create(order=order, leg_type="pickup", driver=driver_old, status="assigned")
+        leg = DeliveryLeg.objects.create(
+            order=order,
+            leg_type="return",
+            driver=driver_old,
+            status="assigned",
+        )
 
         order.delivery_partner = driver_new
         order.save(update_fields=["delivery_partner"])
@@ -68,8 +73,8 @@ class ViewsNormalizeOrderLegsDedupCharacterizationTests(TestCase):
         leg.refresh_from_db()
         self.assertEqual(
             leg.status, "canceled",
-            "le leg de l'ancien driver (non paye) doit etre annule quand la "
-            "commande est reassignee a un nouveau driver",
+            "le leg RETURN de l'ancien driver (non paye) doit etre annule "
+            "quand le RETURN est reassigne a un nouveau driver",
         )
 
     def test_paid_leg_is_never_canceled_even_if_wrong_driver(self):

@@ -171,12 +171,20 @@ if TESTING:
 elif DATABASE_URL:
     # PythonAnywhere / Prod (MySQL) ou override local via DATABASE_URL
     is_sqlite_url = DATABASE_URL.startswith("sqlite:")
+
+    # SSL requis pour les bases distantes, mais pas pour MariaDB locale.
+    is_local_db_url = (
+        "://127.0.0.1:" in DATABASE_URL
+        or "://localhost:" in DATABASE_URL
+    )
+
     DATABASES = {
         "default": dj_database_url.parse(
             DATABASE_URL,
             conn_max_age=0,
             ssl_require=(
                 not is_sqlite_url
+                and not is_local_db_url
                 and os.getenv("DB_SSL_REQUIRE", "1") == "1"
             ),
         )

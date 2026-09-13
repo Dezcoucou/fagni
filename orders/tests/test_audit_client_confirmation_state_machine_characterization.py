@@ -143,8 +143,11 @@ class DoubleConfirmationIdempotentTests(TestCase):
             self.assertFalse(order.is_draft)
             _confirm(client, order)
 
+        # La confirmation commerciale ne matérialise que le pickup.
+        # Le return est créé ultérieurement par le bootstrap logistique
+        # lorsque la commande atteint l'étape métier appropriée.
         self.assertEqual(DeliveryLeg.objects.filter(order=order, leg_type="pickup").count(), 1)
-        self.assertEqual(DeliveryLeg.objects.filter(order=order, leg_type="return").count(), 1)
+        self.assertEqual(DeliveryLeg.objects.filter(order=order, leg_type="return").count(), 0)
 
 
 class NoNewLegsAfterLockTests(TestCase):

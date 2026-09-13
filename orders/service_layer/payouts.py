@@ -56,23 +56,37 @@ def trigger_driver_payout_for_leg(leg):
     # commande - UNIQUEMENT celui correspondant au type de la jambe. Une
     # jambe pickup ne doit jamais etre payee via order.delivery_partner
     # (livreur retour), et inversement.
+    # Pour Crowd : utiliser leg.cotransporter
     if order and not driver:
-        leg_type = (getattr(leg, "leg_type", "") or "").strip().lower()
-        try:
-            if leg_type == "pickup":
-                driver = getattr(order, "pickup_driver", None)
-            elif leg_type == "return":
-                driver = getattr(order, "delivery_partner", None)
-            else:
+        # Vérifier si c'est une jambe Crowd
+        actor_type = getattr(leg, "actor_type", "")
+        if actor_type == "cotransporter":
+            # Pour Crowd, on n'utilise pas le fallback order.pickup_driver
+            # On garde driver = None et on gérera le wallet cotransporteur plus bas
+            pass
+        else:
+            leg_type = (getattr(leg, "leg_type", "") or "").strip().lower()
+            try:
+                if leg_type == "pickup":
+                    driver = getattr(order, "pickup_driver", None)
+                elif leg_type == "return":
+                    driver = getattr(order, "delivery_partner", None)
+                else:
+                    driver = None
+            except Exception:
                 driver = None
-        except Exception:
-            driver = None
 
-    if not order or not driver:
+    # Pour Crowd, on accepte cotransporter à la place de driver
+    actor_type = getattr(leg, "actor_type", "professional")
+    has_actor = bool(driver) or (actor_type == "cotransporter" and getattr(leg, "cotransporter_id", None))
+
+    if not order or not has_actor:
         _dbg(
-            "SKIP: missing order/driver",
+            "SKIP: missing order/actor",
             "order?", bool(order),
             "driver?", bool(driver),
+            "cotransporter?", getattr(leg, "cotransporter_id", None),
+            "actor_type=", actor_type,
             "order.delivery_partner_id=", getattr(order, "delivery_partner_id", None) if order else None,
             "leg.driver_id=", getattr(leg, "driver_id", None),
         )
@@ -120,7 +134,17 @@ def trigger_driver_payout_for_leg(leg):
     from wallets.services import get_or_create_wallet_for_delivery_partner, credit_wallet
     from wallets.models import WalletTransaction
 
-    wallet = get_or_create_wallet_for_delivery_partner(driver)
+    # Déterminer le wallet selon le type d'acteur
+    actor_type = getattr(leg, "actor_type", "professional")
+    if actor_type == "cotransporter":
+        from crowd.wallets import get_or_create_wallet_for_cotransporter
+        cotransporter = getattr(leg, "cotransporter", None)
+        wallet = get_or_create_wallet_for_cotransporter(cotransporter)
+        if not wallet:
+            _dbg("SKIP: no wallet for cotransporter")
+            return None
+    else:
+        wallet = get_or_create_wallet_for_delivery_partner(driver)
 
     # Anti-doublon dur (par jambe) - verrou DB pour serialiser les appels concurrents
     from orders.models import DeliveryLeg

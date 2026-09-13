@@ -15,6 +15,8 @@ def canonical_leg_status(leg) -> str:
         return "assigned"
 
     if raw == "pending" and driver_id:
+        if getattr(leg, "leg_type", None) == "return":
+            return "pending"
         return "assigned"
 
     return "pending"

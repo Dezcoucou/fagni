@@ -2349,74 +2349,6 @@ def ops_update_step(request, order_id, action):
     return redirect(f"{reverse('orders:ops_dashboard')}?highlight={order.id}")
 
 
-def _ensure_delivery_legs_for_order(order):
-    """
-    Crée les legs pickup/return si la commande est en mode livraison et n'a aucun leg.
-    Idempotent.
-
-    - Crée 2 legs (pickup + return) en status="pending"
-    - Remplit client_fee_share / driver_amount / fagni_margin (NOT NULL)
-    - Pas de payout rétro (on ne met jamais done)
-    """
-    from decimal import Decimal, ROUND_HALF_UP
-    from orders.models import DeliveryLeg
-
-    def _round_fcfa(v):
-        if v is None:
-            v = Decimal("0")
-        if not isinstance(v, Decimal):
-            v = Decimal(str(v))
-        # FCFA arrondi à l'entier (stocké en decimal(10,2))
-        return v.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-
-    delivery_fee = Decimal(str(getattr(order, "delivery_fee", 0) or 0))
-    delivery_mode = getattr(order, "delivery_mode", None)
-    amount_driver = Decimal(str(getattr(order, "amount_driver_partner", 0) or 0))
-    margin_total = Decimal(str(getattr(order, "logistic_margin", 0) or 0))
-
-    is_delivery = (
-        bool(getattr(order, "delivery_partner_id", None))
-        or delivery_fee > 0
-        or (delivery_mode not in (None, "", "none"))
-        or amount_driver > 0
-    )
-    if not is_delivery:
-        return 0
-
-    # idempotent
-    if DeliveryLeg.objects.filter(order=order).exists():
-        return 0
-
-    driver = getattr(order, "delivery_partner", None)
-
-    client_1 = _round_fcfa(delivery_fee / 2)
-    client_2 = _round_fcfa(delivery_fee - client_1)
-
-    driver_1 = _round_fcfa(amount_driver / 2)
-    driver_2 = _round_fcfa(amount_driver - driver_1)
-
-    margin_1 = _round_fcfa(margin_total / 2)
-    margin_2 = _round_fcfa(margin_total - margin_1)
-
-    DeliveryLeg.objects.create(
-        order=order,
-        leg_type="pickup",
-        status="pending",
-        driver=driver,
-        client_fee_share=client_1,
-        driver_amount=driver_1,
-        fagni_margin=margin_1,
-    )
-    DeliveryLeg.objects.create(
-        order=order,
-        leg_type="return",
-        status="pending",
-        driver=driver,
-        client_fee_share=client_2,
-        driver_amount=driver_2,
-        fagni_margin=margin_2,
-    )
-    return 2
 
 
 @login_required
@@ -2486,15 +2418,6 @@ def order_mark_paid(request, order_id):
         return redirect("orders:detail", order_id=order.id)
 
     from decimal import Decimal
-
-    # ✅ SAFETY: si la commande est en mode livraison et qu'elle n'a pas de legs, on les crée (idempotent)
-    try:
-        created = _ensure_delivery_legs_for_order(order)
-        if created:
-            messages.info(request, f"Legs logistiques créés automatiquement ({created}) pour cette commande.")
-    except Exception as e:
-        messages.warning(request, f"Attention: impossible d'initialiser les legs logistiques: {e}")
-
 
     # 1) Paiement via source-of-truth (Payment + sync)
     try:
@@ -5488,19 +5411,6 @@ def client_new_order(request):
                 order_kwargs["delivery_place_id"] = pickup_place_id
 
             order = Order.objects.create(**order_kwargs)
-
-            from orders.models import DeliveryLeg
-
-            DeliveryLeg.objects.get_or_create(
-                order=order,
-                leg_type="pickup",
-                defaults={"status": "pending"},
-            )
-            DeliveryLeg.objects.get_or_create(
-                order=order,
-                leg_type="return",
-                defaults={"status": "pending"},
-            )
 
             try:
                 order.update_financials(save=True)
@@ -8801,21 +8711,41 @@ def normalize_order_legs(order, driver=None):
     if not order:
         return
 
-    assigned = getattr(order, "delivery_partner", None)
+    pickup_driver = getattr(order, "pickup_driver", None)
+    return_driver = getattr(order, "delivery_partner", None)
 
-    # driver cible (si driver passé, on normalise sur l'assignation quand elle existe)
-    target_driver = assigned or driver
+    # Le driver cible dépend du type de jambe :
+    # - pickup  -> order.pickup_driver
+    # - return  -> order.delivery_partner
+    # Le fallback `driver` reste disponible pour les appels legacy ciblés.
+    target_driver = return_driver or driver
 
     with transaction.atomic():
-        # 1) Annuler les legs "actifs" des autres drivers (si commande assignée)
-        if assigned:
+        # 1) Annuler uniquement les anciennes affectations qui
+        #    entrent réellement en conflit avec l'autorité de leur leg.
+        #
+        #    IMPORTANT :
+        #    pickup_driver != delivery_partner est un état métier valide.
+        #    Un return assigné à B ne doit donc jamais annuler un pickup
+        #    légitimement assigné à A.
+        for leg_type, expected_driver in (
+            ("pickup", pickup_driver),
+            ("return", return_driver),
+        ):
+            if not expected_driver:
+                continue
+
             other_active = (
                 DeliveryLeg.objects
                 .select_for_update()
-                .filter(order=order)
-                .exclude(driver=assigned)
+                .filter(
+                    order=order,
+                    leg_type=leg_type,
+                )
+                .exclude(driver=expected_driver)
                 .exclude(status__in=["done", "canceled"])
             )
+
             # 🔒 Ne jamais annuler un leg déjà payé (payout existe)
             try:
                 from wallets.models import WalletTransaction
@@ -8876,138 +8806,6 @@ def normalize_order_legs(order, driver=None):
         pass
 
 
-def ensure_default_driver_legs(order, driver):
-    """
-    SAFE helper pour la vue livreur :
-    - normalise les legs (anti-doublons, 1 driver actif)
-    - ne fait un sync "models" QUE si aucun leg actif n'existe (legacy)
-    - si un type manque (pickup/return), crée UNIQUEMENT le leg manquant
-      sans toucher aux statuts déjà en cours.
-    """
-    from decimal import Decimal, ROUND_HALF_UP
-    from orders.models import DeliveryLeg
-
-    if not order or not driver:
-        return DeliveryLeg.objects.none()
-
-    # 🔒 0) Normalisation globale (évite doublons et multi-drivers actifs)
-    try:
-        normalize_order_legs(order, driver=driver)
-    except Exception:
-        import logging
-        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=8551")
-
-    # 🔒 Garde-fou : si commande assignée, on ne gère que le driver assigné
-    assigned = getattr(order, "delivery_partner", None)
-    if assigned and str(getattr(driver, "id", "")) != str(getattr(assigned, "id", "")):
-        return DeliveryLeg.objects.filter(order=order, driver=driver).exclude(status="canceled").order_by("id")
-
-    # Legs actuels (actifs)
-    qs = DeliveryLeg.objects.filter(order=order, driver=driver).exclude(status="canceled").order_by("id")
-
-    # ✅ Legacy : si aucun leg actif du tout, on peut resync via models
-    if not qs.exists():
-        try:
-            from orders.models import sync_delivery_legs_for_order
-            sync_delivery_legs_for_order(order)
-        except Exception:
-            import logging
-            logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=8567")
-        qs = DeliveryLeg.objects.filter(order=order, driver=driver).exclude(status="canceled").order_by("id")
-
-    # Helper arrondi FCFA
-    def _round_fcfa(v):
-        if v is None:
-            return Decimal("0")
-        if not isinstance(v, Decimal):
-            v = Decimal(str(v))
-        return v.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-
-    # Si un type manque, on crée uniquement le leg manquant (sans resync global)
-    have_pickup = qs.filter(leg_type="pickup").exists()
-    have_return = qs.filter(leg_type="return").exists()
-
-    # Base status
-    if getattr(order, "status", None) == "done":
-        base_pickup = "done"
-        base_return = "done"
-    elif getattr(order, "status", None) == "in_progress":
-        base_pickup = "assigned"
-        # 🔒 IMPORTANT : return reste toujours pending jusqu'au "accept" du livreur
-        base_return = "pending"
-    else:
-        base_pickup = "pending"
-        base_return = "pending"
-
-    # Données financières (split 50/50) — fallback 0
-    delivery_fee = Decimal(str(getattr(order, "delivery_fee", 0) or 0))
-    driver_total = Decimal(str(getattr(order, "amount_driver_partner", 0) or 0))
-    margin_total = Decimal(str(getattr(order, "logistic_margin", 0) or 0))
-
-    client_share_1 = _round_fcfa(delivery_fee / 2)
-    client_share_2 = _round_fcfa(delivery_fee - client_share_1)
-
-    driver_share_1 = _round_fcfa(driver_total / 2)
-    driver_share_2 = _round_fcfa(driver_total - driver_share_1)
-
-    margin_share_1 = _round_fcfa(margin_total / 2)
-    margin_share_2 = _round_fcfa(margin_total - margin_share_1)
-
-    # Distance (si connue)
-    distance_total = getattr(order, "distance_km", None) or getattr(order, "distance_km_total", None) or 0
-    try:
-        distance_total = Decimal(str(distance_total or 0))
-    except Exception:
-        distance_total = Decimal("0")
-    distance_one_way = None
-    if distance_total > 0:
-        distance_one_way = (distance_total / Decimal("2")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-    # Création du leg manquant seulement
-    try:
-        if not have_pickup:
-            DeliveryLeg.objects.create(
-                order=order,
-                driver=driver,
-                leg_type="pickup",
-                status=base_pickup,
-                distance_km=float(distance_one_way) if distance_one_way is not None else None,
-                client_fee_share=client_share_1,
-                driver_amount=driver_share_1,
-                fagni_margin=margin_share_1,
-            )
-
-        if not have_return:
-            DeliveryLeg.objects.create(
-                order=order,
-                driver=driver,
-                leg_type="return",
-                status=base_return,
-                distance_km=float(distance_one_way) if distance_one_way is not None else None,
-                client_fee_share=client_share_2,
-                driver_amount=driver_share_2,
-                fagni_margin=margin_share_2,
-            )
-    except Exception:
-        import logging
-        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=8644")
-
-    # Re-load + ajuste return selon wash_complete_time (sans toucher done/canceled)
-    qs = DeliveryLeg.objects.filter(order=order, driver=driver).exclude(status="canceled").order_by("id")
-
-    try:
-        wash_ready = bool(getattr(order, "wash_complete_time", None))
-        r = qs.filter(leg_type="return").exclude(status__in=["done", "canceled"]).order_by("-id").first()
-        if r:
-            # ✅ IMPORTANT : pas d'auto-upgrade du return.
-            # Il reste pending jusqu'au "accept" du livreur.
-            pass
-        qs = DeliveryLeg.objects.filter(order=order, driver=driver).exclude(status="canceled").order_by("id")
-    except Exception:
-        import logging
-        logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=8658")
-
-    return qs
 
 
 @login_required
@@ -11685,7 +11483,7 @@ def update_leg_status(leg, action, user=None):
 
         pickup_leg = (
             DeliveryLeg.objects
-            .filter(order=order, driver=driver, leg_type="pickup")
+            .filter(order=order, leg_type="pickup")
             .exclude(status="canceled")
             .order_by("-id")
             .first()
@@ -11738,20 +11536,6 @@ def update_leg_status(leg, action, user=None):
             except Exception:
                 import logging
                 logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=11378")
-
-            # 2) Aligner driver sur pickup+return
-            try:
-                from orders.models import DeliveryLeg
-                order = getattr(leg, "order", None)
-                driver_id = getattr(getattr(leg, "driver", None), "id", None)
-                if order and driver_id:
-                    DeliveryLeg.objects.filter(
-                        order=order,
-                        leg_type__in=["pickup", "return"],
-                    ).update(driver_id=driver_id)
-            except Exception:
-                import logging
-                logging.getLogger("fagni.orders.views").exception("Exception silencieuse (auto-log) - fichier=orders/views.py ligne=11391")
 
             # 3) Réactiver return canceled non payé
             try:
@@ -13930,20 +13714,10 @@ def client_new_order_step4(request, order_id: int):
                 order_id=order.id,
             )
 
-        # Les ressources logistiques ne sont créées qu'après
-        # finalisation commerciale réussie.
-        from orders.models import DeliveryLeg
+        # Matérialisation logistique canonique après finalisation commerciale.
+        from orders.services import bootstrap_delivery_legs_for_order
 
-        DeliveryLeg.objects.get_or_create(
-            order=order,
-            leg_type="pickup",
-            defaults={"status": "pending"},
-        )
-        DeliveryLeg.objects.get_or_create(
-            order=order,
-            leg_type="return",
-            defaults={"status": "pending"},
-        )
+        bootstrap_delivery_legs_for_order(order)
 
         try:
             order.update_financials(save=True)

@@ -164,6 +164,21 @@ def accept_crowd_offer(leg, cotransporter) -> Tuple[bool, str]:
         
         if leg_locked.assignment_source != "crowd":
             return (False, "WRONG_ACTOR")
+
+        # Garde métier du retour :
+        # - le pickup doit être terminé avant toute acceptation du retour ;
+        # - le linge doit être prêt avant toute acceptation du retour.
+        if leg_locked.leg_type == "return":
+            pickup_done = DeliveryLeg.objects.filter(
+                order=leg_locked.order,
+                leg_type="pickup",
+                status="done",
+            ).exists()
+            if not pickup_done:
+                return (False, "PICKUP_NOT_DONE")
+
+            if not leg_locked.order.wash_complete_time:
+                return (False, "WASH_NOT_READY")
         
         # Assignation
         settings = CrowdSettings.get_solo()

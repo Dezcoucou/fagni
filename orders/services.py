@@ -3,6 +3,31 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.db.models import Sum
 
 
+def bootstrap_delivery_legs_for_order(order):
+    """
+    Matérialise les jambes logistiques initiales d'une commande commerciale.
+
+    Contrat :
+    - la commande doit être persistée ;
+    - utilise exclusivement le moteur canonique
+      sync_delivery_legs_for_order() ;
+    - ne contient aucune logique de pricing ou d'affectation ;
+    - reste idempotent ;
+    - le moteur canonique décide si la jambe retour doit exister.
+    """
+    if order is None or order.pk is None:
+        raise ValueError(
+            "Une commande persistée est requise pour "
+            "initialiser les jambes logistiques."
+        )
+
+    from orders.models import sync_delivery_legs_for_order
+
+    sync_delivery_legs_for_order(order)
+
+    return order.legs.all().order_by("id")
+
+
 def recompute_order_pricing_for_laundry_partner(order, partner) -> bool:
     """
     Sprint P0, Wave 3 (BC1). Extrait tel quel (aucune formule/pourcentage

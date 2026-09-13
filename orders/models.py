@@ -189,11 +189,13 @@ def sync_delivery_legs_for_order(order):
                     leg.save(update_fields=["status", "client_fee_share", "driver_amount", "fagni_margin"])
 
     # RÈGLE (STRICTE) :
-    # - la jambe "return" reste PENDING tant que la collecte (pickup) n'est pas DONE
-    # - dès que pickup est DONE, "return" peut passer ASSIGNED si la commande est en cours (in_progress)
+    # - la jambe "return" reste PENDING jusqu'à son acceptation explicite ;
+    # - pickup DONE n'entraîne jamais automatiquement l'assignation du return ;
+    # - pickup_done reste utilisé uniquement par la règle de rétrogradation
+    #   exceptionnelle d'un return ASSIGNED vers PENDING tant que le pickup n'est pas DONE.
     pickup_leg = existing_by_type.get("pickup")
     pickup_done = bool(pickup_leg and (getattr(pickup_leg, "status", None) or "").lower() == "done")
-    base_status_return = "done" if st == "done" else ("assigned" if pickup_done else "pending")
+    base_status_return = "done" if st == "done" else "pending"
 
     for leg_type, client_part, driver_part, margin_part in legs_data:
         leg = existing_by_type.get(leg_type)

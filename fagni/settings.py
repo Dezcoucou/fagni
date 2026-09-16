@@ -173,10 +173,14 @@ elif DATABASE_URL:
     is_sqlite_url = DATABASE_URL.startswith("sqlite:")
 
     # SSL requis pour les bases distantes, mais pas pour MariaDB locale.
-    is_local_db_url = (
-        "://127.0.0.1:" in DATABASE_URL
-        or "://localhost:" in DATABASE_URL
+    # Parse d'abord l'URL afin de déterminer le véritable hôte de la base.
+    parsed_db_url = dj_database_url.parse(
+        DATABASE_URL,
+        conn_max_age=0,
     )
+    parsed_db_host = (parsed_db_url.get("HOST") or "").strip().lower()
+
+    is_local_db_url = parsed_db_host in {"127.0.0.1", "localhost", "::1"}
 
     DATABASES = {
         "default": dj_database_url.parse(
@@ -196,6 +200,13 @@ elif DATABASE_URL:
 
     if engine.endswith("mysql"):
         DATABASES["default"].setdefault("OPTIONS", {})
+
+        # MySQL/MariaDB n'utilise pas l'option PostgreSQL "sslmode".
+        # dj_database_url peut l'ajouter lors du parsing d'une URL distante.
+        # Pour une base locale, on la supprime explicitement.
+        if is_local_db_url:
+            DATABASES["default"]["OPTIONS"].pop("sslmode", None)
+
         DATABASES["default"]["OPTIONS"]["init_command"] = (
             "SET sql_mode='STRICT_TRANS_TABLES', NAMES 'utf8mb4'"
         )

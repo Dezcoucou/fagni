@@ -822,6 +822,250 @@ def ops_mark_paid(request, order_id):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+def ops_confirm_declared_wave(request, order_id):
+    """
+    POST /api/ops/orders/<id>/confirm-declared-wave/
+
+    Confirmation manuelle d'un paiement Wave déclaré par le client.
+
+    Cette route est volontairement séparée de ops_mark_paid():
+    - ops_mark_paid() reste réservé au CASH ;
+    - Wave passe exclusivement par ce workflow de vérification humaine ;
+    - le paiement comptable est créé via apply_order_payment().
+    """
+    try:
+        _check_ops(request)
+    except Exception:
+        return Response({'error': 'Non autorise'}, status=401)
+
+    from decimal import Decimal
+    from django.db import transaction
+    from orders.models import Order, log_event
+    from orders.views import build_order_finance_summary, apply_order_payment
+
+    verified_reference = (
+        request.data.get('verified_wave_reference') or ''
+    ).strip()
+
+    human_confirmation = (
+        request.data.get('wave_human_verified') or ''
+    ).strip().lower()
+
+    if not verified_reference:
+        return Response(
+            {
+                'error': 'verified_wave_reference_required',
+                'message': 'La référence Wave vérifiée est obligatoire.',
+            },
+            status=400,
+        )
+
+    if human_confirmation not in {'1', 'true', 'on', 'yes'}:
+        return Response(
+            {
+                'error': 'human_confirmation_required',
+                'message': (
+                    'La confirmation humaine de la vérification Wave '
+                    'est obligatoire.'
+                ),
+            },
+            status=400,
+        )
+
+    try:
+        with transaction.atomic():
+            order = (
+                Order.objects
+                .select_for_update()
+                .select_related('customer')
+                .get(id=order_id)
+            )
+
+            if getattr(order, 'payment_status', '') == 'paid':
+                return Response(
+                    {
+                        'error': 'already_paid',
+                        'message': 'Cette commande est déjà payée.',
+                        'payment_status': order.payment_status,
+                    },
+                    status=400,
+                )
+
+            if getattr(order, 'payment_verification_status', '') != 'pending_review':
+                return Response(
+                    {
+                        'error': 'payment_not_pending_review',
+                        'message': (
+                            'Cette commande ne possède pas de paiement '
+                            'Wave en attente de vérification.'
+                        ),
+                        'payment_status': getattr(
+                            order, 'payment_status', ''
+                        ),
+                        'payment_verification_status': getattr(
+                            order, 'payment_verification_status', ''
+                        ),
+                    },
+                    status=400,
+                )
+
+            if getattr(order, 'payment_declared_channel', '') != 'wave':
+                return Response(
+                    {
+                        'error': 'not_wave_declaration',
+                        'message': (
+                            'La déclaration en attente n’est pas une '
+                            'déclaration Wave.'
+                        ),
+                    },
+                    status=400,
+                )
+
+            finance_summary = build_order_finance_summary(order)
+            total_ttc = Decimal(
+                str(finance_summary.get('total_client_ttc', 0) or 0)
+            )
+
+            if total_ttc <= 0:
+                return Response(
+                    {
+                        'error': 'invalid_order_amount',
+                        'message': (
+                            'Le montant TTC de la commande est invalide.'
+                        ),
+                    },
+                    status=400,
+                )
+
+            current_amount_paid = Decimal(
+                str(getattr(order, 'amount_paid', 0) or 0)
+            )
+
+            remaining = total_ttc - current_amount_paid
+            if remaining < 0:
+                remaining = Decimal('0')
+
+            payment_result = apply_order_payment(
+                order,
+                remaining,
+                channel='wave_manual_verified',
+                reference=verified_reference,
+                note=(
+                    'Paiement Wave vérifié manuellement par un opérateur '
+                    'FAGNI dans l’application Wave.'
+                ),
+            )
+
+            order.refresh_from_db()
+
+            if order.payment_status != 'paid':
+                return Response(
+                    {
+                        'error': 'payment_not_confirmed',
+                        'message': (
+                            'Le paiement Wave n’a pas permis de solder '
+                            'la commande.'
+                        ),
+                        'payment_status': order.payment_status,
+                        'amount_paid': float(
+                            order.amount_paid or 0
+                        ),
+                    },
+                    status=400,
+                )
+
+            now_dt = timezone.now()
+
+            update_fields = []
+
+            if getattr(order, 'payment_verification_status', '') != 'verified':
+                order.payment_verification_status = 'verified'
+                update_fields.append('payment_verification_status')
+
+            if not getattr(order, 'payment_date', None):
+                order.payment_date = now_dt
+                update_fields.append('payment_date')
+
+            if not getattr(order, 'payment_method', None):
+                order.payment_method = 'wave'
+                update_fields.append('payment_method')
+
+            if not getattr(order, 'payment_declared_at', None):
+                order.payment_declared_at = now_dt
+                update_fields.append('payment_declared_at')
+
+            if hasattr(order, 'payment_verified_at'):
+                order.payment_verified_at = now_dt
+                update_fields.append('payment_verified_at')
+
+            if update_fields:
+                order.save(update_fields=update_fields)
+
+            try:
+                log_event(
+                    'payment.paid',
+                    order=order,
+                    actor_type='ops',
+                    actor_id=None,
+                    channel='wave_manual_verified',
+                    reference=verified_reference,
+                )
+            except Exception:
+                logger.exception(
+                    'Echec silencieux: payment.paid Wave vérifié | '
+                    'order_id=%s',
+                    getattr(order, 'id', None),
+                )
+
+        return Response(
+            {
+                'success': True,
+                'order_id': order.id,
+                'order_code': order.code or str(order.id),
+                'payment_status': order.payment_status,
+                'payment_verification_status': (
+                    order.payment_verification_status
+                ),
+                'amount_paid': float(order.amount_paid or 0),
+                'verified_wave_reference': verified_reference,
+                'payment_result': {
+                    'applied': float(
+                        payment_result.get('applied', 0) or 0
+                    ),
+                    'already_applied': bool(
+                        payment_result.get('already_applied', False)
+                    ),
+                    'already_settled': bool(
+                        payment_result.get('already_settled', False)
+                    ),
+                },
+            }
+        )
+
+    except Order.DoesNotExist:
+        return Response(
+            {
+                'error': 'order_not_found',
+                'message': 'Commande introuvable.',
+            },
+            status=404,
+        )
+    except Exception as e:
+        logger.exception(
+            'Erreur confirmation Wave OPS | order_id=%s',
+            order_id,
+        )
+        return Response(
+            {
+                'error': 'wave_confirmation_failed',
+                'message': str(e),
+            },
+            status=400,
+        )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
 def ops_add_partner(request):
     """POST /api/ops/partners/add/ — {name, phone, city, address}"""
     try:

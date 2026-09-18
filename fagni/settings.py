@@ -594,6 +594,7 @@ REST_FRAMEWORK = {
 }
 
 CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
     "https://fagni-client.vercel.app",
     "https://fagni-client-ig3z5rdtk-dezcoucous-projects.vercel.app",
     "https://fagni-driver.vercel.app",

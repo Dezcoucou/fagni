@@ -684,6 +684,31 @@ def api_declare_wave_payment(request, order_id):
                 'la déclaration Wave a modifié amount_paid.'
             )
 
+    # Notification push OPS — paiement Wave déclaré
+    try:
+        from orders.models import FCMToken
+        from fagni.notifications import send_push
+
+        title = "💳 Paiement à vérifier"
+        body = (
+            f"{order.code or order.id} - "
+            f"paiement Wave déclaré par {customer.name}"
+        )
+
+        for t in FCMToken.objects.filter(user_type="ops"):
+            send_push(
+                t.token,
+                title,
+                body,
+                {
+                    "type": "ops_payment_declared",
+                    "order_id": order.id,
+                    "order_code": order.code or str(order.id),
+                },
+            )
+    except Exception as e:
+        logger.error(f"[NOTIF] ops payment declared: {e}")
+
     return Response(
         {
             'success': True,

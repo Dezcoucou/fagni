@@ -1,6 +1,7 @@
 from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -128,6 +129,56 @@ class ClientWavePaymentDeclarationApiTests(TestCase):
         )
         self.assertTrue(
             bool(self.order.payment_proof)
+        )
+
+    @patch("fagni.notifications.send_push")
+    def test_declaration_notifie_ops(self, mock_send_push):
+        from orders.models import FCMToken
+
+        FCMToken.objects.create(
+            token="TEST-OPS-FCM-TOKEN-001",
+            user_type="ops",
+            user_id=1,
+        )
+
+        response = self.declare(
+            reference="WAVE-NOTIF-001",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        mock_send_push.assert_called_once()
+
+        args, kwargs = mock_send_push.call_args
+
+        self.assertEqual(
+            args[0],
+            "TEST-OPS-FCM-TOKEN-001",
+        )
+        self.assertEqual(
+            args[1],
+            "💳 Paiement à vérifier",
+        )
+        self.assertIn(
+            self.order.code or str(self.order.id),
+            args[2],
+        )
+        self.assertIn(
+            self.customer.name,
+            args[2],
+        )
+
+        self.assertEqual(
+            args[3]["type"],
+            "ops_payment_declared",
+        )
+        self.assertEqual(
+            args[3]["order_id"],
+            self.order.id,
+        )
+        self.assertEqual(
+            args[3]["order_code"],
+            self.order.code or str(self.order.id),
         )
 
     def test_declaration_ne_cree_aucun_payment(self):

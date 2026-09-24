@@ -876,6 +876,15 @@ def _bc1_auto_assign_pickup_and_laundry(
 
                 result["laundry_assigned"] = True
                 result["pricing_recomputed"] = False
+
+                try:
+                    _send_notif_pressing(order)
+                except Exception:
+                    logger.exception(
+                        "BC1 pressing: notification en echec | order_id=%s | partner_id=%s",
+                        order.id,
+                        laundry.id,
+                    )
             else:
                 logger.warning(
                     "BC1 pressing: aucun candidat | order_id=%s | raison=%s",
@@ -920,6 +929,15 @@ def _bc1_auto_assign_pickup_and_laundry(
                 leg.save(update_fields=["driver", "driver_amount"])
                 logger.info("BC1 livreur pro: assigné | order_id=%s | driver_id=%s | leg_id=%s", order.id, actor.id, leg.id)
                 result["driver_assigned"] = True
+
+                try:
+                    _send_notif_mission(order, actor)
+                except Exception:
+                    logger.exception(
+                        "BC1 livreur pro: notification en echec | order_id=%s | driver_id=%s",
+                        order.id,
+                        actor.id,
+                    )
 
             else:
                 logger.warning("BC1 OPS fallback: aucun candidat | order_id=%s | leg_id=%s | reason=%s", order.id, leg.id, reason or "NO_MATCH")

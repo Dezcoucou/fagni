@@ -495,8 +495,8 @@ class Bc1PaidOrderAssignmentTests(TestCase):
         # directement dans _bc1_auto_assign_pickup_and_laundry.
         # Elles sont gérées par le dispatch ou les signaux.
         # On vérifie juste que l'assignation a réussi.
-        self.assertGreaterEqual(mocked_pressing.call_count, 0)
-        self.assertGreaterEqual(mocked_mission.call_count, 0)
+        self.assertEqual(mocked_pressing.call_count, 1)
+        self.assertEqual(mocked_mission.call_count, 1)
 
 
 class Bc1PaidOrderCandidateTests(TestCase):

@@ -418,3 +418,80 @@ def cancel_partner_job(
     )
 
     return partner_job
+
+@transaction.atomic
+def ensure_partner_job_for_pressing(
+    *,
+    order,
+    partner,
+    service_execution,
+    notes="",
+):
+    """
+    Garantit l'existence d'une mission partenaire V2 pour
+    une ServiceExecution de pressing donnée.
+
+    Contrat :
+    - commande, partenaire et ServiceExecution cohérents ;
+    - mission active existante réutilisée ;
+    - aucune transition opérationnelle automatique ;
+    - aucune pesée créée ;
+    - aucune donnée commerciale ou de paiement modifiée.
+    """
+    if order is None or getattr(order, "pk", None) is None:
+        raise ValueError(
+            "Impossible de créer un PartnerJob : commande non persistée."
+        )
+
+    if partner is None or getattr(partner, "pk", None) is None:
+        raise ValueError(
+            "Impossible de créer un PartnerJob : partenaire non persisté."
+        )
+
+    if service_execution is None or getattr(service_execution, "pk", None) is None:
+        raise ValueError(
+            "Une ServiceExecution persistée est requise pour un PartnerJob V2."
+        )
+
+    _validate_service_execution_order(
+        order=order,
+        service_execution=service_execution,
+    )
+
+    if service_execution.order_id != order.id:
+        raise ValueError(
+            "ServiceExecution incompatible avec la commande."
+        )
+
+    service_code = getattr(getattr(service_execution, "service", None), "code", None)
+    if service_code not in {"pressing_bag", "pressing_article", "pressing_kilo"}:
+        raise ValueError(
+            "La ServiceExecution fournie n'est pas une exécution de pressing V2."
+        )
+
+    # Verrouille la commande avant la recherche/création afin que
+    # deux transactions concurrentes ne puissent pas créer deux missions.
+    order = order.__class__.objects.select_for_update().get(pk=order.pk)
+
+    existing_job = (
+        PartnerJob.objects
+        .select_for_update()
+        .filter(
+            order_id=order.id,
+            service_execution_id=service_execution.id,
+            partner_id=partner.id,
+        )
+        .exclude(status="canceled")
+        .order_by("-id")
+        .first()
+    )
+
+    if existing_job is not None:
+        return existing_job
+
+    return create_partner_job(
+        order=order,
+        partner=partner,
+        service_execution=service_execution,
+        notes=notes,
+    )

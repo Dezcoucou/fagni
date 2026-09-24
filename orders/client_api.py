@@ -794,6 +794,8 @@ def _bc1_auto_assign_pickup_and_laundry(
     from orders.services import recompute_order_pricing_for_laundry_partner
     from orders.models import DeliveryLeg
     from orders.ops_api import _send_notif_pressing, _send_notif_mission
+    from production.services import ensure_partner_job_for_pressing
+    from services.models import ServiceExecution
 
     # Journalisation diagnostic (mission "auto-affectation ne trouve/assigne
     # aucun candidat en production") : pick_best_laundry/pick_best_driver
@@ -876,6 +878,42 @@ def _bc1_auto_assign_pickup_and_laundry(
 
                 result["laundry_assigned"] = True
                 result["pricing_recomputed"] = False
+
+                # V2 : créer la mission partenaire sans faire avancer
+                # son statut opérationnel.
+                try:
+                    pressing_execution = (
+                        ServiceExecution.objects
+                        .filter(
+                            order=order,
+                            service__code__in=(
+                                "pressing_bag",
+                                "pressing_article",
+                                "pressing_kilo",
+                            ),
+                        )
+                        .order_by("sequence_index", "id")
+                        .first()
+                    )
+
+                    if pressing_execution is None:
+                        raise ValueError(
+                            "Aucune ServiceExecution de pressing trouvée "
+                            f"pour la commande {order.id}."
+                        )
+
+                    ensure_partner_job_for_pressing(
+                        order=order,
+                        partner=laundry,
+                        service_execution=pressing_execution,
+                    )
+                except Exception:
+                    logger.exception(
+                        "BC1 pressing V2: création PartnerJob en échec | "
+                        "order_id=%s | partner_id=%s",
+                        order.id,
+                        laundry.id,
+                    )
 
                 try:
                     _send_notif_pressing(order)

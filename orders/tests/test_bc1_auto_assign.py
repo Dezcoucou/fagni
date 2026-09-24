@@ -458,6 +458,81 @@ class Bc1PaidOrderAssignmentTests(TestCase):
             1,
         )
 
+    def test_affectation_pressing_cree_partner_job_v2_en_attente(self):
+        from production.models import PartnerJob
+        from services.models import ServiceExecution
+
+        seed_catalog_v2()
+
+        customer = _make_customer("0700004011")
+        laundry = _make_laundry(
+            name="Pressing V2 Test",
+            phone="0700000011",
+        )
+
+        order = _make_direct_order(customer)
+        _record_full_payment(order)
+
+        # Le catalogue V2 doit déjà avoir matérialisé l'exécution
+        # commerciale de la commande avant BC1.
+        from services.services import materialize_service_executions_for_order
+
+        executions = materialize_service_executions_for_order(
+            order=order,
+        )
+
+        self.assertTrue(executions)
+
+        pressing_execution = (
+            ServiceExecution.objects
+            .filter(
+                order=order,
+                service__code__in=(
+                    "pressing_bag",
+                    "pressing_article",
+                    "pressing_kilo",
+                ),
+            )
+            .order_by("sequence_index", "id")
+            .first()
+        )
+
+        self.assertIsNotNone(pressing_execution)
+
+        with patch(
+            "orders.utils.distances.osrm_distance_km",
+            side_effect=_fake_osrm(),
+        ):
+            result = _bc1_auto_assign_pickup_and_laundry(
+                order,
+                assign_laundry=True,
+                assign_driver=False,
+            )
+
+        order.refresh_from_db()
+
+        self.assertTrue(result["laundry_assigned"])
+        self.assertEqual(order.laundry_partner_id, laundry.id)
+
+        jobs = PartnerJob.objects.filter(
+            order=order,
+            service_execution=pressing_execution,
+            partner=laundry,
+        )
+
+        self.assertEqual(jobs.count(), 1)
+
+        job = jobs.get()
+
+        self.assertEqual(
+            job.status,
+            "awaiting_reception",
+        )
+        self.assertIsNone(job.received_at)
+        self.assertIsNone(job.processing_started_at)
+        self.assertIsNone(job.ready_at)
+        self.assertIsNone(job.handed_over_at)
+
     def test_notifications_declenchees_apres_paiement_uniquement(self):
         customer = _make_customer()
         _make_laundry()

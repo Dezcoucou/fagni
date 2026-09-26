@@ -1500,11 +1500,67 @@ class ArticleConfigAdmin(admin.ModelAdmin):
 
 from orders.models import FCMToken
 
+
+@admin.action(description="Envoyer une notification FCM de test")
+def test_fcm_notification(modeladmin, request, queryset):
+    from fagni.notifications import notif_pressing_commande
+
+    sent = 0
+    failed = 0
+    skipped = 0
+
+    for fcm_token in queryset:
+        if fcm_token.user_type != "partner":
+            skipped += 1
+            continue
+
+        try:
+            success = notif_pressing_commande(
+                fcm_token.token,
+                "TEST-FCM",
+            )
+
+            if success:
+                sent += 1
+            else:
+                failed += 1
+
+        except Exception:
+            failed += 1
+            modeladmin.message_user(
+                request,
+                f"Erreur lors du test FCM pour le token #{fcm_token.id}.",
+                level=messages.ERROR,
+            )
+
+    if sent:
+        modeladmin.message_user(
+            request,
+            f"Notification FCM envoyée avec succès : {sent}.",
+            level=messages.SUCCESS,
+        )
+
+    if failed:
+        modeladmin.message_user(
+            request,
+            f"Échec d'envoi FCM : {failed}.",
+            level=messages.ERROR,
+        )
+
+    if skipped:
+        modeladmin.message_user(
+            request,
+            f"{skipped} token(s) ignoré(s) : seuls les tokens Pressing sont testables ici.",
+            level=messages.WARNING,
+        )
+
+
 @admin.register(FCMToken)
 class FCMTokenAdmin(admin.ModelAdmin):
     list_display = ['user_type', 'user_id', 'created_at', 'updated_at']
     list_filter = ['user_type']
     readonly_fields = ['created_at', 'updated_at']
+    actions = [test_fcm_notification]
 
 
 from orders.models import Abonnement, AbonnementPricingRule

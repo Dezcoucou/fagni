@@ -1,4 +1,5 @@
 """API Partenaire FAGNI — Blanchisserie"""
+from django.db import transaction
 import jwt
 from django.conf import settings
 from rest_framework.decorators import api_view, permission_classes
@@ -218,18 +219,246 @@ def partner_update_status(request, order_id):
     except Exception:
         return Response({'error': 'Commande non trouvée'}, status=404)
 
-    # Frontière d'autorité V2 :
-    # le pressing legacy ne pilote plus directement Order.status dès
-    # qu'une ServiceExecution canonique existe.
-    from services.services import order_uses_canonical_service_executions
+    # Autorité V2 :
+    # dès qu'une ServiceExecution canonique existe, le pressing ne
+    # modifie plus directement Order.status.
+    #
+    # Le pressing pilote son PartnerJob :
+    # received_bag -> received -> processing
+    # ready        -> ready
+    from services.services import (
+        order_uses_canonical_service_executions,
+        schedule_service_execution,
+        start_service_execution,
+    )
+    from services.models import ServiceExecution
+    from production.models import PartnerJob
+    from production.services import (
+        mark_partner_job_received,
+        mark_partner_job_processing,
+        mark_partner_job_ready,
+    )
+
     if order_uses_canonical_service_executions(order=order):
-        return Response({
-            'error': 'autorite_v2',
-            'message': (
-                'Le statut de cette commande est piloté par '
-                'ses ServiceExecution.'
-            ),
-        }, status=409)
+        with transaction.atomic():
+            raw_status = (request.data.get('status') or '').strip()
+
+            executions = list(
+                ServiceExecution.objects
+                .filter(order_id=order.id)
+                .order_by('sequence_index', 'id')
+            )
+
+            if not executions:
+                return Response({
+                    'error': 'execution_introuvable',
+                    'message': (
+                        'Aucune ServiceExecution canonique trouvée '
+                        'pour cette commande.'
+                    ),
+                }, status=409)
+
+            execution = next(
+                (
+                    item for item in executions
+                    if item.status in (
+                        ServiceExecution.STATUS_PENDING,
+                        ServiceExecution.STATUS_SCHEDULED,
+                        ServiceExecution.STATUS_IN_PROGRESS,
+                        ServiceExecution.STATUS_AWAITING_VALIDATION,
+                    )
+                ),
+                None,
+            )
+
+            if execution is None:
+                return Response({
+                    'error': 'execution_non_operable',
+                    'message': (
+                        'Aucune ServiceExecution opérationnelle trouvée '
+                        'pour cette commande.'
+                    ),
+                }, status=409)
+
+            partner_job = (
+                PartnerJob.objects
+                .select_for_update()
+                .filter(
+                    order_id=order.id,
+                    service_execution_id=execution.id,
+                    partner_id=partner.id,
+                )
+                .exclude(status='canceled')
+                .order_by('-id')
+                .first()
+            )
+
+            if partner_job is None:
+                return Response({
+                    'error': 'partner_job_introuvable',
+                    'message': (
+                        'Aucune mission partenaire V2 active ne correspond '
+                        'à cette exécution et à ce pressing.'
+                    ),
+                }, status=409)
+
+            try:
+                if raw_status in (
+                    'received',
+                    'received_bag',
+                    'bag_received',
+                    'recu',
+                    'reçu',
+                    'start',
+                ):
+                    if execution.status == ServiceExecution.STATUS_PENDING:
+                        schedule_service_execution(
+                            service_execution=execution,
+                            note='Sac reçu par le pressing.',
+                        )
+                        execution.refresh_from_db()
+
+                    if execution.status == ServiceExecution.STATUS_SCHEDULED:
+                        start_service_execution(
+                            service_execution=execution,
+                            note='Traitement pressing démarré après réception du sac.',
+                        )
+                        execution.refresh_from_db()
+
+                    if partner_job.status == 'awaiting_reception':
+                        mark_partner_job_received(
+                            partner_job=partner_job,
+                            notes='Sac reçu par le pressing.',
+                        )
+                        partner_job.refresh_from_db()
+
+                    if partner_job.status in {'received', 'weighed', 'confirmed'}:
+                        mark_partner_job_processing(
+                            partner_job=partner_job,
+                            notes='Traitement pressing démarré.',
+                        )
+                        partner_job.refresh_from_db()
+
+                    order.refresh_from_db()
+
+                    return Response({
+                        'success': True,
+                        'status': order.status,
+                        'execution_id': execution.id,
+                        'execution_status': execution.status,
+                        'partner_job_id': partner_job.id,
+                        'partner_job_status': partner_job.status,
+                        'code': order.code,
+                    })
+
+                if raw_status in ('ready',):
+                    # Le pressing ne peut declarer PRET que si la collecte est terminee.
+                    # Cette garde reprend la regle logistique historique sans retirer
+                    # l'autorite V2 du PartnerJob / ServiceExecution.
+                    from orders.models import DeliveryLeg
+                    pickup_done = DeliveryLeg.objects.filter(
+                        order=order,
+                        leg_type='pickup',
+                        status='done',
+                    ).exists()
+
+                    if not pickup_done:
+                        return Response({
+                            'error': 'pickup_non_termine',
+                            'message': "La collecte (DeliveryLeg pickup) n'est pas encore terminee.",
+                        }, status=409)
+
+                    if partner_job.status != 'ready':
+                        mark_partner_job_ready(
+                            partner_job=partner_job,
+                            notes='Commande prête au pressing.',
+                        )
+                        partner_job.refresh_from_db()
+
+                    # Pont de compatibilite V2 -> moteur retour existant :
+                    # PRET signifie que le linge est disponible pour le retour client.
+                    from django.utils import timezone
+                    from decimal import Decimal
+                    from orders.config_models import GlobalPricingSettings
+
+                    _driver_amount = Decimal(
+                        str(GlobalPricingSettings.get_solo().driver_amount_per_leg)
+                    )
+
+                    Order.objects.filter(pk=order.pk).update(
+                        wash_complete_time=timezone.now()
+                    )
+
+                    DeliveryLeg.objects.get_or_create(
+                        order=order,
+                        leg_type='return',
+                        defaults={
+                            'status': 'pending',
+                            'driver_amount': _driver_amount,
+                        },
+                    )
+
+                    # BC3 reste strictement optionnel et idempotent.
+                    if getattr(settings, "AUTO_ASSIGN_RETURN_DRIVER", False):
+                        try:
+                            order.refresh_from_db()
+                            _bc3_auto_assign_return_driver(order)
+                        except Exception:
+                            import logging
+                            logging.getLogger("fagni.orders.partner_api").exception(
+                                "BC3 auto-affectation retour en echec | order_id=%s",
+                                order.id,
+                            )
+
+                    order.refresh_from_db()
+
+                    # Notification client : meme comportement fonctionnel que V1.
+                    try:
+                        from fagni.notifications import notif_client_pret
+                        from orders.models import FCMToken
+
+                        customer = getattr(order, 'customer', None)
+                        if customer:
+                            t = FCMToken.objects.filter(
+                                user_type='client',
+                                user_id=customer.id,
+                            ).first()
+                            if t:
+                                notif_client_pret(
+                                    t.token,
+                                    order.code or str(order.id),
+                                )
+                    except Exception:
+                        import logging
+                        logging.getLogger("fagni.orders.partner_api").exception(
+                            "Exception silencieuse (auto-log) - V2 notification client pret | order_id=%s",
+                            order.id,
+                        )
+
+                    return Response({
+                        'success': True,
+                        'status': order.status,
+                        'execution_id': execution.id,
+                        'execution_status': execution.status,
+                        'partner_job_id': partner_job.id,
+                        'partner_job_status': partner_job.status,
+                        'code': order.code,
+                    })
+
+                return Response({
+                    'error': 'statut_v2_non_autorise',
+                    'message': (
+                        'Cette commande est pilotée par ServiceExecution. '
+                        'Utilisez le parcours V2 du pressing.'
+                    ),
+                }, status=409)
+
+            except ValueError as exc:
+                return Response({
+                    'error': 'transition_v2_echec',
+                    'message': str(exc),
+                }, status=409)
+
 
     raw_status = request.data.get('status', '').strip()
     STATUS_MAP = {

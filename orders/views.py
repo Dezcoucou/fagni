@@ -11761,7 +11761,7 @@ def driver_leg_action(request, leg_id, action):
 
     # 🔐 Actions autorisées (garde-fou param)
     action = (action or "").lower().strip()
-    if action not in {"accept", "start", "finish", "cancel"}:
+    if action not in {"accept", "start", "finish", "handover", "cancel"}:
         messages.error(request, "Action inconnue.")
         return _driver_flow_redirect()
 
@@ -11796,6 +11796,96 @@ def driver_leg_action(request, leg_id, action):
                 messages.error(request, "Retour impossible : la collecte (pickup) n'est pas terminée.")
                 return _driver_flow_redirect()
 
+        # 🔐 V2 HANDOVER : remise du sac au livreur
+        # Le livreur ne termine pas directement le PartnerJob.
+        # Il effectue ici la transition métier READY → HANDED_OVER.
+        if (
+            action == "handover"
+            and (leg.leg_type or "").strip() == "return"
+        ):
+            from django.db import transaction
+            from production.models import PartnerJob
+            from production.services import handover_partner_job
+            from services.models import ServiceExecution
+
+            partner = getattr(order, "laundry_partner", None)
+
+            if partner is None:
+                messages.error(
+                    request,
+                    "Remise impossible : blanchisserie introuvable."
+                )
+                return _driver_flow_redirect()
+
+            try:
+                with transaction.atomic():
+                    pressing_execution = (
+                        ServiceExecution.objects
+                        .filter(
+                            order_id=order.id,
+                            service__code__in=[
+                                "pressing_bag",
+                                "pressing_article",
+                                "pressing_kilo",
+                            ],
+                        )
+                        .order_by("sequence_index", "id")
+                        .first()
+                    )
+
+                    partner_job = None
+
+                    if pressing_execution is not None:
+                        partner_job = (
+                            PartnerJob.objects
+                            .select_for_update()
+                            .filter(
+                                order_id=order.id,
+                                partner_id=partner.id,
+                                service_execution_id=pressing_execution.id,
+                            )
+                            .exclude(status="canceled")
+                            .first()
+                        )
+
+                    if partner_job is None:
+                        messages.error(
+                            request,
+                            "Remise impossible : aucune tâche blanchisserie active."
+                        )
+                        return _driver_flow_redirect()
+
+                    if (partner_job.status or "").strip() != "ready":
+                        messages.error(
+                            request,
+                            "Remise impossible : le sac n'est pas encore prêt."
+                        )
+                        return _driver_flow_redirect()
+
+                    handover_partner_job(
+                        partner_job=partner_job,
+                        notes=f"Sac remis au livreur depuis la mission retour {leg.id}.",
+                    )
+
+                messages.success(
+                    request,
+                    "Sac récupéré auprès de la blanchisserie."
+                )
+                return _driver_flow_redirect()
+
+            except Exception:
+                logger.exception(
+                    "driver_leg_action: V2 handover failed "
+                    "(leg_id=%s order_id=%s)",
+                    leg_id,
+                    getattr(order, "id", None),
+                )
+                messages.error(
+                    request,
+                    "Impossible de confirmer la remise du sac. Réessaie."
+                )
+                return _driver_flow_redirect()
+
     except Exception:
         logger.exception("driver_leg_action: transition guard failed (leg_id=%s action=%s)", leg_id, action)
 
@@ -11813,7 +11903,6 @@ def driver_leg_action(request, leg_id, action):
                 has_order_proof = qs.filter(leg__isnull=True).exists()
 
                 if not (has_leg_proof or has_order_proof):
-                    from django.contrib import messages
                     messages.error(request, "Impossible de terminer : ajoute au moins une photo preuve (non-litige) avant de valider.")
 
                     from urllib.parse import quote
@@ -11859,7 +11948,6 @@ def driver_leg_action(request, leg_id, action):
         messages.error(request, "Erreur interne : action impossible pour le moment.")
         return _driver_flow_redirect()
 
-    from django.contrib import messages
     if changed:
         messages.success(request, msg)
     else:
@@ -14756,10 +14844,63 @@ def _build_driver_mission_context(request, driver, order=None):
         "accept": "✅ Accepter mission",
         "start": "🚀 Démarrer",
         "finish": "✅ Terminer mission",
+        "handover": "📦 Récupérer le sac",
     }
 
     next_action = None
     next_action_label = None
+
+    # 🔐 V2 : sur une mission retour, le livreur doit d'abord
+    # récupérer le sac auprès de la blanchisserie lorsque le
+    # PartnerJob est READY. On ne modifie pas le parcours pickup.
+    partner_job_status = None
+
+    if leg_type == "return" and st == "in_progress":
+        try:
+            from production.models import PartnerJob
+            from services.models import ServiceExecution
+
+            partner = getattr(current_order, "laundry_partner", None)
+
+            if partner is not None:
+                pressing_execution = (
+                    ServiceExecution.objects
+                    .filter(
+                        order_id=current_order.id,
+                        service__code__in=[
+                            "pressing_bag",
+                            "pressing_article",
+                            "pressing_kilo",
+                        ],
+                    )
+                    .order_by("sequence_index", "id")
+                    .first()
+                )
+
+                if pressing_execution is not None:
+                    partner_job = (
+                        PartnerJob.objects
+                        .filter(
+                            order_id=current_order.id,
+                            partner_id=partner.id,
+                            service_execution_id=pressing_execution.id,
+                        )
+                        .exclude(status="canceled")
+                        .first()
+                    )
+
+                    if partner_job is not None:
+                        partner_job_status = (
+                            getattr(partner_job, "status", "") or ""
+                        ).strip().lower()
+
+        except Exception:
+            logger.exception(
+                "_build_driver_mission_context: PartnerJob lookup failed "
+                "(order_id=%s leg_id=%s)",
+                getattr(current_order, "id", None),
+                getattr(leg, "id", None),
+            )
 
     if st == "pending":
         next_action = "accept"
@@ -14773,11 +14914,15 @@ def _build_driver_mission_context(request, driver, order=None):
             next_action_label = "🚀 Démarrer livraison"
 
     elif st == "in_progress":
-        next_action = "finish"
-        if leg_type == "pickup":
-            next_action_label = "✅ Collecte terminée"
+        if leg_type == "return" and partner_job_status == "ready":
+            next_action = "handover"
+            next_action_label = ACTION_LABELS["handover"]
         else:
-            next_action_label = "✅ Livraison terminée"
+            next_action = "finish"
+            if leg_type == "pickup":
+                next_action_label = "✅ Collecte terminée"
+            else:
+                next_action_label = "✅ Livraison terminée"
 
     if leg_type == "pickup":
         mission_type_label = "Collecte"

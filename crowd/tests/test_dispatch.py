@@ -9,7 +9,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from unittest.mock import patch
 
-from crowd.models import Cotransporter, CotransporterRoute, CrowdSettings
+from crowd.models import Cotransporter, CotransporterRoute, CrowdSettings, CrowdOfferAttempt
 from crowd.dispatch import dispatch_delivery_leg, accept_crowd_offer, reject_crowd_offer
 from orders.models import Order, Customer, DeliveryLeg
 from partners.models import DeliveryPartner
@@ -201,6 +201,44 @@ class DispatchTests(TestCase):
         leg.refresh_from_db()
         self.assertIsNone(leg.offered_at)
         self.assertEqual(leg.assignment_reason, "REJECTED")
+
+    def test_expired_offer_redispatches_to_second_cotransporter(self):
+        """Après expiration, une nouvelle offre est envoyée à un autre cotransporteur."""
+        first = self._make_cotransporter("crowd_expiry_a")
+        self._make_route(first)
+
+        order = self._make_order()
+        leg = self._make_leg(order)
+
+        actor, reason, mode = dispatch_delivery_leg(leg)
+        self.assertEqual(mode, "offered")
+        self.assertEqual(leg.offered_to_cotransporter_id, first.id)
+
+        # Le deuxième cotransporteur devient disponible après la première offre.
+        second = self._make_cotransporter("crowd_expiry_b")
+        self._make_route(second)
+
+        DeliveryLeg.objects.filter(pk=leg.pk).update(
+            offer_expires_at=timezone.now() - timedelta(seconds=10)
+        )
+        leg.refresh_from_db()
+
+        result = reject_crowd_offer(leg, reason="EXPIRED")
+        self.assertTrue(result)
+
+        leg.refresh_from_db()
+        self.assertEqual(leg.offered_to_cotransporter_id, second.id)
+        self.assertIsNotNone(leg.offered_at)
+        self.assertIsNotNone(leg.offer_expires_at)
+
+        first_attempt = CrowdOfferAttempt.objects.get(
+            leg=leg, cotransporter=first
+        )
+        second_attempt = CrowdOfferAttempt.objects.get(
+            leg=leg, cotransporter=second
+        )
+        self.assertEqual(first_attempt.status, "expired")
+        self.assertEqual(second_attempt.status, "offered")
 
     def test_concurrent_acceptance_prevented(self):
         """Deux tentatives d'acceptation → une seule réussit."""

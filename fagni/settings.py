@@ -597,6 +597,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "https://fagni-client.vercel.app",
     "https://fagni-client-ig3z5rdtk-dezcoucous-projects.vercel.app",
+    "https://fagni-client-git-main-clean-dezcoucous-projects.vercel.app",
     "https://fagni-driver.vercel.app",
     "https://fagni-partner.vercel.app",
     "https://fagni-ops.vercel.app",

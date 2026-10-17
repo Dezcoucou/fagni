@@ -1,7 +1,9 @@
 from django.urls import path
-from crowd import api, views
+from crowd import api, views, cron_views
 
 urlpatterns = [
+    path('cron/expire-offers/', cron_views.expire_crowd_offers, name='crowd-expire-offers'),
+
     # ── FRONTEND COTRANSPORTEUR ─────────────────────────
     path('login/', views.crowd_login, name='crowd-login'),
     path('dashboard/', views.crowd_dashboard, name='crowd-dashboard'),

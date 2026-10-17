@@ -30,7 +30,7 @@ import math
 from django.utils import timezone
 from django.db.models import Q
 
-from crowd.models import Cotransporter, CotransporterRoute, CrowdSettings
+from crowd.models import Cotransporter, CotransporterRoute, CrowdSettings, CrowdOfferAttempt
 
 
 def _haversine_km(lat1, lng1, lat2, lng2) -> Optional[float]:
@@ -248,11 +248,15 @@ def pick_best_cotransporter(leg) -> Tuple[Optional[Cotransporter], str]:
         leg_dest_lng = pickup_lng
 
     # 3. Trouver tous les cotransporteurs actifs et vérifiés
+    attempted_ids = CrowdOfferAttempt.objects.filter(
+        leg=leg
+    ).values_list("cotransporter_id", flat=True)
+
     cotransporters = Cotransporter.objects.filter(
         is_active=True,
         is_verified=True,
         score__gte=settings.crowd_min_score
-    )
+    ).exclude(id__in=attempted_ids)
 
     if not cotransporters.exists():
         return None, "NO_AVAILABLE"

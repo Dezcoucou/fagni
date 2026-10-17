@@ -3740,6 +3740,16 @@ class DeliveryLeg(models.Model):
         help_text="Rempli uniquement si actor_type='cotransporter'",
     )
 
+    offered_to_cotransporter = models.ForeignKey(
+        'crowd.Cotransporter',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="offered_delivery_legs",
+        verbose_name="Cotransporteur sollicité",
+        help_text="Cotransporteur auquel l'offre Crowd active est destinée",
+    )
+
     # ======================
     #  TRAÇABILITÉ ASSIGNATION
     # ======================

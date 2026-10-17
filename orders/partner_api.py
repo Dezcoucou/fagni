@@ -164,6 +164,8 @@ def partner_orders(request):
         return Response({'error': 'Non autorisé'}, status=401)
 
     from orders.models import Order
+    from services.models import ServiceExecution
+    from production.models import PartnerJob
     import re, ast
     status_filter = request.GET.get('status', '')
     qs = Order.objects.filter(laundry_partner=partner).order_by('-created_at')
@@ -180,18 +182,60 @@ def partner_orders(request):
 
     orders = []
     for o in qs[:50]:
+        pressing_executions = ServiceExecution.objects.filter(
+            order=o,
+            service__code__in=[
+                'pressing_bag',
+                'pressing_article',
+                'pressing_kilo',
+            ],
+        ).order_by('sequence_index', 'id')
+
+        operational_statuses = [
+            ServiceExecution.STATUS_PENDING,
+            ServiceExecution.STATUS_SCHEDULED,
+            ServiceExecution.STATUS_IN_PROGRESS,
+            ServiceExecution.STATUS_AWAITING_VALIDATION,
+        ]
+
+        execution = pressing_executions.filter(
+            status__in=operational_statuses,
+        ).first()
+
+        if execution is None:
+            execution = pressing_executions.first()
+
+        partner_job_status = None
+        if execution is not None:
+            partner_job = (
+                PartnerJob.objects
+                .filter(
+                    order=o,
+                    partner=partner,
+                    service_execution=execution,
+                )
+                .exclude(status='canceled')
+                .order_by('-id')
+                .first()
+            )
+            if partner_job is not None:
+                partner_job_status = partner_job.status
+
         orders.append({
-            'id':             o.id,
-            'code':           o.code or str(o.id),
-            'status':         o.status,
-            'payment_status': o.payment_status,
-            'service_type':   o.service_type or 'pressing',
-            'total':          float(o.total or 0),
-            'bag_size':       o.bag_size or '',
-            'created_at':     o.created_at.isoformat() if o.created_at else None,
-            'zone':           o.pickup_address.split(',')[0] if o.pickup_address else '—',
-            'articles_count': _count_articles(o),
-        'photos': _get_photos_from_notes(o.notes),
+            'id':                      o.id,
+            'code':                    o.code or str(o.id),
+            'status':                  o.status,
+            'payment_status':          o.payment_status,
+            'service_type':            o.service_type or 'pressing',
+            'total':                   float(o.total or 0),
+            'bag_size':                o.bag_size or '',
+            'created_at':              o.created_at.isoformat() if o.created_at else None,
+            'zone':                    o.pickup_address.split(',')[0] if o.pickup_address else '—',
+            'articles_count':          _count_articles(o),
+            'photos':                  _get_photos_from_notes(o.notes),
+            'service_execution_id':    execution.id if execution else None,
+            'service_execution_status': execution.status if execution else None,
+            'partner_job_status':      partner_job_status,
         })
 
     stats = {

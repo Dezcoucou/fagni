@@ -347,3 +347,50 @@ class CrowdSettings(SingletonModel):
     
     def __str__(self):
         return "Configuration Crowd FAGNI"
+
+class CrowdOfferAttempt(models.Model):
+    """Historique des cotransporteurs sollicités pour une mission."""
+
+    STATUS_CHOICES = [
+        ("offered", "Offre envoyée"),
+        ("accepted", "Acceptée"),
+        ("rejected", "Refusée"),
+        ("expired", "Expirée"),
+        ("cancelled", "Annulée"),
+    ]
+
+    leg = models.ForeignKey(
+        "orders.DeliveryLeg",
+        on_delete=models.CASCADE,
+        related_name="crowd_offer_attempts",
+        verbose_name="Mission",
+    )
+    cotransporter = models.ForeignKey(
+        Cotransporter,
+        on_delete=models.CASCADE,
+        related_name="offer_attempts",
+        verbose_name="Cotransporteur",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="offered",
+    )
+    offered_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+    reason = models.CharField(max_length=100, blank=True)
+
+    class Meta:
+        verbose_name = "Tentative d'offre Crowd"
+        verbose_name_plural = "Tentatives d'offres Crowd"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["leg", "cotransporter"],
+                name="unique_crowd_offer_per_leg_cotransporter",
+            ),
+        ]
+        ordering = ["offered_at"]
+
+    def __str__(self):
+        return f"Mission {self.leg_id} — cotransporteur {self.cotransporter_id} — {self.status}"

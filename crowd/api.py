@@ -75,6 +75,7 @@ def api_crowd_offers(request):
     offers = DeliveryLeg.objects.filter(
         status='pending',
         assignment_source='crowd',
+        offered_to_cotransporter=cotransporter,
         offered_at__isnull=False,
     ).filter(
         Q(offer_expires_at__isnull=True) | Q(offer_expires_at__gt=now)
@@ -163,7 +164,11 @@ def api_crowd_reject_offer(request, leg_id):
     except DeliveryLeg.DoesNotExist:
         return Response({'error': 'Offre non trouvée'}, status=404)
     
-    success = reject_crowd_offer(leg, reason="REJECTED_BY_COTRANSPORTER")
+    success = reject_crowd_offer(
+        leg,
+        reason="REJECTED_BY_COTRANSPORTER",
+        cotransporter=cotransporter,
+    )
     
     if success:
         return Response({

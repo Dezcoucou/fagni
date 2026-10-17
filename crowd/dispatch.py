@@ -20,7 +20,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 
-from crowd.models import CrowdSettings
+from crowd.models import CrowdSettings, CrowdOfferAttempt
 from crowd.matching import pick_best_cotransporter
 from orders.assignment import pick_best_driver
 from crowd.notifications import notify_cotransporter_of_offer
@@ -61,6 +61,7 @@ def dispatch_delivery_leg(leg) -> Tuple[Optional[object], str, str]:
                     
                     leg_locked.assignment_source = "crowd"
                     leg_locked.assignment_reason = reason
+                    leg_locked.offered_to_cotransporter = crowd
                     leg_locked.offered_at = timezone.now()
                     leg_locked.offer_expires_at = timezone.now() + timedelta(
                         seconds=settings.crowd_acceptance_timeout_seconds
@@ -68,9 +69,17 @@ def dispatch_delivery_leg(leg) -> Tuple[Optional[object], str, str]:
                     leg_locked.save(update_fields=[
                         "assignment_source",
                         "assignment_reason",
+                        "offered_to_cotransporter",
                         "offered_at",
                         "offer_expires_at",
                     ])
+
+                    CrowdOfferAttempt.objects.create(
+                        leg=leg_locked,
+                        cotransporter=crowd,
+                        status="offered",
+                        expires_at=leg_locked.offer_expires_at,
+                    )
                 
                 leg.refresh_from_db()
                 
@@ -165,6 +174,9 @@ def accept_crowd_offer(leg, cotransporter) -> Tuple[bool, str]:
         if leg_locked.assignment_source != "crowd":
             return (False, "WRONG_ACTOR")
 
+        if leg_locked.offered_to_cotransporter_id != cotransporter.id:
+            return (False, "WRONG_ACTOR")
+
         # Garde métier du retour :
         # - le pickup doit être terminé avant toute acceptation du retour ;
         # - le linge doit être prêt avant toute acceptation du retour.
@@ -189,45 +201,84 @@ def accept_crowd_offer(leg, cotransporter) -> Tuple[bool, str]:
         
         leg_locked.actor_type = "cotransporter"
         leg_locked.cotransporter = cotransporter
+        leg_locked.offered_to_cotransporter = None
         leg_locked.status = "assigned"
         leg_locked.accepted_at = timezone.now()
         leg_locked.driver_amount = amount
         leg_locked.save()
+
+        CrowdOfferAttempt.objects.filter(
+            leg=leg_locked,
+            cotransporter=cotransporter,
+            status="offered",
+        ).update(
+            status="accepted",
+            responded_at=timezone.now(),
+            reason="ACCEPTED",
+        )
+
         leg.refresh_from_db()
         
         return (True, "ACCEPTED")
 
 
-def reject_crowd_offer(leg, reason="REJECTED") -> bool:
-    """
-    Rejet ou expiration d'une offre Crowd.
-    
-    Args:
-        leg: DeliveryLeg avec offre en cours
-        reason: "REJECTED" | "EXPIRED" | "CANCELED"
-    
-    Returns:
-        True si rejeté, False si déjà traité
-    """
+def reject_crowd_offer(leg, reason="REJECTED", cotransporter=None) -> bool:
+    """Rejette ou expire une offre Crowd et historise la réponse."""
     from orders.models import DeliveryLeg
-    
+
+    should_redispatch = False
+
     with transaction.atomic():
         leg_locked = DeliveryLeg.objects.select_for_update().get(pk=leg.pk)
-        
-        if leg_locked.status not in ("pending",):
+
+        if leg_locked.status != "pending" or not leg_locked.offered_at:
             return False
-        
-        if not leg_locked.offered_at:
+
+        recipient_id = leg_locked.offered_to_cotransporter_id
+
+        if cotransporter is not None and recipient_id != cotransporter.id:
             return False
-        
-        # Réinitialiser l'offre
+
+        attempt_status = (
+            "expired" if reason == "EXPIRED"
+            else "cancelled" if reason in ("CANCELED", "CANCELLED")
+            else "rejected"
+        )
+
+        if recipient_id is not None:
+            CrowdOfferAttempt.objects.filter(
+                leg=leg_locked,
+                cotransporter_id=recipient_id,
+                status="offered",
+            ).update(
+                status=attempt_status,
+                responded_at=timezone.now(),
+                reason=reason,
+            )
+
         leg_locked.offered_at = None
         leg_locked.offer_expires_at = None
+        leg_locked.offered_to_cotransporter = None
         leg_locked.assignment_reason = reason
         leg_locked.save(update_fields=[
             "offered_at",
             "offer_expires_at",
+            "offered_to_cotransporter",
             "assignment_reason",
         ])
-        
-        return True
+
+        should_redispatch = reason in ("REJECTED", "REJECTED_BY_COTRANSPORTER", "EXPIRED")
+
+    if should_redispatch:
+        leg.refresh_from_db()
+        _, _, mode = dispatch_delivery_leg(leg)
+
+        # Si aucune affectation n'est possible, conserver le motif
+        # du rejet ou de l'expiration pour la traçabilité.
+        if mode == "ops":
+            type(leg).objects.filter(pk=leg.pk).update(
+                assignment_reason=reason
+            )
+            leg.refresh_from_db()
+
+    return True
